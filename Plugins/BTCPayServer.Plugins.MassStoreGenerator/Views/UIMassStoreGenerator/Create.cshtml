@@ -1,0 +1,96 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Plugins.MassStoreGenerator.Views
+@model BTCPayServer.Plugins.MassStoreGenerator.ViewModels.CreateStoreViewModel
+@{
+    ViewData.SetActivePage(PluginNavPages.Index, "Stores Generator");
+}
+<h1>@ViewData["Title"]</h1>
+
+<form method="post">
+    <div class="sticky-header-setup"></div>
+    <div class="sticky-header d-sm-flex align-items-center justify-content-between">
+        <h2 class="mb-0">Generated Stores</h2>
+        <div class="d-flex gap-3 mt-3 mt-sm-0">
+            <a asp-controller="UIMassStoreGenerator" asp-action="Index" class="btn btn-primary">Generated Stores List</a>
+        </div>
+    </div>
+</form>
+
+
+<div class="container mt-5">
+
+    <div class="d-flex justify-content-end mb-3">
+        <input type="submit" value="Create" class="btn btn-primary" id="Create Store(s)" />
+    </div>
+    <form id="input-form" method="post" asp-action="Create">
+
+        <div class="row g-1 align-items-center mb-3">
+            <div class="col"><strong>Store Name</strong></div>
+            <div class="col"><strong>Currency</strong></div>
+            <div class="col"><strong>Exchange</strong></div>
+        </div>
+
+        <div class="row g-1 align-items-center mb-3 storelist">
+            <div class="col">
+                <input name="model[0].Name" class="form-control w-300px" required />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            <div class="col">
+                <input name="model[0].DefaultCurrency" class="form-control w-300px" currency-selection />
+                <span asp-validation-for="DefaultCurrency" class="text-danger"></span>
+            </div>
+
+            <div class="col">
+                <select name="model[0].PreferredExchange" asp-items="Model.Exchanges" class="form-select w-300px"></select>
+                <span asp-validation-for="PreferredExchange" class="text-danger"></span>
+            </div>
+
+            <div class="col-auto">
+                <button type="button" class="btn btn-outline-danger btn-remove">
+                    <vc:icon symbol="minus" />
+                </button>
+            </div>
+        </div>
+
+        <div class="row g-1 align-items-center mb-3">
+            <div class="col">
+                <button type="button" class="btn btn-outline-primary btn-add">
+                    <vc:icon symbol="plus" />
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('input-form').addEventListener('click', function (e) {
+            if (e.target && e.target.closest('.btn-add')) {
+                e.preventDefault();
+
+                var currentEntry = document.querySelector('.storelist');
+                var newEntry = currentEntry.cloneNode(true);
+                newEntry.querySelectorAll('input').forEach(input => input.value = '');
+
+                var inputIndex = document.querySelectorAll('.storelist').length;
+                newEntry.querySelectorAll('input, select').forEach(function (input) {
+                    var name = input.getAttribute('name');
+                    if (name) {
+                        var newName = name.replace(/\[\d+\]/, '[' + inputIndex + ']');
+                        input.setAttribute('name', newName);
+                    }
+                });
+
+                document.getElementById('input-form').insertBefore(newEntry, document.querySelector('.btn-add').closest('.row'));
+            }
+
+            if (e.target && e.target.closest('.btn-remove')) {
+                e.preventDefault();
+                if (document.querySelectorAll('.storelist').length > 1) {
+                    e.target.closest('.storelist').remove();
+                }
+            }
+        });
+    });
+</script>

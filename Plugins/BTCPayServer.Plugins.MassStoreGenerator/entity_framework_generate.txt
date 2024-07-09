@@ -1,0 +1,1 @@
+﻿dotnet ef migrations add AddingTxnIdToPayrollInvoice -p Plugins/BTCPayServer.Plugins.MassStoreGenerator -c PayrollPluginDbContext -o Data/Migrations

@@ -16,7 +16,7 @@ namespace BTCPayServer.Plugins.MassStoreGenerator.ViewModels
         [Display(Name = "Default Currency")]
         public string DefaultCurrency { get; set; }
 
-        [Display(Name = "Preferred Price Source")]
+        [Display(Name = "Price Source")]
         public string PreferredExchange { get; set; }
 
         public SelectList Exchanges { get; set; }

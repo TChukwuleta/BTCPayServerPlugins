@@ -14,6 +14,9 @@ using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Plugins.MassStoreGenerator.Data;
 using BTCPayServer.Plugins.MassStoreGenerator.Services;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using BTCPayServer.Services.Rates;
+using BTCPayServer.Services;
 
 namespace BTCPayServer.Plugins.Template;
 
@@ -21,15 +24,18 @@ namespace BTCPayServer.Plugins.Template;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIMassStoreGeneratorController : Controller
 {
+    private readonly RateFetcher _rateFactory;
     private readonly StoreRepository _storeRepository;
     private readonly MassStoreGeneratorDbContextFactory _contextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
     public UIMassStoreGeneratorController
-        (StoreRepository storeRepository,
+        (RateFetcher rateFactory,
+        StoreRepository storeRepository,
         MassStoreGeneratorDbContextFactory contextFactory,
         UserManager<ApplicationUser> userManager)
     {
         _userManager = userManager;
+        _rateFactory = rateFactory;
         _contextFactory = contextFactory;
         _storeRepository = storeRepository;
     }
@@ -39,13 +45,19 @@ public class UIMassStoreGeneratorController : Controller
     // GET
     public async Task<IActionResult> Index()
     {
-        return View(new CreateStoreViewModel());
+        List<MassStoresViewModel> vm = new List<MassStoresViewModel>();
+        return View(vm);
     }
 
     [HttpGet("~/plugins/stores/create")]
-    public IActionResult Create()
+    public async Task<IActionResult> Create()
     {
-        return View(new CreateStoreViewModel());
+        CreateStoreViewModel vm = new CreateStoreViewModel
+        {
+            DefaultCurrency = StoreBlob.StandardDefaultCurrency,
+            Exchanges = GetExchangesSelectList(null)
+        };
+        return View(vm);
     }
 
     [HttpPost("~/plugins/stores/create")]
@@ -109,4 +121,15 @@ public class UIMassStoreGeneratorController : Controller
         return RedirectToAction(nameof(Index));
     }
     private string GetUserId() => _userManager.GetUserId(User);
+
+    private SelectList GetExchangesSelectList(string selected)
+    {
+        var exchanges = _rateFactory.RateProviderFactory
+            .AvailableRateProviders
+            .OrderBy(s => s.Id, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        exchanges.Insert(0, new(null, "Recommended", ""));
+        var chosen = exchanges.FirstOrDefault(f => f.Id == selected) ?? exchanges.First();
+        return new SelectList(exchanges, nameof(chosen.Id), nameof(chosen.DisplayName), chosen.Id);
+    }
 }
