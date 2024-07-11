@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc.Rendering;
+﻿using BTCPayServer.Plugins.MassStoreGenerator.Helper;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Newtonsoft.Json.Linq;
 using System.ComponentModel.DataAnnotations;
 
 namespace BTCPayServer.Plugins.MassStoreGenerator.ViewModels
@@ -17,8 +19,10 @@ namespace BTCPayServer.Plugins.MassStoreGenerator.ViewModels
         public string DefaultCurrency { get; set; }
 
         [Display(Name = "Price Source")]
+        public bool HasStoreCreationPermission { get; set; }
         public string PreferredExchange { get; set; }
 
         public SelectList Exchanges { get; set; }
+        public JObject RecommendedExchanges { get; set; } = StoreBlobHelper.RecommendedExchanges;
     }
 }

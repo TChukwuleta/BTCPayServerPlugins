@@ -10,13 +10,11 @@ using BTCPayServer.Data;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Identity;
 using System.Linq;
-using BTCPayServer.Abstractions.Extensions;
-using BTCPayServer.Abstractions.Models;
-using BTCPayServer.Plugins.MassStoreGenerator.Data;
-using BTCPayServer.Plugins.MassStoreGenerator.Services;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using BTCPayServer.Services.Rates;
-using BTCPayServer.Services;
+using Microsoft.Extensions.Logging;
+using BTCPayServer.Plugins.MassStoreGenerator.Helper;
+using BTCPayServer.Controllers;
 
 namespace BTCPayServer.Plugins.Template;
 
@@ -24,79 +22,49 @@ namespace BTCPayServer.Plugins.Template;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIMassStoreGeneratorController : Controller
 {
+    private readonly ILogger<UIMassStoreGeneratorController> _logger;
     private readonly RateFetcher _rateFactory;
     private readonly StoreRepository _storeRepository;
-    private readonly MassStoreGeneratorDbContextFactory _contextFactory;
+    private readonly IAuthorizationService _authorizationService;
     private readonly UserManager<ApplicationUser> _userManager;
     public UIMassStoreGeneratorController
         (RateFetcher rateFactory,
         StoreRepository storeRepository,
-        MassStoreGeneratorDbContextFactory contextFactory,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager, ILogger<UIMassStoreGeneratorController> logger, IAuthorizationService authorizationService)
     {
+        _logger = logger;
         _userManager = userManager;
         _rateFactory = rateFactory;
-        _contextFactory = contextFactory;
         _storeRepository = storeRepository;
+        _authorizationService = authorizationService;
     }
-
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
     // GET
     public async Task<IActionResult> Index()
     {
-        List<MassStoresViewModel> vm = new List<MassStoresViewModel>();
-        return View(vm);
-    }
+        if (CurrentStore is null)
+            return NotFound();
 
-    [HttpGet("~/plugins/stores/create")]
-    public async Task<IActionResult> Create()
-    {
+        var hasPermission = await _authorizationService.AuthorizeAsync(User, CurrentStore.Id, Policies.CanModifyStoreSettingsUnscoped);
         CreateStoreViewModel vm = new CreateStoreViewModel
         {
-            DefaultCurrency = StoreBlob.StandardDefaultCurrency,
+            HasStoreCreationPermission = hasPermission.Succeeded,
+            DefaultCurrency = StoreBlobHelper.StandardDefaultCurrency,
             Exchanges = GetExchangesSelectList(null)
         };
         return View(vm);
     }
 
-    [HttpPost("~/plugins/stores/create")]
 
+    [HttpPost("~/plugins/stores/create")]
     public async Task<IActionResult> Create(List<CreateStoreViewModel> model)
     {
         if (CurrentStore is null)
             return NotFound();
 
-        if (model.Any())
-        {
-            TempData.SetStatusMessageModel(new StatusMessageModel()
-            {
-                Message = $"Please enter store details to create",
-                Severity = StatusMessageModel.StatusSeverity.Error
-            });
-            return RedirectToAction(nameof(Index));
-        }
-
         string userId = GetUserId();
-        var stores = await _storeRepository.GetStoresByUserId(userId);
 
-        var storeDataNames = stores.Select(sd => sd.StoreName).ToList();
-        var createStoreNames = model.Select(csm => csm.Name).ToList();
-
-        var duplicates = storeDataNames.Intersect(createStoreNames).ToList();
-        if (duplicates.Any())
-        {
-            string duplicatesCommaSeparated = string.Join(", ", duplicates);
-            TempData.SetStatusMessageModel(new StatusMessageModel()
-            {
-                Message = $"Cannot complete store(s) generation. Duplicate store names: {duplicatesCommaSeparated}",
-                Severity = StatusMessageModel.StatusSeverity.Error
-            });
-            return RedirectToAction(nameof(Index));
-        }
-        await using var dbPlugins = _contextFactory.CreateContext();
-
-        List<Store> entity = new List<Store>();
         foreach (var vm in model)
         {
             var store = new StoreData { StoreName = vm.Name };
@@ -105,21 +73,11 @@ public class UIMassStoreGeneratorController : Controller
             blob.PreferredExchange = vm.PreferredExchange;
             store.SetStoreBlob(blob);
             await _storeRepository.CreateStore(userId, store);
-
-            entity.Add(new Store
-            {
-                Id = Guid.NewGuid().ToString(),
-                ApplicationUserId = userId,
-                StoreName = vm.Name,
-                StoreBlob = store.StoreBlob,
-                StoreDataId = store.Id
-            });
         }
-        dbPlugins.AddRange(entity);
-        await dbPlugins.SaveChangesAsync();
-
-        return RedirectToAction(nameof(Index));
+        TempData[WellKnownTempData.SuccessMessage] = "Stores successfully created";
+        return RedirectToAction(nameof(UIStoresController.Index), "UIStores", new { storeId = CurrentStore.Id });
     }
+
     private string GetUserId() => _userManager.GetUserId(User);
 
     private SelectList GetExchangesSelectList(string selected)
@@ -128,8 +86,7 @@ public class UIMassStoreGeneratorController : Controller
             .AvailableRateProviders
             .OrderBy(s => s.Id, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        exchanges.Insert(0, new(null, "Recommended", ""));
-        var chosen = exchanges.FirstOrDefault(f => f.Id == selected) ?? exchanges.First();
+        var chosen = exchanges.Find(f => f.Id == selected) ?? exchanges[0];
         return new SelectList(exchanges, nameof(chosen.Id), nameof(chosen.DisplayName), chosen.Id);
     }
 }

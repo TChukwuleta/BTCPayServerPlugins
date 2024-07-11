@@ -1,56 +1,127 @@
 @using BTCPayServer.Abstractions.Extensions
-@using BTCPayServer.Plugins.MassStoreGenerator.ViewModels
+@using BTCPayServer.Abstractions.Services
+@using BTCPayServer.Client
+@using BTCPayServer.Data
 @using BTCPayServer.Plugins.MassStoreGenerator.Views
-@model List<MassStoresViewModel>
+@model BTCPayServer.Plugins.MassStoreGenerator.ViewModels.CreateStoreViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Stores Generator");
+    ViewData.SetActivePage(PluginNavPages.Index, "Plugin Template");
 }
-<h1>@ViewData["Title"]</h1>
+
+<h1>Create Stores</h1>
 
 
-<form method="post">
-    <div class="sticky-header-setup"></div>
-    <div class="sticky-header d-sm-flex align-items-center justify-content-between">
-        <h2 class="mb-0">Generated Stores</h2>
-        <div class="d-flex gap-3 mt-3 mt-sm-0">
-            <a asp-controller="UIMassStoreGenerator" asp-action="Create" class="btn btn-primary">Generate Stores</a>
-        </div>
-    </div>
-</form>
-
-@if (Model.Any())
+@if (Model.HasStoreCreationPermission)
 {
-    <form method="post" asp-action="MassAction">
-        <div class="table-responsive">
-            <table class="table table-hover mass-action">
-                <thead class="mass-action-head">
-                    <tr>
-                        <th scope="col">Store Name</th>
-                        <th scope="col" class="text-end"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var pp in Model)
-                    {
-                        <tr id="invoice_@pp.StoreId" class="mass-action-row">
-                            <td>@pp.StoreName</td>
-                            <td class="text-end">
-                                <a asp-controller="UIStores"
-                                   asp-action="Index"
-                                   asp-route-storeId="@pp.StoreId">
-                                    <vc:icon symbol="actions-show" />
-                                </a>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </form>
+    <div class="container mt-5">
+        <form id="input-form" method="post" asp-action="Create">
+            <div class="d-flex justify-content-end mb-2">
+                <input type="submit" value="Create Store(s)" class="btn btn-primary btn-sm" id="Create" />
+            </div>
+
+            <div class="row g-1 align-items-center mb-3">
+                <div class="col"><strong>Store Name</strong></div>
+                <div class="col"><strong>Currency</strong></div>
+                <div class="col"><strong>Exchange</strong></div>
+            </div>
+
+            <div class="row g-1 align-items-center mb-3 storelist">
+                <div class="col">
+                    <input name="model[0].Name" class="form-control w-300px" required />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+
+                <div class="col">
+                    <input id="DefaultCurrency" name="model[0].DefaultCurrency" class="form-control w-300px" currency-selection value="@Model.DefaultCurrency" />
+                    <span asp-validation-for="DefaultCurrency" class="text-danger"></span>
+                </div>
+
+                <div class="col">
+                    <select id="PreferredExchange" name="model[0].PreferredExchange" asp-items="Model.Exchanges" class="form-select w-300px">
+                        <option value="">Select an exchange</option>
+                        @foreach (var exchange in Model.Exchanges)
+                        {
+                            <option value="@exchange.Value">@exchange.Text</option>
+                        }
+                    </select>
+                    <span asp-validation-for="PreferredExchange" class="text-danger"></span>
+                </div>
+
+                <div class="col-auto">
+                    <button type="button" class="btn btn-outline-danger btn-remove">
+                        <vc:icon symbol="minus" />
+                    </button>
+                </div>
+            </div>
+
+            <div class="row g-2 align-items-center mb-3">
+                <div class="col">
+                    <button type="button" class="btn btn-outline-primary btn-add">
+                        <vc:icon symbol="plus" />
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
 }
 else
 {
-    <p class="text-secondary mt-4">
-        There are no stores generated. Click on the generate Store to begin.
-    </p>
+    <p>You do not have permission to create stores.</p>
 }
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const defaultCurrency = '@Model.DefaultCurrency';
+        const exchanges = @Html.Raw(Json.Serialize(Model.RecommendedExchanges));
+
+        document.getElementById('input-form').addEventListener('click', function (e) {
+            if (e.target && e.target.closest('.btn-add')) {
+                e.preventDefault();
+
+                var currentEntry = document.querySelector('.storelist');
+                var newEntry = currentEntry.cloneNode(true);
+                newEntry.querySelectorAll('input').forEach(input => input.value = '');
+                newEntry.querySelector("input[name*='DefaultCurrency']").value = defaultCurrency;
+                const source = exchanges[defaultCurrency] || 'coingecko';
+                newEntry.querySelector("select[name*='PreferredExchange']").value = source;
+
+                var inputIndex = document.querySelectorAll('.storelist').length;
+                newEntry.querySelectorAll('input, select').forEach(function (input) {
+                    var name = input.getAttribute('name');
+                    if (name) {
+                        var newName = name.replace(/\[\d+\]/, '[' + inputIndex + ']');
+                        input.setAttribute('name', newName);
+                    }
+                });
+                document.getElementById('input-form').insertBefore(newEntry, document.querySelector('.btn-add').closest('.row'));
+            }
+
+            if (e.target && e.target.closest('.btn-remove')) {
+                e.preventDefault();
+                if (document.querySelectorAll('.storelist').length > 1) {
+                    e.target.closest('.storelist').remove();
+                }
+            }
+        });
+
+        const updateRecommended = currency => {
+            const source = exchanges[currency] || 'coingecko';
+            const recommended = document.querySelector("#PreferredExchange");
+
+            for (let i = 0; i < recommended.options.length; i++) {
+                if (recommended.options[i].value === source) {
+                    recommended.selectedIndex = i;
+                    break;
+                }
+            }
+        };
+        updateRecommended(defaultCurrency);
+
+        const defaultCurrencyInput = document.querySelector("#DefaultCurrency");
+        defaultCurrencyInput.addEventListener('change', function (e) {
+            updateRecommended(e.target.value);
+        });
+    });
+
+</script>
+
