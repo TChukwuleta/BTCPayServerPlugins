@@ -17,4 +17,5 @@ public class BigCommerceStore
     public string StoreId { get; set; }
     public string StoreName { get; set; }
     public string ApplicationUserId { get; set; }
+    public string JsFileUuid { get; set; }
 }

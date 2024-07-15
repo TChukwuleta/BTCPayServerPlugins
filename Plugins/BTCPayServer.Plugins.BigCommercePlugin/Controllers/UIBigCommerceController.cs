@@ -1,15 +1,11 @@
-using System;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Client;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using BTCPayServer.Data;
-using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Identity;
 using System.Linq;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using BTCPayServer.Services.Rates;
 using Microsoft.Extensions.Logging;
 using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
 using BTCPayServer.Plugins.BigCommercePlugin.Services;
@@ -17,14 +13,13 @@ using Microsoft.AspNetCore.Http;
 using BTCPayServer.Plugins.BigCommercePlugin.Data;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Models;
-using BTCPayServer.Plugins.BigCommercePlugin.Data.Models;
 using Newtonsoft.Json;
-using System.Collections.Generic;
+using NBitcoin;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
-[Route("~/plugins/storegenerator")]
-[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
+/*[Route("~/plugins/storegenerator")]
+[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]*/
 public class UIBigCommerceController : Controller
 {
     private readonly ILogger<UIBigCommerceController> _logger;
@@ -83,11 +78,7 @@ public class UIBigCommerceController : Controller
         var exisitngStores = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         if (exisitngStores != null)
         {
-            TempData.SetStatusMessageModel(new StatusMessageModel()
-            {
-                Message = $"Cannot create big commerce store as there is a store that has currently been installed",
-                Severity = StatusMessageModel.StatusSeverity.Error
-            });
+            ReturnFailedMessageStatus($"Cannot create big commerce store as there is a store that has currently been installed");
             return RedirectToAction(nameof(Create));
             // Return a existing store error
         }
@@ -103,13 +94,7 @@ public class UIBigCommerceController : Controller
         };
         ctx.Add(entity);
         await ctx.SaveChangesAsync();
-
-        TempData.SetStatusMessageModel(new StatusMessageModel
-        {
-            Severity = StatusMessageModel.StatusSeverity.Success,
-            AllowDismiss = false,
-            Html = $"Big commerce store details saved successfully. Kindly include the following url as callback in your Big Commerce store: {callbackUrl}"
-        });
+        ReturnSuccessMessageStatus($"Big commerce store details saved successfully. Kindly include the following url as callback in your Big Commerce store: {callbackUrl}");
         return View(new InstallBigCommerceViewModel());
     }
 
@@ -151,6 +136,8 @@ public class UIBigCommerceController : Controller
         bigCommerceStore.BigCommerceUserEmail = bigCommerceStoreDetails.user.email;
         bigCommerceStore.BigCommerceUserId = bigCommerceStoreDetails.user.id.ToString();
 
+        await UploadCheckoutScript(bigCommerceStore);
+
         ctx.Update(bigCommerceStore); 
         await ctx.SaveChangesAsync();
         return Ok("Big commerce store installation was successful");
@@ -174,6 +161,8 @@ public class UIBigCommerceController : Controller
         {
             return NotFound("Setting not found for the given store hash.");
         }
+        await _bigCommerceService.DeleteCheckoutScriptAsync(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+
         ctx.Remove(bigCommerceStore);
         await ctx.SaveChangesAsync();
 
@@ -181,6 +170,46 @@ public class UIBigCommerceController : Controller
         return Ok("Big commerce store uninstalled successfully");
     }
 
+    private async Task UploadCheckoutScript(BigCommerceStore bigCommerceStore)
+    {
+        CreateCheckoutScriptResponse script = null;
+        if (!string.IsNullOrEmpty(bigCommerceStore.JsFileUuid))
+        {
+            var existingScript = await _bigCommerceService.GetCheckoutScriptAsync(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+            if (existingScript == null)
+            {
+                script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash);
+            }
+        }
+        else
+        {
+            script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash);
+        }
+        if (script != null && !string.IsNullOrEmpty(script.data.uuid))
+        {
+            bigCommerceStore.JsFileUuid = script.data.uuid;
+        }
+    }
+
+    private void ReturnSuccessMessageStatus(string message)
+    {
+        TempData.SetStatusMessageModel(new StatusMessageModel()
+        {
+            //Message = message,
+            Html = message,
+            AllowDismiss = false,
+            Severity = StatusMessageModel.StatusSeverity.Success
+        });
+    }
+
+    private void ReturnFailedMessageStatus(string message)
+    {
+        TempData.SetStatusMessageModel(new StatusMessageModel()
+        {
+            Message = message,
+            Severity = StatusMessageModel.StatusSeverity.Error
+        });
+    }
 
     private string GetUserId() => _userManager.GetUserId(User);
 }

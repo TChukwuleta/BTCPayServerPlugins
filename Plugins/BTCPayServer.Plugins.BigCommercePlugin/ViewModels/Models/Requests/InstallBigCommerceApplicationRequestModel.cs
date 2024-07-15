@@ -1,4 +1,4 @@
-﻿namespace BTCPayServer.Plugins.BigCommercePlugin.Data.Models;
+﻿namespace BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
 
 public class InstallBigCommerceApplicationRequestModel
 {

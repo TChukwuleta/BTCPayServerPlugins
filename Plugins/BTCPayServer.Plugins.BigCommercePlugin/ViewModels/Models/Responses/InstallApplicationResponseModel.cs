@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BTCPayServer.Plugins.BigCommercePlugin.Data.Models;
+namespace BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
 
 public class InstallApplicationResponseModel
 {
