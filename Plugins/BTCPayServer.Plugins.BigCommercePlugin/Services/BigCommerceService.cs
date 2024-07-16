@@ -1,9 +1,11 @@
 ﻿using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,6 +14,7 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Services;
 
 public class BigCommerceService
 {
+    private readonly string BTCPAY_SCRIPT_NAME = "btcpay-checkout";
     private readonly HttpClient _client;
     private readonly ILogger<BigCommerceService> _logger;
     private readonly IHttpContextAccessor _httpContextAccessor;
@@ -45,15 +48,16 @@ public class BigCommerceService
         return (true, await response.Content.ReadAsStringAsync());
     }
 
-    public async Task<CreateCheckoutScriptResponse> SetCheckoutScriptAsync(string storeHash)
+    public async Task<CreateCheckoutScriptResponse> SetCheckoutScriptAsync(string storeHash, string storeId)
     {
+        var jsFilePath = $"{GetBaseUrl()}/plugins/{storeId}/bigcommerce/btcpay-bc.js";
         try
         {
             var payload = new
             {
-                name = "BTCPAY_SCRIPT_NAME", // To change
+                name = BTCPAY_SCRIPT_NAME,
                 description = "Adds BTCPay Javascript to the checkout page.",
-                src = $"{GetBaseUrl()}/js/btcpay-bc.js?bcid={storeHash.Replace("stores/", string.Empty)}",
+                src = $"{jsFilePath}?bcid={storeHash.Replace("stores/", string.Empty)}",
                 auto_uninstall = true,
                 load_method = "default",
                 location = "footer",
@@ -71,6 +75,17 @@ public class BigCommerceService
             throw new ApplicationException("Error setting file via BC API", ex);
         }
     }
+
+    public async Task<CreateBigCommerceOrderResponse> CreateOrderAsync(string storeHash, string checkoutId, string accessToken)
+    {
+        var result = await MakeBigCommerceAPICallAsync(HttpMethod.Post, $"v3/checkouts/{checkoutId}/orders", storeHash, null, null, accessToken);
+        if (!result.IsSuccessStatusCode)
+        {
+            return null;
+        }
+        return JsonConvert.DeserializeObject<CreateBigCommerceOrderResponse>(await result.Content.ReadAsStringAsync());
+    }
+
 
     public async Task<GetCheckoutScriptResponse> GetCheckoutScriptAsync(string scriptUuid, string storeHash, string accessToken)
     {
@@ -94,7 +109,7 @@ public class BigCommerceService
 
     private async Task<HttpResponseMessage> MakeBigCommerceAPICallAsync(HttpMethod method, string endpoint, string storeHash, object data = null, string clientId = null, string accessToken = null)
     {
-        var request = new HttpRequestMessage(method, $"https://api.bigcommerce.com/stores/{storeHash}/{endpoint}");
+        var request = new HttpRequestMessage(method, $"https://api.bigcommerce.com/{storeHash}/{endpoint}");
         if (!string.IsNullOrEmpty(clientId))
         {
             request.Headers.Add("X-Auth-Client", clientId);

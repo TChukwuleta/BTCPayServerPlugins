@@ -1,7 +1,4 @@
 using System.Threading.Tasks;
-using BTCPayServer.Abstractions.Constants;
-using BTCPayServer.Client;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using BTCPayServer.Data;
 using Microsoft.AspNetCore.Identity;
@@ -13,8 +10,12 @@ using Microsoft.AspNetCore.Http;
 using BTCPayServer.Plugins.BigCommercePlugin.Data;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Models;
-using Newtonsoft.Json;
-using NBitcoin;
+using System;
+using System.Threading;
+using BTCPayServer.Models.InvoicingModels;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Authorization;
+using BTCPayServer.Plugins.BigCommercePlugin.Helper;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -24,37 +25,47 @@ public class UIBigCommerceController : Controller
 {
     private readonly ILogger<UIBigCommerceController> _logger;
     private readonly BigCommerceService _bigCommerceService;
+    private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly BigCommerceDbContextFactory _dbContextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
+    private BigCommerceHelper helper;
     public UIBigCommerceController
-        (BigCommerceDbContextFactory dbContextFactory,
+        (IWebHostEnvironment webHostEnvironment,
         BigCommerceService bigCommerceService,
-        UserManager<ApplicationUser> userManager, 
+        UserManager<ApplicationUser> userManager,
+        BigCommerceDbContextFactory dbContextFactory,
         ILogger<UIBigCommerceController> logger)
     {
         _logger = logger;
         _userManager = userManager;
         _dbContextFactory = dbContextFactory;
+        _webHostEnvironment = webHostEnvironment;
         _bigCommerceService = bigCommerceService;
+        helper = new BigCommerceHelper(_bigCommerceService, _webHostEnvironment, _dbContextFactory);
     }
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
-    // GET
-    [HttpGet("~/plugins/{storeId}/bigcommerce/index")]
+
+    [HttpGet("~/plugins/bigcommerce/index")]
     public async Task<IActionResult> Index()
     {
         if (CurrentStore is null)
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-
         var bigCommerceStore = ctx.BigCommerceStores.SingleOrDefault(c => c.StoreId == CurrentStore.Id);
         if (bigCommerceStore == null)
         {
-            return RedirectToAction(nameof(Create), new { storeId = CurrentStore.Id });
+            return RedirectToAction(nameof(Create), "UIBigCommerce");
         }
-        // Have a default view..
-        return View(new InstallBigCommerceViewModel());
+
+        return View(new InstallBigCommerceViewModel { 
+            ClientId = bigCommerceStore.ClientId, 
+            ClientSecret = bigCommerceStore.ClientSecret, 
+            AuthCallBackUrl = Url.Action("Install", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
+            LoadCallbackUrl = Url.Action("Load", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
+            UninstallCallbackUrl = Url.Action("Uninstall", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
+            StoreName = bigCommerceStore.StoreName});
     }
 
 
@@ -74,13 +85,11 @@ public class UIBigCommerceController : Controller
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-
         var exisitngStores = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         if (exisitngStores != null)
         {
             ReturnFailedMessageStatus($"Cannot create big commerce store as there is a store that has currently been installed");
-            return RedirectToAction(nameof(Create));
-            // Return a existing store error
+            return RedirectToAction(nameof(Create), "UIBigCommerce");
         }
         var callbackUrl = Url.Action("Install", "UIBigCommerce", null, Request.Scheme);
         var entity = new BigCommerceStore
@@ -94,20 +103,17 @@ public class UIBigCommerceController : Controller
         };
         ctx.Add(entity);
         await ctx.SaveChangesAsync();
-        ReturnSuccessMessageStatus($"Big commerce store details saved successfully. Kindly include the following url as callback in your Big Commerce store: {callbackUrl}");
-        return View(new InstallBigCommerceViewModel());
+        ReturnSuccessMessageStatus($"Big commerce store details saved successfully.");
+        return RedirectToAction(nameof(Index), "UIBigCommerce");
     }
 
 
-    [HttpGet("~/plugins/bigcommerce/auth/install")]
-    public async Task<IActionResult> Install([FromQuery] string code, [FromQuery] string context, [FromQuery] string scope)
+    [AllowAnonymous]
+    [HttpGet("~/plugins/{storeId}/bigcommerce/auth/install")]
+    public async Task<IActionResult> Install(string storeId, [FromQuery] string code, [FromQuery] string context, [FromQuery] string scope)
     {
-        if (CurrentStore is null)
-            return NotFound();
-
         await using var ctx = _dbContextFactory.CreateContext();
-
-        var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+        var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
         if (bigCommerceStore == null)
         {
             return BadRequest("Invalid request");
@@ -129,66 +135,123 @@ public class UIBigCommerceController : Controller
         {
             return BadRequest(responseCall.content);
         }
-        var bigCommerceStoreDetails = JsonConvert.DeserializeObject<InstallApplicationResponseModel>(responseCall.content);
+        var bigCommerceStoreDetails = Newtonsoft.Json.JsonConvert.DeserializeObject<InstallApplicationResponseModel>(responseCall.content);
         bigCommerceStore.AccessToken = bigCommerceStoreDetails.access_token;
         bigCommerceStore.Scope = bigCommerceStoreDetails.scope;
         bigCommerceStore.StoreHash = bigCommerceStoreDetails.context;
         bigCommerceStore.BigCommerceUserEmail = bigCommerceStoreDetails.user.email;
         bigCommerceStore.BigCommerceUserId = bigCommerceStoreDetails.user.id.ToString();
 
-        await UploadCheckoutScript(bigCommerceStore);
+        await helper.UploadCheckoutScript(bigCommerceStore);
 
         ctx.Update(bigCommerceStore); 
         await ctx.SaveChangesAsync();
         return Ok("Big commerce store installation was successful");
     }
 
-    [HttpPost("~/plugins/bigcommerce/auth/uninstall")]
-    public async Task<IActionResult> Uninstall()
-    {
-        if (CurrentStore is null)
-            return NotFound();
 
-        var storeHash = HttpContext.Session.GetString("store_hash");
-        if (string.IsNullOrEmpty(storeHash))
+    [AllowAnonymous]
+    [HttpGet("~/plugins/{storeId}/bigcommerce/auth/load")]
+    public async Task<IActionResult> Load(string storeId, [FromQuery] string signed_payload_jwt)
+    {
+        if (string.IsNullOrEmpty(signed_payload_jwt))
         {
-            return BadRequest("Store hash not found in session.");
+            return BadRequest("Missing signed_payload_jwt parameter");
         }
         await using var ctx = _dbContextFactory.CreateContext();
-
-        var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.StoreHash == storeHash);
+        var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
         if (bigCommerceStore == null)
         {
-            return NotFound("Setting not found for the given store hash.");
+            return BadRequest("Invalid request");
         }
-        await _bigCommerceService.DeleteCheckoutScriptAsync(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
-
-        ctx.Remove(bigCommerceStore);
-        await ctx.SaveChangesAsync();
-
-        HttpContext.Session.Clear();
-        return Ok("Big commerce store uninstalled successfully");
+        try
+        {
+            var claims = helper.DecodeJwtPayload(signed_payload_jwt);
+            if (!helper.ValidateClaims(bigCommerceStore, claims))
+            {
+                return BadRequest("Invalid signed_payload_jwt parameter");
+            }
+            return Ok(new { claims });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Invalid token: {ex.Message}");
+        }
     }
 
-    private async Task UploadCheckoutScript(BigCommerceStore bigCommerceStore)
+    [AllowAnonymous]
+    [HttpGet("~/plugins/{storeId}/bigcommerce/auth/uninstall")]
+    public async Task<IActionResult> Uninstall(string storeId, [FromQuery] string signed_payload_jwt)
     {
-        CreateCheckoutScriptResponse script = null;
-        if (!string.IsNullOrEmpty(bigCommerceStore.JsFileUuid))
+        if (string.IsNullOrEmpty(signed_payload_jwt))
         {
-            var existingScript = await _bigCommerceService.GetCheckoutScriptAsync(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
-            if (existingScript == null)
+            return BadRequest("Missing signed_payload_jwt parameter");
+        }
+        await using var ctx = _dbContextFactory.CreateContext();
+        var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
+        if (bigCommerceStore == null)
+        {
+            return BadRequest("Invalid request");
+        }
+        try
+        {
+            var claims = helper.DecodeJwtPayload(signed_payload_jwt);
+            if (!helper.ValidateClaims(bigCommerceStore, claims))
             {
-                script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash);
+                return BadRequest("Invalid signed_payload_jwt parameter");
             }
+            await _bigCommerceService.DeleteCheckoutScriptAsync(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+            ctx.Remove(bigCommerceStore);
+            await ctx.SaveChangesAsync();
+
+            HttpContext.Session.Clear();
+            return Ok("Big commerce store uninstalled successfully");
         }
-        else
+        catch (Exception ex)
         {
-            script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash);
+            return BadRequest($"Invalid token: {ex.Message}");
         }
-        if (script != null && !string.IsNullOrEmpty(script.data.uuid))
+    }
+
+    [AllowAnonymous]
+    [HttpPost("~/plugins/bigcommerce/create-order")]
+    public async Task<IActionResult> CreateOrder(CreateBigCommerceStoreRequest requestModel)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+
+        var exisitngStores = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == requestModel.storeId);
+        if (exisitngStores == null)
         {
-            bigCommerceStore.JsFileUuid = script.data.uuid;
+            return BadRequest("Cannot create big commerce order. Invalid store Id");
         }
+        var createOrder = await _bigCommerceService.CreateOrderAsync(exisitngStores.StoreHash, requestModel.cartId, exisitngStores.AccessToken);
+        if (createOrder == null)
+        {
+            return BadRequest("An error occurred while creating order");
+        }
+        
+        return new RedirectToActionResult("CreateInvoice", "UIInvoice",
+            new
+            {
+                model = new CreateInvoiceModel
+                {
+                    Amount = requestModel.total,
+                    Currency = requestModel.currency,
+                    StoreId = exisitngStores.StoreId,
+                    BuyerEmail = requestModel.email,
+                    OrderId = createOrder.data.id.ToString(),
+                    Metadata = createOrder.meta.ToString()
+                },
+                cancellationToken = new CancellationToken()
+            });
+    }
+
+    [AllowAnonymous]
+    [HttpGet("~/plugins/{storeId}/bigcommerce/btcpay-bc.js")]
+    public async Task<IActionResult> GetBtcPayJavascript(string storeId)
+    {
+        var jsFile = await helper.GetCustomJavascript(storeId, Request.GetAbsoluteRoot());
+        return Content(jsFile, "text/javascript");
     }
 
     private void ReturnSuccessMessageStatus(string message)

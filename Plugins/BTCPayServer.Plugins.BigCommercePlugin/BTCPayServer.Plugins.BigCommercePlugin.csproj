@@ -38,6 +38,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Resources\js\" />
     <Folder Include="Views\UIBigCommerce\" />
   </ItemGroup>
 </Project>
