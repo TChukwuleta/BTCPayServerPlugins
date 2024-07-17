@@ -3,11 +3,9 @@ using BTCPayServer.Plugins.BigCommercePlugin.Services;
 using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
 using Microsoft.AspNetCore.Hosting;
 using System;
-using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin.Helper

@@ -37,7 +37,7 @@ const handleBitcoinPayment = (event) => {
 
     getCart()
         .then(cart => {
-            return fetch(BTCPAYSERVER_URL + '/plugins/bigcommerce/create-order', {
+            return fetch(BTCPAYSERVER_URL + 'plugins/' + BTCPAYSERVER_STORE_ID + '/bigcommerce/create-order', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -90,61 +90,24 @@ const getCart = () => {
         });
 }
 
-const getBCData = () => {
-    const thisScript = document.currentScript;
-    const script_url = thisScript.src;
-    const url = new URL(script_url);
-    const storeId = url.searchParams.get('bcid');
-    return {
-        storeId: storeId,
-        proxyService: 'https://' + url.hostname
-    }
-}
-
-// Need to initialize here otherwise currentScript ref lost.
-const bcData = getBCData();
-
-const getBTCPayData = () => {
-    // todo: get data via proxy service, or find a another way,
-    // e.g. adding script via API like the btcpay-bc.js
-    return {
-        btcpayUrl: 'https://testnet.demo.btcpay.tech'
-    }
-}
-
-//console.log(storeId);
-// Configuration for the observer
-//const config = { childList: true, subtree: true };
-
-// Start observing the body element
-//observer.observe(document.body, config);
-
 // Show BTCPay modal.
 const showBTCPayModal = function(data, checkoutForm) {
     console.log('Triggered showBTCPayModal()');
 
-    const orderConfirmationPath = '/checkout/order-confirmation';
-    const rootpath = window.location.origin;
-
     if (data.id == undefined) {
-        //submitError(BTCPayWP.textModalClosed);
         console.error('No invoice id provided, aborting.');
     }
-    const btcpayData = getBTCPayData();
-    window.btcpay.setApiUrlPrefix(btcpayData.btcpayUrl);
+    window.btcpay.setApiUrlPrefix(BTCPAYSERVER_URL);
     window.btcpay.showInvoice(data.id);
 
     let invoice_paid = false;
     window.btcpay.onModalReceiveMessage(function (event) {
         if (isObject(event.data)) {
-            //console.log('BTCPay modal event: invoiceId: ' + event.data.id);
-            //console.log('BTCPay modal event: status: ' + event.data.status);
             if (event.data.status) {
                 switch (event.data.status) {
                     case 'complete':
                     case 'paid':
                         invoice_paid = true;
-                        //window.location = orderConfirmationPath;
                         showOrderConfirmation(data.orderId, data.id);
                         console.log('Invoice paid.');
                         break;
@@ -222,9 +185,8 @@ const showOrderConfirmation = (orderId, invoiceId) => {
 }
 
 const loadModalScript = () => {
-    const btcpay = getBTCPayData();
     const script = document.createElement('script');
-    script.src = btcpay.btcpayUrl + '/modal/btcpay.js';
+    script.src = BTCPAYSERVER_URL + '/modal/btcpay.js';
     document.head.appendChild(script);
 
     // Optional: Handle loading and error events
@@ -240,5 +202,4 @@ const loadModalScript = () => {
 
 // Entrypoint.
 loadModalScript();
-//observePaymentOptions();
 const pollInterval = setInterval(observePaymentOptions, 300);

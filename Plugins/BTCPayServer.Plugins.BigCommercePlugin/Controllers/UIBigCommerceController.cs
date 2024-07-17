@@ -16,6 +16,7 @@ using BTCPayServer.Models.InvoicingModels;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Authorization;
 using BTCPayServer.Plugins.BigCommercePlugin.Helper;
+using BTCPayServer.Controllers;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -26,11 +27,13 @@ public class UIBigCommerceController : Controller
     private readonly ILogger<UIBigCommerceController> _logger;
     private readonly BigCommerceService _bigCommerceService;
     private readonly IWebHostEnvironment _webHostEnvironment;
+    private readonly UIInvoiceController _invoiceController;
     private readonly BigCommerceDbContextFactory _dbContextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
     private BigCommerceHelper helper;
     public UIBigCommerceController
-        (IWebHostEnvironment webHostEnvironment,
+        (UIInvoiceController invoiceController,
+        IWebHostEnvironment webHostEnvironment,
         BigCommerceService bigCommerceService,
         UserManager<ApplicationUser> userManager,
         BigCommerceDbContextFactory dbContextFactory,
@@ -38,11 +41,14 @@ public class UIBigCommerceController : Controller
     {
         _logger = logger;
         _userManager = userManager;
+        _invoiceController = invoiceController;
         _dbContextFactory = dbContextFactory;
         _webHostEnvironment = webHostEnvironment;
         _bigCommerceService = bigCommerceService;
         helper = new BigCommerceHelper(_bigCommerceService, _webHostEnvironment, _dbContextFactory);
     }
+
+    public const string BIGCOMMERCE_ORDER_ID_PREFIX = "BigCommerce-";
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
 
@@ -77,6 +83,7 @@ public class UIBigCommerceController : Controller
 
         return View(new InstallBigCommerceViewModel());
     }
+
 
     [HttpPost("~/plugins/bigcommerce/create")]
     public async Task<IActionResult> Create(InstallBigCommerceViewModel model)
@@ -171,13 +178,29 @@ public class UIBigCommerceController : Controller
             {
                 return BadRequest("Invalid signed_payload_jwt parameter");
             }
-            return Ok(new { claims });
+
+            var htmlContent = $@"
+            <!DOCTYPE html>
+            <html lang='en'>
+            <head>
+                <meta charset='UTF-8'>
+                <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                <title>BTCPay BigCommerce plugin</title>
+            </head>
+            <body>
+                <h1>BigCommerce Auth Load</h1>
+                <p>BTCPay Store: {storeId}</p>
+                <p>Store Hash: {bigCommerceStore.StoreHash}</p>
+            </body>
+            </html>";
+            return Content(htmlContent, "text/html");
         }
         catch (Exception ex)
         {
             return BadRequest($"Invalid token: {ex.Message}");
         }
     }
+
 
     [AllowAnonymous]
     [HttpGet("~/plugins/{storeId}/bigcommerce/auth/uninstall")]
@@ -213,8 +236,9 @@ public class UIBigCommerceController : Controller
         }
     }
 
+
     [AllowAnonymous]
-    [HttpPost("~/plugins/bigcommerce/create-order")]
+    [HttpPost("~/plugins/{storeId}/bigcommerce/create-order")]
     public async Task<IActionResult> CreateOrder(CreateBigCommerceStoreRequest requestModel)
     {
         await using var ctx = _dbContextFactory.CreateContext();
@@ -229,22 +253,46 @@ public class UIBigCommerceController : Controller
         {
             return BadRequest("An error occurred while creating order");
         }
-        
-        return new RedirectToActionResult("CreateInvoice", "UIInvoice",
-            new
-            {
-                model = new CreateInvoiceModel
-                {
-                    Amount = requestModel.total,
-                    Currency = requestModel.currency,
-                    StoreId = exisitngStores.StoreId,
-                    BuyerEmail = requestModel.email,
-                    OrderId = createOrder.data.id.ToString(),
-                    Metadata = createOrder.meta.ToString()
-                },
-                cancellationToken = new CancellationToken()
-            });
-    }
+
+        string bgOrderId = $"{BIGCOMMERCE_ORDER_ID_PREFIX}{createOrder.data.id}";
+        var invoiceResult = await _invoiceController.CreateInvoice(new CreateInvoiceModel
+        {
+            Amount = requestModel.total,
+            Currency = requestModel.currency,
+            StoreId = exisitngStores.StoreId,
+            BuyerEmail = requestModel.email,
+            OrderId = bgOrderId,
+            Metadata = createOrder.meta.ToString()
+        }, new CancellationToken());
+
+
+        // Find a way to get invoiceId and orderId from this
+
+        /*TempData[WellKnownTempData.SuccessMessage] = $"Invoice {result.Id} just created!";
+        CreatedInvoiceId = result.Id;
+        return RedirectToAction(nameof(Invoice), new { storeId = result.StoreId, invoiceId = result.Id });*/
+
+        var entity = new Transaction
+        {
+            ClientId = exisitngStores.ClientId,
+            StoreHash = exisitngStores.StoreHash,
+            StoreId = exisitngStores.StoreId,
+            OrderId = bgOrderId,
+            InvoiceId = "",
+            TransactionStatus = TransactionStatus.Pending,
+            InvoiceStatus = BTCPayServer.Services.Invoices.InvoiceStatusLegacy.New
+        };
+        ctx.Add(entity);
+        await ctx.SaveChangesAsync();
+
+        return Ok(new
+        {
+            id = "",
+            orderId = createOrder.data.id.ToString(),
+            Message = "Order created and invoice generated successfully",
+            InvoiceResult = invoiceResult
+        });
+     }
 
     [AllowAnonymous]
     [HttpGet("~/plugins/{storeId}/bigcommerce/btcpay-bc.js")]
@@ -253,6 +301,7 @@ public class UIBigCommerceController : Controller
         var jsFile = await helper.GetCustomJavascript(storeId, Request.GetAbsoluteRoot());
         return Content(jsFile, "text/javascript");
     }
+
 
     private void ReturnSuccessMessageStatus(string message)
     {
