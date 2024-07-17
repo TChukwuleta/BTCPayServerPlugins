@@ -1,4 +1,5 @@
-﻿using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
+﻿using BTCPayServer.Plugins.BigCommercePlugin.Data;
+using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -9,6 +10,7 @@ using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using static BTCPayServer.HostedServices.PullPaymentHostedService.PayoutApproval;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin.Services;
 
@@ -74,6 +76,22 @@ public class BigCommerceService
             Console.WriteLine("Error setting file via BC API: " + ex.Message);
             throw new ApplicationException("Error setting file via BC API", ex);
         }
+    }
+
+    public async Task<bool> ConfirmOrderExistAsync(int orderId, string storeHash, string accessToken)
+    {
+        var result = await MakeBigCommerceAPICallAsync(HttpMethod.Get, $"v2/orders/{orderId}", storeHash, null, null, accessToken);
+        if (!result.IsSuccessStatusCode)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    public async Task UpdateOrderStatusAsync(int orderId, BigCommerceOrderState status, string storeHash, string accessToken)
+    {
+        var data = new { status_id = (int)status };
+        await MakeBigCommerceAPICallAsync(HttpMethod.Put, $"v2/orders/{orderId}", storeHash, data, null, accessToken);
     }
 
     public async Task<CreateBigCommerceOrderResponse> CreateOrderAsync(string storeHash, string checkoutId, string accessToken)

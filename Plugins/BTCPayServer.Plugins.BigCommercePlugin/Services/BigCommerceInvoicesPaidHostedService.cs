@@ -14,15 +14,12 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
 {
     private readonly BigCommerceDbContextFactory _contextFactory;
     private readonly BigCommerceService _bigCommerceService;
-    private BTCPayNetworkProvider NetworkProvider { get; }
 
     public BigCommerceInvoicesPaidHostedService(
         BigCommerceService bigCommerceService,
         BigCommerceDbContextFactory contextFactory, 
-        BTCPayNetworkProvider networkProvider, 
         EventAggregator eventAggregator, Logs logs) : base(eventAggregator, logs)
     {
-        NetworkProvider = networkProvider;
         _contextFactory = contextFactory;
         _bigCommerceService = bigCommerceService;
     }
@@ -56,29 +53,22 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
                 {
                     bigCommerceStoreTransaction.TransactionStatus = Data.TransactionStatus.Failed;
                     bigCommerceStoreTransaction.InvoiceId = invoice.Id;
-                    //you have failed us, customer
-
                 }
                 else if (new[] { InvoiceStatusLegacy.Complete, InvoiceStatusLegacy.Confirmed }.Contains(
                     invoice.Status))
                 {
-                    bigCommerceStoreTransaction.TransactionStatus = Data.TransactionStatus.Failed;
+                    var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == bigCommerceStoreTransaction.StoreId);
+                    string orderNumberId = bigCommerceOrderId.Substring(BIGCOMMERCE_ORDER_ID_PREFIX.Length);
+                    int.TryParse(orderNumberId, out int orderId);
+
+                    bigCommerceStoreTransaction.TransactionStatus = Data.TransactionStatus.Success;
                     bigCommerceStoreTransaction.InvoiceId = invoice.Id;
-
-                    // Call Big commerce to confirm
-
-
-                    /*var client = CreateShopifyApiClient(settings);
-                    if (!await client.OrderExists(shopifyOrderId))
+                    bool confirmOrder = await _bigCommerceService.ConfirmOrderExistAsync(orderId, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+                    if (confirmOrder)
                     {
-                        // don't register transactions for orders that don't exist on shopify
-                        return;
-                    }*/
-
-                    // if we got this far, we likely need to register this invoice's payment on Shopify
-                    // OrderTransactionRegisterLogic has check if transaction is already registered which is why we're passing invoice.Id
+                        await _bigCommerceService.UpdateOrderStatusAsync(orderId, Data.BigCommerceOrderState.COMPLETED, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+                    }
                 }
-
                 ctx.Update(bigCommerceStoreTransaction);
                 await ctx.SaveChangesAsync();
             }

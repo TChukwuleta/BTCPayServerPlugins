@@ -105,13 +105,13 @@ const showBTCPayModal = function(data, checkoutForm) {
         if (isObject(event.data)) {
             if (event.data.status) {
                 switch (event.data.status) {
-                    case 'complete':
-                    case 'paid':
+                     'complete':
+                     'paid':
                         invoice_paid = true;
                         showOrderConfirmation(data.orderId, data.id);
                         console.log('Invoice paid.');
                         break;
-                    case 'expired':
+                     'expired':
                         window.btcpay.hideFrame();
                         // todo: show error message
                         console.error('Invoice expired.')
