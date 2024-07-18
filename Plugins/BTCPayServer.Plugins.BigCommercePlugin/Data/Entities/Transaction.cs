@@ -1,4 +1,5 @@
 ﻿using BTCPayServer.Services.Invoices;
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin.Data;
@@ -14,11 +15,11 @@ public class Transaction
     public string InvoiceId { get; set; }
     public InvoiceStatusLegacy InvoiceStatus { get; set; }
     public TransactionStatus TransactionStatus { get; set; }
+
+
+    internal static void OnModelCreating(ModelBuilder modelBuilder)
+    {
+    }
 }
 
-public enum TransactionStatus
-{
-    Pending = 1,
-    Failed = 2,
-    Success = 3
-}
+

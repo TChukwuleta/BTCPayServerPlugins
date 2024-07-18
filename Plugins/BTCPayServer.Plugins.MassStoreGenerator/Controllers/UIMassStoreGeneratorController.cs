@@ -18,7 +18,7 @@ using BTCPayServer.Controllers;
 
 namespace BTCPayServer.Plugins.Template;
 
-[Route("~/plugins/storegenerator")]
+[Route("~/plugins/storesgenerator")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIMassStoreGeneratorController : Controller
 {
@@ -57,7 +57,7 @@ public class UIMassStoreGeneratorController : Controller
     }
 
 
-    [HttpPost("~/plugins/stores/create")]
+    [HttpPost("~/create")]
     public async Task<IActionResult> Create(List<CreateStoreViewModel> model)
     {
         if (CurrentStore is null)

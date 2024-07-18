@@ -17,11 +17,13 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Authorization;
 using BTCPayServer.Plugins.BigCommercePlugin.Helper;
 using BTCPayServer.Controllers;
+using BTCPayServer.Client;
+using BTCPayServer.Abstractions.Constants;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
-/*[Route("~/plugins/storegenerator")]
-[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]*/
+[Route("~/plugins/{storeId}/bigcommerce")]
+[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIBigCommerceController : Controller
 {
     private readonly ILogger<UIBigCommerceController> _logger;
@@ -52,7 +54,6 @@ public class UIBigCommerceController : Controller
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
 
-    [HttpGet("~/plugins/bigcommerce/index")]
     public async Task<IActionResult> Index()
     {
         if (CurrentStore is null)
@@ -65,13 +66,15 @@ public class UIBigCommerceController : Controller
             return RedirectToAction(nameof(Create), "UIBigCommerce");
         }
 
-        return View(new InstallBigCommerceViewModel { 
-            ClientId = bigCommerceStore.ClientId, 
-            ClientSecret = bigCommerceStore.ClientSecret, 
+        return View(new InstallBigCommerceViewModel
+        {
+            ClientId = bigCommerceStore.ClientId,
+            ClientSecret = bigCommerceStore.ClientSecret,
             AuthCallBackUrl = Url.Action("Install", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
             LoadCallbackUrl = Url.Action("Load", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
             UninstallCallbackUrl = Url.Action("Uninstall", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
-            StoreName = bigCommerceStore.StoreName});
+            StoreName = bigCommerceStore.StoreName
+        });
     }
 
 

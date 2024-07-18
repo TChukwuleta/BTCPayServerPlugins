@@ -20,5 +20,8 @@ public class BigCommerceDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.BigCommerce");
+
+        Transaction.OnModelCreating(modelBuilder);
+        BigCommerceStore.OnModelCreating(modelBuilder);
     }
 }

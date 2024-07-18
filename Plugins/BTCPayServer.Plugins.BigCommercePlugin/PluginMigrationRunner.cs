@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using BTCPayServer.Plugins.BigCommercePlugin.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.Extensions.Hosting;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
@@ -18,7 +19,8 @@ public class PluginMigrationRunner : IHostedService
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await using var ctx = _pluginDbContextFactory.CreateContext();
-        //await ctx.Database.MigrateAsync(cancellationToken);
+        await using var dbContext = _pluginDbContextFactory.CreateContext();
+        await ctx.Database.MigrateAsync(cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken)

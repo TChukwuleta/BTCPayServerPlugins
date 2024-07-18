@@ -22,7 +22,7 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<BigCommerc
 
 public class BigCommerceDbContextFactory : BaseDbContextFactory<BigCommerceDbContext>
 {
-    public BigCommerceDbContextFactory(IOptions<DatabaseOptions> options) : base(options, "BTCPayServer.Plugins.BigCommerce")
+    public BigCommerceDbContextFactory(IOptions<DatabaseOptions> options) : base(options, "BTCPayServer.Plugins.BigCommercePlugin")
     {
     }
 

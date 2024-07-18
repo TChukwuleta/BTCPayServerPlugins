@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin.Data;
 
@@ -18,4 +19,9 @@ public class BigCommerceStore
     public string StoreName { get; set; }
     public string ApplicationUserId { get; set; }
     public string JsFileUuid { get; set; }
+
+
+    internal static void OnModelCreating(ModelBuilder modelBuilder)
+    {
+    }
 }

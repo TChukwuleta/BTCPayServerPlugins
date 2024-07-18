@@ -2,16 +2,16 @@
 @using BTCPayServer.Abstractions.Services
 @using BTCPayServer.Client
 @using BTCPayServer.Data
-@using BTCPayServer.Plugins.MassStoreGenerator.Views
+@using BTCPayServer.Plugins.BigCommercePlugin.Views
 @model BTCPayServer.Plugins.BigCommercePlugin.ViewModels.InstallBigCommerceViewModel
 @{
     ViewData.SetActivePage(PluginNavPages.Index, "Big Commerce");
 }
 
-<form method="post" asp-action="Upload" enctype="multipart/form-data">
+<form method="post" asp-action="Create" enctype="multipart/form-data">
     <div class="sticky-header d-flex align-items-center justify-content-between">
-        <h2>Setup bigCommerce</h2>
-        <input type="submit" value="Upload" class="btn btn-primary" id="Upload" />
+        <h2>Setup Big Commerce</h2>
+        <input type="submit" value="Create" class="btn btn-primary" id="Create" />
     </div>
 
     <partial name="_StatusMessage" />
