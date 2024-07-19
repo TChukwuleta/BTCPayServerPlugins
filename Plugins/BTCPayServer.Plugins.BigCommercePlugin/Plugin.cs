@@ -20,7 +20,12 @@ public class Plugin : BaseBTCPayServerPlugin
         services.AddSingleton<IHostedService, BigCommerceInvoicesPaidHostedService>();
         services.AddHostedService<ApplicationPartsLogger>();
         services.AddSingleton<BigCommerceService>();
-        services.AddHostedService<PluginMigrationRunner>();
         services.AddSingleton<BigCommerceDbContextFactory>();
+        services.AddDbContext<BigCommerceDbContext>((provider, o) =>
+        {
+            var factory = provider.GetRequiredService<BigCommerceDbContextFactory>();
+            factory.ConfigureBuilder(o);
+        });
+        services.AddHostedService<PluginMigrationRunner>();
     }
 }

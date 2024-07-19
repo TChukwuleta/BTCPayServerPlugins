@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 using System.Text.Json;
 
-var plugins = Directory.GetDirectories("../../../../../Plugins");
+var plugins = Directory.GetDirectories("../../../../Plugins");
 var p = "";
 foreach (var plugin in plugins)
 {
@@ -17,6 +17,4 @@ var content = JsonSerializer.Serialize(new
 });
 
 Console.WriteLine(content);
-await File.WriteAllTextAsync("../../../../../btcpayserver/BTCPayServer/appsettings.dev.json", content);
-
-
+await File.WriteAllTextAsync("../../../../btcpayserver/BTCPayServer/appsettings.dev.json", content);
