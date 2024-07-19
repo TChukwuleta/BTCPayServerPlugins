@@ -19,14 +19,17 @@ using BTCPayServer.Plugins.BigCommercePlugin.Helper;
 using BTCPayServer.Controllers;
 using BTCPayServer.Client;
 using BTCPayServer.Abstractions.Constants;
+using BTCPayServer.Services.Stores;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
-[Route("~/plugins/{storeId}/bigcommerce")]
+[Route("~/plugins/bigcommerce")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIBigCommerceController : Controller
 {
     private readonly ILogger<UIBigCommerceController> _logger;
+    private readonly StoreRepository _storeRepository;
     private readonly BigCommerceService _bigCommerceService;
     private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly UIInvoiceController _invoiceController;
@@ -34,7 +37,8 @@ public class UIBigCommerceController : Controller
     private readonly UserManager<ApplicationUser> _userManager;
     private BigCommerceHelper helper;
     public UIBigCommerceController
-        (UIInvoiceController invoiceController,
+        (StoreRepository storeRepository,
+        UIInvoiceController invoiceController,
         IWebHostEnvironment webHostEnvironment,
         BigCommerceService bigCommerceService,
         UserManager<ApplicationUser> userManager,
@@ -43,6 +47,7 @@ public class UIBigCommerceController : Controller
     {
         _logger = logger;
         _userManager = userManager;
+        _storeRepository = storeRepository;
         _invoiceController = invoiceController;
         _dbContextFactory = dbContextFactory;
         _webHostEnvironment = webHostEnvironment;
@@ -65,7 +70,7 @@ public class UIBigCommerceController : Controller
         {
             return RedirectToAction(nameof(Create), "UIBigCommerce");
         }
-
+        TempData[WellKnownTempData.SuccessMessage] = "Big commerce store details retrieved successfully";
         return View(new InstallBigCommerceViewModel
         {
             ClientId = bigCommerceStore.ClientId,
@@ -94,6 +99,8 @@ public class UIBigCommerceController : Controller
         if (CurrentStore is null)
             return NotFound();
 
+        string userId = GetUserId();
+
         await using var ctx = _dbContextFactory.CreateContext();
         var exisitngStores = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         if (exisitngStores != null)
@@ -101,6 +108,13 @@ public class UIBigCommerceController : Controller
             ReturnFailedMessageStatus($"Cannot create big commerce store as there is a store that has currently been installed");
             return RedirectToAction(nameof(Create), "UIBigCommerce");
         }
+        var userBigCommerceStores = ctx.BigCommerceStores.Where(store => store.ApplicationUserId == userId).ToList();
+        if (userBigCommerceStores.Exists(store => store.ClientId == model.ClientId || store.ClientSecret == model.ClientSecret))
+        {
+            ModelState.AddModelError(nameof(model.ClientSecret), "Cannot create BigCommerce store as a store with the same Client ID or Client Secret already exists.");
+            return RedirectToAction(nameof(Create), "UIBigCommerce");
+        }
+
         var callbackUrl = Url.Action("Install", "UIBigCommerce", null, Request.Scheme);
         var entity = new BigCommerceStore
         {
@@ -310,9 +324,9 @@ public class UIBigCommerceController : Controller
     {
         TempData.SetStatusMessageModel(new StatusMessageModel()
         {
-            //Message = message,
+            Message = message,
             Html = message,
-            AllowDismiss = false,
+            AllowDismiss = true,
             Severity = StatusMessageModel.StatusSeverity.Success
         });
     }
