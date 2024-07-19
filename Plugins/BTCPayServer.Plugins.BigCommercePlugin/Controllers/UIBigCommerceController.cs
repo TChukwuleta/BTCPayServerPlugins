@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using BTCPayServer.Data;
 using Microsoft.AspNetCore.Identity;
 using System.Linq;
-using Microsoft.Extensions.Logging;
 using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
 using BTCPayServer.Plugins.BigCommercePlugin.Services;
 using Microsoft.AspNetCore.Http;
@@ -13,14 +12,11 @@ using BTCPayServer.Abstractions.Models;
 using System;
 using System.Threading;
 using BTCPayServer.Models.InvoicingModels;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Authorization;
 using BTCPayServer.Plugins.BigCommercePlugin.Helper;
 using BTCPayServer.Controllers;
 using BTCPayServer.Client;
 using BTCPayServer.Abstractions.Constants;
-using BTCPayServer.Services.Stores;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -28,31 +24,22 @@ namespace BTCPayServer.Plugins.BigCommercePlugin;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIBigCommerceController : Controller
 {
-    private readonly ILogger<UIBigCommerceController> _logger;
-    private readonly StoreRepository _storeRepository;
     private readonly BigCommerceService _bigCommerceService;
-    private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly UIInvoiceController _invoiceController;
     private readonly BigCommerceDbContextFactory _dbContextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
     private BigCommerceHelper helper;
     public UIBigCommerceController
-        (StoreRepository storeRepository,
-        UIInvoiceController invoiceController,
-        IWebHostEnvironment webHostEnvironment,
+        (UIInvoiceController invoiceController,
         BigCommerceService bigCommerceService,
         UserManager<ApplicationUser> userManager,
-        BigCommerceDbContextFactory dbContextFactory,
-        ILogger<UIBigCommerceController> logger)
+        BigCommerceDbContextFactory dbContextFactory)
     {
-        _logger = logger;
         _userManager = userManager;
-        _storeRepository = storeRepository;
         _invoiceController = invoiceController;
         _dbContextFactory = dbContextFactory;
-        _webHostEnvironment = webHostEnvironment;
         _bigCommerceService = bigCommerceService;
-        helper = new BigCommerceHelper(_bigCommerceService, _webHostEnvironment, _dbContextFactory);
+        helper = new BigCommerceHelper(_bigCommerceService, _dbContextFactory);
     }
 
     public const string BIGCOMMERCE_ORDER_ID_PREFIX = "BigCommerce-";
@@ -123,7 +110,7 @@ public class UIBigCommerceController : Controller
             RedirectUrl = callbackUrl,
             ClientSecret = model.ClientSecret,
             StoreName = CurrentStore.StoreName,
-            ApplicationUserId = GetUserId()
+            ApplicationUserId = userId
         };
         ctx.Add(entity);
         await ctx.SaveChangesAsync();
@@ -166,10 +153,11 @@ public class UIBigCommerceController : Controller
         bigCommerceStore.BigCommerceUserEmail = bigCommerceStoreDetails.user.email;
         bigCommerceStore.BigCommerceUserId = bigCommerceStoreDetails.user.id.ToString();
 
-        await helper.UploadCheckoutScript(bigCommerceStore);
-
-        ctx.Update(bigCommerceStore); 
+        ctx.Update(bigCommerceStore);
         await ctx.SaveChangesAsync();
+
+        await helper.UploadCheckoutScript(bigCommerceStore, Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme));
+
         return Ok("Big commerce store installation was successful");
     }
 
@@ -245,7 +233,7 @@ public class UIBigCommerceController : Controller
             await ctx.SaveChangesAsync();
 
             HttpContext.Session.Clear();
-            return Ok("Big commerce store uninstalled successfully");
+            return Ok("Big commerce store uninstalled successfully.");
         }
         catch (Exception ex)
         {
@@ -316,7 +304,11 @@ public class UIBigCommerceController : Controller
     public async Task<IActionResult> GetBtcPayJavascript(string storeId)
     {
         var jsFile = await helper.GetCustomJavascript(storeId, Request.GetAbsoluteRoot());
-        return Content(jsFile, "text/javascript");
+        if (!jsFile.succeeded)
+        {
+            return BadRequest(jsFile.response);
+        }
+        return Content(jsFile.response, "text/javascript");
     }
 
 

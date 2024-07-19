@@ -1,11 +1,10 @@
 ﻿using BTCPayServer.Plugins.BigCommercePlugin.Data;
 using BTCPayServer.Plugins.BigCommercePlugin.Services;
 using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
-using Microsoft.AspNetCore.Hosting;
 using System;
 using System.IdentityModel.Tokens.Jwt;
-using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
@@ -13,12 +12,10 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
     public class BigCommerceHelper
     {
         private readonly BigCommerceService _bigCommerceService;
-        private readonly IWebHostEnvironment _webHostEnvironment;
         private readonly BigCommerceDbContextFactory _dbContextFactory;
-        public BigCommerceHelper(BigCommerceService bigCommerceService, IWebHostEnvironment webHostEnvironment, BigCommerceDbContextFactory dbContextFactory)
+        public BigCommerceHelper(BigCommerceService bigCommerceService, BigCommerceDbContextFactory dbContextFactory)
         {
             _dbContextFactory = dbContextFactory;
-            _webHostEnvironment = webHostEnvironment;
             _bigCommerceService = bigCommerceService;
 
         }
@@ -39,7 +36,7 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
             return store.StoreHash == claims.sub && store.ClientId == claims.aud;
         }
 
-        public async Task UploadCheckoutScript(BigCommerceStore bigCommerceStore)
+        public async Task UploadCheckoutScript(BigCommerceStore bigCommerceStore, string jsFilePath)
         {
             CreateCheckoutScriptResponse script = null;
             if (!string.IsNullOrEmpty(bigCommerceStore.JsFileUuid))
@@ -47,12 +44,12 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
                 var existingScript = await _bigCommerceService.GetCheckoutScriptAsync(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
                 if (existingScript == null)
                 {
-                    script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, bigCommerceStore.StoreId);
+                    script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, jsFilePath);
                 }
             }
             else
             {
-                script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, bigCommerceStore.StoreId);
+                script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, jsFilePath);
             }
             if (script != null && !string.IsNullOrEmpty(script.data.uuid))
             {
@@ -60,28 +57,53 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
             }
         }
 
-        public async Task<string> GetCustomJavascript(string storeId, string baseUrl)
+        public async Task<(bool succeeded, string response)> GetCustomJavascript(string storeId, string baseUrl)
         {
             await using var ctx = _dbContextFactory.CreateContext();
             var bcStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
             if (bcStore == null)
             {
-                // throw an error.
+                return (false, "Invalid store Id specified");
             }
-            string[] fileList = new[] { "Resources/js/btcpay-bc.js" };
+
+            string fileUrl = "https://raw.githubusercontent.com/TChukwuleta/BTCPayServerPlugins/main/Plugins/BTCPayServer.Plugins.BigCommercePlugin/Resources/js/btcpay-bc.js";
+
             string combinedJavascript = string.Empty;
+
+            using (var httpClient = new HttpClient())
+            {
+                try
+                {
+                    combinedJavascript = await httpClient.GetStringAsync(fileUrl);
+                }
+                catch (Exception ex)
+                {
+                    return (false, $"Failed to fetch file content: {ex.Message}");
+                }
+            }
+
+            // Find a way to pull the JS file directly from the plugin through BTCPay server
+
+            /*string resourcesFolder = Path.Combine(AppContext.BaseDirectory, "Resources", "js");
+            string[] fileList = new[] { "btcpay-bc.js" };
+            string combinedJavascript = string.Empty;
+
             foreach (var file in fileList)
             {
-                var fileInfo = _webHostEnvironment.WebRootFileProvider.GetFileInfo(file);
-                if (fileInfo.Exists)
+                string filePath = Path.Combine(resourcesFolder, file);
+                _logger.LogInformation($"File path is: {filePath}");
+                var fileInfo = _webHostEnvironment.WebRootFileProvider.GetFileInfo(filePath);
+                if (fileInfo.Exists);
                 {
                     await using var stream = fileInfo.CreateReadStream();
                     using var reader = new StreamReader(stream);
                     combinedJavascript += Environment.NewLine + await reader.ReadToEndAsync();
                 }
-            }
+            }*/
+
+
             string jsVariables = $"var BTCPAYSERVER_URL = '{baseUrl}'; var STORE_HASH = '{bcStore.StoreHash}'; var BTCPAYSERVER_STORE_ID = '{storeId}';";
-            return $"{jsVariables}{combinedJavascript}";
+            return (true, $"{jsVariables}{combinedJavascript}");
         }
     }
 }

@@ -47,9 +47,9 @@ public class BigCommerceService
         return (true, await response.Content.ReadAsStringAsync());
     }
 
-    public async Task<CreateCheckoutScriptResponse> SetCheckoutScriptAsync(string storeHash, string storeId)
+    public async Task<CreateCheckoutScriptResponse> SetCheckoutScriptAsync(string storeHash, string jsFilePath)
     {
-        var jsFilePath = $"{GetBaseUrl()}/plugins/{storeId}/bigcommerce/btcpay-bc.js";
+        //var jsFilePath = $"{GetBaseUrl()}/plugins/{storeId}/bigcommerce/btcpay-bc.js";
         try
         {
             var payload = new
