@@ -36,7 +36,7 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
             return store.StoreHash == claims.sub && store.ClientId == claims.aud;
         }
 
-        public async Task UploadCheckoutScript(BigCommerceStore bigCommerceStore, string jsFilePath)
+        public async Task<BigCommerceStore> UploadCheckoutScript(BigCommerceStore bigCommerceStore, string jsFilePath)
         {
             CreateCheckoutScriptResponse script = null;
             if (!string.IsNullOrEmpty(bigCommerceStore.JsFileUuid))
@@ -44,17 +44,18 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
                 var existingScript = await _bigCommerceService.GetCheckoutScriptAsync(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
                 if (existingScript == null)
                 {
-                    script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, jsFilePath);
+                    script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, jsFilePath, bigCommerceStore.AccessToken);
                 }
             }
             else
             {
-                script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, jsFilePath);
+                script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, jsFilePath, bigCommerceStore.AccessToken);
             }
             if (script != null && !string.IsNullOrEmpty(script.data.uuid))
             {
                 bigCommerceStore.JsFileUuid = script.data.uuid;
             }
+            return bigCommerceStore;
         }
 
         public async Task<(bool succeeded, string response)> GetCustomJavascript(string storeId, string baseUrl)

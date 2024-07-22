@@ -17,6 +17,10 @@ using BTCPayServer.Plugins.BigCommercePlugin.Helper;
 using BTCPayServer.Controllers;
 using BTCPayServer.Client;
 using BTCPayServer.Abstractions.Constants;
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
+using System.Web;
+using System.Security.Claims;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -121,8 +125,13 @@ public class UIBigCommerceController : Controller
 
     [AllowAnonymous]
     [HttpGet("~/plugins/{storeId}/bigcommerce/auth/install")]
-    public async Task<IActionResult> Install(string storeId, [FromQuery] string code, [FromQuery] string context, [FromQuery] string scope)
+    public async Task<IActionResult> Install(string storeId, [FromQuery] string account_uuid, [FromQuery] string code, [FromQuery] string context, [FromQuery] string scope)
     {
+        account_uuid = HttpUtility.UrlDecode(account_uuid);
+        code = HttpUtility.UrlDecode(code);
+        context = HttpUtility.UrlDecode(context);
+        scope = HttpUtility.UrlDecode(scope);
+
         await using var ctx = _dbContextFactory.CreateContext();
         var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
         if (bigCommerceStore == null)
@@ -138,7 +147,8 @@ public class UIBigCommerceController : Controller
             ClientId = bigCommerceStore.ClientId,
             ClientSecret = bigCommerceStore.ClientSecret,
             Code = code,
-            RedirectUrl = bigCommerceStore.RedirectUrl,
+            RedirectUrl = Url.Action("Install", "UIBigCommerce", new { storeId = storeId }, Request.Scheme),
+            //RedirectUrl = "https://01c1-102-88-82-88.ngrok-free.app/plugins/7zFr8vWCHQpWXnobdZdjiX8AcAG56fspdjinLYXuyLbi/bigcommerce/auth/install",
             Context = context,
             Scope = scope
         });
@@ -153,11 +163,10 @@ public class UIBigCommerceController : Controller
         bigCommerceStore.BigCommerceUserEmail = bigCommerceStoreDetails.user.email;
         bigCommerceStore.BigCommerceUserId = bigCommerceStoreDetails.user.id.ToString();
 
+        bigCommerceStore = await helper.UploadCheckoutScript(bigCommerceStore, Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId }, Request.Scheme));
+
         ctx.Update(bigCommerceStore);
         await ctx.SaveChangesAsync();
-
-        await helper.UploadCheckoutScript(bigCommerceStore, Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme));
-
         return Ok("Big commerce store installation was successful");
     }
 
@@ -184,21 +193,7 @@ public class UIBigCommerceController : Controller
                 return BadRequest("Invalid signed_payload_jwt parameter");
             }
 
-            var htmlContent = $@"
-            <!DOCTYPE html>
-            <html lang='en'>
-            <head>
-                <meta charset='UTF-8'>
-                <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-                <title>BTCPay BigCommerce plugin</title>
-            </head>
-            <body>
-                <h1>BigCommerce Auth Load</h1>
-                <p>BTCPay Store: {storeId}</p>
-                <p>Store Hash: {bigCommerceStore.StoreHash}</p>
-            </body>
-            </html>";
-            return Content(htmlContent, "text/html");
+            return Redirect("https://01c1-102-88-82-88.ngrok-free.app/plugins/7zFr8vWCHQpWXnobdZdjiX8AcAG56fspdjinLYXuyLbi/bigcommerce/auth/install");
         }
         catch (Exception ex)
         {
@@ -228,11 +223,9 @@ public class UIBigCommerceController : Controller
             {
                 return BadRequest("Invalid signed_payload_jwt parameter");
             }
-            await _bigCommerceService.DeleteCheckoutScriptAsync(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
             ctx.Remove(bigCommerceStore);
             await ctx.SaveChangesAsync();
 
-            HttpContext.Session.Clear();
             return Ok("Big commerce store uninstalled successfully.");
         }
         catch (Exception ex)

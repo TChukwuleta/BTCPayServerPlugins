@@ -26,30 +26,33 @@ public class BigCommerceService
 
     public async Task<(bool success, string content)> InstallApplication(InstallBigCommerceApplicationRequestModel requestModel)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://login.bigcommerce.com/oauth2/token");
-        var content = new FormUrlEncodedContent(new[]
+        string result = string.Empty;
+        using (var client = new HttpClient())
         {
-            new KeyValuePair<string, string>("client_id", requestModel.ClientId),
-            new KeyValuePair<string, string>("client_secret", requestModel.ClientSecret),
-            new KeyValuePair<string, string>("code", requestModel.Code),
-            new KeyValuePair<string, string>("scope", requestModel.Scope),
-            new KeyValuePair<string, string>("grant_type", requestModel.GrantType),
-            new KeyValuePair<string, string>("redirect_uri", requestModel.RedirectUrl),
-            new KeyValuePair<string, string>("context", requestModel.Context)
-        });
-        request.Content = content;
-        var response = await _client.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
-        {
-            _logger.LogError($"An error occurred while trying to install a big commerce application: {response.ReasonPhrase}");
-            return (false, response.ReasonPhrase);
+            var requestUri = "https://login.bigcommerce.com/oauth2/token";
+            var content = new FormUrlEncodedContent(new[]
+            {
+                    new KeyValuePair<string, string>("client_id", requestModel.ClientId),
+                    new KeyValuePair<string, string>("client_secret", requestModel.ClientSecret),
+                    new KeyValuePair<string, string>("code", requestModel.Code),
+                    new KeyValuePair<string, string>("scope", requestModel.Scope),
+                    new KeyValuePair<string, string>("grant_type", requestModel.GrantType),
+                    new KeyValuePair<string, string>("redirect_uri", requestModel.RedirectUrl),
+                    new KeyValuePair<string, string>("context", requestModel.Context),
+            });
+            var response = await client.PostAsync(requestUri, content);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                return (false, $"An error occurred while installing a big commerce application: {errorResponse}");
+            }
+            result = await response.Content.ReadAsStringAsync();
         }
-        return (true, await response.Content.ReadAsStringAsync());
+        return (true, result);
     }
 
-    public async Task<CreateCheckoutScriptResponse> SetCheckoutScriptAsync(string storeHash, string jsFilePath)
+    public async Task<CreateCheckoutScriptResponse> SetCheckoutScriptAsync(string storeHash, string jsFilePath, string accessToken)
     {
-        //var jsFilePath = $"{GetBaseUrl()}/plugins/{storeId}/bigcommerce/btcpay-bc.js";
         try
         {
             var payload = new
@@ -65,7 +68,7 @@ public class BigCommerceService
                 consent_category = "essential",
                 enabled = true,
             };
-            var result = await MakeBigCommerceAPICallAsync(HttpMethod.Post, "v3/content/scripts", storeHash, payload);
+            var result = await MakeBigCommerceAPICallAsync(HttpMethod.Post, "v3/content/scripts", storeHash, payload, null, accessToken);
             return JsonConvert.DeserializeObject<CreateCheckoutScriptResponse>(await result.Content.ReadAsStringAsync());
         }
         catch (Exception ex)
