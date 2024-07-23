@@ -74,22 +74,28 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
 
         public async Task<BigCommerceStore> UploadCheckoutScript(BigCommerceStore bigCommerceStore, string jsFilePath)
         {
-            CreateCheckoutScriptResponse script = null;
-            if (!string.IsNullOrEmpty(bigCommerceStore.JsFileUuid))
+            try
             {
-                var existingScript = await _bigCommerceService.GetCheckoutScriptAsync(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
-                if (existingScript == null)
+                CreateCheckoutScriptResponse script = null;
+                if (!string.IsNullOrEmpty(bigCommerceStore.JsFileUuid))
+                {
+                    var existingScript = await _bigCommerceService.GetCheckoutScriptAsync(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+                    if (existingScript == null)
+                    {
+                        script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, jsFilePath, bigCommerceStore.AccessToken);
+                    }
+                }
+                else
                 {
                     script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, jsFilePath, bigCommerceStore.AccessToken);
                 }
+                if (script != null && !string.IsNullOrEmpty(script.data.uuid))
+                {
+                    bigCommerceStore.JsFileUuid = script.data.uuid;
+                }
             }
-            else
+            catch (Exception)
             {
-                script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, jsFilePath, bigCommerceStore.AccessToken);
-            }
-            if (script != null && !string.IsNullOrEmpty(script.data.uuid))
-            {
-                bigCommerceStore.JsFileUuid = script.data.uuid;
             }
             return bigCommerceStore;
         }

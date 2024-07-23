@@ -16,16 +16,6 @@ With this you have the option of accepting Bitcoin payments for your store.
 8. Log back to your big commerce application and update your app with the three url.
 
 
-## Flow
-When a customer goes to the ticket purchase page, they can enter a name and must enter an email. Ticket Tailor requires a full name, so we generate one if not specified.
-After the tickets are selected, the customer is redirected to the BTCPay Server checkout page, and a hold for the selected tickets is created to reserve the tickets for this customer. After the payment is sent, the customer is redirected to a custom receipt page where they can see their tickets. Tickets are only issued AFTER an invoice is settled. If an invoice is set to invalid or expired, the hold is deleted and the tickets are released for sale again.
+## Big Commerce Uninstall
 
-
-## Additional Configuration
-
-You should configure the [SMTP email settings in the store](https://docs.btcpayserver.org/Notifications/#store-emails) so that users receive the ticket link by email after an invoice is settled.
-You're also able to override ticket names, prices and description on the BTCPay Server side.
-
-## Secret Tickets
-
-You can configure a ticket on ticket tailor to require an access code. BTCPay Server allows you to add `?accessCode=XXXX` to the ticket purchase page url to allow customers to view and purchase these secret tickets.
+Once you uninstall the application, the client Id and the client secret is also deleted from the store and can be reused by another store, or the same store with a new application
