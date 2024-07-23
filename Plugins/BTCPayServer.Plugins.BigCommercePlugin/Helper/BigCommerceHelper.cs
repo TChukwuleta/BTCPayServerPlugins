@@ -1,11 +1,14 @@
 ﻿using BTCPayServer.Plugins.BigCommercePlugin.Data;
 using BTCPayServer.Plugins.BigCommercePlugin.Services;
 using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
+using Microsoft.IdentityModel.Tokens;
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
 {
@@ -29,6 +32,39 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
             var payloadJson = System.Text.Json.JsonSerializer.Serialize(payload);
             var payloadData = System.Text.Json.JsonSerializer.Deserialize<BigCommerceSignedJwtPayloadRequest>(payloadJson);
             return payloadData;
+        }
+
+        public string EncodePayload(BigCommerceSignedJwtPayloadRequest session, string clientSecret)
+        {
+            var context = session.sub.Split('/')[1] ?? string.Empty;
+
+            var claims = new[]
+            {
+                new System.Security.Claims.Claim("context", context),
+                new System.Security.Claims.Claim("user", session.user.ToString()),
+                new System.Security.Claims.Claim("owner", session.owner.ToString())
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(clientSecret));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                claims: claims,
+                expires: DateTime.Now.AddHours(24),
+                signingCredentials: creds);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        public string BuildRedirectUrl(string url, string encodedContext)
+        {
+            var uri = new Uri(url);
+            var query = uri.Query.TrimStart('?');
+            var queryParams = HttpUtility.ParseQueryString(query);
+            queryParams["context"] = encodedContext;
+
+            var newQuery = queryParams.ToString();
+            return $"{uri.GetLeftPart(UriPartial.Path)}?{newQuery}";
         }
 
         public bool ValidateClaims(BigCommerceStore store, dynamic claims)

@@ -21,13 +21,17 @@ using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Web;
 using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
-[Route("~/plugins/bigcommerce")]
+[Route("~/plugins/{storeId}/bigcommerce")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIBigCommerceController : Controller
 {
+    private readonly ILogger<UIBigCommerceController> _logger;  
     private readonly BigCommerceService _bigCommerceService;
     private readonly UIInvoiceController _invoiceController;
     private readonly BigCommerceDbContextFactory _dbContextFactory;
@@ -35,10 +39,12 @@ public class UIBigCommerceController : Controller
     private BigCommerceHelper helper;
     public UIBigCommerceController
         (UIInvoiceController invoiceController,
+        ILogger<UIBigCommerceController> logger,
         BigCommerceService bigCommerceService,
         UserManager<ApplicationUser> userManager,
         BigCommerceDbContextFactory dbContextFactory)
     {
+        _logger = logger;
         _userManager = userManager;
         _invoiceController = invoiceController;
         _dbContextFactory = dbContextFactory;
@@ -50,13 +56,13 @@ public class UIBigCommerceController : Controller
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
 
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string storeId)
     {
-        if (CurrentStore is null)
+        if (string.IsNullOrEmpty(storeId))
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var bigCommerceStore = ctx.BigCommerceStores.SingleOrDefault(c => c.StoreId == CurrentStore.Id);
+        var bigCommerceStore = ctx.BigCommerceStores.SingleOrDefault(c => c.StoreId == storeId);
         if (bigCommerceStore == null)
         {
             return RedirectToAction(nameof(Create), "UIBigCommerce");
@@ -147,7 +153,7 @@ public class UIBigCommerceController : Controller
             ClientId = bigCommerceStore.ClientId,
             ClientSecret = bigCommerceStore.ClientSecret,
             Code = code,
-            RedirectUrl = Url.Action("Install", "UIBigCommerce", new { storeId = storeId }, Request.Scheme),
+            RedirectUrl = Url.Action("Install", "UIBigCommerce", new { storeId }, Request.Scheme),
             //RedirectUrl = "https://01c1-102-88-82-88.ngrok-free.app/plugins/7zFr8vWCHQpWXnobdZdjiX8AcAG56fspdjinLYXuyLbi/bigcommerce/auth/install",
             Context = context,
             Scope = scope
@@ -193,7 +199,8 @@ public class UIBigCommerceController : Controller
                 return BadRequest("Invalid signed_payload_jwt parameter");
             }
 
-            return Redirect("https://01c1-102-88-82-88.ngrok-free.app/plugins/7zFr8vWCHQpWXnobdZdjiX8AcAG56fspdjinLYXuyLbi/bigcommerce/auth/install");
+            return Redirect("https://bigcommerce.btcpay.tech/");
+            //return View();
         }
         catch (Exception ex)
         {

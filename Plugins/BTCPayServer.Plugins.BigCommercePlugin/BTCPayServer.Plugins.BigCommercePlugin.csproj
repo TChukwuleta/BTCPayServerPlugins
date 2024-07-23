@@ -44,6 +44,5 @@
   <ItemGroup>
 	<ProjectReference Include="..\..\btcpayserver\BTCPayServer\BTCPayServer.csproj" />
     <Folder Include="Resources\js\" />
-    <Folder Include="Views\UIBigCommerce\" />
   </ItemGroup>
 </Project>
