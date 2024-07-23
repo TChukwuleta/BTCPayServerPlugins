@@ -11,3 +11,6 @@ This plugin allows you to generate multiple stores in your BTCPay Server instanc
 4. You can then go ahead and add multiple stores by entering the store name and selecting the exchange providers for the different stores intended to be created
 
 
+![image](https://github.com/user-attachments/assets/ba180370-24a9-41ce-8617-f8faa8a5f023)
+
+
