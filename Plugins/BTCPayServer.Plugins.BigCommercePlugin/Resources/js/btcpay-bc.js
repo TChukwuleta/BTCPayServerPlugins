@@ -72,6 +72,7 @@ const getCart = () => {
     })
         .then(response => response.json())
         .then(myJson => {
+            console.log(myJson);
             const cart = {
                 id: myJson[0].id,
                 currency: myJson[0].currency.code,
@@ -80,12 +81,10 @@ const getCart = () => {
             };
             console.log('Log Cart');
             console.table(cart);
-            // Resolve the promise with the cart data
             return cart;
         })
         .catch(error => {
             console.error('Error fetching cart:', error);
-            // You might want to handle the rejected state by returning a default value or re-throwing the error
             throw error;
         });
 }

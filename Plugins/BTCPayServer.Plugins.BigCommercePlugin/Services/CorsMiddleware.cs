@@ -20,7 +20,7 @@ public class CorsMiddleware
 
         if (context.Request.Method == "OPTIONS")
         {
-            context.Response.StatusCode = 204;
+            context.Response.StatusCode = 204; // No Content
             return;
         }
 

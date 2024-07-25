@@ -73,7 +73,6 @@ public class BigCommerceService
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Error setting file via BC API: " + ex.Message);
             throw new ApplicationException("Error setting file via BC API", ex);
         }
     }
@@ -94,11 +93,12 @@ public class BigCommerceService
         await MakeBigCommerceAPICallAsync(HttpMethod.Put, $"v2/orders/{orderId}", storeHash, data, null, accessToken);
     }
 
-    public async Task<CreateBigCommerceOrderResponse> CreateOrderAsync(string storeHash, string checkoutId, string accessToken)
+    public async Task<CreateBigCommerceOrderResponse> CheckoutOrderAsync(string storeHash, string checkoutId, string accessToken)
     {
         var result = await MakeBigCommerceAPICallAsync(HttpMethod.Post, $"v3/checkouts/{checkoutId}/orders", storeHash, null, null, accessToken);
         if (!result.IsSuccessStatusCode)
         {
+            _logger.LogError($"Unable to checkout orders... Status code: {result.StatusCode.ToString()}... Error content: {result.Content.ToString()}");
             return null;
         }
         return JsonConvert.DeserializeObject<CreateBigCommerceOrderResponse>(await result.Content.ReadAsStringAsync());

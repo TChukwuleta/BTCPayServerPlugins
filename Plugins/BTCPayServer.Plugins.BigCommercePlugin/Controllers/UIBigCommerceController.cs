@@ -20,6 +20,7 @@ using System.Web;
 using Newtonsoft.Json;
 using BTCPayServer.Services.Stores;
 using BTCPayServer.Services.Invoices;
+using Microsoft.AspNetCore.Cors;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -233,20 +234,19 @@ public class UIBigCommerceController : Controller
 
     [AllowAnonymous]
     [HttpPost("~/plugins/{storeId}/bigcommerce/create-order")]
+    [EnableCors("AllowAllOrigins")]
     public async Task<IActionResult> CreateOrder(CreateBigCommerceStoreRequest requestModel)
     {
         try
         {
-            _logger.LogInformation("ABout to create order");
             await using var ctx = _dbContextFactory.CreateContext();
             var exisitngStores = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == requestModel.storeId);
             if (exisitngStores == null)
             {
-                _logger.LogError("Invalid existing store");
                 return BadRequest("Cannot create big commerce order. Invalid store Id");
             }
-            _logger.LogInformation($"About to create order on Big commerce: Cart Id: {requestModel.cartId}... AccessToken: {exisitngStores.AccessToken}.. Store hash: {exisitngStores.StoreHash}");
-            var createOrder = await _bigCommerceService.CreateOrderAsync(exisitngStores.StoreHash, requestModel.cartId, exisitngStores.AccessToken);
+            _logger.LogInformation($"About to create order on Big commerce. Request {JsonConvert.SerializeObject(requestModel)}");
+            var createOrder = await _bigCommerceService.CheckoutOrderAsync(exisitngStores.StoreHash, requestModel.cartId, exisitngStores.AccessToken);
             if (createOrder == null)
             {
                 _logger.LogError($"An error occurred while creating order.");
