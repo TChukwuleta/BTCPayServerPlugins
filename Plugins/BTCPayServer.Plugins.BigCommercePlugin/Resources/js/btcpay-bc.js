@@ -37,6 +37,7 @@ const handleBitcoinPayment = (event) => {
 
     getCart()
         .then(cart => {
+            console.log(cart);
             return fetch(BTCPAYSERVER_URL + '/plugins/' + BTCPAYSERVER_STORE_ID + '/bigcommerce/create-order', {
                 method: 'POST',
                 headers: {
@@ -79,8 +80,6 @@ const getCart = () => {
                 amount: myJson[0].cartAmount,
                 customerEmail: myJson[0].email
             };
-            console.log('Log Cart');
-            console.table(cart);
             return cart;
         })
         .catch(error => {
@@ -187,11 +186,8 @@ const showOrderConfirmation = (orderId, invoiceId) => {
 
 const loadModalScript = () => {
     const script = document.createElement('script');
-    //script.src = 'https://testnet.demo.btcpay.tech/modal/btcpay.js';
-    console.log("Here.. ABout to access the script");
     script.src = BTCPAYSERVER_URL + /plugins/ + BTCPAYSERVER_STORE_ID + '/bigcommerce/modal/btcpay.js';
-    console.log("Here.. Done accessing the script");
-    console.log(script);
+    console.log("... Done accessing the script");
     document.head.appendChild(script);
 
     // Optional: Handle loading and error events
@@ -204,7 +200,6 @@ const loadModalScript = () => {
     };
 }
 
-console.log("We are here");
 // Entrypoint.
 loadModalScript();
 const pollInterval = setInterval(observePaymentOptions, 300);
