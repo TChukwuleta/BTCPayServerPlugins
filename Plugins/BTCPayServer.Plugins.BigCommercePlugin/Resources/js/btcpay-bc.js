@@ -186,7 +186,8 @@ const showOrderConfirmation = (orderId, invoiceId) => {
 
 const loadModalScript = () => {
     const script = document.createElement('script');
-    script.src = BTCPAYSERVER_URL + /plugins/ + BTCPAYSERVER_STORE_ID + '/bigcommerce/modal/btcpay.js';
+    script.src = 'https://testnet.demo.btcpay.tech/modal/btcpay.js';
+    //script.src = BTCPAYSERVER_URL + /plugins/ + BTCPAYSERVER_STORE_ID + '/bigcommerce/modal/btcpay.js';
     document.head.appendChild(script);
 
     // Optional: Handle loading and error events
