@@ -245,10 +245,11 @@ public class UIBigCommerceController : Controller
                 _logger.LogError("Invalid existing store");
                 return BadRequest("Cannot create big commerce order. Invalid store Id");
             }
+            _logger.LogInformation($"About to create order on Big commerce: Cart Id: {requestModel.cartId}... AccessToken: {exisitngStores.AccessToken}.. Store hash: {exisitngStores.StoreHash}");
             var createOrder = await _bigCommerceService.CreateOrderAsync(exisitngStores.StoreHash, requestModel.cartId, exisitngStores.AccessToken);
             if (createOrder == null)
             {
-                _logger.LogError($"An error occurred while creating order. Cart Id: {requestModel.cartId}... AccessToken: {exisitngStores.AccessToken}.. Store hash: {exisitngStores.StoreHash}");
+                _logger.LogError($"An error occurred while creating order.");
                 return BadRequest("An error occurred while creating order");
             }
             _logger.LogInformation($"Created an order successfully: {JsonConvert.SerializeObject(createOrder)}");

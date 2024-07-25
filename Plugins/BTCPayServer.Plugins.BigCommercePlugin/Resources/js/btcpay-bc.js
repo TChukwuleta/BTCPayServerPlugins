@@ -1,15 +1,12 @@
 
 const observePaymentOptions = () => {
-    console.log("we got here 1");
     const checkoutForm = document.querySelector('.checkout-form');
     if (!checkoutForm) return;
 
-    console.log("we got here 2");
     const paymentButton = document.getElementById('checkout-payment-continue');
     if (!paymentButton) return;
 
     const updatePaymentButton = () => {
-        console.log("Update payment 1");
         const bitcoinOptionSelected = Array.from(checkoutForm.querySelectorAll('input[name="paymentProviderRadio"]')).some(radio => {
             return radio.nextElementSibling && radio.nextElementSibling.innerText.includes('Bitcoin') && radio.checked;
         });
@@ -22,14 +19,11 @@ const observePaymentOptions = () => {
             paymentButton.onclick = null; // Reset to default behavior
         }
     };
-    console.log("we got here 3");
 
     const paymentOptions = checkoutForm.querySelectorAll('input[name="paymentProviderRadio"]');
-    console.log("we got here 4");
     paymentOptions.forEach(radio => {
         radio.addEventListener('change', updatePaymentButton);
     });
-    console.log("we got here 5");
 
     // Initial call to set the correct button state
     updatePaymentButton();
@@ -43,7 +37,7 @@ const handleBitcoinPayment = (event) => {
 
     getCart()
         .then(cart => {
-            return fetch(BTCPAYSERVER_URL + 'plugins/' + BTCPAYSERVER_STORE_ID + '/bigcommerce/create-order', {
+            return fetch(BTCPAYSERVER_URL + '/plugins/' + BTCPAYSERVER_STORE_ID + '/bigcommerce/create-order', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
