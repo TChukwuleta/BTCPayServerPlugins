@@ -100,6 +100,33 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
             return bigCommerceStore;
         }
 
+        public async Task<(bool succeeded, string response)> GetCustomModalJavascript(string storeId)
+        {
+            await using var ctx = _dbContextFactory.CreateContext();
+            var bcStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
+            if (bcStore == null)
+            {
+                return (false, "Invalid store Id specified");
+            }
+
+            string fileUrl = "https://raw.githubusercontent.com/TChukwuleta/BTCPayServerPlugins/main/Plugins/BTCPayServer.Plugins.BigCommercePlugin/Resources/js/btcpay.js";
+
+            string combinedJavascript = string.Empty;
+
+            using (var httpClient = new HttpClient())
+            {
+                try
+                {
+                    combinedJavascript = await httpClient.GetStringAsync(fileUrl);
+                }
+                catch (Exception ex)
+                {
+                    return (false, $"Failed to fetch file content: {ex.Message}");
+                }
+            }
+            return (true, combinedJavascript);
+        }
+
         public async Task<(bool succeeded, string response)> GetCustomJavascript(string storeId, string baseUrl)
         {
             await using var ctx = _dbContextFactory.CreateContext();

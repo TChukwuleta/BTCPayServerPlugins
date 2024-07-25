@@ -171,6 +171,7 @@ public class UIBigCommerceController : Controller
         bigCommerceStore = await helper.UploadCheckoutScript(bigCommerceStore, Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId }, Request.Scheme));
         ctx.Update(bigCommerceStore);
         await ctx.SaveChangesAsync();
+        _logger.LogInformation($"Big commerce store details: {JsonConvert.SerializeObject(bigCommerceStore)}");
         return Ok("Big commerce store installation was successful");
     }
 
@@ -236,17 +237,21 @@ public class UIBigCommerceController : Controller
     {
         try
         {
+            _logger.LogInformation("ABout to create order");
             await using var ctx = _dbContextFactory.CreateContext();
             var exisitngStores = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == requestModel.storeId);
             if (exisitngStores == null)
             {
+                _logger.LogError("Invalid existing store");
                 return BadRequest("Cannot create big commerce order. Invalid store Id");
             }
             var createOrder = await _bigCommerceService.CreateOrderAsync(exisitngStores.StoreHash, requestModel.cartId, exisitngStores.AccessToken);
             if (createOrder == null)
             {
+                _logger.LogError($"An error occurred while creating order. Cart Id: {requestModel.cartId}... AccessToken: {exisitngStores.AccessToken}.. Store hash: {exisitngStores.StoreHash}");
                 return BadRequest("An error occurred while creating order");
             }
+            _logger.LogInformation($"Created an order successfully: {JsonConvert.SerializeObject(createOrder)}");
             string bgOrderId = $"{BIGCOMMERCE_ORDER_ID_PREFIX}{createOrder.data.id}";
 
             var metadata = new InvoiceMetadata();
@@ -254,12 +259,16 @@ public class UIBigCommerceController : Controller
             metadata.BuyerEmail = requestModel.email;
 
             var store = await _storeRepo.FindStore(exisitngStores.StoreId);
-            var result = await _invoiceController.CreateInvoiceCoreRaw(new Client.Models.CreateInvoiceRequest()
+            var createInvoiceRequest = new Client.Models.CreateInvoiceRequest()
             {
                 Amount = requestModel.total,
                 Currency = requestModel.currency,
                 Metadata = metadata.ToJObject(),
-            }, store, HttpContext.Request.GetAbsoluteRoot());
+            };
+            _logger.LogInformation($"Create invoice request: {JsonConvert.SerializeObject(createInvoiceRequest)}");
+            _logger.LogInformation($"Store: {JsonConvert.SerializeObject(store)}");
+            var result = await _invoiceController.CreateInvoiceCoreRaw(createInvoiceRequest, store, HttpContext.Request.GetAbsoluteRoot());
+            _logger.LogInformation($"Invoice store response: {JsonConvert.SerializeObject(result)}");
 
             var entity = new Transaction
             {
@@ -293,6 +302,18 @@ public class UIBigCommerceController : Controller
     public async Task<IActionResult> GetBtcPayJavascript(string storeId)
     {
         var jsFile = await helper.GetCustomJavascript(storeId, Request.GetAbsoluteRoot());
+        if (!jsFile.succeeded)
+        {
+            return BadRequest(jsFile.response);
+        }
+        return Content(jsFile.response, "text/javascript");
+    }
+
+    [AllowAnonymous]
+    [HttpGet("~/plugins/{storeId}/bigcommerce/modal/btcpay.js")]
+    public async Task<IActionResult> GetBtcPayModalJavascript(string storeId)
+    {
+        var jsFile = await helper.GetCustomModalJavascript(storeId);
         if (!jsFile.succeeded)
         {
             return BadRequest(jsFile.response);
