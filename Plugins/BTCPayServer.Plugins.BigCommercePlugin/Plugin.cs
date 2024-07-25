@@ -2,8 +2,10 @@ using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
 using BTCPayServer.Plugins.BigCommercePlugin.Services;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -27,5 +29,20 @@ public class Plugin : BaseBTCPayServerPlugin
             factory.ConfigureBuilder(o);
         });
         services.AddHostedService<PluginMigrationRunner>();
+
+        services.AddCors(options =>
+        {
+            options.AddPolicy("AllowAllOrigins", builder =>
+            {
+                builder.AllowAnyOrigin()
+                       .AllowAnyMethod()
+                       .AllowAnyHeader();
+            });
+        });
+    }
+
+    public override void Execute(IApplicationBuilder applicationBuilder, IServiceProvider applicationBuilderApplicationServices)
+    {
+        applicationBuilder.UseMiddleware<CorsMiddleware>();
     }
 }
