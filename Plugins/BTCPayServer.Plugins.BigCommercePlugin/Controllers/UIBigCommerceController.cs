@@ -150,8 +150,7 @@ public class UIBigCommerceController : Controller
             ClientId = bigCommerceStore.ClientId,
             ClientSecret = bigCommerceStore.ClientSecret,
             Code = code,
-            //RedirectUrl = Url.Action("Install", "UIBigCommerce", new { storeId }, Request.Scheme),
-            RedirectUrl = "https://91eb-102-88-62-215.ngrok-free.app/plugins/5JEgjiJUC7Gkg7s9pmBJGWJJ8CjooY62e2Ck1LXCGZUX/bigcommerce/auth/install",
+            RedirectUrl = Url.Action("Install", "UIBigCommerce", new { storeId }, Request.Scheme),
             Context = context,
             Scope = scope
         });
