@@ -29,7 +29,6 @@ namespace BTCPayServer.Plugins.BigCommercePlugin;
 public class UIBigCommerceController : Controller
 {
     private readonly StoreRepository _storeRepo;
-    private readonly ILogger<UIBigCommerceController> _logger;
     private readonly BigCommerceService _bigCommerceService;
     private readonly UIInvoiceController _invoiceController;
     private readonly BigCommerceDbContextFactory _dbContextFactory;
@@ -39,12 +38,10 @@ public class UIBigCommerceController : Controller
         (StoreRepository storeRepo,
         UIInvoiceController invoiceController,
         BigCommerceService bigCommerceService,
-        ILogger<UIBigCommerceController> logger,
         UserManager<ApplicationUser> userManager,
         BigCommerceDbContextFactory dbContextFactory)
     {
         _storeRepo = storeRepo;
-        _logger = logger;
         _userManager = userManager;
         _invoiceController = invoiceController;
         _dbContextFactory = dbContextFactory;
@@ -267,9 +264,6 @@ public class UIBigCommerceController : Controller
             };
             ctx.Add(entity);
             await ctx.SaveChangesAsync();
-
-            _logger.LogInformation($"Transactions: {JsonConvert.SerializeObject(entity)}");
-
             return Ok(new
             {
                 id = result.Id,
@@ -277,7 +271,7 @@ public class UIBigCommerceController : Controller
                 Message = "Order created and invoice generated successfully"
             });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             return BadRequest("An error occurred while trying to create order for Big Commerce");
         }

@@ -15,13 +15,9 @@ public class BigCommerceService
 {
     private readonly string BTCPAY_SCRIPT_NAME = "btcpay-checkout";
     private readonly HttpClient _client;
-    private readonly ILogger<BigCommerceService> _logger;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    public BigCommerceService(HttpClient client, ILogger<BigCommerceService> logger, IHttpContextAccessor httpContextAccessor)
+    public BigCommerceService(HttpClient client)
     {
         _client = client;
-        _logger = logger;
-        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<(bool success, string content)> InstallApplication(InstallBigCommerceApplicationRequestModel requestModel)
@@ -80,22 +76,13 @@ public class BigCommerceService
     public async Task<bool> ConfirmOrderExistAsync(int orderId, string storeHash, string accessToken)
     {
         var result = await MakeBigCommerceAPICallAsync(HttpMethod.Get, $"v2/orders/{orderId}", storeHash, null, null, accessToken);
-        if (!result.IsSuccessStatusCode)
-        {
-            _logger.LogError($"Unable to confirm order... Status code: {result.StatusCode.ToString()}... Error content: {result.Content.ToString()}");
-            return false;
-        }
-        return true;
+        return result.IsSuccessStatusCode;
     }
 
     public async Task UpdateOrderStatusAsync(int orderId, BigCommerceOrderState status, string storeHash, string accessToken)
     {
         var data = new { status_id = (int)status };
-        var result = await MakeBigCommerceAPICallAsync(HttpMethod.Put, $"v2/orders/{orderId}", storeHash, data, null, accessToken);
-        if (!result.IsSuccessStatusCode)
-        {
-            _logger.LogError($"Unable to update order status... Status code: {result.StatusCode.ToString()}... Error content: {result.Content.ToString()}");
-        }
+        await MakeBigCommerceAPICallAsync(HttpMethod.Put, $"v2/orders/{orderId}", storeHash, data, null, accessToken);
     }
 
     public async Task<CreateBigCommerceOrderResponse> CheckoutOrderAsync(string storeHash, string checkoutId, string accessToken)
@@ -157,12 +144,5 @@ public class BigCommerceService
             Console.WriteLine($"Request status code: {e.StatusCode}");
             throw;
         }
-    }
-
-    private string GetBaseUrl()
-    {
-        var request = _httpContextAccessor.HttpContext.Request;
-        var baseUrl = $"{request.Scheme}://{request.Host}{request.PathBase}";
-        return baseUrl;
     }
 }

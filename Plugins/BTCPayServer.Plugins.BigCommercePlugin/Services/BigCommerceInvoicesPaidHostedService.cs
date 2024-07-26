@@ -50,12 +50,11 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
             }.Contains(invoiceEvent.Name))
         {
             var invoice = invoiceEvent.Invoice;
-            _logger.LogInformation($"Gotten hereeee. Invoice Id: {invoice.Id}...Status: {invoice.Status.ToString()}");
+            _logger.LogInformation($"Invoice Id: {invoice.Id}... Status: {invoice.Status.ToString()}");
             await using var ctx = _contextFactory.CreateContext();
             var bigCommerceStoreTransaction = ctx.Transactions.FirstOrDefault(c => c.InvoiceId == invoice.Id && c.TransactionStatus == Data.TransactionStatus.Pending);
             if (bigCommerceStoreTransaction != null)
             {
-                _logger.LogInformation($"Full invoice entity detail: {JsonConvert.SerializeObject(invoice)}");
                 if (new[] { "complete", "confirmed", "paid", "settled" }.Contains(invoice.Status.ToString().ToLower()) ||
                     (invoice.Status.ToString().ToLower() == "expired" && 
                      (invoice.ExceptionStatus is InvoiceExceptionStatus.PaidLate or InvoiceExceptionStatus.PaidOver)))
@@ -67,21 +66,10 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
 
                     bigCommerceStoreTransaction.TransactionStatus = Data.TransactionStatus.Success;
                     bigCommerceStoreTransaction.InvoiceId = invoice.Id;
-                    try
+                    bool confirmOrder = await _bigCommerceService.ConfirmOrderExistAsync(orderId, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+                    if (confirmOrder)
                     {
-                        _logger.LogInformation("About to confirm order");
-                        bool confirmOrder = await _bigCommerceService.ConfirmOrderExistAsync(orderId, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
-                        if (confirmOrder)
-                        {
-                            _logger.LogInformation($"Done confirming order");
-                            await _bigCommerceService.UpdateOrderStatusAsync(orderId, Data.BigCommerceOrderState.COMPLETED, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
-                        }
-                        _logger.LogInformation("Done Done");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError($"An error occured: {ex.Message}");
-                        throw;
+                        await _bigCommerceService.UpdateOrderStatusAsync(orderId, Data.BigCommerceOrderState.COMPLETED, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
                     }
                 }
                 else if (new[] { "invalid", "expired" }.Contains(invoice.GetInvoiceState()
