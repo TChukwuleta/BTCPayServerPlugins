@@ -105,6 +105,7 @@ const showBTCPayModal = function(data, checkoutForm) {
                 switch (event.data.status) {
                     case 'complete':
                     case 'paid':
+                    case 'confirmed':
                         invoice_paid = true;
                         showOrderConfirmation(data.orderId, data.id);
                         console.log('Invoice paid.');
@@ -187,14 +188,10 @@ const showOrderConfirmation = (orderId, invoiceId) => {
 const loadModalScript = () => {
     const script = document.createElement('script');
     script.src = BTCPAYSERVER_URL + /plugins/ + BTCPAYSERVER_STORE_ID + '/bigcommerce/modal/btcpay.js';
-    console.log("... Done accessing the script");
     document.head.appendChild(script);
-
-    // Optional: Handle loading and error events
     script.onload = function() {
         console.log('External modal script loaded successfully.');
     };
-
     script.onerror = function() {
         console.error('Error loading the external modal script.');
     };

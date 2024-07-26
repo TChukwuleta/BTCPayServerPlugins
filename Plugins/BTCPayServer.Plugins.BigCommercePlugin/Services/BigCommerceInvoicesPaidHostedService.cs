@@ -5,21 +5,24 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using BTCPayServer.Services.Invoices;
 using BTCPayServer.Client.Models;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin.Services;
 
 public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
 {
     private readonly BigCommerceDbContextFactory _contextFactory;
+    private readonly ILogger<BigCommerceInvoicesPaidHostedService> _logger;
     private readonly BigCommerceService _bigCommerceService;
 
     public BigCommerceInvoicesPaidHostedService(
         BigCommerceService bigCommerceService,
         BigCommerceDbContextFactory contextFactory, 
-        EventAggregator eventAggregator, Logs logs) : base(eventAggregator, logs)
+        EventAggregator eventAggregator, Logs logs, ILogger<BigCommerceInvoicesPaidHostedService> logger) : base(eventAggregator, logs)
     {
+        _logger = logger;
         _contextFactory = contextFactory;
         _bigCommerceService = bigCommerceService;
     }
@@ -28,6 +31,7 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
 
     protected override void SubscribeToEvents()
     {
+        _logger.LogInformation("Subscribe to Event");
         Subscribe<InvoiceEvent>();
         base.SubscribeToEvents();
     }
@@ -35,40 +39,58 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
 
     protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
     {
+        _logger.LogInformation($"About to process events");
         if (evt is InvoiceEvent invoiceEvent && !new[]
         {
-                InvoiceEvent.Created, InvoiceEvent.ExpiredPaidPartial,
-                InvoiceEvent.ReceivedPayment, InvoiceEvent.PaidInFull
+                InvoiceEvent.MarkedCompleted,
+                InvoiceEvent.MarkedInvalid,
+                InvoiceEvent.Expired,
+                InvoiceEvent.Confirmed,
+                InvoiceEvent.Completed
             }.Contains(invoiceEvent.Name))
         {
             var invoice = invoiceEvent.Invoice;
-            var bigCommerceOrderId = invoice.GetInternalTags(BIGCOMMERCE_ORDER_ID_PREFIX).FirstOrDefault();
-            if (bigCommerceOrderId != null)
+            _logger.LogInformation($"Gotten hereeee. Invoice Id: {invoice.Id}...Status: {invoice.Status.ToString()}");
+            await using var ctx = _contextFactory.CreateContext();
+            var bigCommerceStoreTransaction = ctx.Transactions.FirstOrDefault(c => c.InvoiceId == invoice.Id && c.TransactionStatus == Data.TransactionStatus.Pending);
+            if (bigCommerceStoreTransaction != null)
             {
-                await using var ctx = _contextFactory.CreateContext();
+                _logger.LogInformation($"Full invoice entity detail: {JsonConvert.SerializeObject(invoice)}");
+                if (new[] { "complete", "confirmed", "paid", "settled" }.Contains(invoice.Status.ToString().ToLower()) ||
+                    (invoice.Status.ToString().ToLower() == "expired" && 
+                     (invoice.ExceptionStatus is InvoiceExceptionStatus.PaidLate or InvoiceExceptionStatus.PaidOver)))
+                {
 
-                var bigCommerceStoreTransaction = ctx.Transactions.FirstOrDefault(c => c.OrderId == bigCommerceOrderId);
-                if (new[] { InvoiceStatusLegacy.Invalid, InvoiceStatusLegacy.Expired }.Contains(invoice.GetInvoiceState()
-                    .Status) && invoice.ExceptionStatus != InvoiceExceptionStatus.None)
-                {
-                    bigCommerceStoreTransaction.TransactionStatus = Data.TransactionStatus.Failed;
-                    bigCommerceStoreTransaction.InvoiceId = invoice.Id;
-                }
-                else if (new[] { InvoiceStatusLegacy.Complete, InvoiceStatusLegacy.Confirmed }.Contains(
-                    invoice.Status))
-                {
                     var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == bigCommerceStoreTransaction.StoreId);
-                    string orderNumberId = bigCommerceOrderId.Substring(BIGCOMMERCE_ORDER_ID_PREFIX.Length);
+                    string orderNumberId = bigCommerceStoreTransaction.OrderId.Substring(BIGCOMMERCE_ORDER_ID_PREFIX.Length);
                     int.TryParse(orderNumberId, out int orderId);
 
                     bigCommerceStoreTransaction.TransactionStatus = Data.TransactionStatus.Success;
                     bigCommerceStoreTransaction.InvoiceId = invoice.Id;
-                    bool confirmOrder = await _bigCommerceService.ConfirmOrderExistAsync(orderId, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
-                    if (confirmOrder)
+                    try
                     {
-                        await _bigCommerceService.UpdateOrderStatusAsync(orderId, Data.BigCommerceOrderState.COMPLETED, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+                        _logger.LogInformation("About to confirm order");
+                        bool confirmOrder = await _bigCommerceService.ConfirmOrderExistAsync(orderId, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+                        if (confirmOrder)
+                        {
+                            _logger.LogInformation($"Done confirming order");
+                            await _bigCommerceService.UpdateOrderStatusAsync(orderId, Data.BigCommerceOrderState.COMPLETED, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+                        }
+                        _logger.LogInformation("Done Done");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"An error occured: {ex.Message}");
+                        throw;
                     }
                 }
+                else if (new[] { "invalid", "expired" }.Contains(invoice.GetInvoiceState()
+                    .Status.ToString().ToLower()) && invoice.ExceptionStatus != InvoiceExceptionStatus.None)
+                {
+                    bigCommerceStoreTransaction.TransactionStatus = Data.TransactionStatus.Failed;
+                    bigCommerceStoreTransaction.InvoiceId = invoice.Id;
+                }
+
                 ctx.Update(bigCommerceStoreTransaction);
                 await ctx.SaveChangesAsync();
             }

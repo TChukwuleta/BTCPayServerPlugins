@@ -29,7 +29,7 @@ namespace BTCPayServer.Plugins.BigCommercePlugin;
 public class UIBigCommerceController : Controller
 {
     private readonly StoreRepository _storeRepo;
-    private readonly ILogger<UIBigCommerceController> _logger;  
+    private readonly ILogger<UIBigCommerceController> _logger;
     private readonly BigCommerceService _bigCommerceService;
     private readonly UIInvoiceController _invoiceController;
     private readonly BigCommerceDbContextFactory _dbContextFactory;
@@ -38,13 +38,13 @@ public class UIBigCommerceController : Controller
     public UIBigCommerceController
         (StoreRepository storeRepo,
         UIInvoiceController invoiceController,
-        ILogger<UIBigCommerceController> logger,
         BigCommerceService bigCommerceService,
+        ILogger<UIBigCommerceController> logger,
         UserManager<ApplicationUser> userManager,
         BigCommerceDbContextFactory dbContextFactory)
     {
-        _logger = logger;
         _storeRepo = storeRepo;
+        _logger = logger;
         _userManager = userManager;
         _invoiceController = invoiceController;
         _dbContextFactory = dbContextFactory;
@@ -154,7 +154,7 @@ public class UIBigCommerceController : Controller
             ClientSecret = bigCommerceStore.ClientSecret,
             Code = code,
             //RedirectUrl = Url.Action("Install", "UIBigCommerce", new { storeId }, Request.Scheme),
-            RedirectUrl = "https://01c1-102-88-82-88.ngrok-free.app/plugins/5JEgjiJUC7Gkg7s9pmBJGWJJ8CjooY62e2Ck1LXCGZUX/bigcommerce/auth/install",
+            RedirectUrl = "https://91eb-102-88-62-215.ngrok-free.app/plugins/5JEgjiJUC7Gkg7s9pmBJGWJJ8CjooY62e2Ck1LXCGZUX/bigcommerce/auth/install",
             Context = context,
             Scope = scope
         });
@@ -172,7 +172,6 @@ public class UIBigCommerceController : Controller
         bigCommerceStore = await helper.UploadCheckoutScript(bigCommerceStore, Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId }, Request.Scheme));
         ctx.Update(bigCommerceStore);
         await ctx.SaveChangesAsync();
-        _logger.LogInformation($"Big commerce store details: {JsonConvert.SerializeObject(bigCommerceStore)}");
         return Ok("Big commerce store installation was successful");
     }
 
@@ -185,7 +184,6 @@ public class UIBigCommerceController : Controller
         {
             return BadRequest("Missing signed_payload_jwt parameter");
         }
-        _logger.LogInformation($"Signed JWT token: {signed_payload_jwt}");
         await using var ctx = _dbContextFactory.CreateContext();
         var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
         if (bigCommerceStore == null)
@@ -214,28 +212,21 @@ public class UIBigCommerceController : Controller
         {
             return BadRequest("Invalid request");
         }
-        try
+        var claims = helper.DecodeJwtPayload(signed_payload_jwt);
+        if (!helper.ValidateClaims(bigCommerceStore, claims))
         {
-            var claims = helper.DecodeJwtPayload(signed_payload_jwt);
-            if (!helper.ValidateClaims(bigCommerceStore, claims))
-            {
-                return BadRequest("Invalid signed_payload_jwt parameter");
-            }
-            ctx.Remove(bigCommerceStore);
-            await ctx.SaveChangesAsync();
+            return BadRequest("Invalid signed_payload_jwt parameter");
+        }
+        ctx.Remove(bigCommerceStore);
+        await ctx.SaveChangesAsync();
 
-            return Ok("Big commerce store uninstalled successfully.");
-        }
-        catch (Exception ex)
-        {
-            return BadRequest($"Invalid token: {ex.Message}");
-        }
+        return Ok("Big commerce store uninstalled successfully");
     }
 
     [AllowAnonymous]
     [HttpPost("~/plugins/{storeId}/bigcommerce/create-order")]
     [EnableCors("AllowAllOrigins")]
-    public async Task<IActionResult> CreateOrder(CreateBigCommerceStoreRequest requestModel)
+    public async Task<IActionResult> CreateOrder([FromBody] CreateBigCommerceStoreRequest requestModel)
     {
         try
         {
@@ -245,14 +236,11 @@ public class UIBigCommerceController : Controller
             {
                 return BadRequest("Cannot create big commerce order. Invalid store Id");
             }
-            _logger.LogInformation($"About to create order on Big commerce. Request {JsonConvert.SerializeObject(requestModel)}");
             var createOrder = await _bigCommerceService.CheckoutOrderAsync(exisitngStores.StoreHash, requestModel.cartId, exisitngStores.AccessToken);
             if (createOrder == null)
             {
-                _logger.LogError($"An error occurred while creating order.");
                 return BadRequest("An error occurred while creating order");
             }
-            _logger.LogInformation($"Created an order successfully: {JsonConvert.SerializeObject(createOrder)}");
             string bgOrderId = $"{BIGCOMMERCE_ORDER_ID_PREFIX}{createOrder.data.id}";
 
             var metadata = new InvoiceMetadata();
@@ -260,16 +248,12 @@ public class UIBigCommerceController : Controller
             metadata.BuyerEmail = requestModel.email;
 
             var store = await _storeRepo.FindStore(exisitngStores.StoreId);
-            var createInvoiceRequest = new Client.Models.CreateInvoiceRequest()
+            var result = await _invoiceController.CreateInvoiceCoreRaw(new Client.Models.CreateInvoiceRequest()
             {
                 Amount = requestModel.total,
                 Currency = requestModel.currency,
                 Metadata = metadata.ToJObject(),
-            };
-            _logger.LogInformation($"Create invoice request: {JsonConvert.SerializeObject(createInvoiceRequest)}");
-            _logger.LogInformation($"Store: {JsonConvert.SerializeObject(store)}");
-            var result = await _invoiceController.CreateInvoiceCoreRaw(createInvoiceRequest, store, HttpContext.Request.GetAbsoluteRoot());
-            _logger.LogInformation($"Invoice store response: {JsonConvert.SerializeObject(result)}");
+            }, store, HttpContext.Request.GetAbsoluteRoot());
 
             var entity = new Transaction
             {
@@ -284,6 +268,8 @@ public class UIBigCommerceController : Controller
             ctx.Add(entity);
             await ctx.SaveChangesAsync();
 
+            _logger.LogInformation($"Transactions: {JsonConvert.SerializeObject(entity)}");
+
             return Ok(new
             {
                 id = result.Id,
@@ -293,7 +279,6 @@ public class UIBigCommerceController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError($"An error occurred while trying to create order for Big Commerce. {ex.Message}");
             return BadRequest("An error occurred while trying to create order for Big Commerce");
         }
      }

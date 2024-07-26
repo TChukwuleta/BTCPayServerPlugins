@@ -82,6 +82,7 @@ public class BigCommerceService
         var result = await MakeBigCommerceAPICallAsync(HttpMethod.Get, $"v2/orders/{orderId}", storeHash, null, null, accessToken);
         if (!result.IsSuccessStatusCode)
         {
+            _logger.LogError($"Unable to confirm order... Status code: {result.StatusCode.ToString()}... Error content: {result.Content.ToString()}");
             return false;
         }
         return true;
@@ -90,7 +91,11 @@ public class BigCommerceService
     public async Task UpdateOrderStatusAsync(int orderId, BigCommerceOrderState status, string storeHash, string accessToken)
     {
         var data = new { status_id = (int)status };
-        await MakeBigCommerceAPICallAsync(HttpMethod.Put, $"v2/orders/{orderId}", storeHash, data, null, accessToken);
+        var result = await MakeBigCommerceAPICallAsync(HttpMethod.Put, $"v2/orders/{orderId}", storeHash, data, null, accessToken);
+        if (!result.IsSuccessStatusCode)
+        {
+            _logger.LogError($"Unable to update order status... Status code: {result.StatusCode.ToString()}... Error content: {result.Content.ToString()}");
+        }
     }
 
     public async Task<CreateBigCommerceOrderResponse> CheckoutOrderAsync(string storeHash, string checkoutId, string accessToken)
@@ -98,7 +103,6 @@ public class BigCommerceService
         var result = await MakeBigCommerceAPICallAsync(HttpMethod.Post, $"v3/checkouts/{checkoutId}/orders", storeHash, null, null, accessToken);
         if (!result.IsSuccessStatusCode)
         {
-            _logger.LogError($"Unable to checkout orders... Status code: {result.StatusCode.ToString()}... Error content: {result.Content.ToString()}");
             return null;
         }
         return JsonConvert.DeserializeObject<CreateBigCommerceOrderResponse>(await result.Content.ReadAsStringAsync());
