@@ -58,11 +58,21 @@ public class UIBigCommerceController : Controller
         if (string.IsNullOrEmpty(storeId))
             return NotFound();
 
+        string userId = GetUserId();
         await using var ctx = _dbContextFactory.CreateContext();
+
         var bigCommerceStore = ctx.BigCommerceStores.SingleOrDefault(c => c.StoreId == storeId);
         if (bigCommerceStore == null)
         {
-            return RedirectToAction(nameof(Create), "UIBigCommerce");
+            bigCommerceStore = new BigCommerceStore
+            {
+                StoreId = CurrentStore.Id,
+                StoreName = CurrentStore.StoreName,
+                ApplicationUserId = userId,
+                RedirectUrl = Url.Action("Install", "UIBigCommerce", null, Request.Scheme)
+            };
+            ctx.Add(bigCommerceStore);
+            await ctx.SaveChangesAsync();
         }
         TempData[WellKnownTempData.SuccessMessage] = "Big commerce store details retrieved successfully";
         return View(new InstallBigCommerceViewModel
@@ -78,10 +88,21 @@ public class UIBigCommerceController : Controller
 
 
     [HttpGet("~/plugins/bigcommerce/create")]
-    public IActionResult Create()
+    public async Task<IActionResult> Create()
     {
         if (CurrentStore is null)
             return NotFound();
+
+        string userId = GetUserId();
+        await using var ctx = _dbContextFactory.CreateContext();
+        var entity = new BigCommerceStore
+        {
+            StoreId = CurrentStore.Id,
+            StoreName = CurrentStore.StoreName,
+            ApplicationUserId = userId
+        };
+        ctx.Add(entity);
+        await ctx.SaveChangesAsync();
 
         return View(new InstallBigCommerceViewModel());
     }
@@ -96,30 +117,18 @@ public class UIBigCommerceController : Controller
         string userId = GetUserId();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var exisitngStores = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (exisitngStores != null)
-        {
-            ReturnFailedMessageStatus($"Cannot create big commerce store as there is a store that has currently been installed");
-            return RedirectToAction(nameof(Create), "UIBigCommerce");
-        }
-        var userBigCommerceStores = ctx.BigCommerceStores.Where(store => store.ApplicationUserId == userId).ToList();
+        var userStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+
+        var userBigCommerceStores = ctx.BigCommerceStores.Where(store => store.ApplicationUserId == userId && store.StoreId != CurrentStore.Id).ToList();
         if (userBigCommerceStores.Exists(store => store.ClientId == model.ClientId || store.ClientSecret == model.ClientSecret))
         {
             ModelState.AddModelError(nameof(model.ClientSecret), "Cannot create BigCommerce store as a store with the same Client ID or Client Secret already exists.");
-            return RedirectToAction(nameof(Create), "UIBigCommerce");
+            return RedirectToAction(nameof(Index), "UIBigCommerce", new { storeId = CurrentStore.Id });
         }
 
-        var callbackUrl = Url.Action("Install", "UIBigCommerce", null, Request.Scheme);
-        var entity = new BigCommerceStore
-        {
-            StoreId = CurrentStore.Id,
-            ClientId = model.ClientId,
-            RedirectUrl = callbackUrl,
-            ClientSecret = model.ClientSecret,
-            StoreName = CurrentStore.StoreName,
-            ApplicationUserId = userId
-        };
-        ctx.Add(entity);
+        userStore.ClientId = model.ClientId;
+        userStore.ClientSecret = model.ClientSecret;
+        ctx.Update(userStore);
         await ctx.SaveChangesAsync();
         ReturnSuccessMessageStatus($"Big commerce store details saved successfully.");
         return RedirectToAction(nameof(Index), "UIBigCommerce", new { storeId = CurrentStore.Id });

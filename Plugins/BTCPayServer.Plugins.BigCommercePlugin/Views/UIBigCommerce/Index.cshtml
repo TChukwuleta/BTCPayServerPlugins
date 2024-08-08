@@ -8,31 +8,42 @@
     ViewData.SetActivePage(PluginNavPages.Index, "Big Commerce");
 }
 
-<div class="row">
-    <div class="col-md-6">
-        <div class="form-group">
-            <label asp-for="ClientId" class="form-label"></label>
-            <input asp-for="ClientId" class="form-control" readonly />
+<div class="container mt-5">
+    <form id="input-form" method="post" asp-action="Create">
+        @if (string.IsNullOrEmpty(Model.ClientId) && string.IsNullOrEmpty(Model.ClientSecret))
+        {
+            <div class="d-flex justify-content-end mb-2">
+                <input type="submit" value="Update Credentials" class="btn btn-primary btn-sm" id="Create" />
+            </div>
+        }
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label asp-for="ClientId" class="form-label"></label>
+                    <input asp-for="ClientId" class="form-control" />
+                </div>
+                <div class="form-group">
+                    <label asp-for="ClientSecret" class="form-label"></label>
+                    <input asp-for="ClientSecret" class="form-control" />
+                </div>
+                <div class="form-group">
+                    <label asp-for="StoreName" class="form-label"></label>
+                    <input asp-for="StoreName" class="form-control" readonly />
+                </div>
+                <div class="form-group">
+                    <label asp-for="AuthCallBackUrl" class="form-label"></label>
+                    <input asp-for="AuthCallBackUrl" class="form-control" readonly />
+                </div>
+                <div class="form-group">
+                    <label asp-for="LoadCallbackUrl" class="form-label"></label>
+                    <input asp-for="LoadCallbackUrl" class="form-control" readonly />
+                </div>
+                <div class="form-group">
+                    <label asp-for="UninstallCallbackUrl" class="form-label"></label>
+                    <input asp-for="UninstallCallbackUrl" class="form-control" readonly />
+                </div>
+            </div>
         </div>
-        <div class="form-group">
-            <label asp-for="ClientSecret" class="form-label"></label>
-            <input asp-for="ClientSecret" class="form-control" readonly />
-        </div>
-        <div class="form-group">
-            <label asp-for="StoreName" class="form-label"></label>
-            <input asp-for="StoreName" class="form-control" readonly />
-        </div>
-        <div class="form-group">
-            <label asp-for="AuthCallBackUrl" class="form-label"></label>
-            <input asp-for="AuthCallBackUrl" class="form-control" readonly />
-        </div>
-        <div class="form-group">
-            <label asp-for="LoadCallbackUrl" class="form-label"></label>
-            <input asp-for="LoadCallbackUrl" class="form-control" readonly />
-        </div>
-        <div class="form-group">
-            <label asp-for="UninstallCallbackUrl" class="form-label"></label>
-            <input asp-for="UninstallCallbackUrl" class="form-control" readonly />
-        </div>
-    </div>
+    </form>
 </div>
