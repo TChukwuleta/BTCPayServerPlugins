@@ -59,6 +59,9 @@ Using this example, your script url would be:
 
 https://domain.btcpayserver.com/plugins/B6XJFepkN61YkcHXT42vfwLK1bMdJEYi61nEyxVY4frW/bigcommerce/btcpay-bc.js?bcid=test1234
 
+Once completed, click the save button and you should be good to go. 
+
+You can now receive payment for your store using BigCommerce
 
 ## Big Commerce Uninstall
 
