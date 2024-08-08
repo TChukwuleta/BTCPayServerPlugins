@@ -82,6 +82,7 @@ public class UIBigCommerceController : Controller
             AuthCallBackUrl = Url.Action("Install", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
             LoadCallbackUrl = Url.Action("Load", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
             UninstallCallbackUrl = Url.Action("Uninstall", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
+            CheckoutScriptUrl = Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
             StoreName = bigCommerceStore.StoreName
         });
     }
@@ -173,10 +174,10 @@ public class UIBigCommerceController : Controller
         bigCommerceStore.StoreHash = bigCommerceStoreDetails.context;
         bigCommerceStore.BigCommerceUserEmail = bigCommerceStoreDetails.user.email;
         bigCommerceStore.BigCommerceUserId = bigCommerceStoreDetails.user.id.ToString();
-
-        bigCommerceStore = await helper.UploadCheckoutScript(bigCommerceStore, Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId }, Request.Scheme));
         ctx.Update(bigCommerceStore);
         await ctx.SaveChangesAsync();
+
+        bigCommerceStore = await helper.UploadCheckoutScript(bigCommerceStore, Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId }, Request.Scheme));
         return Ok("Big commerce store installation was successful");
     }
 

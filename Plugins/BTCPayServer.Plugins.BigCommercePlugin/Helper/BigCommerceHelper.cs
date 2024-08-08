@@ -135,11 +135,8 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
             {
                 return (false, "Invalid store Id specified");
             }
-
             string fileUrl = "https://raw.githubusercontent.com/TChukwuleta/BTCPayServerPlugins/main/Plugins/BTCPayServer.Plugins.BigCommercePlugin/Resources/js/btcpay-bc.js";
-
             string combinedJavascript = string.Empty;
-
             using (var httpClient = new HttpClient())
             {
                 try
@@ -151,7 +148,6 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
                     return (false, $"Failed to fetch file content: {ex.Message}");
                 }
             }
-
             // Find a way to pull the JS file directly from the plugin through BTCPay server
 
             /*string resourcesFolder = Path.Combine(AppContext.BaseDirectory, "Resources", "js");
@@ -170,7 +166,6 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
                     combinedJavascript += Environment.NewLine + await reader.ReadToEndAsync();
                 }
             }*/
-
 
             string jsVariables = $"var BTCPAYSERVER_URL = '{baseUrl}'; var STORE_HASH = '{bcStore.StoreHash}'; var BTCPAYSERVER_STORE_ID = '{storeId}';";
             return (true, $"{jsVariables}{combinedJavascript}");

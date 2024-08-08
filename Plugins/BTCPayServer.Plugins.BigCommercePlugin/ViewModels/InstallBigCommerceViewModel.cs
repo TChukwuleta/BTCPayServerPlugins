@@ -23,5 +23,8 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.ViewModels
 
         [Display(Name = "Uninstall Callback URL")]
         public string UninstallCallbackUrl { get; set; }
+
+        [Display(Name = "Checkout Script URL")]
+        public string CheckoutScriptUrl { get; set; }
     }
 }
