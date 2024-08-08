@@ -178,6 +178,8 @@ public class UIBigCommerceController : Controller
         await ctx.SaveChangesAsync();
 
         bigCommerceStore = await helper.UploadCheckoutScript(bigCommerceStore, Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId }, Request.Scheme));
+        ctx.Update(bigCommerceStore);
+        await ctx.SaveChangesAsync();
         return Ok("Big commerce store installation was successful");
     }
 
