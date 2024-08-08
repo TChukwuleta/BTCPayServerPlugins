@@ -7,14 +7,19 @@ With this you have the option of accepting Bitcoin payments for your store.
 ## Installation
 
 1. Install the plugin from Plugins=>Add New=> BigCommerce
-2. Restart BTCPay Server
-3. Log in to your Big commerce application, and set up an application to be used for receiving bitcoin payment via BTCPay Server account
-4. Copy the client Id and the client Secret of the created application
-5. Go back to your BTCPay Server, choose the store to integrate with and click on Big Commerce in the navigation. 
-6. Enter the Client Id and secret and click create. (P.S: For multiple store integrations, kindly use unique client Id and secret for each store)
-7.Once completed, the plugin would then display your auth callback url, load url, and uninstall url..
-8. Log back to your big commerce application and update your app with the three url.
+2. Restart BTCPay Server.
+3. Navigate to and click the BigCommerce plugin as show on the navigation panel. There you would see all required URLs (Auth, load, uninstall).
+4. Log in to your Big commerce application, and set up an application to be used for receiving bitcoin payment via BTCPay Server account.
+5. Input the Auth Callback URL, Load Callback URL, and the Uninstall Callback URL with the URL in your BTCPay BigCommerce instance
+6. For scopes and permissions:
 
+![image](https://github.com/user-attachments/assets/a7770f65-fde9-408d-8643-daf7aa2345fb)
+
+![image](https://github.com/user-attachments/assets/009b5150-4d31-4ec1-9ffa-3b614834165c)
+
+7. Once you are done setting up your application on BigCommerce, copy the client Id and the client Secret, go to your BTCPay instance and update the credentials. Please ensure they are copied properly.
+
+P.S: You cannot assign a BigCommerce application credential to multiple stores on BTCPay Server.
 
 ## Big Commerce Uninstall
 
