@@ -15,6 +15,9 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.ViewModels
         [Display(Name = "Store Name")]
         public string StoreName { get; set; }
 
+        [Display(Name = "Store Id")]
+        public string StoreId { get; set; }
+
         [Display(Name = "Auth Callback URL")]
         public string AuthCallBackUrl { get; set; }
 
@@ -26,5 +29,9 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.ViewModels
 
         [Display(Name = "Checkout Script URL")]
         public string CheckoutScriptUrl { get; set; }
+
+        public string CryptoCode { get; set; }
+
+        public bool HasError { get; set; } = false;
     }
 }

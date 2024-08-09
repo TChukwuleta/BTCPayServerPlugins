@@ -21,6 +21,9 @@ using Newtonsoft.Json;
 using BTCPayServer.Services.Stores;
 using BTCPayServer.Services.Invoices;
 using Microsoft.AspNetCore.Cors;
+using BTCPayServer.Payments;
+using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -28,25 +31,31 @@ namespace BTCPayServer.Plugins.BigCommercePlugin;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIBigCommerceController : Controller
 {
+    private readonly ILogger<UIBigCommerceController> _logger;
     private readonly StoreRepository _storeRepo;
     private readonly BigCommerceService _bigCommerceService;
     private readonly UIInvoiceController _invoiceController;
     private readonly BigCommerceDbContextFactory _dbContextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly BTCPayNetworkProvider _networkProvider;
     private BigCommerceHelper helper;
     public UIBigCommerceController
         (StoreRepository storeRepo,
+        BTCPayNetworkProvider networkProvider,
         UIInvoiceController invoiceController,
         BigCommerceService bigCommerceService,
         UserManager<ApplicationUser> userManager,
-        BigCommerceDbContextFactory dbContextFactory)
+        BigCommerceDbContextFactory dbContextFactory,
+        ILogger<UIBigCommerceController> logger)
     {
         _storeRepo = storeRepo;
         _userManager = userManager;
+        _networkProvider = networkProvider;
         _invoiceController = invoiceController;
         _dbContextFactory = dbContextFactory;
         _bigCommerceService = bigCommerceService;
         helper = new BigCommerceHelper(_bigCommerceService, _dbContextFactory);
+        _logger = logger;
     }
 
     public const string BIGCOMMERCE_ORDER_ID_PREFIX = "BigCommerce-";
@@ -61,6 +70,20 @@ public class UIBigCommerceController : Controller
         string userId = GetUserId();
         await using var ctx = _dbContextFactory.CreateContext();
 
+        var storeData = await _storeRepo.FindStore(storeId);
+        if (storeData == null)
+            return NotFound();
+
+        var storeHasWallet = GetPaymentMethodConfigs(storeData, true).Any();
+        if (!storeHasWallet)
+        {
+            return View(new InstallBigCommerceViewModel
+            {
+                CryptoCode = _networkProvider.DefaultNetwork.CryptoCode,
+                StoreId = storeId,
+                HasError = true
+            });
+        }
         var bigCommerceStore = ctx.BigCommerceStores.SingleOrDefault(c => c.StoreId == storeId);
         if (bigCommerceStore == null)
         {
@@ -74,7 +97,6 @@ public class UIBigCommerceController : Controller
             ctx.Add(bigCommerceStore);
             await ctx.SaveChangesAsync();
         }
-        TempData[WellKnownTempData.SuccessMessage] = "Big commerce store details retrieved successfully";
         return View(new InstallBigCommerceViewModel
         {
             ClientId = bigCommerceStore.ClientId,
@@ -155,17 +177,21 @@ public class UIBigCommerceController : Controller
         {
             return BadRequest("Missing required query parameters.");
         }
-        var responseCall = await _bigCommerceService.InstallApplication(new InstallBigCommerceApplicationRequestModel
+        var installRequest = new InstallBigCommerceApplicationRequestModel
         {
             ClientId = bigCommerceStore.ClientId,
             ClientSecret = bigCommerceStore.ClientSecret,
             Code = code,
+            //RedirectUrl = "https://df10-3-66-137-200.ngrok-free.app/plugins/Htf9tevLnA236KeyTG1BxvUE7SJbc5j4biMjx2o8i9dg/bigcommerce/auth/install",
             RedirectUrl = Url.Action("Install", "UIBigCommerce", new { storeId }, Request.Scheme),
             Context = context,
             Scope = scope
-        });
+        };
+        _logger.LogInformation($"{JsonConvert.SerializeObject(installRequest)}");
+        var responseCall = await _bigCommerceService.InstallApplication(installRequest);
         if (!responseCall.success)
         {
+            _logger.LogError($"{responseCall.content}");
             return BadRequest(responseCall.content);
         }
         var bigCommerceStoreDetails = JsonConvert.DeserializeObject<InstallApplicationResponseModel>(responseCall.content);
@@ -176,7 +202,6 @@ public class UIBigCommerceController : Controller
         bigCommerceStore.BigCommerceUserId = bigCommerceStoreDetails.user.id.ToString();
         ctx.Update(bigCommerceStore);
         await ctx.SaveChangesAsync();
-
         bigCommerceStore = await helper.UploadCheckoutScript(bigCommerceStore, Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId }, Request.Scheme));
         ctx.Update(bigCommerceStore);
         await ctx.SaveChangesAsync();
@@ -247,6 +272,7 @@ public class UIBigCommerceController : Controller
             var createOrder = await _bigCommerceService.CheckoutOrderAsync(exisitngStores.StoreHash, requestModel.cartId, exisitngStores.AccessToken);
             if (createOrder == null)
             {
+                _logger.LogError($"Error occurred while creating order... {JsonConvert.SerializeObject(createOrder)}");
                 return BadRequest("An error occurred while creating order");
             }
             string bgOrderId = $"{BIGCOMMERCE_ORDER_ID_PREFIX}{createOrder.data.id}";
@@ -282,8 +308,9 @@ public class UIBigCommerceController : Controller
                 Message = "Order created and invoice generated successfully"
             });
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError($"An error occurred on creating order. Exception message: {ex.Message}");
             return BadRequest("An error occurred while trying to create order for Big Commerce");
         }
      }
@@ -331,6 +358,24 @@ public class UIBigCommerceController : Controller
             Message = message,
             Severity = StatusMessageModel.StatusSeverity.Error
         });
+    }
+
+    private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(BTCPayServer.Data.StoreData storeData, bool onlyEnabled = false)
+    {
+        if (string.IsNullOrEmpty(storeData.DerivationStrategies))
+            return new Dictionary<PaymentMethodId, JToken>();
+        var excludeFilter = onlyEnabled ? storeData.GetStoreBlob().GetExcludedPaymentMethods() : null;
+        var paymentMethodConfigurations = new Dictionary<PaymentMethodId, JToken>();
+        JObject strategies = JObject.Parse(storeData.DerivationStrategies);
+        foreach (var strat in strategies.Properties())
+        {
+            if (!PaymentMethodId.TryParse(strat.Name, out var paymentMethodId))
+                continue;
+            if (excludeFilter?.Match(paymentMethodId) is true)
+                continue;
+            paymentMethodConfigurations.Add(paymentMethodId, strat.Value);
+        }
+        return paymentMethodConfigurations;
     }
 
     private string GetUserId() => _userManager.GetUserId(User);
