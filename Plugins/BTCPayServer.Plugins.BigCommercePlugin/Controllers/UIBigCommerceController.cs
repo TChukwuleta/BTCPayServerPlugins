@@ -153,7 +153,6 @@ public class UIBigCommerceController : Controller
         userStore.ClientSecret = model.ClientSecret;
         ctx.Update(userStore);
         await ctx.SaveChangesAsync();
-        ReturnSuccessMessageStatus($"Big commerce store details saved successfully.");
         return RedirectToAction(nameof(Index), "UIBigCommerce", new { storeId = CurrentStore.Id });
     }
 
@@ -162,50 +161,56 @@ public class UIBigCommerceController : Controller
     [HttpGet("~/plugins/{storeId}/bigcommerce/auth/install")]
     public async Task<IActionResult> Install(string storeId, [FromQuery] string account_uuid, [FromQuery] string code, [FromQuery] string context, [FromQuery] string scope)
     {
-        account_uuid = HttpUtility.UrlDecode(account_uuid);
-        code = HttpUtility.UrlDecode(code);
-        context = HttpUtility.UrlDecode(context);
-        scope = HttpUtility.UrlDecode(scope);
+        try
+        {
+            account_uuid = HttpUtility.UrlDecode(account_uuid);
+            code = HttpUtility.UrlDecode(code);
+            context = HttpUtility.UrlDecode(context);
+            scope = HttpUtility.UrlDecode(scope);
 
-        await using var ctx = _dbContextFactory.CreateContext();
-        var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
-        if (bigCommerceStore == null)
-        {
-            return BadRequest("Invalid request");
+            await using var ctx = _dbContextFactory.CreateContext();
+            var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
+            if (bigCommerceStore == null)
+            {
+                return BadRequest("Invalid request");
+            }
+            if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(context) || string.IsNullOrEmpty(scope))
+            {
+                return BadRequest("Missing required query parameters.");
+            }
+            var installRequest = new InstallBigCommerceApplicationRequestModel
+            {
+                ClientId = bigCommerceStore.ClientId,
+                ClientSecret = bigCommerceStore.ClientSecret,
+                Code = code,
+                RedirectUrl = Url.Action("Install", "UIBigCommerce", new { storeId }, Request.Scheme),
+                Context = context,
+                Scope = scope
+            };
+            var responseCall = await _bigCommerceService.InstallApplication(installRequest);
+            if (!responseCall.success)
+            {
+                _logger.LogError($"{responseCall.content}");
+                return BadRequest(responseCall.content);
+            }
+            var bigCommerceStoreDetails = JsonConvert.DeserializeObject<InstallApplicationResponseModel>(responseCall.content);
+            bigCommerceStore.AccessToken = bigCommerceStoreDetails.access_token;
+            bigCommerceStore.Scope = bigCommerceStoreDetails.scope;
+            bigCommerceStore.StoreHash = bigCommerceStoreDetails.context;
+            bigCommerceStore.BigCommerceUserEmail = bigCommerceStoreDetails.user.email;
+            bigCommerceStore.BigCommerceUserId = bigCommerceStoreDetails.user.id.ToString();
+            ctx.Update(bigCommerceStore);
+            await ctx.SaveChangesAsync();
+            bigCommerceStore = await helper.UploadCheckoutScript(bigCommerceStore, Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId }, Request.Scheme));
+            ctx.Update(bigCommerceStore);
+            await ctx.SaveChangesAsync();
+            return Ok("Big commerce store installation was successful");
         }
-        if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(context) || string.IsNullOrEmpty(scope))
+        catch (Exception ex)
         {
-            return BadRequest("Missing required query parameters.");
+            _logger.LogError($"An error occurred while completing Big commerce installation. Exception error: {ex.Message}");
+            return BadRequest("An error occurred while completing Big commerce installation");
         }
-        var installRequest = new InstallBigCommerceApplicationRequestModel
-        {
-            ClientId = bigCommerceStore.ClientId,
-            ClientSecret = bigCommerceStore.ClientSecret,
-            Code = code,
-            //RedirectUrl = "https://df10-3-66-137-200.ngrok-free.app/plugins/Htf9tevLnA236KeyTG1BxvUE7SJbc5j4biMjx2o8i9dg/bigcommerce/auth/install",
-            RedirectUrl = Url.Action("Install", "UIBigCommerce", new { storeId }, Request.Scheme),
-            Context = context,
-            Scope = scope
-        };
-        _logger.LogInformation($"{JsonConvert.SerializeObject(installRequest)}");
-        var responseCall = await _bigCommerceService.InstallApplication(installRequest);
-        if (!responseCall.success)
-        {
-            _logger.LogError($"{responseCall.content}");
-            return BadRequest(responseCall.content);
-        }
-        var bigCommerceStoreDetails = JsonConvert.DeserializeObject<InstallApplicationResponseModel>(responseCall.content);
-        bigCommerceStore.AccessToken = bigCommerceStoreDetails.access_token;
-        bigCommerceStore.Scope = bigCommerceStoreDetails.scope;
-        bigCommerceStore.StoreHash = bigCommerceStoreDetails.context;
-        bigCommerceStore.BigCommerceUserEmail = bigCommerceStoreDetails.user.email;
-        bigCommerceStore.BigCommerceUserId = bigCommerceStoreDetails.user.id.ToString();
-        ctx.Update(bigCommerceStore);
-        await ctx.SaveChangesAsync();
-        bigCommerceStore = await helper.UploadCheckoutScript(bigCommerceStore, Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId }, Request.Scheme));
-        ctx.Update(bigCommerceStore);
-        await ctx.SaveChangesAsync();
-        return Ok("Big commerce store installation was successful");
     }
 
 
@@ -360,7 +365,7 @@ public class UIBigCommerceController : Controller
         });
     }
 
-    private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(BTCPayServer.Data.StoreData storeData, bool onlyEnabled = false)
+    private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(StoreData storeData, bool onlyEnabled = false)
     {
         if (string.IsNullOrEmpty(storeData.DerivationStrategies))
             return new Dictionary<PaymentMethodId, JToken>();
