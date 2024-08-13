@@ -140,7 +140,7 @@ public class UIBigCommerceController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var userStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
 
-        var userBigCommerceStores = ctx.BigCommerceStores.Where(store => store.ApplicationUserId == userId && store.StoreId != CurrentStore.Id).ToList();
+        var userBigCommerceStores = ctx.BigCommerceStores.Where(store => store.StoreId != CurrentStore.Id).ToList();
         if (userBigCommerceStores.Exists(store => store.ClientId == model.ClientId || store.ClientSecret == model.ClientSecret))
         {
             ModelState.AddModelError(nameof(model.ClientSecret), "Cannot create BigCommerce store as a store with the same Client ID or Client Secret already exists.");

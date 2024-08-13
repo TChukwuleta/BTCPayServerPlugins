@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Options;
 
-namespace BTCPayServer.Plugins.BigCommercePlugin.Services;
+namespace BTCPayServer.Plugins.ShopifyPlugin.Services;
 
 public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<ShopifyDbContext>
 {

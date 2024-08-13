@@ -3,23 +3,17 @@ using Microsoft.AspNetCore.Mvc;
 using BTCPayServer.Data;
 using Microsoft.AspNetCore.Identity;
 using System.Linq;
-using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
-using BTCPayServer.Plugins.BigCommercePlugin.Services;
 using Microsoft.AspNetCore.Http;
-using BTCPayServer.Plugins.BigCommercePlugin.Data;
 using BTCPayServer.Abstractions.Extensions;
-using BTCPayServer.Abstractions.Models;
 using System;
 using Microsoft.AspNetCore.Authorization;
 using BTCPayServer.Controllers;
 using BTCPayServer.Client;
 using BTCPayServer.Abstractions.Constants;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using BTCPayServer.Services.Stores;
 using BTCPayServer.Services.Invoices;
 using Microsoft.AspNetCore.Cors;
-using BTCPayServer.Payments;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using NicolasDorier.RateLimits;
@@ -27,10 +21,10 @@ using System.Globalization;
 using BTCPayServer.Plugins.ShopifyPlugin.Helper;
 using BTCPayServer.Plugins.ShopifyPlugin.Services;
 using BTCPayServer.Plugins.ShopifyPlugin;
-using BTCPayServer.Plugins.Shopify.Models;
 using System.Net.Http;
 using BTCPayServer.Plugins.ShopifyPlugin.ViewModels.Models;
 using BTCPayServer.Client.Models;
+using BTCPayServer.Plugins.ShopifyPlugin.Data;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -45,12 +39,10 @@ public class UIShopifyController : Controller
     private readonly UIInvoiceController _invoiceController;
     private readonly ShopifyDbContextFactory _dbContextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly BTCPayNetworkProvider _networkProvider;
     private readonly IHttpClientFactory _clientFactory;
     private ShopifyHelper helper;
     public UIShopifyController
         (StoreRepository storeRepo,
-        BTCPayNetworkProvider networkProvider,
         UIInvoiceController invoiceController,
         UserManager<ApplicationUser> userManager,
         ShopifyService shopifyService,
@@ -63,7 +55,6 @@ public class UIShopifyController : Controller
         _userManager = userManager;
         _clientFactory = clientFactory;
         _shopifyService = shopifyService;
-        _networkProvider = networkProvider;
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
         _invoiceController = invoiceController;
@@ -77,23 +68,17 @@ public class UIShopifyController : Controller
         if (string.IsNullOrEmpty(storeId))
             return NotFound();
 
-        return View();
+        await using var ctx = _dbContextFactory.CreateContext();
+
+        var userStore = ctx.ShopifySettings.FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new ShopifySetting();
+        return View(userStore);
     }
-
-    [HttpGet]
-    [Route("~/plugins/stores/{storeId}/shopify")]
-    public IActionResult EditShopify()
-    {
-        var blob = CurrentStore.GetStoreBlob();
-
-        return View(blob.GetShopifySettings());
-    }
-
 
     [HttpPost("~/plugins/stores/{storeId}/shopify")]
-    public async Task<IActionResult> EditShopify(string storeId,
-            ShopifySettings vm, string command = "")
+    public async Task<IActionResult> Index(string storeId,
+            ShopifySetting vm, string command = "")
     {
+        await using var ctx = _dbContextFactory.CreateContext();
         switch (command)
         {
             case "ShopifySaveCredentials":
@@ -123,36 +108,28 @@ public class UIShopifyController : Controller
                             "Please grant the private app permissions for read_orders, write_orders";
                         return View(vm);
                     }
-
-                    // everything ready, proceed with saving Shopify integration credentials
                     shopify.IntegratedAt = DateTimeOffset.Now;
-
-                    // Change this implementation to save to shopify table
-                    var blob = CurrentStore.GetStoreBlob();
-                    blob.SetShopifySettings(shopify);
-                    if (CurrentStore.SetStoreBlob(blob))
-                    {
-                        await _storeRepo.UpdateStore(CurrentStore);
-                    }
+                    shopify.StoreId = CurrentStore.Id;
+                    shopify.StoreName = CurrentStore.StoreName;
+                    ctx.Update(shopify);
+                    await ctx.SaveChangesAsync();
 
                     TempData[WellKnownTempData.SuccessMessage] = "Shopify plugin successfully updated";
                     break;
                 }
             case "ShopifyClearCredentials":
                 {
-                    var blob = CurrentStore.GetStoreBlob();
-                    blob.SetShopifySettings(null);
-                    if (CurrentStore.SetStoreBlob(blob))
+                    var shopifySetting = ctx.ShopifySettings.FirstOrDefault(c => !string.IsNullOrEmpty(vm.Id) && c.Id == vm.Id);
+                    if (shopifySetting != null)
                     {
-                        await _storeRepo.UpdateStore(CurrentStore);
+                        ctx.Remove(shopifySetting);
+                        await ctx.SaveChangesAsync();
                     }
-
                     TempData[WellKnownTempData.SuccessMessage] = "Shopify plugin credentials cleared";
                     break;
                 }
         }
-
-        return RedirectToAction(nameof(EditShopify), new { storeId = CurrentStore.Id });
+        return RedirectToAction(nameof(Index), new { storeId = CurrentStore.Id });
     }
 
 
@@ -176,6 +153,14 @@ public class UIShopifyController : Controller
     public async Task<IActionResult> ShopifyInvoiceEndpoint(
            string storeId, string orderId, decimal amount, bool checkOnly = false)
     {
+        await using var ctx = _dbContextFactory.CreateContext();
+
+        var userStore = ctx.ShopifySettings.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+        if (userStore == null)
+        {
+            return BadRequest("Invalid BTCPay store specified");
+        }
+
         var shopifySearchTerm = $"{ShopifyService.SHOPIFY_ORDER_ID_PREFIX}{orderId}";
         var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
         {
@@ -189,7 +174,8 @@ public class UIShopifyController : Controller
 
         var firstInvoiceStillPending =
             matchedExistingInvoices.FirstOrDefault(entity =>
-                entity.GetInvoiceState().Status == InvoiceStatus.New);
+                entity.GetInvoiceState().Status.ToString().Equals("New"));
+
         if (firstInvoiceStillPending != null)
         {
             return Ok(new
@@ -205,13 +191,13 @@ public class UIShopifyController : Controller
                     .Contains(
                         entity.GetInvoiceState().Status));
 
-        var store = await _storeRepository.FindStore(storeId);
-        var shopify = store?.GetStoreBlob()?.GetShopifySettings();
+        var store = await _storeRepo.FindStore(storeId);
+
         ShopifyApiClient client = null;
         ShopifyOrder order = null;
-        if (shopify?.IntegratedAt.HasValue is true)
+        if (userStore.IntegratedAt.HasValue)
         {
-            client = new ShopifyApiClient(_clientFactory, shopify.CreateShopifyApiCredentials());
+            client = new ShopifyApiClient(_clientFactory, userStore.CreateShopifyApiCredentials());
             order = await client.GetOrder(orderId);
             if (order?.Id is null)
             {
@@ -243,7 +229,7 @@ public class UIShopifyController : Controller
             return Ok();
         }
 
-        if (shopify?.IntegratedAt.HasValue is true)
+        if (userStore.IntegratedAt.HasValue)
         {
             if (order?.Id is null ||
                 !new[] { "pending", "partially_paid" }.Contains(order.FinancialStatus))

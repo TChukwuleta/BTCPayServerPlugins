@@ -1,7 +1,8 @@
 using BTCPayServer.Plugins.BigCommercePlugin.Data;
+using BTCPayServer.Plugins.ShopifyPlugin.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace BTCPayServer.Plugins.BigCommercePlugin;
+namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 public class ShopifyDbContext : DbContext
 {
@@ -15,6 +16,7 @@ public class ShopifyDbContext : DbContext
 
     /*public DbSet<BigCommerceStore> BigCommerceStores { get; set; }
     public DbSet<Transaction> Transactions { get; set; }*/
+    public DbSet<ShopifySetting> ShopifySettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,6 +24,6 @@ public class ShopifyDbContext : DbContext
         modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.Shopify");
 
         Transaction.OnModelCreating(modelBuilder);
-        BigCommerceStore.OnModelCreating(modelBuilder);
+        ShopifySetting.OnModelCreating(modelBuilder);
     }
 }

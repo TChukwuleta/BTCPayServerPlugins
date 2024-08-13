@@ -1,5 +1,6 @@
 ﻿using BTCPayServer.Data;
 using BTCPayServer.Plugins.Shopify.Models;
+using BTCPayServer.Plugins.ShopifyPlugin.Data;
 using BTCPayServer.Plugins.ShopifyPlugin.Services;
 using NBitcoin;
 using NBXplorer;
@@ -10,7 +11,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Helper;
 public static class ShopifyExtensions
 {
     public const string StoreBlobKey = "shopify";
-    public static ShopifyApiClientCredentials CreateShopifyApiCredentials(this ShopifySettings shopify)
+    public static ShopifyApiClientCredentials CreateShopifyApiCredentials(this ShopifySetting shopify)
     {
         return new ShopifyApiClientCredentials
         {

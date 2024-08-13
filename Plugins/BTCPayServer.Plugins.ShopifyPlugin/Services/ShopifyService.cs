@@ -3,6 +3,7 @@ using BTCPayServer.Data;
 using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
+using BTCPayServer.Plugins.ShopifyPlugin.Data;
 using BTCPayServer.Plugins.ShopifyPlugin.Helper;
 using BTCPayServer.Plugins.ShopifyPlugin.ViewModels.Models;
 using BTCPayServer.Services.Invoices;
@@ -110,7 +111,7 @@ public class ShopifyService : EventHostedServiceBase
     }
 
 
-    private ShopifyApiClient CreateShopifyApiClient(ShopifySettings shopify)
+    private ShopifyApiClient CreateShopifyApiClient(ShopifySetting shopify)
     {
         return new ShopifyApiClient(_httpClientFactory, shopify.CreateShopifyApiCredentials());
     }
