@@ -38,7 +38,7 @@ const handleBitcoinPayment = (event) => {
     getCart()
         .then(cart => {
             console.log(cart);
-            return fetch(BTCPAYSERVER_URL + '/plugins/' + BTCPAYSERVER_STORE_ID + '/bigcommerce/create-order', {
+            return fetch(BTCPAYSERVER_URL + '/plugins/stores/' + BTCPAYSERVER_STORE_ID + '/bigcommerce/create-order', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -187,7 +187,7 @@ const showOrderConfirmation = (orderId, invoiceId) => {
 
 const loadModalScript = () => {
     const script = document.createElement('script');
-    script.src = BTCPAYSERVER_URL + /plugins/ + BTCPAYSERVER_STORE_ID + '/bigcommerce/modal/btcpay.js';
+    script.src = BTCPAYSERVER_URL + '/plugins/stores/' + BTCPAYSERVER_STORE_ID + '/bigcommerce/modal/btcpay.js';
     document.head.appendChild(script);
     script.onload = function() {
         console.log('External modal script loaded successfully.');

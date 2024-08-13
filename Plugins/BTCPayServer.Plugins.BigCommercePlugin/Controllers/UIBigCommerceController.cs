@@ -27,7 +27,7 @@ using System.Collections.Generic;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
-[Route("~/plugins/{storeId}/bigcommerce")]
+[Route("~/plugins/stores/{storeId}/bigcommerce")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIBigCommerceController : Controller
 {
@@ -57,8 +57,6 @@ public class UIBigCommerceController : Controller
         helper = new BigCommerceHelper(_bigCommerceService, _dbContextFactory);
         _logger = logger;
     }
-
-    public const string BIGCOMMERCE_ORDER_ID_PREFIX = "BigCommerce-";
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
 
@@ -158,7 +156,7 @@ public class UIBigCommerceController : Controller
 
 
     [AllowAnonymous]
-    [HttpGet("~/plugins/{storeId}/bigcommerce/auth/install")]
+    [HttpGet("~/plugins/stores/{storeId}/bigcommerce/auth/install")]
     public async Task<IActionResult> Install(string storeId, [FromQuery] string account_uuid, [FromQuery] string code, [FromQuery] string context, [FromQuery] string scope)
     {
         try
@@ -215,7 +213,7 @@ public class UIBigCommerceController : Controller
 
 
     [AllowAnonymous]
-    [HttpGet("~/plugins/{storeId}/bigcommerce/auth/load")]
+    [HttpGet("~/plugins/stores/{storeId}/bigcommerce/auth/load")]
     public async Task<IActionResult> Load(string storeId, [FromQuery] string signed_payload_jwt)
     {
         if (string.IsNullOrEmpty(signed_payload_jwt))
@@ -237,7 +235,7 @@ public class UIBigCommerceController : Controller
     }
 
     [AllowAnonymous]
-    [HttpGet("~/plugins/{storeId}/bigcommerce/auth/uninstall")]
+    [HttpGet("~/plugins/stores/{storeId}/bigcommerce/auth/uninstall")]
     public async Task<IActionResult> Uninstall(string storeId, [FromQuery] string signed_payload_jwt)
     {
         if (string.IsNullOrEmpty(signed_payload_jwt))
@@ -262,7 +260,7 @@ public class UIBigCommerceController : Controller
     }
 
     [AllowAnonymous]
-    [HttpPost("~/plugins/{storeId}/bigcommerce/create-order")]
+    [HttpPost("~/plugins/stores/{storeId}/bigcommerce/create-order")]
     [EnableCors("AllowAllOrigins")]
     public async Task<IActionResult> CreateOrder([FromBody] CreateBigCommerceStoreRequest requestModel)
     {
@@ -280,7 +278,7 @@ public class UIBigCommerceController : Controller
                 _logger.LogError($"Error occurred while creating order... {JsonConvert.SerializeObject(createOrder)}");
                 return BadRequest("An error occurred while creating order");
             }
-            string bgOrderId = $"{BIGCOMMERCE_ORDER_ID_PREFIX}{createOrder.data.id}";
+            string bgOrderId = $"{BigCommerceInvoicesPaidHostedService.BIGCOMMERCE_ORDER_ID_PREFIX}{createOrder.data.id}";
 
             var metadata = new InvoiceMetadata();
             metadata.OrderId = bgOrderId;
@@ -321,7 +319,7 @@ public class UIBigCommerceController : Controller
      }
 
     [AllowAnonymous]
-    [HttpGet("~/plugins/{storeId}/bigcommerce/btcpay-bc.js")]
+    [HttpGet("~/plugins/stores/{storeId}/bigcommerce/btcpay-bc.js")]
     public async Task<IActionResult> GetBtcPayJavascript(string storeId)
     {
         var jsFile = await helper.GetCustomJavascript(storeId, Request.GetAbsoluteRoot());
@@ -333,7 +331,7 @@ public class UIBigCommerceController : Controller
     }
 
     [AllowAnonymous]
-    [HttpGet("~/plugins/{storeId}/bigcommerce/modal/btcpay.js")]
+    [HttpGet("~/plugins/stores/{storeId}/bigcommerce/modal/btcpay.js")]
     public async Task<IActionResult> GetBtcPayModalJavascript(string storeId)
     {
         var jsFile = await helper.GetCustomModalJavascript(storeId);

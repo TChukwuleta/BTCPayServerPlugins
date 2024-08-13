@@ -9,26 +9,19 @@
     ViewData.SetActivePage(PluginNavPages.Index, "Big Commerce");
 }
 
-<div class="d-sm-flex align-items-center">
-    <h2 class="mb-0">
-        @ViewData["Title"]
-    </h2>
-</div>
-
-
 <div class="container mt-5">
+    <div class="d-sm-flex align-items-center">
+        <h2 class="mb-0">
+            @ViewData["Title"]
+        </h2>
+    </div>
     @if (!Model.HasError)
     {
-        <div class="alert alert-warning alert-dismissible mb-4" role="alert">
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
-                <vc:icon symbol="close" />
-            </button>
-            <h5 class="alert-heading">Important note about BigCommerce Plugin</h5>
-            <p class="mb-0">
-                Please note that once the client Id and client secret are inputted, you would only be able to update it and not delete the credentials. Deletion of credentials is only possible when the BTCPay-BigCommerce app is uninstalled on BigCommerce.
-            </p>
-        </div>
         <form id="input-form" method="post" asp-action="Create">
+            <div class="d-flex justify-content-end mb-2">
+                <input type="submit" value="Update Credentials" class="btn btn-primary btn-sm" id="Create" />
+            </div>
+
             <div class="row">
                 <div class="col-md-6">
                     <div class="form-group">
@@ -61,17 +54,11 @@
                     </div>
                 </div>
             </div>
-
-            <div class="d-flex mt-3">
-                <input type="submit" value="Update Credentials" class="btn btn-primary btn-sm" id="Create" />
-            </div>
         </form>
-
     }
     else
     {
-
-        <div class="alert alert-warning alert-dismissible mb-4" role="alert">
+        <div class="alert alert-warning mt-4 p-2">
             <p class="mb-0" style="font-size: 0.9rem;">
                 To proceed with the BigCommerce plugin on this store, you need to
                 <a href="@Url.Action(nameof(UIStoresController.SetupWallet), "UIStores", new { cryptoCode = Model.CryptoCode, storeId = Model.StoreId })" class="alert-link">
@@ -80,5 +67,6 @@
                 first.
             </p>
         </div>
+
     }
 </div>
