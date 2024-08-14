@@ -10,22 +10,13 @@ public class ShopifyHelper
 
     public async Task<(bool succeeded, string response)> GetCustomJavascript(string storeId, string baseUrl)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
-        var bcStore = await ctx.BigCommerceStores.SingleOrDefaultAsync(c => c.StoreId == storeId);
-
-        if (bcStore == null)
-        {
-            return (false, "Invalid store Id specified");
-        }
-
         string[] fileUrls = new[]
         {
-            "https://raw.githubusercontent.com/TChukwuleta/BTCPayServerPlugins/main/Plugins/BTCPayServer.Plugins.BigCommercePlugin/Resources/js/btcpay.js",
-            "https://raw.githubusercontent.com/TChukwuleta/BTCPayServerPlugins/main/Plugins/BTCPayServer.Plugins.BigCommercePlugin/Resources/js/btcpay-shopify.js"
+            "https://raw.githubusercontent.com/TChukwuleta/BTCPayServerPlugins/main/Plugins/BTCPayServer.Plugins.ShopifyPlugin/Resources/js/btcpay.js",
+            "https://raw.githubusercontent.com/TChukwuleta/BTCPayServerPlugins/main/Plugins/BTCPayServer.Plugins.ShopifyPlugin/Resources/js/btcpay-shopify.js"
         };
 
         StringBuilder combinedJavascript = new StringBuilder();
-
         using (var httpClient = new HttpClient())
         {
             foreach (var fileUrl in fileUrls)
@@ -45,9 +36,8 @@ public class ShopifyHelper
                 }
             }
         }
-        string jsVariables = $"var BTCPAYSERVER_URL = '{baseUrl}'; var STORE_HASH = '{bcStore.StoreHash}'; var BTCPAYSERVER_STORE_ID = '{storeId}';";
+        string jsVariables = $"var BTCPAYSERVER_URL = '{baseUrl}'; var STORE_ID = '{storeId}';";
         combinedJavascript.Insert(0, jsVariables + Environment.NewLine);
-
         return (true, combinedJavascript.ToString());
     }
 }

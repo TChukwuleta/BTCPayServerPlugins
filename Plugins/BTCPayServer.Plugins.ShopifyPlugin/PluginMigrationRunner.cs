@@ -1,8 +1,7 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
-using BTCPayServer.Plugins.BigCommercePlugin.Services;
+using BTCPayServer.Plugins.ShopifyPlugin.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.Extensions.Hosting;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;

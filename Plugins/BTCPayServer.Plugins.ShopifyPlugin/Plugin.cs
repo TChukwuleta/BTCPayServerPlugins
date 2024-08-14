@@ -2,6 +2,8 @@ using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
 using BTCPayServer.Plugins.BigCommercePlugin.Services;
+using BTCPayServer.Plugins.ShopifyPlugin;
+using BTCPayServer.Plugins.ShopifyPlugin.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -18,10 +20,9 @@ public class Plugin : BaseBTCPayServerPlugin
 
     public override void Execute(IServiceCollection services)
     {
-        services.AddSingleton<IUIExtension>(new UIExtension("BigCommercePluginHeaderNav", "header-nav"));
-        services.AddSingleton<IHostedService, BigCommerceInvoicesPaidHostedService>();
+        services.AddSingleton<IUIExtension>(new UIExtension("ShopifyPluginHeaderNav", "header-nav"));
+        services.AddSingleton<IHostedService, ShopifyService>();
         services.AddHostedService<ApplicationPartsLogger>();
-        services.AddSingleton<BigCommerceService>();
         services.AddSingleton<ShopifyDbContextFactory>();
         services.AddDbContext<ShopifyDbContext>((provider, o) =>
         {

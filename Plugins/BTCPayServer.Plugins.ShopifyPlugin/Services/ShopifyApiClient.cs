@@ -9,7 +9,7 @@ using BTCPayServer.Plugins.ShopifyPlugin.ViewModels.Models;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin.Services
 {
-    internal class ShopifyApiClient
+    public class ShopifyApiClient
     {
         private readonly HttpClient _httpClient;
         private readonly ShopifyApiClientCredentials _credentials;

@@ -187,9 +187,9 @@ public class UIShopifyController : Controller
 
         var firstInvoiceSettled =
             matchedExistingInvoices.LastOrDefault(entity =>
-                new[] { InvoiceStatus.Processing, InvoiceStatus.Settled }
+                new[] { InvoiceStatus.Processing.ToString(), InvoiceStatus.Settled.ToString() }
                     .Contains(
-                        entity.GetInvoiceState().Status));
+                        entity.GetInvoiceState().Status.ToString()));
 
         var store = await _storeRepo.FindStore(storeId);
 
@@ -209,7 +209,7 @@ public class UIShopifyController : Controller
         {
             //if BTCPay was shut down before the tx managed to get registered on shopify, this will fix it on the next UI load in shopify
             if (client != null && order?.FinancialStatus == "pending" &&
-                firstInvoiceSettled.Status != InvoiceStatus.Processing)
+                firstInvoiceSettled.Status.ToString() != InvoiceStatus.Processing.ToString())
             {
                 await _shopifyService.Process(client, orderId, firstInvoiceSettled.Id,
                     firstInvoiceSettled.Currency,

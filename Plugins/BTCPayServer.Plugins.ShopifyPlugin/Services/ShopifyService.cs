@@ -23,14 +23,17 @@ public class ShopifyService : EventHostedServiceBase
     private readonly StoreRepository _storeRepository;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ShopifyDbContextFactory _dbContextFactory;
 
     public ShopifyService(EventAggregator eventAggregator,
         StoreRepository storeRepository,
         InvoiceRepository invoiceRepository,
         IHttpClientFactory httpClientFactory,
+        ShopifyDbContextFactory dbContextFactory,
         Logs logs) : base(eventAggregator, logs)
     {
         _storeRepository = storeRepository;
+        _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
         _httpClientFactory = httpClientFactory;
     }
@@ -58,10 +61,11 @@ public class ShopifyService : EventHostedServiceBase
             var shopifyOrderId = invoice.GetInternalTags(SHOPIFY_ORDER_ID_PREFIX).FirstOrDefault();
             if (shopifyOrderId != null)
             {
-                var success = invoice.Status switch
+                string invoiceStatus = invoice.Status.ToString();
+                bool? success = invoiceStatus switch
                 {
-                    InvoiceStatus.Settled => true,
-                    InvoiceStatus.Invalid or InvoiceStatus.Expired => false,
+                    "Settled" => true,
+                    "Invalid" or "Expired" => false,
                     _ => (bool?)null
                 };
 
@@ -69,21 +73,20 @@ public class ShopifyService : EventHostedServiceBase
                     await RegisterTransaction(invoice, shopifyOrderId, success.Value);
             }
         }
-
         await base.ProcessEvent(evt, cancellationToken);
     }
 
     private async Task RegisterTransaction(InvoiceEntity invoice, string shopifyOrderId, bool success)
     {
         var storeData = await _storeRepository.FindStore(invoice.StoreId);
-        var storeBlob = storeData.GetStoreBlob();
+        await using var ctx = _dbContextFactory.CreateContext();
+        var userStore = ctx.ShopifySettings.FirstOrDefault(c => c.StoreId == invoice.StoreId);
 
         // ensure that store in question has shopify integration turned on 
         // and that invoice's orderId has shopify specific prefix
-        var settings = storeBlob.GetShopifySettings();
-        if (settings?.IntegratedAt.HasValue == true)
+        if (userStore?.IntegratedAt.HasValue == true)
         {
-            var client = CreateShopifyApiClient(settings);
+            var client = CreateShopifyApiClient(userStore);
             if (!await client.OrderExists(shopifyOrderId))
             {
                 // don't register transactions for orders that don't exist on shopify
