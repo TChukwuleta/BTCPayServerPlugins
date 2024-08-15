@@ -18,14 +18,14 @@ using System.Threading.Tasks;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin.Services;
 
-public class ShopifyService : EventHostedServiceBase
+public class ShopifyHostedService : EventHostedServiceBase
 {
     private readonly StoreRepository _storeRepository;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ShopifyDbContextFactory _dbContextFactory;
 
-    public ShopifyService(EventAggregator eventAggregator,
+    public ShopifyHostedService(EventAggregator eventAggregator,
         StoreRepository storeRepository,
         InvoiceRepository invoiceRepository,
         IHttpClientFactory httpClientFactory,

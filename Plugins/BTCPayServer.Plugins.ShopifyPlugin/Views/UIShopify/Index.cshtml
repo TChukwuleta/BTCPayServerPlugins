@@ -3,9 +3,10 @@
 @using BTCPayServer.Client
 @using BTCPayServer.Controllers
 @using BTCPayServer.Data
+@using BTCPayServer.Plugins.Shopify.Models
 @using BTCPayServer.Plugins.ShopifyPlugin.Data
 @using Microsoft.AspNetCore.Routing
-@model BTCPayServer.Plugins.Shopify.Models.ShopifySettings
+@model ShopifySetting
 @{
     ViewData.SetActivePage(PluginNavPages.Index, "Shopify");
     var shopifyCredsSet = Model?.IntegratedAt.HasValue is true;

@@ -47,14 +47,11 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
             using var resp = await _httpClient.SendAsync(req);
 
             var strResp = await resp.Content.ReadAsStringAsync();
-            if (strResp.StartsWith("{", StringComparison.OrdinalIgnoreCase))
+            if (strResp.StartsWith("{", StringComparison.OrdinalIgnoreCase) && JObject.Parse(strResp)["errors"]?.Value<string>() is string error)
             {
-                if (JObject.Parse(strResp)["errors"]?.Value<string>() is string error)
-                {
-                    if (error == "Not Found")
-                        error = "Shop not found";
-                    throw new ShopifyApiException(error);
-                }
+                if (error == "Not Found")
+                    error = "Shop not found";
+                throw new ShopifyApiException(error);
             }
             return strResp;
         }

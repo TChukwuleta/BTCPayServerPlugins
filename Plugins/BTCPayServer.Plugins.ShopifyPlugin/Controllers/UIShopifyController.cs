@@ -28,11 +28,10 @@ using BTCPayServer.Plugins.ShopifyPlugin.Data;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
-[Route("~/plugins/stores/{storeId}/shopify")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIShopifyController : Controller
 {
-    private readonly ShopifyService _shopifyService;
+    private readonly ShopifyHostedService _shopifyService;
     private readonly ILogger<UIShopifyController> _logger;
     private readonly StoreRepository _storeRepo;
     private readonly InvoiceRepository _invoiceRepository;
@@ -45,7 +44,7 @@ public class UIShopifyController : Controller
         (StoreRepository storeRepo,
         UIInvoiceController invoiceController,
         UserManager<ApplicationUser> userManager,
-        ShopifyService shopifyService,
+        ShopifyHostedService shopifyService,
         ShopifyDbContextFactory dbContextFactory,
         InvoiceRepository invoiceRepository,
         IHttpClientFactory clientFactory,
@@ -61,8 +60,10 @@ public class UIShopifyController : Controller
         helper = new ShopifyHelper();
         _logger = logger;
     }
+    private const string SHOPIFY_ORDER_ID_PREFIX = "shopify-";
     public BTCPayServer.Data.StoreData CurrentStore => HttpContext.GetStoreData();
 
+    [Route("~/plugins/stores/{storeId}/shopify")]
     public async Task<IActionResult> Index(string storeId)
     {
         if (string.IsNullOrEmpty(storeId))
@@ -161,14 +162,14 @@ public class UIShopifyController : Controller
             return BadRequest("Invalid BTCPay store specified");
         }
 
-        var shopifySearchTerm = $"{ShopifyService.SHOPIFY_ORDER_ID_PREFIX}{orderId}";
+        var shopifySearchTerm = $"{SHOPIFY_ORDER_ID_PREFIX}{orderId}";
         var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
         {
             TextSearch = shopifySearchTerm,
             StoreId = new[] { storeId }
         });
         matchedExistingInvoices = matchedExistingInvoices.Where(entity =>
-                entity.GetInternalTags(ShopifyService.SHOPIFY_ORDER_ID_PREFIX)
+                entity.GetInternalTags(SHOPIFY_ORDER_ID_PREFIX)
                     .Any(s => s == orderId))
             .ToArray();
 
@@ -263,6 +264,4 @@ public class UIShopifyController : Controller
 
         return NotFound();
     }
-
-    private string GetUserId() => _userManager.GetUserId(User);
 }

@@ -43,6 +43,5 @@ public class ShopifySetting
     }
     internal static void OnModelCreating(ModelBuilder modelBuilder)
     {
-        throw new NotImplementedException();
     }
 }

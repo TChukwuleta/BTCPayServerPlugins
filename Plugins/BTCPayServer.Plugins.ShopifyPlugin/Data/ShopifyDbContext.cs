@@ -14,16 +14,13 @@ public class ShopifyDbContext : DbContext
         _designTime = designTime;
     }
 
-    /*public DbSet<BigCommerceStore> BigCommerceStores { get; set; }
-    public DbSet<Transaction> Transactions { get; set; }*/
     public DbSet<ShopifySetting> ShopifySettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.Shopify");
-
-        Transaction.OnModelCreating(modelBuilder);
+        
         ShopifySetting.OnModelCreating(modelBuilder);
     }
 }

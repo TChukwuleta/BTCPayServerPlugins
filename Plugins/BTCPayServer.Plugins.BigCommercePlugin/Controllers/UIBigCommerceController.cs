@@ -8,7 +8,6 @@ using BTCPayServer.Plugins.BigCommercePlugin.Services;
 using Microsoft.AspNetCore.Http;
 using BTCPayServer.Plugins.BigCommercePlugin.Data;
 using BTCPayServer.Abstractions.Extensions;
-using BTCPayServer.Abstractions.Models;
 using System;
 using Microsoft.AspNetCore.Authorization;
 using BTCPayServer.Plugins.BigCommercePlugin.Helper;
@@ -57,6 +56,7 @@ public class UIBigCommerceController : Controller
         helper = new BigCommerceHelper(_bigCommerceService, _dbContextFactory);
         _logger = logger;
     }
+    private const string BIGCOMMERCE_ORDER_ID_PREFIX = "BigCommerce-";
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
 
@@ -65,7 +65,6 @@ public class UIBigCommerceController : Controller
         if (string.IsNullOrEmpty(storeId))
             return NotFound();
 
-        string userId = GetUserId();
         await using var ctx = _dbContextFactory.CreateContext();
 
         var storeData = await _storeRepo.FindStore(storeId);
@@ -89,7 +88,7 @@ public class UIBigCommerceController : Controller
             {
                 StoreId = CurrentStore.Id,
                 StoreName = CurrentStore.StoreName,
-                ApplicationUserId = userId,
+                ApplicationUserId = GetUserId(),
                 RedirectUrl = Url.Action("Install", "UIBigCommerce", null, Request.Scheme)
             };
             ctx.Add(bigCommerceStore);
@@ -107,43 +106,21 @@ public class UIBigCommerceController : Controller
         });
     }
 
-
-    [HttpGet("~/plugins/bigcommerce/create")]
-    public async Task<IActionResult> Create()
-    {
-        if (CurrentStore is null)
-            return NotFound();
-
-        string userId = GetUserId();
-        await using var ctx = _dbContextFactory.CreateContext();
-        var entity = new BigCommerceStore
-        {
-            StoreId = CurrentStore.Id,
-            StoreName = CurrentStore.StoreName,
-            ApplicationUserId = userId
-        };
-        ctx.Add(entity);
-        await ctx.SaveChangesAsync();
-
-        return View(new InstallBigCommerceViewModel());
-    }
-
-
     [HttpPost("~/plugins/bigcommerce/create")]
     public async Task<IActionResult> Create(InstallBigCommerceViewModel model)
     {
         if (CurrentStore is null)
             return NotFound();
 
-        string userId = GetUserId();
-
         await using var ctx = _dbContextFactory.CreateContext();
         var userStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
 
-        var userBigCommerceStores = ctx.BigCommerceStores.Where(store => store.StoreId != CurrentStore.Id).ToList();
-        if (userBigCommerceStores.Exists(store => store.ClientId == model.ClientId || store.ClientSecret == model.ClientSecret))
+        var hasConflictingStore = ctx.BigCommerceStores
+        .Where(store => store.StoreId != CurrentStore.Id)
+        .Any(store => store.ClientId == model.ClientId || store.ClientSecret == model.ClientSecret);
+        if (hasConflictingStore)
         {
-            ModelState.AddModelError(nameof(model.ClientSecret), "Cannot create BigCommerce store as a store with the same Client ID or Client Secret already exists.");
+            TempData[WellKnownTempData.ErrorMessage] = "Cannot create BigCommerce store as a store with the same Client ID or Client Secret already exists";
             return RedirectToAction(nameof(Index), "UIBigCommerce", new { storeId = CurrentStore.Id });
         }
 
@@ -151,6 +128,7 @@ public class UIBigCommerceController : Controller
         userStore.ClientSecret = model.ClientSecret;
         ctx.Update(userStore);
         await ctx.SaveChangesAsync();
+        TempData[WellKnownTempData.ErrorMessage] = "Big commerce record updated successfully";
         return RedirectToAction(nameof(Index), "UIBigCommerce", new { storeId = CurrentStore.Id });
     }
 
@@ -278,7 +256,7 @@ public class UIBigCommerceController : Controller
                 _logger.LogError($"Error occurred while creating order... {JsonConvert.SerializeObject(createOrder)}");
                 return BadRequest("An error occurred while creating order");
             }
-            string bgOrderId = $"{BigCommerceInvoicesPaidHostedService.BIGCOMMERCE_ORDER_ID_PREFIX}{createOrder.data.id}";
+            string bgOrderId = $"{BIGCOMMERCE_ORDER_ID_PREFIX}{createOrder.data.id}";
 
             var metadata = new InvoiceMetadata();
             metadata.OrderId = bgOrderId;
@@ -340,27 +318,6 @@ public class UIBigCommerceController : Controller
             return BadRequest(jsFile.response);
         }
         return Content(jsFile.response, "text/javascript");
-    }
-
-
-    private void ReturnSuccessMessageStatus(string message)
-    {
-        TempData.SetStatusMessageModel(new StatusMessageModel()
-        {
-            Message = message,
-            Html = message,
-            AllowDismiss = true,
-            Severity = StatusMessageModel.StatusSeverity.Success
-        });
-    }
-
-    private void ReturnFailedMessageStatus(string message)
-    {
-        TempData.SetStatusMessageModel(new StatusMessageModel()
-        {
-            Message = message,
-            Severity = StatusMessageModel.StatusSeverity.Error
-        });
     }
 
     private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(StoreData storeData, bool onlyEnabled = false)
