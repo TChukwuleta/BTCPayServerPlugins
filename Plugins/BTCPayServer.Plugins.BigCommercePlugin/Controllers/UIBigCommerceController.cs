@@ -194,6 +194,7 @@ public class UIBigCommerceController : Controller
     [HttpGet("~/plugins/stores/{storeId}/bigcommerce/auth/load")]
     public async Task<IActionResult> Load(string storeId, [FromQuery] string signed_payload_jwt)
     {
+        _logger.LogInformation(signed_payload_jwt);
         if (string.IsNullOrEmpty(signed_payload_jwt))
         {
             return BadRequest("Missing signed_payload_jwt parameter");
@@ -209,6 +210,20 @@ public class UIBigCommerceController : Controller
         {
             return BadRequest("Invalid signed_payload_jwt parameter");
         }
+        // Set the X-Frame-Options header to allow embedding
+        /*Response.Headers.Remove("X-Frame-Options");
+        Response.Headers["X-Frame-Options"] = "SAMEORIGIN";*/
+        /*return View(new InstallBigCommerceViewModel
+        {
+            ClientId = bigCommerceStore.ClientId,
+            ClientSecret = bigCommerceStore.ClientSecret,
+            AuthCallBackUrl = Url.Action("Install", "UIBigCommerce", new { storeId }, Request.Scheme),
+            LoadCallbackUrl = Url.Action("Load", "UIBigCommerce", new { storeId }, Request.Scheme),
+            UninstallCallbackUrl = Url.Action("Uninstall", "UIBigCommerce", new { storeId }, Request.Scheme),
+            CheckoutScriptUrl = Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId }, Request.Scheme),
+            StoreName = bigCommerceStore.StoreName
+        });*/
+
         return Redirect("https://btcpayserver.org/");
     }
 

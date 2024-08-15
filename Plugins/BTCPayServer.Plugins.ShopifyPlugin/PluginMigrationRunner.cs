@@ -19,7 +19,7 @@ public class PluginMigrationRunner : IHostedService
     {
         await using var ctx = _pluginDbContextFactory.CreateContext();
         await using var dbContext = _pluginDbContextFactory.CreateContext();
-        /*await ctx.Database.MigrateAsync(cancellationToken);*/
+        await ctx.Database.MigrateAsync(cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken)

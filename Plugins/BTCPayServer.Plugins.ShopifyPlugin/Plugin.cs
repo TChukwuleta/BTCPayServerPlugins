@@ -5,7 +5,6 @@ using BTCPayServer.Plugins.BigCommercePlugin.Services;
 using BTCPayServer.Plugins.ShopifyPlugin;
 using BTCPayServer.Plugins.ShopifyPlugin.Services;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -19,7 +18,6 @@ public class Plugin : BaseBTCPayServerPlugin
     public override void Execute(IServiceCollection services)
     {
         services.AddSingleton<IUIExtension>(new UIExtension("ShopifyPluginHeaderNav", "header-nav"));
-        /*services.AddSingleton<IHostedService, ShopifyHostedService>();*/
         services.AddSingleton<ShopifyHostedService>();
         services.AddHostedService<ShopifyHostedService>();
         services.AddHostedService<ApplicationPartsLogger>();
