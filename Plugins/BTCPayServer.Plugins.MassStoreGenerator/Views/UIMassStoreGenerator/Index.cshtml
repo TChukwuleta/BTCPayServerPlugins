@@ -16,7 +16,7 @@
     <div class="container mt-5">
         <form id="input-form" method="post" asp-action="Create">
             <div class="d-flex justify-content-end mb-2">
-                <input type="submit" value="Create Store(s)" class="btn btn-primary btn-sm" id="Create" />
+                <button type="submit" class="btn btn-primary btn-sm" id="Create">Create</button>
             </div>
 
             <div class="row g-1 align-items-center mb-3">
@@ -48,19 +48,13 @@
                 </div>
 
                 <div class="col-auto">
-                    <button type="button" class="btn btn-outline-danger btn-remove">
-                        @* <vc:icon symbol="actions-minus" /> *@
-                        Remove
-                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-remove">Remove</button>
                 </div>
             </div>
 
             <div class="row g-2 align-items-center mb-3">
                 <div class="col">
-                    <button type="button" class="btn btn-outline-primary btn-add">
-                        @* <vc:icon symbol="actions-add" /> *@
-                        Add New
-                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-add">Add New</button>
                 </div>
             </div>
         </form>

@@ -196,10 +196,7 @@ public class UIBigCommerceController : Controller
     [HttpGet("~/stores/{storeId}/plugins/bigcommerce/auth/load")]
     public async Task<IActionResult> Load(string storeId, [FromQuery] string signed_payload_jwt)
     {
-        var htmlContent = "<html><body><p>Your BTCPay plugin was successfully configured.</p></body></html>";
-        return Content(htmlContent, "text/html");
-
-        /*_logger.LogInformation(signed_payload_jwt);
+        _logger.LogInformation(signed_payload_jwt);
         if (string.IsNullOrEmpty(signed_payload_jwt))
         {
             return BadRequest("Missing signed_payload_jwt parameter");
@@ -216,7 +213,7 @@ public class UIBigCommerceController : Controller
             return BadRequest("Invalid signed_payload_jwt parameter");
         }
         var htmlContent = "<html><body><p>Your BTCPay plugin was successfully configured.</p></body></html>";
-        return Content(htmlContent, "text/html");*/
+        return Content(htmlContent, "text/html");
     }
 
     [AllowAnonymous]
