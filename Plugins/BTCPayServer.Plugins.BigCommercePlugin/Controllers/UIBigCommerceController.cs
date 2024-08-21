@@ -26,7 +26,7 @@ using System.Collections.Generic;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
-[Route("~/plugins/stores/{storeId}/bigcommerce")]
+[Route("~/stores/{storeId}/plugins/bigcommerce")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIBigCommerceController : Controller
 {
@@ -134,7 +134,7 @@ public class UIBigCommerceController : Controller
 
 
     [AllowAnonymous]
-    [HttpGet("~/plugins/stores/{storeId}/bigcommerce/auth/install")]
+    [HttpGet("~/stores/{storeId}/plugins/bigcommerce/auth/install")]
     public async Task<IActionResult> Install(string storeId, [FromQuery] string account_uuid, [FromQuery] string code, [FromQuery] string context, [FromQuery] string scope)
     {
         try
@@ -191,7 +191,7 @@ public class UIBigCommerceController : Controller
 
 
     [AllowAnonymous]
-    [HttpGet("~/plugins/stores/{storeId}/bigcommerce/auth/load")]
+    [HttpGet("~/stores/{storeId}/plugins/bigcommerce/auth/load")]
     public async Task<IActionResult> Load(string storeId, [FromQuery] string signed_payload_jwt)
     {
         _logger.LogInformation(signed_payload_jwt);
@@ -210,25 +210,11 @@ public class UIBigCommerceController : Controller
         {
             return BadRequest("Invalid signed_payload_jwt parameter");
         }
-        // Set the X-Frame-Options header to allow embedding
-        /*Response.Headers.Remove("X-Frame-Options");
-        Response.Headers["X-Frame-Options"] = "SAMEORIGIN";*/
-        /*return View(new InstallBigCommerceViewModel
-        {
-            ClientId = bigCommerceStore.ClientId,
-            ClientSecret = bigCommerceStore.ClientSecret,
-            AuthCallBackUrl = Url.Action("Install", "UIBigCommerce", new { storeId }, Request.Scheme),
-            LoadCallbackUrl = Url.Action("Load", "UIBigCommerce", new { storeId }, Request.Scheme),
-            UninstallCallbackUrl = Url.Action("Uninstall", "UIBigCommerce", new { storeId }, Request.Scheme),
-            CheckoutScriptUrl = Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId }, Request.Scheme),
-            StoreName = bigCommerceStore.StoreName
-        });*/
-
         return Redirect("https://btcpayserver.org/");
     }
 
     [AllowAnonymous]
-    [HttpGet("~/plugins/stores/{storeId}/bigcommerce/auth/uninstall")]
+    [HttpGet("~/stores/{storeId}/plugins/bigcommerce/auth/uninstall")]
     public async Task<IActionResult> Uninstall(string storeId, [FromQuery] string signed_payload_jwt)
     {
         if (string.IsNullOrEmpty(signed_payload_jwt))
@@ -253,7 +239,7 @@ public class UIBigCommerceController : Controller
     }
 
     [AllowAnonymous]
-    [HttpPost("~/plugins/stores/{storeId}/bigcommerce/create-order")]
+    [HttpPost("~/stores/{storeId}/plugins/bigcommerce/create-order")]
     [EnableCors("AllowAllOrigins")]
     public async Task<IActionResult> CreateOrder([FromBody] CreateBigCommerceStoreRequest requestModel)
     {
@@ -312,7 +298,7 @@ public class UIBigCommerceController : Controller
      }
 
     [AllowAnonymous]
-    [HttpGet("~/plugins/stores/{storeId}/bigcommerce/btcpay-bc.js")]
+    [HttpGet("~/stores/{storeId}/plugins/bigcommerce/btcpay-bc.js")]
     public async Task<IActionResult> GetBtcPayJavascript(string storeId)
     {
         var jsFile = await helper.GetCustomJavascript(storeId, Request.GetAbsoluteRoot());
@@ -324,7 +310,7 @@ public class UIBigCommerceController : Controller
     }
 
     [AllowAnonymous]
-    [HttpGet("~/plugins/stores/{storeId}/bigcommerce/modal/btcpay.js")]
+    [HttpGet("~/stores/{storeId}/plugins/bigcommerce/modal/btcpay.js")]
     public async Task<IActionResult> GetBtcPayModalJavascript(string storeId)
     {
         var jsFile = await helper.GetCustomModalJavascript(storeId);
