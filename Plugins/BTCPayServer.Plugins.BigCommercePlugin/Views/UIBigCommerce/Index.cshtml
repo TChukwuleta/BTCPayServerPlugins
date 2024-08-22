@@ -9,6 +9,26 @@
     ViewData.SetActivePage(PluginNavPages.Index, "Big Commerce");
 }
 
+@if (ViewBag.SuccessMessage != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @ViewBag.SuccessMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
+            <vc:icon symbol="close" />
+        </button>
+    </div>
+}
+
+@if (ViewBag.ErrorMessage != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @ViewBag.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
+            <vc:icon symbol="close" />
+        </button>
+    </div>
+}
+
 <div class="d-sm-flex align-items-center">
     <h2 class="mb-0">
         @ViewData["Title"]
@@ -38,10 +58,6 @@
                     <div class="form-group">
                         <label asp-for="ClientSecret" class="form-label"></label>
                         <input asp-for="ClientSecret" class="form-control" />
-                    </div>
-                    <div class="form-group">
-                        <label asp-for="StoreName" class="form-label"></label>
-                        <input asp-for="StoreName" class="form-control" readonly />
                     </div>
                     <div class="form-group">
                         <label asp-for="AuthCallBackUrl" class="form-label"></label>

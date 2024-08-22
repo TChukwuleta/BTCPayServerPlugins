@@ -71,6 +71,17 @@ public class UIBigCommerceController : Controller
         if (storeData == null)
             return NotFound();
 
+        if (TempData["SuccessMessage"] != null)
+        {
+            ViewBag.SuccessMessage = TempData["SuccessMessage"];
+            TempData.Remove("SuccessMessage");
+        }
+        if (TempData["ErrorMessage"] != null)
+        {
+            ViewBag.ErrorMessage = TempData["ErrorMessage"];
+            TempData.Remove("ErrorMessage");
+        }
+
         var storeHasWallet = GetPaymentMethodConfigs(storeData, true).Any();
         if (!storeHasWallet)
         {
@@ -94,8 +105,6 @@ public class UIBigCommerceController : Controller
             ctx.Add(bigCommerceStore);
             await ctx.SaveChangesAsync();
         }
-
-        TempData[WellKnownTempData.SuccessMessage] = "Big commerce details saved successfully";
         return View(new InstallBigCommerceViewModel
         {
             ClientId = bigCommerceStore.ClientId,
@@ -130,7 +139,7 @@ public class UIBigCommerceController : Controller
         userStore.ClientSecret = model.ClientSecret;
         ctx.Update(userStore);
         await ctx.SaveChangesAsync();
-        TempData[WellKnownTempData.ErrorMessage] = "Big commerce record updated successfully";
+        TempData[WellKnownTempData.SuccessMessage] = "Big commerce record saved successfully";
         return RedirectToAction(nameof(Index), "UIBigCommerce", new { storeId = CurrentStore.Id });
     }
 
