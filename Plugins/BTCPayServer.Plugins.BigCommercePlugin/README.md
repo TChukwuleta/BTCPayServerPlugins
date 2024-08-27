@@ -19,7 +19,7 @@ Our integration with [BigCommerce](https://bigcommerce.com/) allows you to conne
 
 Before diving into the setup process, ensure you have the following:
 
--[A BigCommerce Account](https://login.bigcommerce.com/)
+- [A BigCommerce Account](https://login.bigcommerce.com/)
 - BTCPay Server - [self-hosted](https://docs.btcpayserver.org/Deployment/) or run by a [third-party host](https://docs.btcpayserver.org/Deployment/ThirdPartyHosting/) v1.4.8 or later.
 - [Created BTCPay Server store](https://docs.btcpayserver.org/CreateStore/) with [wallet set up](https://docs.btcpayserver.org/WalletSetup/)
   
@@ -30,11 +30,20 @@ Before diving into the setup process, ensure you have the following:
 3. Navigate to and click the BigCommerce plugin as show on the navigation panel. There you would see all required URLs (Auth, load, uninstall).
 4. Log in to your Big commerce application, and set up an application to be used for receiving bitcoin payment via BTCPay Server account.
 5. Input the Auth Callback URL, Load Callback URL, and the Uninstall Callback URL with the URL in your BTCPay BigCommerce instance
-6. For scopes and permissions:
-
-![image](https://github.com/user-attachments/assets/a7770f65-fde9-408d-8643-daf7aa2345fb)
-
-![image](https://github.com/user-attachments/assets/009b5150-4d31-4ec1-9ffa-3b614834165c)
+6. To install the Plugin successfully, and to be able to receive payment via Bitcoin, you'd need to register some permissions on BigCommerce. Below are the required OAuth Scopes needed for the BigCommerce app
+   - Orders => Modify
+   - Order Transactions => Modify
+   - Create Payments => Create
+   - Get Payment Methods => Get
+   - Stored Payment Instruments => Read-Only
+   - Products => Read-Only
+   - Customers => Read-Only
+   - Content => Modify
+   - Checkout Content => Modify
+   - Carts => Modify
+   - Checkouts => Modify
+   - Information & Settings => Read-Only
+     
 
 7. Once you are done setting up your application on BigCommerce, copy the client Id and the client Secret, go to your BTCPay instance and update the credentials. Please ensure they are copied properly.
 
