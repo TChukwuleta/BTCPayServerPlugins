@@ -92,4 +92,5 @@ You can now receive payment for your store using BigCommerce
 
 ## Big Commerce Uninstall
 
-Once you uninstall the application, the client Id and the client secret is also deleted from the store and can be reused by another store, or the same store with a new application
+Once you uninstall the application, the client Id and the client secret is also deleted from the store and can be reused by another store, or the same store with a new application.
+So if you uninstalled, and you want to still use the same store, go back to your BTCPay instance and save the clientId and secret.
