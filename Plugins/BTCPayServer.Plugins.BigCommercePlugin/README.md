@@ -60,7 +60,7 @@ One last step, we need to verify that the checkout script was updated successful
 Navigate to StoreFront => Script Manager.
 
 Confirm you have a script with the name: btcpay-checkout. If you do, you are good to go.
-If you dont, you would need to create a new script. 
+If you dont, you would need to create a new script.
 
 In the create script form:
 
@@ -89,6 +89,27 @@ https://domain.btcpayserver.com/plugins/B6XJFepkN61YkcHXT42vfwLK1bMdJEYi61nEyxVY
 Once completed, click the save button and you should be good to go. 
 
 You can now receive payment for your store using BigCommerce
+
+P.S. You need to ensure that the required permissions listed above are granted to the application before creating a new payment script.
+
+## How to receive payment:
+
+On the checkout page, after all necessary information has been inputted, the payment screen would be similar to this:
+
+![image](https://github.com/user-attachments/assets/afde799b-5c27-470c-b175-fb27233e6ff8)
+
+From the payment providers listed, select "Bitcoin/Lightning Network". 
+
+![image](https://github.com/user-attachments/assets/da589c8f-f3de-4c63-9776-36aae9be574d)
+
+Notice that the button now changes to "Pay with Bitcoin".
+
+To complete the payment, the customer clicks on the the "Pay with Bitcoin" button. The QR code would pop on the screen with an option to pay directly through the customer's wallet.
+
+![image](https://github.com/user-attachments/assets/0f3073c3-e0e5-464e-b879-0bfe37384eaf)
+
+Once the payment is complete and confirmed, an invoice is then successfully created on the merchant BTCPay instance as well as the payment. 
+
 
 ## Big Commerce Uninstall
 
