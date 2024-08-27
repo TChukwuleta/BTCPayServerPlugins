@@ -1,10 +1,29 @@
-# Big Commerce plugin for BTCPayServer
+# Accept Bitcoin in BigCommerce with BTCPay Server
 
-This plugin allows you to integrate your [BigCommerce](https://bigcommerce.com/) application with BTCPay Server. 
+Introducing BTCPay Server for BigCommerce – an open-source payment gateway that empowers you to accept Bitcoin payments directly on your website or store from customers with no fees.
 
-With this you have the option of accepting Bitcoin payments for your store.
+Our integration with [BigCommerce](https://bigcommerce.com/) allows you to connect your self-hosted BTCPay Server with your BigCommerce store, enabling you to accept Bitcoin payments quickly and securely.
 
-## Installation
+## Why Choose BTCPay for Your BigCommerce Store?
+
+- **No Fees, No Hidden Costs**: BTCPay Server empowers your business with a truly fee-free payment solution. Enjoy every cent of your transactions without any deductions
+- **Direct payment**: Say goodbye to intermediaries and lengthy KYC processes. Receive payments directly to your wallet with complete privacy
+- **Automated Payment Processing**: BTCPay Server takes care of payments, invoice management automatically.
+- **Great Checkout Experience**: Enhance customer experience with Bitcoin QR code displays during checkout.
+- **Self-hosted infrastructure**: With BTCPay Server, you own your payment instances. You also maintain complete control over your payment infrastructure.
+- **Easy CSV exports**: Easily export payment data with CSV files, making financial management a breeze.
+- **Multilingual ready**: Serve a global audience right out of the box.
+- **Community-driven support**: Get responsive assistance from our dedicated community ([Mattermost](http://chat.btcpayserver.org/) or [Telegram](https://t.me/btcpayserver)).
+
+## Prerequisites:
+
+Before diving into the setup process, ensure you have the following:
+
+-[A BigCommerce Account](https://login.bigcommerce.com/)
+- BTCPay Server - [self-hosted](https://docs.btcpayserver.org/Deployment/) or run by a [third-party host](https://docs.btcpayserver.org/Deployment/ThirdPartyHosting/) v1.4.8 or later.
+- [Created BTCPay Server store](https://docs.btcpayserver.org/CreateStore/) with [wallet set up](https://docs.btcpayserver.org/WalletSetup/)
+  
+## Setting up BTCPay Server with BigCommerce
 
 1. Install the plugin from Plugins=>Add New=> BigCommerce
 2. Restart BTCPay Server.
