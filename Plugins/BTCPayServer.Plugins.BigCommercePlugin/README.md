@@ -33,16 +33,15 @@ Before diving into the setup process, ensure you have the following:
 6. To install the Plugin successfully, and to be able to receive payment via Bitcoin, you'd need to register some permissions on BigCommerce. Below are the required OAuth Scopes needed for the BigCommerce app
    - Orders => Modify
    - Order Transactions => Modify
-   - Create Payments => Create
-   - Get Payment Methods => Get
-   - Stored Payment Instruments => Read-Only
-   - Products => Read-Only
-   - Customers => Read-Only
    - Content => Modify
    - Checkout Content => Modify
    - Carts => Modify
    - Checkouts => Modify
    - Information & Settings => Read-Only
+
+![image](https://github.com/user-attachments/assets/a49d2d5e-8d28-4f8e-97d4-bfac64bd0b24)
+
+![image](https://github.com/user-attachments/assets/9bbfc66d-e6c7-4ba9-8f47-16ed6eab29dd)
      
 
 7. Once you are done setting up your application on BigCommerce, copy the client Id and the client Secret, go to your BTCPay instance and update the credentials. Please ensure they are copied properly.
