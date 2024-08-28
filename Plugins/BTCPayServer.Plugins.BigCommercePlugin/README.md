@@ -82,6 +82,8 @@ Once you have completed the above steps, it is time to install your BigCommerce 
 
 6. Once the installation is successful, you should see the application listed on the Apps section of your navigation panel.
 
+You manually need to create an offline payment method containing "Bitcoin" (e.g. Bitcoin / Lightning Network) in the BigCommerce store under Settings => Setup => Payments => Additional providers
+
 ### Verify script installation
 
 One last step, we need to verify that the checkout script was updated successfully on your store.
