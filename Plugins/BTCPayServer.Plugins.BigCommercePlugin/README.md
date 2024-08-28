@@ -35,6 +35,7 @@ Before diving into the setup process, ensure you have the following:
 
 Click on it, it would display  BigCommerce configuration page for BTCPay server where you can configure your credentials and also view your callback Urls.
 
+
 ### Setup the BigCommerce app
 
 1. Now, you need to create a BigCommerce application. go to [devtools.bigcommerce.com](https://devtools.bigcommerce.com) and click on Create an app button.
@@ -60,24 +61,36 @@ following permissions and their access levels.
 4. Go ahead and fill out other information about the application, once completed you can save.
 5. Once your application is included in the app list, click on the "View Client Id" icon of the just created application to get the client Id and secret of the BigCommerce application.
 6. Go back to your BigCommerce plugin on BTCPay server, and update the configuration details with the client Id and secret as copied from the BigCommerce application. Please ensure they are copied properly.
-     
+
+P.S: It is important to note that you cannot assign a BigCommerce application credential to multiple stores on BTCPay Server.
 
 
-P.S: You cannot assign a BigCommerce application credential to multiple stores on BTCPay Server.
+### Install the app to your store and connect
 
+Once you have completed the above steps, it is time to install your BigCommerce application in your store and start receiving payment using Bitcoin.
 
-Once you are done you can go ahead and install the application on your BigCommerce store. 
+1. Login to your [BigCommerce](https://docs.btcpayserver.org/WalletSetup/), Navigate to Apps => MyApps
+2. Select "My Draft Apps", there you would see a list of all your BigCommerce application that you've set up including this newly created application.
+3. Hover on your newly created application and click on "Learn more"
+4. It would take you to a page containing your application details including permissions granted to the application, with a button to install.
 
-Login to your BigCommerce, Navigate to Apps => MyApps and install the Big Commerce plugin.
+![image](https://github.com/user-attachments/assets/a6b2ea8b-5d2b-44ee-a359-d471cc52a834)
 
-Once the installation is completed, you should see the plugin on the Apps section of your navigation panel.
+5. Click on the install button, acknowledge that PCI-DSS compliance, and confirm the installation.
 
-One last step, we need to verify that the checkout script was updated successfully.  
+![image](https://github.com/user-attachments/assets/aa2dd84a-d54a-4f10-83e7-f7b9bc9c4e57)
 
-Navigate to StoreFront => Script Manager.
+6. Once the installation is successful, you should see the application listed on the Apps section of your navigation panel.
 
-Confirm you have a script with the name: btcpay-checkout. If you do, you are good to go.
-If you dont, you would need to create a new script.
+### Verify script installation
+
+One last step, we need to verify that the checkout script was updated successfully on your store.
+
+1. Navigate to StoreFront => Script Manager.
+2. Confirm you have a script with the name: btcpay-checkout, with date-installed corresponding to the date at which the app was installed. If you do, you are good to go.
+3. If you dont, you would need to create a new script. Just before then, you need to ensure that the required permissions listed above are granted to the application.
+
+To create a new script, under Script Manager, click on "Create a Script".
 
 In the create script form:
 
@@ -86,28 +99,23 @@ In the create script form:
 - Location => Checkout
 - Script Category => Essential
 - Script type => URL
-- Script URL => 
-Copy the checkout script URL in your Bigcommerce plugin page on BTCPay Server. 
-To the copied script URL, you would need to include a query parameter as show below:
+- Script URL => Copy the checkout script URL in your Bigcommerce plugin page on BTCPay Server. 
 
-https://domain.btcpayserver.com/plugins/B6XJFepkN61YkcHXT42vfwLK1bMdJEYi61nEyxVY4frW/bigcommerce/btcpay-bc.js?bcid={storehash}
+To the copied script URL, you would need to include a query parameter as shown:
+https://btcpay.example.com/plugins/B6XJFepkN61YkcHXT42vfwLK1bMdJEYi61nEyxVY4frW/bigcommerce/btcpay-bc.js?bcid={storehash}
 
-Where store hash is replaced with your actual store hash. 
-Don't know where to find your store hash? It is the set of characters in your BigCommerce store url beside store-
+Where store hash is replaced with your actual BigCommerce store hash. 
+Don't know where to find your store hash? It is the set of characters in your BigCommerce store url beside 'store-'
 
 For instance, assuming your URL is https://store-test1234.mybigcommerce.com/
-
 Your store hash is test1234
 
 Using this example, your script url would be:
-
-https://domain.btcpayserver.com/plugins/B6XJFepkN61YkcHXT42vfwLK1bMdJEYi61nEyxVY4frW/bigcommerce/btcpay-bc.js?bcid=test1234
+https://btcpay.example.com/plugins/B6XJFepkN61YkcHXT42vfwLK1bMdJEYi61nEyxVY4frW/bigcommerce/btcpay-bc.js?bcid=test1234
 
 Once completed, click the save button and you should be good to go. 
 
 You can now receive payment for your store using BigCommerce
-
-P.S. You need to ensure that the required permissions listed above are granted to the application before creating a new payment script.
 
 ## How to receive payment:
 
