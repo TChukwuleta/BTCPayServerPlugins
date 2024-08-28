@@ -25,8 +25,23 @@ Before diving into the setup process, ensure you have the following:
   
 ## Setting up BTCPay Server with BigCommerce
 
-1. Install the plugin from Plugins=>Add New=> BigCommerce
+### Install the plugin on BTCPay Server
+
+1. In your BTCPay instance, navigate to Plugins=> Add New => BigCommerce
 2. Restart BTCPay Server.
+3. If successful, you'd see Bigcommerce included in the plugin section.
+
+![image](https://github.com/user-attachments/assets/fd08535d-8a6a-4d94-a55c-317b297858c1)
+
+Click on it would direct you to BigCommerce configuration page for BTCPay server where you can configure your credentials and also view your callback Urls.
+
+![image](https://github.com/user-attachments/assets/b58cb647-cd67-49b8-bd1a-791117404f1c)
+
+### Setup the BigCommerce app
+
+1. Now, you need to setup a BigCommerce application. go to [devtools.bigcommerce.com](https://devtools.bigcommerce.com) 
+
+
 3. Navigate to and click the BigCommerce plugin as show on the navigation panel. There you would see all required URLs (Auth, load, uninstall).
 4. Log in to your Big commerce application, and set up an application to be used for receiving bitcoin payment via BTCPay Server account.
 5. Input the Auth Callback URL, Load Callback URL, and the Uninstall Callback URL with the URL in your BTCPay BigCommerce instance
