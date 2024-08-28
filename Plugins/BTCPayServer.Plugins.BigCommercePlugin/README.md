@@ -33,19 +33,18 @@ Before diving into the setup process, ensure you have the following:
 
 ![image](https://github.com/user-attachments/assets/fd08535d-8a6a-4d94-a55c-317b297858c1)
 
-Click on it would direct you to BigCommerce configuration page for BTCPay server where you can configure your credentials and also view your callback Urls.
-
-![image](https://github.com/user-attachments/assets/b58cb647-cd67-49b8-bd1a-791117404f1c)
+Click on it, it would display  BigCommerce configuration page for BTCPay server where you can configure your credentials and also view your callback Urls.
 
 ### Setup the BigCommerce app
 
-1. Now, you need to setup a BigCommerce application. go to [devtools.bigcommerce.com](https://devtools.bigcommerce.com) 
+1. Now, you need to create a BigCommerce application. go to [devtools.bigcommerce.com](https://devtools.bigcommerce.com) and click on Create an app button.
+2. After inputting the name of the application, you'd need to fill more details about the application including the callback urls, permission and scopes, etc.
+   For the callback urls (auth, load, uninstall), you can copy it from your Bigcommerce plugin page on BTCPay Server, and prefill the inputs on your BigCommerce app.
 
+![image](https://github.com/user-attachments/assets/c359d350-54cd-465b-8b75-b4b55c23e5a0)
 
-3. Navigate to and click the BigCommerce plugin as show on the navigation panel. There you would see all required URLs (Auth, load, uninstall).
-4. Log in to your Big commerce application, and set up an application to be used for receiving bitcoin payment via BTCPay Server account.
-5. Input the Auth Callback URL, Load Callback URL, and the Uninstall Callback URL with the URL in your BTCPay BigCommerce instance
-6. To install the Plugin successfully, and to be able to receive payment via Bitcoin, you'd need to register some permissions on BigCommerce. Below are the required OAuth Scopes needed for the BigCommerce app
+3. There are also required permissions that you will need to grant the BigCommerce application for the integration to be successful. So from the OAuth scopes list, ensure you select the
+following permissions and their access levels.
    - Orders => Modify
    - Order Transactions => Modify
    - Content => Modify
@@ -57,9 +56,12 @@ Click on it would direct you to BigCommerce configuration page for BTCPay server
 ![image](https://github.com/user-attachments/assets/a49d2d5e-8d28-4f8e-97d4-bfac64bd0b24)
 
 ![image](https://github.com/user-attachments/assets/9bbfc66d-e6c7-4ba9-8f47-16ed6eab29dd)
+
+4. Go ahead and fill out other information about the application, once completed you can save.
+5. Once your application is included in the app list, click on the "View Client Id" icon of the just created application to get the client Id and secret of the BigCommerce application.
+6. Go back to your BigCommerce plugin on BTCPay server, and update the configuration details with the client Id and secret as copied from the BigCommerce application. Please ensure they are copied properly.
      
 
-7. Once you are done setting up your application on BigCommerce, copy the client Id and the client Secret, go to your BTCPay instance and update the credentials. Please ensure they are copied properly.
 
 P.S: You cannot assign a BigCommerce application credential to multiple stores on BTCPay Server.
 
