@@ -1,18 +1,18 @@
 # Accept Bitcoin in BigCommerce with BTCPay Server
 
-Introducing BTCPay Server for BigCommerce – an open-source payment gateway that empowers you to accept Bitcoin payments directly on your website or store from customers with no fees.
+Introducing BTCPay Server for BigCommerce – an open-source payment gateway that enables you accept Bitcoin payments directly on your website or store from customers with no fees.
 
-Our integration with [BigCommerce](https://bigcommerce.com/) allows you to connect your self-hosted BTCPay Server with your BigCommerce store, enabling you to accept Bitcoin payments quickly and securely.
+Our integration with [BigCommerce](https://bigcommerce.com/) allows you to connect your self-hosted BTCPay Server with your BigCommerce store, enabling you to accept Bitcoin payments seamlessly.
 
 ## Why Choose BTCPay for Your BigCommerce Store?
 
 - **No Fees, No Hidden Costs**: BTCPay Server empowers your business with a truly fee-free payment solution. Enjoy every cent of your transactions without any deductions
 - **Direct payment**: Say goodbye to intermediaries and lengthy KYC processes. Receive payments directly to your wallet with complete privacy
-- **Automated Payment Processing**: BTCPay Server takes care of payments, invoice management automatically.
+- **Automated Payment Processing**: BTCPay Server takes care of payments and invoice management automatically.
 - **Great Checkout Experience**: Enhance customer experience with Bitcoin QR code displays during checkout.
 - **Self-hosted infrastructure**: With BTCPay Server, you own your payment instances. You also maintain complete control over your payment infrastructure.
-- **Easy CSV exports**: Easily export payment data with CSV files, making financial management a breeze.
-- **Multilingual ready**: Serve a global audience right out of the box.
+- **Easy data exports**: Easily export payment data with CSV files, making financial management a breeze.
+- **Multilingual ready**: Serve a global audience right out of your corner.
 - **Community-driven support**: Get responsive assistance from our dedicated community ([Mattermost](http://chat.btcpayserver.org/) or [Telegram](https://t.me/btcpayserver)).
 
 ## Prerequisites:
