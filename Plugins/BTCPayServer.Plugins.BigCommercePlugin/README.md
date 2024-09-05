@@ -86,11 +86,41 @@ You manually need to create an offline payment method containing "Bitcoin" (e.g.
 
 ### Verify script installation
 
-One last step, we need to verify that the checkout script was updated successfully on your store.
+Two more steps to go. First, we need to verify that the checkout script was updated successfully on your store.
 
 1. Navigate to StoreFront => Script Manager.
 2. Confirm you have a script with the name: btcpay-checkout, with date-installed corresponding to the date at which the app was installed. If you do, you are good to go.
 3. If you dont, kindly verify the permissions granted and retry the installation process.
+
+
+### Create an offline payment method
+
+Now that we have the checkout scripts uploaded to the BigCommerce application, we need to configure an offline payment method. This is the important for checkout payment.
+
+On your BigCommerce dashboard, navigate to Settings => Setup => Payments => Additional providers
+
+![image](https://github.com/user-attachments/assets/24bf27d4-ab73-4f50-9b95-442a2556db75)
+
+From the list of Offline payment method, choose "Money Order" and then click "Set up" button. It would take you to the configuration page for Money Order payment method.
+
+![image](https://github.com/user-attachments/assets/057c6c32-8177-48bf-9754-0759d138c3ca)
+
+We need to change the Display name for this guide. Let's name it "Bitcoin / Lightning Network" or "Bitcoin Payment". You can input the display name of your choice when configuring this, however the name inputted must include the word "bitcoin" so it can be detected by BTCPay Server as shown below
+
+![image](https://github.com/user-attachments/assets/31f766b1-a489-49a2-a11b-7d4eada45269)
+
+![image](https://github.com/user-attachments/assets/30b2e9a4-5785-4f17-929f-98c666ae81d1)
+
+Once the name has been updated, go ahead and save the changes. 
+
+![image](https://github.com/user-attachments/assets/28eacef7-4587-458f-b3d8-3d6ac4764cf3)
+
+Now if you return to the Offline payment method list, we should see Money Order checked.
+
+![image](https://github.com/user-attachments/assets/df0ddb1e-c487-466c-96de-ad2dc6818e96)
+
+Now you are ready to receive Bitcoin payment from your BigCommerce store.
+
 
 ## How to receive payment:
 
