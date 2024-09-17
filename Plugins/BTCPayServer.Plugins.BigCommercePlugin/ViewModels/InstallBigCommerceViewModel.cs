@@ -32,6 +32,6 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.ViewModels
 
         public string CryptoCode { get; set; }
 
-        public bool HasError { get; set; } = false;
+        public bool HasStore { get; set; } = true;
     }
 }

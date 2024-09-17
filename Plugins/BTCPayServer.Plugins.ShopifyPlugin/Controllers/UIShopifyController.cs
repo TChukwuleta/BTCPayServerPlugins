@@ -25,6 +25,7 @@ using BTCPayServer.Plugins.ShopifyPlugin.ViewModels.Models;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Plugins.ShopifyPlugin.Data;
 using Newtonsoft.Json.Linq;
+using BTCPayServer.Payments;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -38,10 +39,12 @@ public class UIShopifyController : Controller
     private readonly UIInvoiceController _invoiceController;
     private readonly ShopifyDbContextFactory _dbContextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly BTCPayNetworkProvider _networkProvider;
     private readonly IHttpClientFactory _clientFactory;
     private ShopifyHelper helper;
     public UIShopifyController
         (StoreRepository storeRepo,
+        BTCPayNetworkProvider networkProvider,
         UIInvoiceController invoiceController,
         UserManager<ApplicationUser> userManager,
         ShopifyHostedService shopifyService,
@@ -54,6 +57,7 @@ public class UIShopifyController : Controller
         _userManager = userManager;
         _clientFactory = clientFactory;
         _shopifyService = shopifyService;
+        _networkProvider = networkProvider;
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
         _invoiceController = invoiceController;
@@ -66,11 +70,24 @@ public class UIShopifyController : Controller
     [Route("~/plugins/stores/{storeId}/shopify")]
     public async Task<IActionResult> Index(string storeId)
     {
+        // http://localhost:14142/plugins/stores/6nxCxMtexeDAuGWVN7rZJFC7hwgykizfKNWryzU1XAt9/shopify
         if (string.IsNullOrEmpty(storeId))
             return NotFound();
 
+        var storeData = await _storeRepo.FindStore(storeId);
+        var storeHasWallet = GetPaymentMethodConfigs(storeData, true).Any();
+        _logger.LogInformation($"Store has wallet: {storeHasWallet}");
+        _logger.LogInformation($"Default crypto currency code: {_networkProvider.DefaultNetwork.CryptoCode}");
+        if (!storeHasWallet)
+        {
+            return View(new ShopifySetting
+            {
+                CryptoCode = _networkProvider.DefaultNetwork.CryptoCode,
+                StoreId = storeId,
+                HasStore = false 
+            });
+        }
         await using var ctx = _dbContextFactory.CreateContext();
-
         var userStore = ctx.ShopifySettings.FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new ShopifySetting();
         return View(userStore);
     }
@@ -79,58 +96,66 @@ public class UIShopifyController : Controller
     public async Task<IActionResult> Index(string storeId,
             ShopifySetting vm, string command = "")
     {
-        await using var ctx = _dbContextFactory.CreateContext();
-        switch (command)
+        try
         {
-            case "ShopifySaveCredentials":
-                {
-                    var shopify = vm;
-                    var validCreds = shopify != null && shopify?.CredentialsPopulated() == true;
-                    if (!validCreds)
+            await using var ctx = _dbContextFactory.CreateContext();
+            switch (command)
+            {
+                case "ShopifySaveCredentials":
                     {
-                        TempData[WellKnownTempData.ErrorMessage] = "Please provide valid Shopify credentials";
-                        return View(vm);
-                    }
-                    var apiClient = new ShopifyApiClient(_clientFactory, shopify.CreateShopifyApiCredentials());
-                    try
-                    {
-                        await apiClient.OrdersCount();
-                    }
-                    catch (ShopifyApiException err)
-                    {
-                        TempData[WellKnownTempData.ErrorMessage] = err.Message;
-                        return View(vm);
-                    }
+                        var shopify = vm;
+                        var validCreds = shopify != null && shopify?.CredentialsPopulated() == true;
+                        if (!validCreds)
+                        {
+                            TempData[WellKnownTempData.ErrorMessage] = "Please provide valid Shopify credentials";
+                            return View(vm);
+                        }
+                        var apiClient = new ShopifyApiClient(_clientFactory, shopify.CreateShopifyApiCredentials());
+                        try
+                        {
+                            await apiClient.OrdersCount();
+                        }
+                        catch (ShopifyApiException err)
+                        {
+                            TempData[WellKnownTempData.ErrorMessage] = err.Message;
+                            return View(vm);
+                        }
 
-                    var scopesGranted = await apiClient.CheckScopes();
-                    if (!scopesGranted.Contains("read_orders") || !scopesGranted.Contains("write_orders"))
-                    {
-                        TempData[WellKnownTempData.ErrorMessage] =
-                            "Please grant the private app permissions for read_orders, write_orders";
-                        return View(vm);
-                    }
-                    shopify.IntegratedAt = DateTimeOffset.Now;
-                    shopify.StoreId = CurrentStore.Id;
-                    shopify.StoreName = CurrentStore.StoreName;
-                    ctx.Update(shopify);
-                    await ctx.SaveChangesAsync();
-
-                    TempData[WellKnownTempData.SuccessMessage] = "Shopify plugin successfully updated";
-                    break;
-                }
-            case "ShopifyClearCredentials":
-                {
-                    var shopifySetting = ctx.ShopifySettings.FirstOrDefault(c => !string.IsNullOrEmpty(vm.Id) && c.Id == vm.Id);
-                    if (shopifySetting != null)
-                    {
-                        ctx.Remove(shopifySetting);
+                        var scopesGranted = await apiClient.CheckScopes();
+                        if (!scopesGranted.Contains("read_orders") || !scopesGranted.Contains("write_orders"))
+                        {
+                            TempData[WellKnownTempData.ErrorMessage] =
+                                "Please grant the private app permissions for read_orders, write_orders";
+                            return View(vm);
+                        }
+                        shopify.IntegratedAt = DateTimeOffset.UtcNow;
+                        shopify.StoreId = CurrentStore.Id;
+                        shopify.StoreName = CurrentStore.StoreName;
+                        ctx.Update(shopify);
                         await ctx.SaveChangesAsync();
+
+                        TempData[WellKnownTempData.SuccessMessage] = "Shopify plugin successfully updated";
+                        break;
                     }
-                    TempData[WellKnownTempData.SuccessMessage] = "Shopify plugin credentials cleared";
-                    break;
-                }
+                case "ShopifyClearCredentials":
+                    {
+                        var shopifySetting = ctx.ShopifySettings.FirstOrDefault(c => !string.IsNullOrEmpty(vm.Id) && c.Id == vm.Id);
+                        if (shopifySetting != null)
+                        {
+                            ctx.Remove(shopifySetting);
+                            await ctx.SaveChangesAsync();
+                        }
+                        TempData[WellKnownTempData.SuccessMessage] = "Shopify plugin credentials cleared";
+                        break;
+                    }
+            }
+            return RedirectToAction(nameof(Index), new { storeId = CurrentStore.Id });
         }
-        return RedirectToAction(nameof(Index), new { storeId = CurrentStore.Id });
+        catch (Exception ex)
+        {
+            _logger.LogError($"General error: {ex.Message}");
+            throw;
+        }
     }
 
 
@@ -264,4 +289,41 @@ public class UIShopifyController : Controller
 
         return NotFound();
     }
+
+
+    [AllowAnonymous]
+    [HttpGet("~/stores/{storeId}/plugins/shopify/initiate-payment-request")]
+    public async Task<IActionResult> InitiatePaymentRequest(string storeId)
+    {
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var exisitngStores = ctx.ShopifySettings.FirstOrDefault();
+
+        var jsFile = await helper.GetCustomJavascript(storeId, Request.GetAbsoluteRoot());
+        if (!jsFile.succeeded)
+        {
+            return BadRequest(jsFile.response);
+        }
+        return Content(jsFile.response, "text/javascript");
+    }
+
+    private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(BTCPayServer.Data.StoreData storeData, bool onlyEnabled = false)
+    {
+        if (string.IsNullOrEmpty(storeData.DerivationStrategies))
+            return new Dictionary<PaymentMethodId, JToken>();
+        var excludeFilter = onlyEnabled ? storeData.GetStoreBlob().GetExcludedPaymentMethods() : null;
+        var paymentMethodConfigurations = new Dictionary<PaymentMethodId, JToken>();
+        JObject strategies = JObject.Parse(storeData.DerivationStrategies);
+        foreach (var strat in strategies.Properties())
+        {
+            if (!PaymentMethodId.TryParse(strat.Name, out var paymentMethodId))
+                continue;
+            if (excludeFilter?.Match(paymentMethodId) is true)
+                continue;
+            paymentMethodConfigurations.Add(paymentMethodId, strat.Value);
+        }
+        return paymentMethodConfigurations;
+    }
+
+    private string GetUserId() => _userManager.GetUserId(User);
 }

@@ -41,6 +41,12 @@ public class ShopifySetting
             return ShopName?.Contains('.', StringComparison.OrdinalIgnoreCase) is true ? ShopName : $"https://{ShopName}.myshopify.com";
         }
     }
+
+    [NotMapped]
+    public bool HasStore { get; set; } = true;
+
+    [NotMapped]
+    public string CryptoCode { get; set; }
     internal static void OnModelCreating(ModelBuilder modelBuilder)
     {
     }

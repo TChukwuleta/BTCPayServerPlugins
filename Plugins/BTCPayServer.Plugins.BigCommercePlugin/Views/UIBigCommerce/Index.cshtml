@@ -37,7 +37,7 @@
 
 
 <div class="container mt-5">
-    @if (!Model.HasError)
+    @if (Model.HasStore)
     {
         <div class="alert alert-warning alert-dismissible mb-4" role="alert">
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
@@ -89,7 +89,7 @@
 
         <div class="alert alert-warning alert-dismissible mb-4" role="alert">
             <p class="mb-0" style="font-size: 0.9rem;">
-                To proceed with the BigCommerce plugin on this store, you need to
+                To proceed with BigCommerce plugin on this store, you need to
                 <a href="@Url.Action(nameof(UIStoresController.SetupWallet), "UIStores", new { cryptoCode = Model.CryptoCode, storeId = Model.StoreId })" class="alert-link">
                     set up a wallet
                 </a>

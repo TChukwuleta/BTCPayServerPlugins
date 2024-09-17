@@ -89,7 +89,7 @@ public class UIBigCommerceController : Controller
             {
                 CryptoCode = _networkProvider.DefaultNetwork.CryptoCode,
                 StoreId = storeId,
-                HasError = true
+                HasStore = false
             });
         }
         var bigCommerceStore = ctx.BigCommerceStores.SingleOrDefault(c => c.StoreId == storeId);
