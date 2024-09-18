@@ -4,7 +4,7 @@ using BTCPayServer.Plugins.ShopifyPlugin.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 
-namespace BTCPayServer.Plugins.BigCommercePlugin;
+namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 public class PluginMigrationRunner : IHostedService
 {

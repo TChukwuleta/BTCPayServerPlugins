@@ -1,12 +1,12 @@
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
-using BTCPayServer.Plugins.BigCommercePlugin.Services;
-using BTCPayServer.Plugins.ShopifyPlugin;
 using BTCPayServer.Plugins.ShopifyPlugin.Services;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using System;
 
-namespace BTCPayServer.Plugins.BigCommercePlugin;
+namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 public class Plugin : BaseBTCPayServerPlugin
 {
@@ -38,5 +38,14 @@ public class Plugin : BaseBTCPayServerPlugin
                        .AllowAnyHeader();
             });
         });
+    }
+
+    public override void Execute(IApplicationBuilder applicationBuilder, IServiceProvider applicationBuilderApplicationServices)
+    {
+
+        applicationBuilder.UseMiddleware<CorsMiddleware>();
+        applicationBuilder.UseCors("AllowAllOrigins");
+
+        base.Execute(applicationBuilder, applicationBuilderApplicationServices);
     }
 }

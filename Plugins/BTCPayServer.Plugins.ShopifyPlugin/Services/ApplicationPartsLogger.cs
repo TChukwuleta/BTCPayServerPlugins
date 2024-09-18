@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace BTCPayServer.Plugins.BigCommercePlugin.Services;
+namespace BTCPayServer.Plugins.ShopifyPlugin.Services;
 
 public class ApplicationPartsLogger : IHostedService
 {

@@ -26,6 +26,7 @@ using BTCPayServer.Client.Models;
 using BTCPayServer.Plugins.ShopifyPlugin.Data;
 using Newtonsoft.Json.Linq;
 using BTCPayServer.Payments;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -172,16 +173,16 @@ public class UIShopifyController : Controller
     }
 
 
-    [RateLimitsFilter(ZoneLimits.Shopify, Scope = RateLimitsScope.RemoteAddress)]
     [AllowAnonymous]
-    [EnableCors(CorsPolicies.All)]
-    [HttpGet("stores/{storeId}/plugins/shopify/{orderId}")]
+    [HttpGet("stores/{storeId}/plugins/shopify/invoice/{orderId}")]
+    [EnableCors("AllowAllOrigins")]
     public async Task<IActionResult> ShopifyInvoiceEndpoint(
            string storeId, string orderId, decimal amount, bool checkOnly = false)
     {
+        _logger.LogInformation($"Store is: {storeId}");
+        _logger.LogInformation($"Order is: {orderId}");
         await using var ctx = _dbContextFactory.CreateContext();
-
-        var userStore = ctx.ShopifySettings.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+        var userStore = ctx.ShopifySettings.FirstOrDefault(c => c.ShopName == storeId);
         if (userStore == null)
         {
             return BadRequest("Invalid BTCPay store specified");
@@ -191,7 +192,7 @@ public class UIShopifyController : Controller
         var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
         {
             TextSearch = shopifySearchTerm,
-            StoreId = new[] { storeId }
+            StoreId = new[] { userStore.StoreId }
         });
         matchedExistingInvoices = matchedExistingInvoices.Where(entity =>
                 entity.GetInternalTags(SHOPIFY_ORDER_ID_PREFIX)
@@ -217,7 +218,7 @@ public class UIShopifyController : Controller
                     .Contains(
                         entity.GetInvoiceState().Status.ToString()));
 
-        var store = await _storeRepo.FindStore(storeId);
+        var store = await _storeRepo.FindStore(userStore.StoreId);
 
         ShopifyApiClient client = null;
         ShopifyOrder order = null;

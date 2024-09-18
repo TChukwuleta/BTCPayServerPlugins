@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
 
-namespace BTCPayServer.Plugins.BigCommercePlugin.Services;
+namespace BTCPayServer.Plugins.ShopifyPlugin.Services;
 
 public class CorsMiddleware
 {
