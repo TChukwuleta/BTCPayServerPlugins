@@ -102,10 +102,12 @@ const showBTCPayModal = function(data, checkoutForm) {
     window.btcpay.onModalReceiveMessage(function (event) {
         if (isObject(event.data)) {
             if (event.data.status) {
-                switch (event.data.status) {
+                switch (event.data.status.toLowerCase()) {
                     case 'complete':
                     case 'paid':
                     case 'confirmed':
+                    case 'processing':
+                    case 'settled':
                         invoice_paid = true;
                         showOrderConfirmation(data.orderId, data.id);
                         console.log('Invoice paid.');
@@ -114,6 +116,10 @@ const showBTCPayModal = function(data, checkoutForm) {
                         window.btcpay.hideFrame();
                         // todo: show error message
                         console.error('Invoice expired.');
+                        break;
+                    case 'invalid':
+                        window.btcpay.hideFrame();
+                        console.error('Invalid invoice.');
                         break;
                     default:
                         console.error('Unknown status: ' + event.data.status);

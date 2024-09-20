@@ -23,15 +23,17 @@ public class ShopifyHostedService : EventHostedServiceBase
     private readonly StoreRepository _storeRepository;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<ShopifyApiClient> _loggerrr;
     private readonly ShopifyDbContextFactory _dbContextFactory;
 
     public ShopifyHostedService(EventAggregator eventAggregator,
         StoreRepository storeRepository,
         InvoiceRepository invoiceRepository,
         IHttpClientFactory httpClientFactory,
-        ShopifyDbContextFactory dbContextFactory,
+        ShopifyDbContextFactory dbContextFactory, ILogger<ShopifyApiClient> loggerrr,
         Logs logs) : base(eventAggregator, logs)
     {
+        _loggerrr = loggerrr;
         _storeRepository = storeRepository;
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
@@ -116,7 +118,7 @@ public class ShopifyHostedService : EventHostedServiceBase
 
     private ShopifyApiClient CreateShopifyApiClient(ShopifySetting shopify)
     {
-        return new ShopifyApiClient(_httpClientFactory, shopify.CreateShopifyApiCredentials());
+        return new ShopifyApiClient(_httpClientFactory, shopify.CreateShopifyApiCredentials(), _loggerrr);
     }
 
     private static string[] _keywords = new[] { "bitcoin", "btc", "btcpayserver", "btcpay server" };

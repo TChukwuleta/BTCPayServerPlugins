@@ -12,8 +12,8 @@ public class ShopifyHelper
     {
         string[] fileUrls = new[]
         {
-            "https://raw.githubusercontent.com/TChukwuleta/BTCPayServerPlugins/main/Plugins/BTCPayServer.Plugins.ShopifyPlugin/Resources/js/btcpay.js",
-            "https://raw.githubusercontent.com/TChukwuleta/BTCPayServerPlugins/main/Plugins/BTCPayServer.Plugins.ShopifyPlugin/Resources/js/btcpay-shopify.js"
+            "https://raw.githubusercontent.com/TChukwuleta/BTCPayServerPlugins/main/Plugins/BTCPayServer.Plugins.ShopifyPlugin/Resources/js/btcpay.js"
+            //"https://raw.githubusercontent.com/TChukwuleta/BTCPayServerPlugins/main/Plugins/BTCPayServer.Plugins.ShopifyPlugin/Resources/js/btcpay-shopify.js"
         };
 
         StringBuilder combinedJavascript = new StringBuilder();

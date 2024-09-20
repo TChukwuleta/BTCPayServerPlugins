@@ -6,15 +6,18 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using BTCPayServer.Plugins.ShopifyPlugin.ViewModels.Models;
+using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin.Services
 {
     public class ShopifyApiClient
     {
         private readonly HttpClient _httpClient;
+        private readonly ILogger<ShopifyApiClient> _logger;
         private readonly ShopifyApiClientCredentials _credentials;
 
-        public ShopifyApiClient(IHttpClientFactory httpClientFactory, ShopifyApiClientCredentials credentials)
+        public ShopifyApiClient(IHttpClientFactory httpClientFactory, ShopifyApiClientCredentials credentials, ILogger<ShopifyApiClient> logger)
         {
             if (httpClientFactory != null)
             {
@@ -24,7 +27,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
             {
                 _httpClient = new HttpClient();
             }
-
+            _logger = logger;
             _credentials = credentials;
 
             var bearer = $"{_credentials.ApiKey}:{_credentials.ApiPassword}";
@@ -34,7 +37,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
         }
 
         private HttpRequestMessage CreateRequest(string shopName, HttpMethod method, string action,
-            string relativeUrl = null, string apiVersion = "2020-07")
+            string relativeUrl = null, string apiVersion = "2024-07")
         {
             var url =
                 $"https://{(shopName.Contains('.', StringComparison.InvariantCulture) ? shopName : $"{shopName}.myshopify.com")}/{relativeUrl ?? ($"admin/api/{apiVersion}/" + action)}";
@@ -47,6 +50,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
             using var resp = await _httpClient.SendAsync(req);
 
             var strResp = await resp.Content.ReadAsStringAsync();
+            _logger.LogInformation($"Response from client call: {strResp}");
             if (strResp.StartsWith("{", StringComparison.OrdinalIgnoreCase) && JObject.Parse(strResp)["errors"]?.Value<string>() is string error)
             {
                 if (error == "Not Found")
@@ -102,10 +106,22 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
             return JsonConvert.DeserializeObject<TransactionsCreateResp>(strResp);
         }
 
+        public async Task<List<ShopifyOrderVm>> RetrieveAllOrders()
+        {
+            var req = CreateRequest(_credentials.ShopName, HttpMethod.Get, "orders.json");
+            _logger.LogInformation(JsonConvert.SerializeObject(req));
+
+            var strResp = await SendRequest(req);
+
+            return JObject.Parse(strResp)["orders"].ToObject<List<ShopifyOrderVm>>();
+
+        }
+
         public async Task<ShopifyOrder> GetOrder(string orderId)
         {
             var req = CreateRequest(_credentials.ShopName, HttpMethod.Get,
                 $"orders/{orderId}.json?fields=id,order_number,total_price,total_outstanding,currency,presentment_currency,transactions,financial_status");
+            _logger.LogInformation(JsonConvert.SerializeObject(req));
 
             var strResp = await SendRequest(req);
 
