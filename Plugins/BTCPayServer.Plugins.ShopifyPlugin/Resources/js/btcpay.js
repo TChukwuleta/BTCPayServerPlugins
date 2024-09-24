@@ -170,6 +170,8 @@
     window.addEventListener('message', receiveMessage, false);
     setButtonListeners();
 
+    console.log('Main modal script loaded successfully.');
+
     window.btcpay = {
         showFrame: showFrame,
         hideFrame: hideFrame,

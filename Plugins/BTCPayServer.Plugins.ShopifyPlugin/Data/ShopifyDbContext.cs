@@ -1,4 +1,3 @@
-using BTCPayServer.Plugins.BigCommercePlugin.Data;
 using BTCPayServer.Plugins.ShopifyPlugin.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +14,7 @@ public class ShopifyDbContext : DbContext
     }
 
     public DbSet<ShopifySetting> ShopifySettings { get; set; }
+    public DbSet<Transaction> Transactions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

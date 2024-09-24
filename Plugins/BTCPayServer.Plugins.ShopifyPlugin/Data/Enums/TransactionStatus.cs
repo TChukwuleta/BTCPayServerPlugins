@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace BTCPayServer.Plugins.BigCommercePlugin.Data
+﻿namespace BTCPayServer.Plugins.ShopifyPlugin.Data
 {
     public enum TransactionStatus
     {

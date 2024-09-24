@@ -14,10 +14,9 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
     public class ShopifyApiClient
     {
         private readonly HttpClient _httpClient;
-        private readonly ILogger<ShopifyApiClient> _logger;
         private readonly ShopifyApiClientCredentials _credentials;
 
-        public ShopifyApiClient(IHttpClientFactory httpClientFactory, ShopifyApiClientCredentials credentials, ILogger<ShopifyApiClient> logger)
+        public ShopifyApiClient(IHttpClientFactory httpClientFactory, ShopifyApiClientCredentials credentials)
         {
             if (httpClientFactory != null)
             {
@@ -27,7 +26,6 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
             {
                 _httpClient = new HttpClient();
             }
-            _logger = logger;
             _credentials = credentials;
 
             var bearer = $"{_credentials.ApiKey}:{_credentials.ApiPassword}";
@@ -50,7 +48,6 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
             using var resp = await _httpClient.SendAsync(req);
 
             var strResp = await resp.Content.ReadAsStringAsync();
-            _logger.LogInformation($"Response from client call: {strResp}");
             if (strResp.StartsWith("{", StringComparison.OrdinalIgnoreCase) && JObject.Parse(strResp)["errors"]?.Value<string>() is string error)
             {
                 if (error == "Not Found")
@@ -109,7 +106,6 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
         public async Task<List<ShopifyOrderVm>> RetrieveAllOrders()
         {
             var req = CreateRequest(_credentials.ShopName, HttpMethod.Get, "orders.json");
-            _logger.LogInformation(JsonConvert.SerializeObject(req));
 
             var strResp = await SendRequest(req);
 
@@ -121,7 +117,6 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
         {
             var req = CreateRequest(_credentials.ShopName, HttpMethod.Get,
                 $"orders/{orderId}.json?fields=id,order_number,total_price,total_outstanding,currency,presentment_currency,transactions,financial_status");
-            _logger.LogInformation(JsonConvert.SerializeObject(req));
 
             var strResp = await SendRequest(req);
 

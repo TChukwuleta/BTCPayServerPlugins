@@ -31,9 +31,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NBitcoin;
 using NBitpayClient;
 using NBXplorer;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using BitpayCreateInvoiceRequest = BTCPayServer.Models.BitpayCreateInvoiceRequest;
 using StoreData = BTCPayServer.Data.StoreData;
@@ -670,6 +672,7 @@ namespace BTCPayServer.Controllers
             // Keep compatibility with Bitpay
             invoiceId ??= id;
 
+            _logger.LogInformation($"Invoice ID is: {invoiceId}");
             if (invoiceId is null)
                 return NotFound();
 
@@ -772,12 +775,14 @@ namespace BTCPayServer.Controllers
             BTCPayNetworkBase network = _NetworkProvider.GetNetwork<BTCPayNetworkBase>(paymentMethodId.CryptoCode);
             if (network is null || !invoice.Support(paymentMethodId))
             {
+                _logger.LogInformation("Did it get here?");
                 if (!isDefaultPaymentId)
                     return null;
                 var paymentMethodTemp = invoice
                     .GetPaymentMethods()
                     .Where(p => displayedPaymentMethods.Contains(p.GetId()))
                     .FirstOrDefault();
+                _logger.LogInformation("Payment method temp here..");
                 if (paymentMethodTemp is null)
                     return null;
                 network = paymentMethodTemp.Network;

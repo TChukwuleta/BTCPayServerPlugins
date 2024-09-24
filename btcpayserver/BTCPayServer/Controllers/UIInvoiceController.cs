@@ -32,6 +32,8 @@ using Microsoft.AspNetCore.Routing;
 using NBitcoin;
 using Newtonsoft.Json.Linq;
 using StoreData = BTCPayServer.Data.StoreData;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Controllers
 {
@@ -57,6 +59,7 @@ namespace BTCPayServer.Controllers
         private readonly LinkGenerator _linkGenerator;
         private readonly IAuthorizationService _authorizationService;
         private readonly TransactionLinkProviders _transactionLinkProviders;
+        private readonly ILogger<UIInvoiceController> _logger;
         private readonly AppService _appService;
         private readonly IFileService _fileService;
 
@@ -84,6 +87,7 @@ namespace BTCPayServer.Controllers
             LinkGenerator linkGenerator,
             AppService appService,
             IFileService fileService,
+            ILogger<UIInvoiceController> logger,
             IAuthorizationService authorizationService,
             TransactionLinkProviders transactionLinkProviders)
         {
@@ -94,6 +98,7 @@ namespace BTCPayServer.Controllers
             _walletRepository = walletRepository;
             _RateProvider = rateProvider ?? throw new ArgumentNullException(nameof(rateProvider));
             _UserManager = userManager;
+            _logger = logger;
             _EventAggregator = eventAggregator;
             _NetworkProvider = networkProvider;
             _paymentMethodHandlerDictionary = paymentMethodHandlerDictionary;
@@ -257,7 +262,7 @@ namespace BTCPayServer.Controllers
             var paymentMethods = new PaymentMethodDictionary();
 
             bool noNeedForMethods = entity.Type != InvoiceType.TopUp && entity.Price == 0m;
-
+            _logger.LogInformation($"Ready for payment methods... price is: {entity.Price}");
             if (!noNeedForMethods)
             {
                 // This loop ends with .ToList so we are querying all payment methods at once
@@ -284,6 +289,7 @@ namespace BTCPayServer.Controllers
                     supported.Add(o.SupportedPaymentMethod);
                     paymentMethods.Add(paymentMethod);
                 }
+                _logger.LogInformation($"Payment methods: {JsonConvert.SerializeObject(paymentMethods)}");
 
                 if (supported.Count == 0)
                 {

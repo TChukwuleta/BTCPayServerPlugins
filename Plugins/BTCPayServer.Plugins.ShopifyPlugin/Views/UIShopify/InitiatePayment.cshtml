@@ -1,0 +1,73 @@
+@using BTCPayServer.Plugins.ShopifyPlugin.ViewModels.Models
+@model ShopifyOrderViewModel
+@{
+    ViewBag.Title = "Pay with BTCPay Server...";
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewBag.Title</title>
+    <script src="@($"{Model.BTCPayServerUrl}/plugins/stores/{Model.ShopName}/shopify/btcpay-shopify.js")"></script>
+    <script>
+        function showBTCPayModal() {
+
+            window.btcpay.setApiUrlPrefix("@Model.BTCPayServerUrl");
+            window.btcpay.showInvoice("@Model.InvoiceId");
+
+            console.log('Shall we');
+
+            let invoice_paid = false;
+            window.btcpay.onModalReceiveMessage(function (event) {
+                if (isObject(event.data)) {
+                    switch (event.data.status.toLowerCase()) {
+                        case 'complete':
+                        case 'paid':
+                        case 'confirmed':
+                        case 'processing':
+                        case 'settled':
+                            invoice_paid = true;
+                            //showOrderConfirmation(data.orderId, data.id);
+                            console.log('Invoice paid.');
+                            break;
+                        case 'expired':
+                            window.btcpay.hideFrame();
+                            console.error('Invoice expired.');
+                            break;
+                        case 'invalid':
+                            window.btcpay.hideFrame();
+                            console.error('Invalid invoice.');
+                            break;
+                        default:
+                            console.error('Unknown status: ' + event.data.status);
+                    }
+                } else if (event.data === 'close') {
+                    if (invoice_paid === true) {
+                        //showOrderConfirmation(data.orderId, data.id);
+                        console.log('Invoice paid.');
+                    }
+                    console.log('Modal closed.');
+                }
+            });
+
+            function isObject(obj) {
+                return Object.prototype.toString.call(obj) === '[object Object]';
+            }
+        }
+
+        function showOrderConfirmation(orderId, invoiceId) {
+            alert('Order Confirmed! Order ID: ' + orderId + ', Invoice ID: ' + invoiceId);
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            showBTCPayModal();
+        });
+    </script>
+
+</head>
+<body>
+    
+</body>
+</html>

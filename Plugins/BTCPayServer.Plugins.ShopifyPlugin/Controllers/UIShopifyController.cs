@@ -27,6 +27,10 @@ using BTCPayServer.Plugins.ShopifyPlugin.Data;
 using Newtonsoft.Json.Linq;
 using BTCPayServer.Payments;
 using Newtonsoft.Json;
+using BTCPayServer.Plugins.ShopifyPlugin.ViewModels;
+using MailKit.Search;
+using static BTCPayServer.HostedServices.PullPaymentHostedService.PayoutApproval;
+using NBitpayClient;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -35,7 +39,6 @@ public class UIShopifyController : Controller
 {
     private readonly ShopifyHostedService _shopifyService;
     private readonly ILogger<UIShopifyController> _logger;
-    private readonly ILogger<ShopifyApiClient> _loggerrr;
     private readonly StoreRepository _storeRepo;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly UIInvoiceController _invoiceController;
@@ -53,8 +56,7 @@ public class UIShopifyController : Controller
         ShopifyDbContextFactory dbContextFactory,
         InvoiceRepository invoiceRepository,
         IHttpClientFactory clientFactory,
-        ILogger<UIShopifyController> logger,
-        ILogger<ShopifyApiClient> loggerrr)
+        ILogger<UIShopifyController> logger)
     {
         _storeRepo = storeRepo;
         _userManager = userManager;
@@ -66,15 +68,13 @@ public class UIShopifyController : Controller
         _invoiceController = invoiceController;
         helper = new ShopifyHelper();
         _logger = logger;
-        _loggerrr = loggerrr;
     }
     private const string SHOPIFY_ORDER_ID_PREFIX = "shopify-";
-    public BTCPayServer.Data.StoreData CurrentStore => HttpContext.GetStoreData();
+    public Data.StoreData CurrentStore => HttpContext.GetStoreData();
 
     [Route("~/plugins/stores/{storeId}/shopify")]
     public async Task<IActionResult> Index(string storeId)
     {
-        // http://localhost:14142/plugins/stores/6nxCxMtexeDAuGWVN7rZJFC7hwgykizfKNWryzU1XAt9/shopify
         if (string.IsNullOrEmpty(storeId))
             return NotFound();
 
@@ -114,7 +114,7 @@ public class UIShopifyController : Controller
                             TempData[WellKnownTempData.ErrorMessage] = "Please provide valid Shopify credentials";
                             return View(vm);
                         }
-                        var apiClient = new ShopifyApiClient(_clientFactory, shopify.CreateShopifyApiCredentials(), _loggerrr);
+                        var apiClient = new ShopifyApiClient(_clientFactory, shopify.CreateShopifyApiCredentials());
                         try
                         {
                             await apiClient.OrdersCount();
@@ -134,6 +134,7 @@ public class UIShopifyController : Controller
                         }
                         shopify.IntegratedAt = DateTimeOffset.UtcNow;
                         shopify.StoreId = CurrentStore.Id;
+                        shopify.ApplicationUserId = GetUserId();
                         shopify.StoreName = CurrentStore.StoreName;
                         ctx.Update(shopify);
                         await ctx.SaveChangesAsync();
@@ -162,105 +163,99 @@ public class UIShopifyController : Controller
         }
     }
 
-
     [AllowAnonymous]
-    [HttpGet("~/plugins/stores/{storeId}/shopify/shopify.js")]
+    [HttpGet("~/stores/{invoiceId}/plugins/shopify/initiate-payment")]
     [EnableCors("AllowAllOrigins")]
-    public async Task<IActionResult> GetBtcPayJavascript(string storeId)
+    public async Task<IActionResult> InitiatePayment(string invoiceId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var userStore = ctx.ShopifySettings.FirstOrDefault(c => c.ShopName == storeId);
+        var transaction = ctx.Transactions.FirstOrDefault(c => c.InvoiceId == invoiceId && c.InvoiceStatus.ToLower().Equals("new"));
+        if (transaction == null)
+        {
+            return BadRequest("Invalid BTCPay transaction specified");
+        }
+        var userStore = ctx.ShopifySettings.FirstOrDefault(c => c.ShopName == transaction.ShopName);
         if (userStore == null)
         {
             return BadRequest("Invalid BTCPay store specified");
         }
-    
-        //var jsFile = await helper.GetCustomJavascript(userStore.StoreId, Request.GetAbsoluteRoot());
-        var jsFile = await helper.GetCustomJavascript(userStore.StoreId, "https://0979-2c0f-2a80-78-f310-a079-b217-56c1-6c3f.ngrok-free.app");
-        if (!jsFile.succeeded)
+        return View(new ShopifyOrderViewModel
         {
-            return BadRequest(jsFile.response);
-        }
-        return Content(jsFile.response, "text/javascript");
+            BTCPayServerUrl = Request.GetAbsoluteRoot(),
+            InvoiceId = transaction.InvoiceId,
+            OrderId = transaction.OrderId,
+            ShopName = transaction.ShopName
+        });
     }
 
-
     [AllowAnonymous]
-    [HttpGet("stores/{storeId}/plugins/shopify/invoice/{orderId}")]
+    [HttpPost("~/stores/{storeId}/plugins/shopify/create-order")]
     [EnableCors("AllowAllOrigins")]
-    public async Task<IActionResult> ShopifyInvoiceEndpoint(
-           string storeId, string orderId, decimal amount, bool checkOnly = false)
+    public async Task<IActionResult> CreateOrder([FromBody] CreateShopifyOrderRequest model, string storeId)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
-        var userStore = ctx.ShopifySettings.FirstOrDefault(c => c.ShopName == storeId);
-        if (userStore == null)
+        if (!storeId.Equals(model.storeId))
         {
-            return BadRequest("Invalid BTCPay store specified");
+            return BadRequest("Store Id mismatch");
+        }
+        var shopifySearchTerm = $"{SHOPIFY_ORDER_ID_PREFIX}{model.orderId}";
+        await using var ctx = _dbContextFactory.CreateContext();
+        var shopifySetting = ctx.ShopifySettings.FirstOrDefault(c => c.ShopName == storeId);
+        if (shopifySetting == null || !shopifySetting.IntegratedAt.HasValue)
+        {
+            return BadRequest("Invalid Shopify BTCPay store specified");
+        }
+        ShopifyApiClient client = new ShopifyApiClient(_clientFactory, shopifySetting.CreateShopifyApiCredentials());
+        ShopifyOrder order = await client.GetOrder(model.orderId);
+        var store = await _storeRepo.FindStore(shopifySetting.StoreId);
+        if (order == null)
+        {
+            return NotFound();
         }
 
-        var shopifySearchTerm = $"{SHOPIFY_ORDER_ID_PREFIX}{orderId}";
         var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
         {
             TextSearch = shopifySearchTerm,
-            StoreId = new[] { userStore.StoreId }
+            StoreId = new[] { shopifySetting.StoreId }
         });
+
         matchedExistingInvoices = matchedExistingInvoices.Where(entity =>
-                entity.GetInternalTags(SHOPIFY_ORDER_ID_PREFIX)
-                    .Any(s => s == orderId))
-            .ToArray();
+                entity.GetInternalTags(SHOPIFY_ORDER_ID_PREFIX).Any(s => s == model.orderId)).ToArray();
 
         var firstInvoiceSettled =
             matchedExistingInvoices.LastOrDefault(entity =>
-                new[] { InvoiceStatus.Processing.ToString(), InvoiceStatus.Settled.ToString() }
+                new[] { "settled", "processing", "confirmed", "paid", "complete" }
                     .Contains(
-                        entity.GetInvoiceState().Status.ToString()));
+                        entity.GetInvoiceState().Status.ToString().ToLower()));
 
-        var store = await _storeRepo.FindStore(userStore.StoreId);
-
-        ShopifyApiClient client = null;
-        ShopifyOrder order = null;
-        if (userStore.IntegratedAt.HasValue)
+        _logger.LogInformation($"First settled invoice: {JsonConvert.SerializeObject(firstInvoiceSettled)}");
+        try
         {
-            client = new ShopifyApiClient(_clientFactory, userStore.CreateShopifyApiCredentials(), _loggerrr);
-            order = await client.GetOrder(orderId);
-            if (order?.Id is null)
+            if (firstInvoiceSettled != null)
             {
-                return NotFound();
-            }
-        }
-        _logger.LogInformation($"Gotten here.. order: {JsonConvert.SerializeObject(order)}");
+                //if BTCPay was shut down before the tx managed to get registered on shopify, this will fix it on the next UI load in shopify
+                if (order?.FinancialStatus == "pending" &&
+                    firstInvoiceSettled.Status.ToString().ToLower() != InvoiceStatus.Processing.ToString().ToLower())
+                {
+                    await _shopifyService.Process(client, model.orderId, firstInvoiceSettled.Id,
+                        firstInvoiceSettled.Currency,
+                        firstInvoiceSettled.Price.ToString(CultureInfo.InvariantCulture), true, firstInvoiceSettled.Status.ToString().ToLower());
+                    order = await client.GetOrder(model.orderId);
+                }
 
-        if (firstInvoiceSettled != null)
-        {
-            //if BTCPay was shut down before the tx managed to get registered on shopify, this will fix it on the next UI load in shopify
-            if (client != null && order?.FinancialStatus == "pending" &&
-                firstInvoiceSettled.Status.ToString() != InvoiceStatus.Processing.ToString())
-            {
-                await _shopifyService.Process(client, orderId, firstInvoiceSettled.Id,
-                    firstInvoiceSettled.Currency,
-                    firstInvoiceSettled.Price.ToString(CultureInfo.InvariantCulture), true);
-                order = await client.GetOrder(orderId);
+                return Ok(new
+                {
+                    invoiceId = firstInvoiceSettled.Id,
+                    status = firstInvoiceSettled.Status.ToString().ToLowerInvariant()
+                });
             }
 
-            return Ok(new
-            {
-                invoiceId = firstInvoiceSettled.Id,
-                status = firstInvoiceSettled.Status.ToString().ToLowerInvariant()
-            });
-        }
 
-        if (checkOnly)
-        {
-            return Ok();
-        }
-
-        if (userStore.IntegratedAt.HasValue)
-        {
-            //we create the invoice at due amount provided from order page or full amount if due amount is bigger than order amount
+            _logger.LogInformation($"Model total is: {model.total}");
+            _logger.LogInformation($"Total outstanding is: {order.TotalOutstanding}");
             var invoice = await _invoiceController.CreateInvoiceCoreRaw(
                 new CreateInvoiceRequest()
                 {
-                    Amount = amount < order.TotalOutstanding ? amount : order.TotalOutstanding,
+                    Amount = Math.Max(model.total, order.TotalOutstanding),
                     Currency = order.PresentmentCurrency,
                     Metadata = new JObject
                     {
@@ -276,24 +271,54 @@ public class UIShopifyController : Controller
                     }
                 }, store,
                 Request.GetAbsoluteRoot(), new List<string>() { shopifySearchTerm });
-            _logger.LogInformation($"Invoice... {JsonConvert.SerializeObject(invoice)}");
+
+            var entity = new Transaction
+            {
+                ShopName = storeId,
+                StoreId = store.Id,
+                OrderId = shopifySearchTerm,
+                InvoiceId = invoice.Id,
+                TransactionStatus = ShopifyPlugin.Data.TransactionStatus.Pending,
+                InvoiceStatus = InvoiceStatusLegacy.New.ToString().ToLower(),
+            };
+            ctx.Add(entity);
+            await ctx.SaveChangesAsync();
 
             return Ok(new { invoiceId = invoice.Id, status = invoice.Status.ToString().ToLowerInvariant() });
         }
-
-        return NotFound();
+        catch (Exception ex)
+        {
+            _logger.LogError($"An error occurred on creating order. Exception message: {ex.Message}");
+            return BadRequest("An error occurred while trying to create order for Big Commerce");
+        }
     }
 
+    [AllowAnonymous]
+    [HttpGet("~/plugins/stores/{storeId}/shopify/validate")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> ValidateShopifyAccount(string storeId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var shopifySetting = ctx.ShopifySettings.FirstOrDefault(c => c.ShopName == storeId);
+        if (shopifySetting == null || !shopifySetting.IntegratedAt.HasValue)
+        {
+            return BadRequest("Invalid Shopify BTCPay store specified");
+        }
+        return Ok(new { BTCPayStoreId = shopifySetting.StoreId, BTCPayStoreUrl = Request.GetAbsoluteRoot() });
+    }
 
     [AllowAnonymous]
-    [HttpGet("~/stores/{storeId}/plugins/shopify/initiate-payment-request")]
-    public async Task<IActionResult> InitiatePaymentRequest(string storeId)
+    [HttpGet("~/plugins/stores/{storeId}/shopify/btcpay-shopify.js")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> GetBtcPayJavascript(string storeId)
     {
-
         await using var ctx = _dbContextFactory.CreateContext();
-        var exisitngStores = ctx.ShopifySettings.FirstOrDefault();
-
-        var jsFile = await helper.GetCustomJavascript(storeId, Request.GetAbsoluteRoot());
+        var userStore = ctx.ShopifySettings.FirstOrDefault(c => c.ShopName == storeId);
+        if (userStore == null)
+        {
+            return BadRequest("Invalid BTCPay store specified");
+        }
+        var jsFile = await helper.GetCustomJavascript(userStore.StoreId, Request.GetAbsoluteRoot());
         if (!jsFile.succeeded)
         {
             return BadRequest(jsFile.response);
@@ -301,7 +326,7 @@ public class UIShopifyController : Controller
         return Content(jsFile.response, "text/javascript");
     }
 
-    private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(BTCPayServer.Data.StoreData storeData, bool onlyEnabled = false)
+    private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(Data.StoreData storeData, bool onlyEnabled = false)
     {
         if (string.IsNullOrEmpty(storeData.DerivationStrategies))
             return new Dictionary<PaymentMethodId, JToken>();

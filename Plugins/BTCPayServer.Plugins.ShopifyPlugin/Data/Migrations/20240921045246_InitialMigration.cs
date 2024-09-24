@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace BTCPayServer.Plugins.ShopifyPlugin.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class initialMigration : Migration
+    public partial class InitialMigration : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -32,6 +32,24 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Data.Migrations
                 {
                     table.PrimaryKey("PK_ShopifySettings", x => x.Id);
                 });
+
+            migrationBuilder.CreateTable(
+                name: "Transactions",
+                schema: "BTCPayServer.Plugins.Shopify",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    ShopName = table.Column<string>(type: "text", nullable: true),
+                    StoreId = table.Column<string>(type: "text", nullable: true),
+                    OrderId = table.Column<string>(type: "text", nullable: true),
+                    InvoiceId = table.Column<string>(type: "text", nullable: true),
+                    InvoiceStatus = table.Column<string>(type: "text", nullable: true),
+                    TransactionStatus = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Transactions", x => x.Id);
+                });
         }
 
         /// <inheritdoc />
@@ -39,6 +57,10 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Data.Migrations
         {
             migrationBuilder.DropTable(
                 name: "ShopifySettings",
+                schema: "BTCPayServer.Plugins.Shopify");
+
+            migrationBuilder.DropTable(
+                name: "Transactions",
                 schema: "BTCPayServer.Plugins.Shopify");
         }
     }
