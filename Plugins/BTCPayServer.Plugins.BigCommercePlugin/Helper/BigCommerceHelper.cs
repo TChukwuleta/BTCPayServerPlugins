@@ -1,6 +1,7 @@
 ﻿using BTCPayServer.Plugins.BigCommercePlugin.Data;
 using BTCPayServer.Plugins.BigCommercePlugin.Services;
 using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System;
 using System.IdentityModel.Tokens.Jwt;
@@ -14,13 +15,14 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
 {
     public class BigCommerceHelper
     {
+        private readonly HttpClient _client;
         private readonly BigCommerceService _bigCommerceService;
         private readonly BigCommerceDbContextFactory _dbContextFactory;
-        public BigCommerceHelper(BigCommerceService bigCommerceService, BigCommerceDbContextFactory dbContextFactory)
+        public BigCommerceHelper(HttpClient client, BigCommerceService bigCommerceService, BigCommerceDbContextFactory dbContextFactory)
         {
+            _client = client;
             _dbContextFactory = dbContextFactory;
             _bigCommerceService = bigCommerceService;
-
         }
 
         public BigCommerceSignedJwtPayloadRequest DecodeJwtPayload(string token)
@@ -74,101 +76,69 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
 
         public async Task<BigCommerceStore> UploadCheckoutScript(BigCommerceStore bigCommerceStore, string jsFilePath)
         {
-            try
+            if (!string.IsNullOrEmpty(bigCommerceStore.JsFileUuid))
             {
-                CreateCheckoutScriptResponse script = null;
-                if (!string.IsNullOrEmpty(bigCommerceStore.JsFileUuid))
+                var existingScript = await _bigCommerceService.GetCheckoutScriptAsync(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+                if (existingScript != null)
                 {
-                    var existingScript = await _bigCommerceService.GetCheckoutScriptAsync(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
-                    if (existingScript == null)
-                    {
-                        script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, jsFilePath, bigCommerceStore.AccessToken);
-                    }
-                }
-                else
-                {
-                    script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, jsFilePath, bigCommerceStore.AccessToken);
-                }
-                if (script != null && !string.IsNullOrEmpty(script.data.uuid))
-                {
-                    bigCommerceStore.JsFileUuid = script.data.uuid;
+                    return bigCommerceStore;
                 }
             }
-            catch (Exception)
+            var script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, jsFilePath, bigCommerceStore.AccessToken);
+            if (script?.data?.uuid != null)
             {
+                bigCommerceStore.JsFileUuid = script.data.uuid;
             }
             return bigCommerceStore;
         }
 
-        public async Task<(bool succeeded, string response)> GetCustomModalJavascript(string storeId)
+        public async Task<GenericResponse> GetBtcpayCustomJavascriptModal(string storeId)
         {
             await using var ctx = _dbContextFactory.CreateContext();
-            var bcStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
+            var bcStore = await ctx.BigCommerceStores.FirstOrDefaultAsync(c => c.StoreId == storeId);
             if (bcStore == null)
             {
-                return (false, "Invalid store Id specified");
+                return new GenericResponse { Success = false,  Content = $"Invalid store Id specified" };
             }
-
             string fileUrl = "https://raw.githubusercontent.com/TChukwuleta/BTCPayServerPlugins/main/Plugins/BTCPayServer.Plugins.BigCommercePlugin/Resources/js/btcpay.js";
-
-            string combinedJavascript = string.Empty;
-
-            using (var httpClient = new HttpClient())
+            try
             {
-                try
-                {
-                    combinedJavascript = await httpClient.GetStringAsync(fileUrl);
-                }
-                catch (Exception ex)
-                {
-                    return (false, $"Failed to fetch file content: {ex.Message}");
-                }
+                var combinedJavascript = await _client.GetStringAsync(fileUrl);
+                return new GenericResponse { Success = true, Content = combinedJavascript };
             }
-            return (true, combinedJavascript);
+            catch (HttpRequestException ex)
+            {
+                return new GenericResponse { Success = false, Content = $"Failed to fetch file content: {ex.Message}" };
+            }
         }
 
-        public async Task<(bool succeeded, string response)> GetCustomJavascript(string storeId, string baseUrl)
+
+        public async Task<GenericResponse> GetCustomJavascript(string storeId, string baseUrl)
         {
             await using var ctx = _dbContextFactory.CreateContext();
-            var bcStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
+            var bcStore = await ctx.BigCommerceStores.FirstOrDefaultAsync(c => c.StoreId == storeId);
             if (bcStore == null)
             {
-                return (false, "Invalid store Id specified");
+                return new GenericResponse { Success = false, Content = "Invalid store Id specified" };
             }
             string fileUrl = "https://raw.githubusercontent.com/TChukwuleta/BTCPayServerPlugins/main/Plugins/BTCPayServer.Plugins.BigCommercePlugin/Resources/js/btcpay-bc.js";
-            string combinedJavascript = string.Empty;
-            using (var httpClient = new HttpClient())
+            string combinedJavascript;
+            try
             {
-                try
-                {
-                    combinedJavascript = await httpClient.GetStringAsync(fileUrl);
-                }
-                catch (Exception ex)
-                {
-                    return (false, $"Failed to fetch file content: {ex.Message}");
-                }
+                combinedJavascript = await _client.GetStringAsync(fileUrl);
             }
-            // Find a way to pull the JS file directly from the plugin through BTCPay server
-
-            /*string resourcesFolder = Path.Combine(AppContext.BaseDirectory, "Resources", "js");
-            string[] fileList = new[] { "btcpay-bc.js" };
-            string combinedJavascript = string.Empty;
-
-            foreach (var file in fileList)
+            catch (HttpRequestException ex)
             {
-                string filePath = Path.Combine(resourcesFolder, file);
-                _logger.LogInformation($"File path is: {filePath}");
-                var fileInfo = _webHostEnvironment.WebRootFileProvider.GetFileInfo(filePath);
-                if (fileInfo.Exists);
-                {
-                    await using var stream = fileInfo.CreateReadStream();
-                    using var reader = new StreamReader(stream);
-                    combinedJavascript += Environment.NewLine + await reader.ReadToEndAsync();
-                }
-            }*/
-
-            string jsVariables = $"var BTCPAYSERVER_URL = '{baseUrl}'; var STORE_HASH = '{bcStore.StoreHash}'; var BTCPAYSERVER_STORE_ID = '{storeId}';";
-            return (true, $"{jsVariables}{combinedJavascript}");
+                return new GenericResponse { Success = false, Content = $"Failed to fetch file content: {ex.Message}" };
+            }
+            /*string jsVariables = $"var BTCPAYSERVER_URL = '{baseUrl}'; var STORE_HASH = '{bcStore.StoreHash}'; var BTCPAYSERVER_STORE_ID = '{storeId}';";
+            $"{jsVariables}{combinedJavascript}";*/
+            var jsBuilder = new StringBuilder();
+            jsBuilder.Append($"var BTCPAYSERVER_URL = '{baseUrl}'; ");
+            jsBuilder.Append($"var STORE_HASH = '{bcStore.StoreHash}'; ");
+            jsBuilder.Append($"var BTCPAYSERVER_STORE_ID = '{storeId}'; ");
+            jsBuilder.Append(combinedJavascript);
+            return new GenericResponse { Success = true, Content = jsBuilder.ToString() };
         }
     }
 }

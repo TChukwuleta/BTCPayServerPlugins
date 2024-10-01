@@ -23,6 +23,8 @@ using Microsoft.AspNetCore.Cors;
 using BTCPayServer.Payments;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
+using System.Net.Http;
+using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -30,30 +32,33 @@ namespace BTCPayServer.Plugins.BigCommercePlugin;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIBigCommerceController : Controller
 {
-    private readonly ILogger<UIBigCommerceController> _logger;
+    private BigCommerceHelper helper;
+    private readonly HttpClient _client;
     private readonly StoreRepository _storeRepo;
     private readonly BigCommerceService _bigCommerceService;
     private readonly UIInvoiceController _invoiceController;
-    private readonly BigCommerceDbContextFactory _dbContextFactory;
-    private readonly UserManager<ApplicationUser> _userManager;
     private readonly BTCPayNetworkProvider _networkProvider;
-    private BigCommerceHelper helper;
+    private readonly ILogger<UIBigCommerceController> _logger;
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly BigCommerceDbContextFactory _dbContextFactory;
     public UIBigCommerceController
-        (StoreRepository storeRepo,
+        (HttpClient client,
+        StoreRepository storeRepo,
         BTCPayNetworkProvider networkProvider,
         UIInvoiceController invoiceController,
         BigCommerceService bigCommerceService,
+        ILogger<UIBigCommerceController> logger,
         UserManager<ApplicationUser> userManager,
-        BigCommerceDbContextFactory dbContextFactory,
-        ILogger<UIBigCommerceController> logger)
+        BigCommerceDbContextFactory dbContextFactory)
     {
+        _client = client;
         _storeRepo = storeRepo;
         _userManager = userManager;
         _networkProvider = networkProvider;
-        _invoiceController = invoiceController;
         _dbContextFactory = dbContextFactory;
+        _invoiceController = invoiceController;
         _bigCommerceService = bigCommerceService;
-        helper = new BigCommerceHelper(_bigCommerceService, _dbContextFactory);
+        helper = new BigCommerceHelper(_client, _bigCommerceService, _dbContextFactory);
         _logger = logger;
     }
     private const string BIGCOMMERCE_ORDER_ID_PREFIX = "BigCommerce-";
@@ -125,7 +130,8 @@ public class UIBigCommerceController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
         var userStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-
+        if (userStore is null)
+            return NotFound();
         var hasConflictingStore = ctx.BigCommerceStores
         .Where(store => store.StoreId != CurrentStore.Id)
         .Any(store => store.ClientId == model.ClientId || store.ClientSecret == model.ClientSecret);
@@ -134,7 +140,6 @@ public class UIBigCommerceController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Cannot create BigCommerce store as a store with the same Client ID or Client Secret already exists";
             return RedirectToAction(nameof(Index), "UIBigCommerce", new { storeId = CurrentStore.Id });
         }
-
         userStore.ClientId = model.ClientId;
         userStore.ClientSecret = model.ClientSecret;
         ctx.Update(userStore);
@@ -150,7 +155,6 @@ public class UIBigCommerceController : Controller
     {
         try
         {
-            account_uuid = HttpUtility.UrlDecode(account_uuid);
             code = HttpUtility.UrlDecode(code);
             context = HttpUtility.UrlDecode(context);
             scope = HttpUtility.UrlDecode(scope);
@@ -175,12 +179,12 @@ public class UIBigCommerceController : Controller
                 Scope = scope
             };
             var responseCall = await _bigCommerceService.InstallApplication(installRequest);
-            if (!responseCall.success)
+            if (!responseCall.Success)
             {
-                _logger.LogError($"{responseCall.content}");
-                return BadRequest(responseCall.content);
+                _logger.LogError($"{responseCall.Content}");
+                return BadRequest(responseCall.Content);
             }
-            var bigCommerceStoreDetails = JsonConvert.DeserializeObject<InstallApplicationResponseModel>(responseCall.content);
+            var bigCommerceStoreDetails = JsonConvert.DeserializeObject<InstallApplicationResponseModel>(responseCall.Content);
             bigCommerceStore.AccessToken = bigCommerceStoreDetails.access_token;
             bigCommerceStore.Scope = bigCommerceStoreDetails.scope;
             bigCommerceStore.StoreHash = bigCommerceStoreDetails.context;
@@ -193,9 +197,8 @@ public class UIBigCommerceController : Controller
             await ctx.SaveChangesAsync();
             return Ok("Big commerce store installation was successful");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogError($"An error occurred while completing Big commerce installation. Exception error: {ex.Message}");
             return BadRequest("An error occurred while completing Big commerce installation");
         }
     }
@@ -225,6 +228,7 @@ public class UIBigCommerceController : Controller
         return Content(htmlContent, "text/html");
     }
 
+
     [AllowAnonymous]
     [HttpGet("~/stores/{storeId}/plugins/bigcommerce/auth/uninstall")]
     public async Task<IActionResult> Uninstall(string storeId, [FromQuery] string signed_payload_jwt)
@@ -246,9 +250,9 @@ public class UIBigCommerceController : Controller
         }
         ctx.Remove(bigCommerceStore);
         await ctx.SaveChangesAsync();
-
         return Ok("Big commerce store uninstalled successfully");
     }
+
 
     [AllowAnonymous]
     [HttpPost("~/stores/{storeId}/plugins/bigcommerce/create-order")]
@@ -258,36 +262,35 @@ public class UIBigCommerceController : Controller
         try
         {
             await using var ctx = _dbContextFactory.CreateContext();
-            var exisitngStores = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == requestModel.storeId);
-            if (exisitngStores == null)
+            var exisitngStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == requestModel.storeId);
+            if (exisitngStore == null)
             {
                 return BadRequest("Cannot create big commerce order. Invalid store Id");
             }
-            var createOrder = await _bigCommerceService.CheckoutOrderAsync(exisitngStores.StoreHash, requestModel.cartId, exisitngStores.AccessToken);
+            var createOrder = await _bigCommerceService.CheckoutOrderAsync(exisitngStore.StoreHash, requestModel.cartId, exisitngStore.AccessToken);
             if (createOrder == null)
             {
-                _logger.LogError($"Error occurred while creating order... {JsonConvert.SerializeObject(createOrder)}");
-                return BadRequest("An error occurred while creating order");
+                return BadRequest($"An error occurred while creating order. {JsonConvert.SerializeObject(createOrder)}");
             }
             string bgOrderId = $"{BIGCOMMERCE_ORDER_ID_PREFIX}{createOrder.data.id}";
+            InvoiceMetadata metadata = new InvoiceMetadata
+            {
+                OrderId = bgOrderId,
+                BuyerEmail = requestModel.email
+            };
 
-            var metadata = new InvoiceMetadata();
-            metadata.OrderId = bgOrderId;
-            metadata.BuyerEmail = requestModel.email;
-
-            var store = await _storeRepo.FindStore(exisitngStores.StoreId);
+            var store = await _storeRepo.FindStore(exisitngStore.StoreId);
             var result = await _invoiceController.CreateInvoiceCoreRaw(new Client.Models.CreateInvoiceRequest()
             {
                 Amount = requestModel.total,
                 Currency = requestModel.currency,
                 Metadata = metadata.ToJObject(),
             }, store, HttpContext.Request.GetAbsoluteRoot());
-
             var entity = new Transaction
             {
-                ClientId = exisitngStores.ClientId,
-                StoreHash = exisitngStores.StoreHash,
-                StoreId = exisitngStores.StoreId,
+                ClientId = exisitngStore.ClientId,
+                StoreHash = exisitngStore.StoreHash,
+                StoreId = exisitngStore.StoreId,
                 OrderId = bgOrderId,
                 InvoiceId = result.Id,
                 TransactionStatus = TransactionStatus.Pending,
@@ -304,33 +307,34 @@ public class UIBigCommerceController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError($"An error occurred on creating order. Exception message: {ex.Message}");
-            return BadRequest("An error occurred while trying to create order for Big Commerce");
+            return BadRequest($"An error occurred while trying to create order for Big Commerce. {ex.Message}");
         }
-     }
+    }
+
 
     [AllowAnonymous]
     [HttpGet("~/stores/{storeId}/plugins/bigcommerce/btcpay-bc.js")]
     public async Task<IActionResult> GetBtcPayJavascript(string storeId)
     {
         var jsFile = await helper.GetCustomJavascript(storeId, Request.GetAbsoluteRoot());
-        if (!jsFile.succeeded)
+        if (!jsFile.Success)
         {
-            return BadRequest(jsFile.response);
+            return BadRequest(jsFile.Content);
         }
-        return Content(jsFile.response, "text/javascript");
+        return Content(jsFile.Content, "text/javascript");
     }
+
 
     [AllowAnonymous]
     [HttpGet("~/stores/{storeId}/plugins/bigcommerce/modal/btcpay.js")]
     public async Task<IActionResult> GetBtcPayModalJavascript(string storeId)
     {
-        var jsFile = await helper.GetCustomModalJavascript(storeId);
-        if (!jsFile.succeeded)
+        var jsFile = await helper.GetBtcpayCustomJavascriptModal(storeId);
+        if (!jsFile.Success)
         {
-            return BadRequest(jsFile.response);
+            return BadRequest(jsFile.Content);
         }
-        return Content(jsFile.response, "text/javascript");
+        return Content(jsFile.Content, "text/javascript");
     }
 
     private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(StoreData storeData, bool onlyEnabled = false)

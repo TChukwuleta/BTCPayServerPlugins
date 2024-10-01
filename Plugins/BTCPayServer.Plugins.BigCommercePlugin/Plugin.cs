@@ -44,7 +44,7 @@ public class Plugin : BaseBTCPayServerPlugin
     public override void Execute(IApplicationBuilder applicationBuilder, IServiceProvider applicationBuilderApplicationServices)
     {
 
-        applicationBuilder.UseMiddleware<CorsMiddleware>();
+        //applicationBuilder.UseMiddleware<CorsMiddleware>();
         applicationBuilder.UseCors("AllowAllOrigins");
 
         base.Execute(applicationBuilder, applicationBuilderApplicationServices);
