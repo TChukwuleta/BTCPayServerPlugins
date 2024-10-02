@@ -24,6 +24,8 @@ using BTCPayServer.Payments;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Net.Http;
+using BTCPayServer.Filters;
+using System.Security.Cryptography.X509Certificates;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -204,6 +206,7 @@ public class UIBigCommerceController : Controller
 
 
     [AllowAnonymous]
+    [XFrameOptions(XFrameOptionsAttribute.XFrameOptions.Unset)]
     [HttpGet("~/stores/{storeId}/plugins/bigcommerce/auth/load")]
     public async Task<IActionResult> Load(string storeId, [FromQuery] string signed_payload_jwt)
     {
@@ -223,7 +226,52 @@ public class UIBigCommerceController : Controller
         {
             return BadRequest("Invalid signed_payload_jwt parameter");
         }
-        var htmlContent = "<html><body><p>Your BTCPay plugin was successfully configured.</p></body></html>";
+        var htmlContent = $@"
+            <!DOCTYPE html>
+            <html lang='en'>
+            <head>
+                <meta charset='utf-8' />
+                <title>BTCPay Plugin Configuration</title>
+                <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+                <style>
+                    table {{
+                        width: 60%;
+                        border-collapse: collapse;
+                        margin: 20px auto;
+                    }}
+                    th, td {{
+                        border: 1px solid #ddd;
+                        padding: 8px;
+                        text-align: left;
+                    }}
+                    th {{
+                        background-color: #f2f2f2;
+                    }}
+                </style>
+            </head>
+            <body>
+                <h2 style='text-align: center;'>BTCPay Plugin Configuration</h2>
+                <table>
+                    <tr>
+                        <th>BTCPay Server Store Name</th>
+                        <td>{bigCommerceStore.StoreName}</td>
+                    </tr>
+                    <tr>
+                        <th>Auth Callback URL</th>
+                        <td>{Url.Action("Install", "UIBigCommerce", new { storeId = bigCommerceStore.StoreId }, Request.Scheme)}</td>
+                    </tr>
+                    <tr>
+                        <th>Load Callback URL</th>
+                        <td>{Url.Action("Load", "UIBigCommerce", new { storeId = bigCommerceStore.StoreId }, Request.Scheme)}</td>
+                    </tr>
+                    <tr>
+                        <th>Uninstall Callback URL</th>
+                        <td>{Url.Action("Uninstall", "UIBigCommerce", new { storeId = bigCommerceStore.StoreId }, Request.Scheme)}</td>
+                    </tr>
+                </table>
+            </body>
+            </html>";
+
         return Content(htmlContent, "text/html");
     }
 

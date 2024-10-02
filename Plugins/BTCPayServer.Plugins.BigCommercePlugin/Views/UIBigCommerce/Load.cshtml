@@ -1,35 +1,36 @@
 @model BTCPayServer.Plugins.BigCommercePlugin.ViewModels.InstallBigCommerceViewModel
 
-<div class="d-sm-flex align-items-center">
-    <h2 class="mb-0">
-        @ViewData["Title"]
-    </h2>
-</div>
-
-
-<div class="container mt-5">
-    <div class="row">
-        <div class="col-md-6">
-            <div class="form-group">
-                <label class="form-label">BTCPay Server Store Name</label>
-                <input asp-for="StoreName" class="form-control" readonly />
-            </div>
-            <div class="form-group">
-                <label asp-for="AuthCallBackUrl" class="form-label"></label>
-                <input asp-for="AuthCallBackUrl" class="form-control" readonly />
-            </div>
-            <div class="form-group">
-                <label asp-for="LoadCallbackUrl" class="form-label"></label>
-                <input asp-for="LoadCallbackUrl" class="form-control" readonly />
-            </div>
-            <div class="form-group">
-                <label asp-for="UninstallCallbackUrl" class="form-label"></label>
-                <input asp-for="UninstallCallbackUrl" class="form-control" readonly />
-            </div>
-            <div class="form-group">
-                <label asp-for="CheckoutScriptUrl" class="form-label"></label>
-                <input asp-for="CheckoutScriptUrl" class="form-control" readonly />
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>BTCPay Plugin Configuration</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label">BTCPay Server Store Name</label>
+                    <input asp-for="StoreName" class="form-control" readonly />
+                </div>
+                <div class="form-group">
+                    <label asp-for="AuthCallBackUrl" class="form-label"></label>
+                    <input asp-for="AuthCallBackUrl" class="form-control" readonly />
+                </div>
+                <div class="form-group">
+                    <label asp-for="LoadCallbackUrl" class="form-label"></label>
+                    <input asp-for="LoadCallbackUrl" class="form-control" readonly />
+                </div>
+                <div class="form-group">
+                    <label asp-for="UninstallCallbackUrl" class="form-label"></label>
+                    <input asp-for="UninstallCallbackUrl" class="form-control" readonly />
+                </div>
             </div>
         </div>
     </div>
-</div>
+
+    <p>Your BTCPay plugin was successfully configured.</p>
+</body>
+</html>

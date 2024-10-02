@@ -5,8 +5,8 @@
 
   <!-- Plugin specific properties -->
   <PropertyGroup>
-    <Product>BTCPay Server Big commerce Plugin</Product>
-    <Description>BTCPay server integration with Big commerce.</Description>
+    <Product>BigCommerce for BTCPay Server</Product>
+    <Description>BTCPay server integration for BigCommerce.</Description>
     <Version>1.0.0</Version>
   </PropertyGroup>
 
