@@ -69,7 +69,7 @@ P.S: It is important to note that you cannot assign a BigCommerce application cr
 
 Once you have completed the above steps, it is time to install your BigCommerce application in your store and start receiving payment using Bitcoin.
 
-1. Login to your [BigCommerce](https://docs.btcpayserver.org/WalletSetup/), Navigate to Apps => MyApps
+1. Login to your [BigCommerce](https://login.bigcommerce.com/login/), Navigate to Apps => MyApps
 2. Select "My Draft Apps", there you would see a list of all your BigCommerce application that you've set up including this newly created application.
 3. Hover on your newly created application and click on "Learn more"
 4. It would take you to a page containing your application details including permissions granted to the application, with a button to install.
