@@ -17,7 +17,7 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("BTCPayServer.Plugins.BigCommerce")
-                .HasAnnotation("ProductVersion", "8.0.6")
+                .HasAnnotation("ProductVersion", "8.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -81,8 +81,8 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Migrations
                     b.Property<string>("InvoiceId")
                         .HasColumnType("text");
 
-                    b.Property<int>("InvoiceStatus")
-                        .HasColumnType("integer");
+                    b.Property<string>("InvoiceStatus")
+                        .HasColumnType("text");
 
                     b.Property<string>("OrderId")
                         .HasColumnType("text");

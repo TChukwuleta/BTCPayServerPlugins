@@ -279,7 +279,7 @@ public class UIShopifyController : Controller
                 OrderId = shopifySearchTerm,
                 InvoiceId = invoice.Id,
                 TransactionStatus = ShopifyPlugin.Data.TransactionStatus.Pending,
-                InvoiceStatus = InvoiceStatusLegacy.New.ToString().ToLower(),
+                InvoiceStatus = InvoiceStatus.New.ToString().ToLower(),
             };
             ctx.Add(entity);
             await ctx.SaveChangesAsync();

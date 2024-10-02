@@ -1,5 +1,279 @@
 # Changelog
 
+## 1.13.5
+
+### Bug fixes
+
+* Fix: Plugin Exception Handler didn't disabled plugin if crash was detected @NicolasDorier
+* Fix: Kraken rate provider failing due to bid > ask @NicolasDorier
+
+## 1.13.4
+
+### Bug fixes
+
+* LNUrl payouts failing due to amount restriction wouldn't be immediately cancelled (#6061) @Kukks
+* Fix row ordering and display issues in reporting (#6065 #6087, 597e2b0e) @NicolasDorier @dennisreimann
+* Parse Timespan strings in the API properly (#6012) @dennisreimann
+* "Return to Store" link in invoice receipt should return to the redirectUrl (#6079) @dennisreimann
+* Fix crash caused by custom explorer links in some conditions (#6077 #6078) @dennisreimann
+* Fix: Can't save email settings on store level (#6076 #6080) @dennisreimann
+* Reports: Fix dropdown z-index @dennisreimann
+* Shopify: Properly cancel an order when BTCPay invoice expires, and restock the inventory (#6104 #6107 #6108) @NicolasDorier
+* Shopify: Generate BTCPay invoice as soon as the payment page in shopify opens (#6105) @NicolasDorier
+
+### Improvements
+
+* Checkout: Display item description if present (#6082) @dennisreimann
+* Disable plugins if they crash the Dashboard page (#6099) @NicolasDorier
+* Hide empty values in the receipts (#6079) @dennisreimann
+* Greenfield: Add the invoice metadata of a Lightning Address (#6067 #6084) @dennisreimann
+
+## 1.13.3
+
+### Bug fixes
+
+* Fix potential crash on receipt print page (#6045) @dennisreimann
+* Fix invoice paid for topping up a pull payment didn't top up. @NicolasDorier
+* Pull payment: Enable CORS for LNURL request (#6044) @dennisreimann 
+
+
+## 1.13.2
+
+### New features
+
+* Add refund reports (#5791) @NicolasDorier
+* Allow `lightning:` in html hyperlinks (#6002 #6001) @dennisreimann
+
+### Bug fixes
+
+* If you specified a 0 amount bolt 11 invoice for a payout, it would be incorrectly validated and not accepted. (#5943 #5819) @Kukks
+* Domain mapping constraint: Fix .onion case (#5948 #5917) @dennisreimann
+* Pull payment QR scan fixes (#5950) @dennisreimann
+* Server email settings: Fix missing password field (#5952 #5949) @dennisreimann
+* Fix: Some valid taproot PSBT couldn't parsed and show better error message (#5715 #5993) @NicolasDorier
+* Fix: Adding a label to a base58 addresses in the `Send Wallet` screen wasn't working (#6011) @NicolasDorier
+* Fix: When an invoice expires, the corresponding Shopify order remains pending instead of canceling (#6021 #6027) @Kukks
+
+### Improvements
+
+* Search: Display text filters in search input (#5986 #5984) @dennisreimann
+* POS: Allow overpay for articles with minimum price (#5997 #5995) @dennisreimann
+* Improve data display on receipt (#5896 #5882) @dennisreimann
+* Greenfield API clarifications (#5955) @ndeet
+* Improvements to receipts display for PoS @rockstardev
+* Fix layout on mobile on the dashboard (#5721 #6006) @dennisreimann
+
+## 1.13.1
+
+### Bug fixes
+
+* Fix: CSV exports from the Reports were exporting dates in 12-hour format instead of 24-hour format. (#5915, #5922) @TChukwuleta
+* Fix: Crash when configuring BTCPay Server with a non-default Postgres schema (Fix #5901) @NicolasDorier
+* Fix: A payment request with an amount of 0 no longer causes the payment request's page to crash (#5926) @Kukks
+
+### Improvements
+
+* Prevent unintentional double payouts (#5931, #5913) @dennisreimann
+* The `buyerEmail` field in a Payment Request's form will now set the email for the payment request (#5926) @Kukks
+* Added Tether as a supporter to the BTCPay Server Foundation (#5891) @rockstardev
+
+## 1.13.0
+
+### New feature
+
+* Server Settings: Customize instance name and add contact URL (#5718 #5872) @dennisreimann
+* Admin overview of the stores on the instance (#5745 #5782) @dennisreimann @Kukks
+* Onboarding: Invite new users (#5714 #5719 #5874) @dennisreimann @dstrukt
+* POS: Add item list to keypad (#5814 #5857 #5877) @dennisreimann @dstrukt
+* Wallet: Support BBQr PSBTSs (#5852) @Kukks
+
+### Improvements
+
+* Dashboard: Tooltip for balance on a particular day (#5650) @dennisreimann
+* Shopify: Improve instruction display (#5752) @dennisreimann
+* Wallet: Support 16mb PSBTs (#5768) @Kukks
+* Invoice: Improve events display (#5775) @dennisreimann
+* Crowdfund: Add forms (like with the POS) (#5659) @Nisaba
+* API docs: Adding introduction, Authentication and Usage examples sections (#5772 #5858) @ndeet
+* Policies: Cleanup and improvements (#5731) @dennisreimann @dstrukt
+* Add legacy report (#5740) @Kukks
+* Store: Move support URL to Checkout Appearance and improve wording (#5717) @dennisreimann
+* Apps: Allow `mailto:` links in descriptions (#5736) @dennisreimann
+* Webhooks: Fixes and docs (#5686) @Kukks
+* UI: Deprecate the custom CSS options — use store branding (#5735) @dennisreimann
+* Wallet: Reposition the camera scan icon on send page (#5790) @TChukwuleta
+* Branding: Remove restriction of square dimension for store logo (#5738) @dennisreimann
+* Apps: Make app name the default title (#5779) @dennisreimann
+* Wallet: Label filter dropdown (#5802) @dennisreimann
+* POS: App to show QR code for public page for easy setup (#5825) @TChukwuleta
+* Payouts: Parallel payout for Lightning invoices (#5781) @Kukks
+* Pull Payments: When opened in mobile, use deeplink to setup card (#5613) @NicolasDorier
+* UI consistency: Use toggles in various setting views (#5769) @TChukwuleta
+* Wallet: Improve info message (#5756) @rockstardev
+* Item Editor: Apply item changes directly (#5849 #5871) @dennisreimann
+* Specify mailto: prefix for emails in Server Settings (#5844) @TChukwuleta @dennisreimann
+* UI: Improve Create First Store view (#5854) @dennisreimann
+* Receipts: Smaller printed receipts (#5856) @Kukks
+
+### Bug fixes
+
+* Lightning: Closing Balance in Dashboard was showing incorrect value (#5716) @NicolasDorier
+* Currencies: Remove decimals for Colombian (COP) and Argentina's Peso (ARS) (#5710) @TChukwuleta
+* Wallet: Labels wouldn't be properly applied to some wallet's transactions (#5770) @NicolasDorier
+* Apps: Don't redirect .onion requests to canonical domain (#5776) @dennisreimann
+* UI: Make store selector list scrollable if necessary (#5760) @dennisreimann @dstrukt
+* Lightning: Replace user info in server URL when logging (#5750) @dennisreimann
+* Lightning: Setup page fixes (#5796) @dennisreimann
+* Currencies: Fix currency-api link (#5803) @fawazahmed0
+* Reports: Fix old payments not showing up in reports (#5812) @NicolasDorier
+* POS: Fix exception when asking for data with a top up item (#5816) @dennisreimann
+* Plugins: Do not have report name conflict with old plugin (#5826) @Kukks
+* Lightning: Do not throw when local node is not synced and using external ln node (#5859) @Kukks
+
+## 1.12.5
+
+### Bug fixes
+
+* Fix: Emergency fix for stores using Kraken rate source @NicolasDorier
+
+## 1.12.4
+
+### Bug fixes
+
+* Fix: When the mempool fee was above 850 sat/vbyte, it was being rounded to 2000 sat/vbyte (#5643) @Kukks
+* Fix: Bitpay's API rate route was not backward compatible for some queries (#5671) @NicolasDorier
+* Fix: Partial Payment displayed 'Could not update BTC (LNURL-Pay)' in invoice logs (#5670) @NicolasDorier
+* Fix: BTCPay Server failed to start the first time when installing a new plugin (#5595) @NicolasDorier
+* Importing a Taproot account from Passport failed with no error message (#5518 #5638) @Kukks
+* Fix: POS order with invalid form input was unable to reach the payment page (#5655 #5658) @dennisreimann
+* Fix: Checkout v1 was not applying the custom style (#5628 #5615 #5616) @dennisreimann
+* Fix: Test email with multiple recipients was crashing (#5649 #5648) @dennisreimann
+* Fix: Test webhook for payment requests (#5680) @Kukks
+* Fix: Sometimes importing a wallet file from Electrum would fail @NicolasDorier
+* Fix: Creating a Store as a Guest generates a 403 error (#5688 #5689) @dennisreimann
+* Fix: In Wallet Send, label were not applied to transactions (#5700) @NicolasDorier
+* Fix: "View recent invoices" in Keypad PoS should be accessible for authenticated Guest users (#5702 #5698) @dennisreimann
+
+### Improvements
+
+* Checkout v2: Update checkout v2 translations from Transifex and ChatGPT (#5679) @NicolasDorier
+* Checkout v2: Clicking the QR code now copies the full payment URI (#5625 #5627) @dennisreimann
+* Improved checkout page load time by fetching the recommended fee in the background periodically (#5672) @NicolasDorier
+* Clear any previous pending actions of a plugin when you click uninstall (#5577) @Kukks
+* Display the plugin version that was disabled (#5577) @Kukks
+* Show an update button on disabled plugins instead of an install button (#5577) @Kukks
+* If a plugin is scheduled to be installed/updated, it will display which version was scheduled for the update. If a newer version is available than the scheduled one, an option to switch will be shown (#5577) @Kukks
+* Improved fee rate approximation by linear interpolation between known block targets (#5643) @Kukks
+* Prevented creation of payment requests when a wallet is not set up (#5620) @TChukwuleta
+* Hide LN Balance when using an internal node and not a server admin (#5639) @Kukks
+* Added a link to the Greenfield API Key management page from the store's settings Access token page (#5635) @hiluan
+* Removed the 'What's New' button and information (#5608 #5618) @hiluan
+
+## 1.12.3
+
+### Bug fixes
+
+* Fix: Crashes would happen on some plugins introducing new apps type (#5590) @dennisreimann
+
+## 1.12.2
+
+### Bug fixes
+
+*  Plugins: Fix missing uninstall button (#5587) @dennisreimann
+*  Webhooks: Fix invoice interpolation (#5586 #5584) @dennisreimann
+
+## 1.12.1
+
+Recommended update for users using Boltcard with pull payments or Top-Up invoices.
+
+Breaking change: Boltcards linked to pull payments in version 1.12.0 are not compatible with version 1.12.1.
+
+# New Features
+
+* A disabled plugin can now be uninstalled in the UI (#5570) @Kukks
+
+### Bug fixes
+
+* Fix: Payments to Top-Up could go undetected due to a race condition (#5568) @NicolasDorier
+* Lightning: Fixed the connection display name in LN settings (#5569) @dennisreimann
+* Prevent redirection to archived store after login (#5566) @dennisreimann
+* Use PullPaymentId to derive the cardkey of a Boltcard (#5575) @NicolasDorier
+* Greenfield: The Link a boltcard to a pull payment route would not generate new keys for the boltcard when onExisting was set to UpdateVersion. @NicolasDorier
+
+### Improvements
+
+* Lightning Address: Use lowercase usernames when resolving (#5579) @dennisreimann
+* UI: Form validation summary now matches alert style (#5576, #5564) @dennisreimann
+* Improved error message in Vault if a hardware device isn't supported @NicolasDorier
+* Lightning: Allow LND to be used with non-admin macaroons (#5567) @dennisreimann
+* Fix in API Documentation: The Link a boltcard to a pull payment had incorrectly documented permissions. @NicolasDorier
+
+## 1.12.0
+
+### Noteworthy
+
+* With this release we upgrade to .NET 8, which also requires a current version of the Docker engine (>= 20.10.10).
+  We will try to migrate outdated versions when upgrading BTCPay Server, but if you see these [symptoms](https://docs.linuxserver.io/FAQ/#symptoms) after updating, please [upgrade Docker engine manually](https://docs.docker.com/engine/install/).
+* We changed a lot of things under the hood, making the Lightning integrations extendible by plugins and also preparing the
+  migration of Altcoins to plugins. If you are using plugins, you will most likely find them disabled after this update, because
+  new versions compatible with BTCPay Server v1.12 are required. Please see the "Manage Plugins" section once updated.
+* We are ending support for Postgresql 11 as it reached 5 years after its initial release. Read more about [end-of-life (EOL) of postgresql](https://www.postgresql.org/support/versioning/). While Postgresql 11 should still work with BTCPay Server, we will not keep compatibility moving forward.
+
+### New feature
+
+* Webhooks: Support for Payment Requests, Payouts and extendibility by plugins (#5421) @Kukks
+* Support BIP129 Multisig wallet import (#5389) @Kukks
+* POS Keypad: Add plus and change clear functionality (#5396) @dennisreimann @dstrukt
+* Forms: Support adjusting invoice amount by multiplier, enables percentage-based discount codes (#5463) @Kukks
+* Can pair or reset a Boltcard to a pull payment (#5419) @NicolasDorier
+* Plugins: Allow scheduling installs/updates of future plugins (#5537) @Kukks
+
+### Bug fixes
+
+* Webhooks: Re-add OverPaid property to WebhookInvoiceSettledEvent (#5538 #5496) @dennisreimann
+* Apps: Filter list lookups by available app types (#5482) @dennisreimann
+* Wallet: Use application/jsonl as MIME type for BIP329 label export (#5489) @dennisreimann
+* Wallet: Fill label from BIP21 (#5428) @dennisreimann
+* Greenfield: LNURLPay store payment method fixes (#5446) @dennisreimann
+* Greenfield: Fix invoice refund permission (#5558) @Kukks
+* Do not activate Blazor in Wizard screens (#5435) @NicolasDorier
+* Pull Payment: Display the amount of claims (#5427) @NicolasDorier
+* Dashboard: LND limbo balance had the wrong unit (a 1 BTC limbo balance would show as 0.001 BTC) @NicolasDorier
+* Fix occasional concurrency issue which would result in app settings change not being properly saved (#5565) @NicolasDorier
+
+### Improvements
+
+* Upgrade to .NET 8.0 (#5479) @NicolasDorier
+* Enhance fine grain permissions (#5502) @Kukks
+* Checkout: NFC improvements (#5509) @dennisreimann
+* Checkout: Receipt improvements (#5505) @rockstardev @dennisreimann
+* Payment Request: Improve public view (#5413) @dennisreimann @dstrukt
+* POS Keypad: List recent transactions (#5478) @dennisreimann @dstrukt
+* POS Cart: Add options for search and categories display (#5438) @dennisreimann
+* POS Cart: Horizontal scrollable filters (#5391) @dennisreimann
+* POS and Crowdfund: Item editor improvements (#5418 #5449) @dennisreimann
+* Reporting: UI improvements (#5432) @dennisreimann @dstrukt
+* Wallet: Use Mempool.space fee estimation (#5490 #5556) @Kukks @NicolasDorier
+* Wallet: Update Passport instructions for import (#5423) @sethforprivacy
+* Plugins: Send notification when a new plugin version is available (#5450) @Kukks
+* Plugins: Improve crash detection on startup and hint at disabled plugins (#5514) @dennisreimann
+* Plugins: Add disclaimer (#5552) @dennisreimann
+* Server Policies: Add warnings for certain options (#5554) @dennisreimann
+* Greenfield: Remove unused checkout type setting from POS (#5512) @dennisreimann
+* Greenfield: Make checkout type V2 default for new stores (#5495) @dennisreimann
+* Domain mapping: Redirect root app to canonical URL (#5471) @dennisreimann
+* Lightning: Make implementations extendible by plugins (#5422) @Kukks
+* Lightning: Upgrade LND to 0.17.2-beta @rockstardev
+* Store Branding: Use store logo as favicon (#5519) @dennisreimann
+* Rate Providers: Remove Bittrex (#5553) @Kukks
+* UI: Unify list views (#5399) @dennisreimann @dstrukt
+* UI: Unify public page styles (#5460 #5462 #5466) @dennisreimann @dstrukt
+* UI: Add system option for theme switch (#5473) @dennisreimann
+* UI: Pull payment improvements (#5453) @dennisreimann
+* UI: Switch pos data to metadata in invoice create view (#5412) @Kukks
+* UI: Improve invoice's webhooks table (#5545) @NicolasDorier
+* UI: Remove forced center alignment for POS description (#5555) @dennisreimann
+
 ## 1.11.7
 
 ### New feature

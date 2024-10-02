@@ -24,7 +24,6 @@ using BTCPayServer.Payments;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Net.Http;
-using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -32,8 +31,8 @@ namespace BTCPayServer.Plugins.BigCommercePlugin;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIBigCommerceController : Controller
 {
-    private BigCommerceHelper helper;
     private readonly HttpClient _client;
+    private readonly BigCommerceHelper helper;
     private readonly StoreRepository _storeRepo;
     private readonly BigCommerceService _bigCommerceService;
     private readonly UIInvoiceController _invoiceController;
@@ -294,7 +293,7 @@ public class UIBigCommerceController : Controller
                 OrderId = bgOrderId,
                 InvoiceId = result.Id,
                 TransactionStatus = TransactionStatus.Pending,
-                InvoiceStatus = InvoiceStatusLegacy.New
+                InvoiceStatus = Client.Models.InvoiceStatus.New.ToString()
             };
             ctx.Add(entity);
             await ctx.SaveChangesAsync();

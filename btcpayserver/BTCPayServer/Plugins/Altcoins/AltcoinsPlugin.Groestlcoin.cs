@@ -20,7 +20,7 @@ public partial class AltcoinsPlugin
             DefaultRateRules = new[]
             {
                     "GRS_X = GRS_BTC * BTC_X",
-                    "GRS_BTC = bittrex(GRS_BTC)"
+                    "GRS_BTC = upbit(GRS_BTC)"
                 },
             CryptoImagePath = "imlegacy/groestlcoin.png",
             LightningImagePath = "imlegacy/groestlcoin-lightning.svg",
@@ -34,7 +34,7 @@ public partial class AltcoinsPlugin
                 ? "https://chainz.cryptoid.info/grs/tx.dws?{0}.htm"
                 : "https://chainz.cryptoid.info/grs-test/tx.dws?{0}.htm";
         services.AddBTCPayNetwork(network)
-                .AddTransactionLinkProvider(new PaymentMethodId(nbxplorerNetwork.CryptoCode, PaymentTypes.BTCLike), new DefaultTransactionLinkProvider(blockExplorerLink));
+                .AddTransactionLinkProvider(nbxplorerNetwork.CryptoCode, new DefaultTransactionLinkProvider(blockExplorerLink));
     }
 }
 

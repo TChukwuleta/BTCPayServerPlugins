@@ -13,7 +13,7 @@ public class Transaction
     public string StoreId { get; set; }
     public string OrderId { get; set; }
     public string InvoiceId { get; set; }
-    public InvoiceStatusLegacy InvoiceStatus { get; set; }
+    public string InvoiceStatus { get; set; }
     public TransactionStatus TransactionStatus { get; set; }
 
 

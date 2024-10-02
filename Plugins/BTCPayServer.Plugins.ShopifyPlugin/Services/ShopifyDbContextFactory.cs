@@ -3,6 +3,8 @@ using BTCPayServer.Abstractions.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Options;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
+using System;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin.Services;
 
@@ -26,10 +28,10 @@ public class ShopifyDbContextFactory : BaseDbContextFactory<ShopifyDbContext>
     {
     }
 
-    public override ShopifyDbContext CreateContext()
+    public override ShopifyDbContext CreateContext(Action<NpgsqlDbContextOptionsBuilder> npgsqlOptionsAction = null)
     {
         var builder = new DbContextOptionsBuilder<ShopifyDbContext>();
-        ConfigureBuilder(builder);
+        ConfigureBuilder(builder, npgsqlOptionsAction);
         return new ShopifyDbContext(builder.Options);
     }
 }

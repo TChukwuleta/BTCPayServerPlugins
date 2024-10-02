@@ -3,6 +3,8 @@ using BTCPayServer.Abstractions.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Options;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
+using System;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin.Services;
 
@@ -26,10 +28,10 @@ public class BigCommerceDbContextFactory : BaseDbContextFactory<BigCommerceDbCon
     {
     }
 
-    public override BigCommerceDbContext CreateContext()
+    public override BigCommerceDbContext CreateContext(Action<NpgsqlDbContextOptionsBuilder> npgsqlOptionsAction = null)
     {
         var builder = new DbContextOptionsBuilder<BigCommerceDbContext>();
-        ConfigureBuilder(builder);
+        ConfigureBuilder(builder, npgsqlOptionsAction);
         return new BigCommerceDbContext(builder.Options);
     }
 }

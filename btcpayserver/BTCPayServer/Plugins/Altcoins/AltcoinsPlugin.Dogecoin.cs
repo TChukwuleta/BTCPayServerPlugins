@@ -21,7 +21,7 @@ public partial class AltcoinsPlugin
             DefaultRateRules = new[]
             {
                                 "DOGE_X = DOGE_BTC * BTC_X",
-                                "DOGE_BTC = bittrex(DOGE_BTC)"
+                                "DOGE_BTC = bitpay(DOGE_BTC)"
                 },
             CryptoImagePath = "imlegacy/dogecoin.png",
             DefaultSettings = BTCPayDefaultSettings.GetDefaultSettings(ChainName),
@@ -30,7 +30,7 @@ public partial class AltcoinsPlugin
 
         var blockExplorerLink = ChainName == ChainName.Mainnet ? "https://dogechain.info/tx/{0}" : "https://dogechain.info/tx/{0}";
         services.AddBTCPayNetwork(network)
-                .AddTransactionLinkProvider(new PaymentMethodId(nbxplorerNetwork.CryptoCode, PaymentTypes.BTCLike), new DefaultTransactionLinkProvider(blockExplorerLink));
+                .AddTransactionLinkProvider(nbxplorerNetwork.CryptoCode, new DefaultTransactionLinkProvider(blockExplorerLink));
     }
 }
 

@@ -2,17 +2,19 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Threading.Tasks;
-using Amazon.S3;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Client;
 using BTCPayServer.Data;
 using BTCPayServer.Events;
 using BTCPayServer.Migrations;
+using Dapper;
 using Microsoft.EntityFrameworkCore;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 using Newtonsoft.Json;
+using static BTCPayServer.Services.Stores.StoreRepository;
 
 namespace BTCPayServer.Services.Stores
 {
@@ -62,6 +64,7 @@ namespace BTCPayServer.Services.Stores
             public string Id { get; set; }
             public string Email { get; set; }
             public StoreRole StoreRole { get; set; }
+            public UserBlob UserBlob { get; set; }
         }
 
         public class StoreRole
@@ -79,15 +82,31 @@ namespace BTCPayServer.Services.Stores
             public bool? IsUsed { get; set; }
         }
 #nullable enable
-        public async Task<StoreRole[]> GetStoreRoles(string? storeId, bool includeUsers = false, bool storeOnly = false)
+        public async Task<StoreRole[]> GetStoreRoles(string? storeId, bool storeOnly = false)
         {
             await using var ctx = _ContextFactory.CreateContext();
-            var query = ctx.StoreRoles.Where(u => (storeOnly && u.StoreDataId == storeId) || (!storeOnly && (u.StoreDataId == null || u.StoreDataId == storeId)));
-            if (includeUsers)
+            var query = ctx.StoreRoles
+                .Where(u => (storeOnly && u.StoreDataId == storeId) || (!storeOnly && (u.StoreDataId == null || u.StoreDataId == storeId)))
+                // Not calling ToStoreRole here because we don't want to load users in the DB query
+                .Select(u => new StoreRole()
+                {
+                        Id = u.Id,
+                        Role = u.Role,
+                        Permissions = u.Permissions,
+                        IsServerRole = u.StoreDataId == null,
+                        IsUsed = u.Users.Any()
+                });
+            
+            var roles = await query.ToArrayAsync();
+            // return ordered: default role comes first, then server-wide roles in specified order, followed by store roles
+            var defaultRole = await GetDefaultRole();
+            var defaultOrder = StoreRoleId.DefaultOrder.Select(r => r.Role).ToArray();
+            return roles.OrderBy(role =>
             {
-                query = query.Include(u => u.Users);
-            }
-            return (await query.ToArrayAsync()).Select(role => ToStoreRole(role)).ToArray();
+                if (role.Role == defaultRole.Role) return -1;
+                int index = Array.IndexOf(defaultOrder, role.Role);
+                return index == -1 ? int.MaxValue : index;
+            }).ToArray();
         }
 
         public async Task<StoreRoleId> GetDefaultRole()
@@ -166,11 +185,11 @@ namespace BTCPayServer.Services.Stores
             return ToStoreRole(match);
         }
 
-
-        public async Task<StoreUser[]> GetStoreUsers(string storeId)
+        public async Task<StoreUser[]> GetStoreUsers(string storeId, IEnumerable<StoreRoleId>? filterRoles = null)
         {
             ArgumentNullException.ThrowIfNull(storeId);
             await using var ctx = _ContextFactory.CreateContext();
+            var roles = filterRoles?.Select(role => role.Id);
             return (await
                 ctx
                     .UserStore
@@ -179,19 +198,22 @@ namespace BTCPayServer.Services.Stores
                     .Select(u => new
                     {
                         Id = u.ApplicationUserId,
-                        u.ApplicationUser.Email,
+                        u.ApplicationUser,
                         u.StoreRole
-                    }).ToArrayAsync()).Select(arg => new StoreUser()
+                    })
+                    .Where(u => roles == null || roles.Contains(u.StoreRole.Id))
+                    .ToArrayAsync()).Select(arg => new StoreUser
                     {
                         StoreRole = ToStoreRole(arg.StoreRole),
                         Id = arg.Id,
-                        Email = arg.Email
+                        Email = arg.ApplicationUser.Email,
+                        UserBlob = arg.ApplicationUser.GetBlob() ?? new()
                     }).ToArray();
         }
 
         public static StoreRole ToStoreRole(Data.StoreRole storeRole)
         {
-            return new StoreRole()
+            return new StoreRole
             {
                 Id = storeRole.Id,
                 Role = storeRole.Role,
@@ -199,6 +221,18 @@ namespace BTCPayServer.Services.Stores
                 IsServerRole = storeRole.StoreDataId == null,
                 IsUsed = storeRole.Users?.Any()
             };
+        }
+
+        public async Task<StoreData[]> GetStores(IEnumerable<string>? storeIds = null)
+        {
+            await using var ctx = _ContextFactory.CreateContext();
+            return await ctx.Stores
+                .Where(s => storeIds == null || storeIds.Contains(s.Id))
+                .Include(data => data.UserStores)
+                .ThenInclude(data => data.StoreRole)
+                .Include(data => data.UserStores)
+                .ThenInclude(data => data.ApplicationUser)
+                .ToArrayAsync();
         }
 
         public async Task<StoreData[]> GetStoresByUserId(string userId, IEnumerable<string>? storeIds = null)
@@ -225,7 +259,7 @@ namespace BTCPayServer.Services.Stores
         /// `role` can be passed in two format:
         /// STOREID::ROLE or ROLE.
         /// If the first case, this method make sure the storeId is same as <paramref name="storeId"/>.
-        /// In the second case, we interprete ROLE as a server level roleId first, then if it does not exist, check if there is a store level role.
+        /// In the second case, we interpret ROLE as a server level roleId first, then if it does not exist, check if there is a store level role.
         /// </summary>
         /// <param name="storeId"></param>
         /// <param name="role"></param>
@@ -250,14 +284,48 @@ namespace BTCPayServer.Services.Stores
             return null;
         }
 
+        public async Task<UserStore?> GetStoreUser(string storeId, string userId)
+        {
+            await using var ctx = _ContextFactory.CreateContext();
+            return await ctx.UserStore.FindAsync(userId, storeId);
+        }
+
         public async Task<bool> AddStoreUser(string storeId, string userId, StoreRoleId? roleId = null)
         {
             ArgumentNullException.ThrowIfNull(storeId);
             AssertStoreRoleIfNeeded(storeId, roleId);
             roleId ??= await GetDefaultRole();
             await using var ctx = _ContextFactory.CreateContext();
-            var userStore = new UserStore() { StoreDataId = storeId, ApplicationUserId = userId, StoreRoleId = roleId.Id };
+            var userStore = new UserStore { StoreDataId = storeId, ApplicationUserId = userId, StoreRoleId = roleId.Id };
             ctx.UserStore.Add(userStore);
+            try
+            {
+                await ctx.SaveChangesAsync();
+                return true;
+            }
+            catch (DbUpdateException)
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> AddOrUpdateStoreUser(string storeId, string userId, StoreRoleId? roleId = null)
+        {
+            ArgumentNullException.ThrowIfNull(storeId);
+            AssertStoreRoleIfNeeded(storeId, roleId);
+            roleId ??= await GetDefaultRole();
+            await using var ctx = _ContextFactory.CreateContext();
+            var userStore = await ctx.UserStore.FindAsync(userId, storeId);
+            if (userStore is null)
+            {
+                userStore = new UserStore { StoreDataId = storeId, ApplicationUserId = userId };
+                ctx.UserStore.Add(userStore);
+            }
+
+            if (userStore.StoreRoleId == roleId.Id)
+                return false;
+            
+            userStore.StoreRoleId = roleId.Id;
             try
             {
                 await ctx.SaveChangesAsync();
@@ -278,8 +346,6 @@ namespace BTCPayServer.Services.Stores
         public async Task CleanUnreachableStores()
         {
             await using var ctx = _ContextFactory.CreateContext();
-            if (!ctx.Database.SupportDropForeignKey())
-                return;
             var events = new List<Events.StoreRemovedEvent>();
             foreach (var store in await ctx.Stores.Include(data => data.UserStores)
                          .ThenInclude(store => store.StoreRole).Where(s =>
@@ -311,17 +377,14 @@ namespace BTCPayServer.Services.Stores
         private async Task DeleteStoreIfOrphan(string storeId)
         {
             await using var ctx = _ContextFactory.CreateContext();
-            if (ctx.Database.SupportDropForeignKey())
+            if (!await ctx.UserStore.Where(u => u.StoreDataId == storeId && u.StoreRole.Permissions.Contains(Policies.CanModifyStoreSettings)).AnyAsync())
             {
-                if (!await ctx.UserStore.Where(u => u.StoreDataId == storeId && u.StoreRole.Permissions.Contains(Policies.CanModifyStoreSettings)).AnyAsync())
+                var store = await ctx.Stores.FindAsync(storeId);
+                if (store != null)
                 {
-                    var store = await ctx.Stores.FindAsync(storeId);
-                    if (store != null)
-                    {
-                        ctx.Stores.Remove(store);
-                        await ctx.SaveChangesAsync();
-                        _eventAggregator.Publish(new StoreRemovedEvent(store.Id));
-                    }
+                    ctx.Stores.Remove(store);
+                    await ctx.SaveChangesAsync();
+                    _eventAggregator.Publish(new StoreRemovedEvent(store.Id));
                 }
             }
         }
@@ -502,8 +565,6 @@ namespace BTCPayServer.Services.Stores
         {
             int retry = 0;
             using var ctx = _ContextFactory.CreateContext();
-            if (!ctx.Database.SupportDropForeignKey())
-                return false;
             var store = await ctx.Stores.FindAsync(storeId);
             if (store == null)
                 return false;
@@ -585,10 +646,21 @@ retry:
             return ex.InnerException is Npgsql.PostgresException postgres && postgres.SqlState == "40P01";
         }
 
-        public bool CanDeleteStores()
+        public async Task<bool> InternalNodePayoutAuthorized(string storeId)
         {
             using var ctx = _ContextFactory.CreateContext();
-            return ctx.Database.SupportDropForeignKey();
+            return (await ctx.Database.GetDbConnection().ExecuteScalarAsync<bool?>("""
+                SELECT TRUE
+                FROM "UserStore" us
+                JOIN "StoreRoles" sr ON sr."Id" = us."Role"
+                JOIN "AspNetUserRoles" ur ON us."ApplicationUserId" = ur."UserId"
+                JOIN "AspNetRoles" r ON ur."RoleId" = r."Id"
+                WHERE
+                      us."StoreDataId"=@storeId AND
+                      r."NormalizedName"='SERVERADMIN' AND
+                      'btcpay.store.canmodifystoresettings' = ANY(sr."Permissions")
+                LIMIT 1;
+                """, new { storeId })) is true;
         }
     }
 
@@ -633,8 +705,12 @@ retry:
             Role = role;
         }
 
-        public static StoreRoleId Owner { get; } = new StoreRoleId("Owner");
-        public static StoreRoleId Guest { get; } = new StoreRoleId("Guest");
+        public static StoreRoleId Owner { get; } = new ("Owner");
+        public static StoreRoleId Manager { get; } = new ("Manager");
+        public static StoreRoleId Employee { get; } = new ("Employee");
+        public static StoreRoleId Guest { get; } = new ("Guest");
+
+        public static readonly StoreRoleId[] DefaultOrder = [Owner, Manager, Employee, Guest];
         public string? StoreId { get; }
         public string Role { get; }
         public string Id

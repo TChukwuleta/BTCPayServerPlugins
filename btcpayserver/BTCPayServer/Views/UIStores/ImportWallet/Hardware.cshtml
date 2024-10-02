@@ -1,7 +1,7 @@
 @model WalletSetupViewModel
 @{
     Layout = "_LayoutWalletSetup";
-    ViewData.SetActivePage(StoreNavPages.OnchainSettings, "Connect your hardware wallet", Context.GetStoreData().Id);
+    ViewData.SetActivePage(StoreNavPages.OnchainSettings, "Connect your hardware wallet", $"{Context.GetStoreData().Id}-{Model.CryptoCode}");
 }
 
 @section Navbar {
@@ -17,8 +17,10 @@
 
 @if (!ViewContext.ModelState.IsValid)
 {
-    <div asp-validation-summary="All" class="text-danger"></div>
+    <div asp-validation-summary="All"></div>
 }
+
+<partial name="LocalhostBrowserSupport" />
 
 <div class="row mt-5 mb-4">
     <div class="col-md-8 mx-auto">
@@ -58,7 +60,6 @@
     <div class="row mb-5">
         <div class="col-md-8 mx-auto">
             <h4 class="mb-3">Public Key Information</h4>
-
             <div class="form-group">
                 <label asp-for="DerivationScheme" class="form-label"></label>
                 <textarea asp-for="DerivationScheme" class="form-control store-derivation-scheme font-monospace py-2" rows="3" readonly></textarea>
@@ -103,7 +104,6 @@
             document.getElementById("RootFingerprint").value = fingerprint;
             document.getElementById("AccountKey").value = accountKey;
             document.getElementById("KeyPath").value = keyPath;
-
             document.getElementById("walletInfo").style = null;
         });
     </script>

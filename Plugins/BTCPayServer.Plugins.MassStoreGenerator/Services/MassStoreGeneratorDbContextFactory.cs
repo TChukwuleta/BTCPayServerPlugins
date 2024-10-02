@@ -3,6 +3,8 @@ using BTCPayServer.Abstractions.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Options;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
+using System;
 
 namespace BTCPayServer.Plugins.MassStoreGenerator.Services;
 
@@ -26,10 +28,10 @@ public class MassStoreGeneratorDbContextFactory : BaseDbContextFactory<MassStore
     {
     }
 
-    public override MassStoreGeneratorDbContext CreateContext()
+    public override MassStoreGeneratorDbContext CreateContext(Action<NpgsqlDbContextOptionsBuilder> npgsqlOptionsAction = null)
     {
         var builder = new DbContextOptionsBuilder<MassStoreGeneratorDbContext>();
-        ConfigureBuilder(builder);
+        ConfigureBuilder(builder, npgsqlOptionsAction);
         return new MassStoreGeneratorDbContext(builder.Options);
     }
 }

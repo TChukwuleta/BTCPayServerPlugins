@@ -60,12 +60,14 @@ var vaultui = (function () {
         * @type {VaultBridgeUI}
         */
         var self = this;
+        /**
+       * @type {string}
+       */
         this.backend_uri = backend_uri;
         /**
         * @type {vault.VaultBridge}
         */
         this.bridge = null;
-
         /**
         * @type {string}
         */
@@ -87,21 +89,23 @@ var vaultui = (function () {
         * @param {VaultFeedback} feedback
         */
         function show(feedback) {
-            var icon = $(".vault-feedback.vault-feedback" + self.currentFeedback + " " + ".vault-feedback-icon");
-            icon.removeClass();
-            icon.addClass("vault-feedback-icon mt-1 me-2");
+            const $icon = document.querySelector(`.vault-feedback.vault-feedback${self.currentFeedback} .vault-feedback-icon`);
+            let iconClasses = '';
             if (feedback.type == "?") {
-                icon.addClass("fa fa-question-circle feedback-icon-loading");
+                iconClasses = "icon-dots feedback-icon-loading";
             }
             else if (feedback.type == "ok") {
-                icon.addClass("fa fa-check-circle feedback-icon-success");
+                iconClasses = "icon-checkmark feedback-icon-success";
+                $icon.innerHTML = $icon.innerHTML.replace("#dots", "#checkmark");
             }
             else if (feedback.type == "failed") {
-                icon.addClass("fa fa-times-circle feedback-icon-failed");
+                iconClasses = "icon-cross feedback-icon-failed";
+                $icon.innerHTML = $icon.innerHTML.replace("#dots", "#cross");
                 showRetry();
             }
-            var content = $(".vault-feedback.vault-feedback" + self.currentFeedback + " " + ".vault-feedback-content");
-            content.html(feedback.txt);
+            $icon.setAttribute('class', `vault-feedback-icon icon me-2 ${iconClasses}`);
+            const $content = document.querySelector(`.vault-feedback.vault-feedback${self.currentFeedback} .vault-feedback-content`);
+            $content.innerHTML = feedback.txt;
             if (feedback.type === 'ok')
                 self.currentFeedback++;
             if (feedback.type === 'failed')
@@ -127,6 +131,18 @@ var vaultui = (function () {
                     console.warn(json.details);
             }
         }
+
+        function showMessage(message) {
+            let type = 'ok';
+            if (message.type === 'Error')
+                type = 'failed';
+            if (message.type === 'Processing')
+                type = '?';
+            show(new VaultFeedback(type, message.message, ""));
+            if (type.debug)
+                console.warn(type.debug);
+        }
+
         async function needRetry(json) {
             if (json.hasOwnProperty("error")) {
                 var handled = false;
@@ -212,7 +228,26 @@ var vaultui = (function () {
             }
             return true;
         };
-
+        this.sendBackendCommand = async function (command) {
+            if (!self.bridge || self.bridge.socket.readyState !== 1) {
+                self.bridge = await vault.connectToBackendSocket(self.backend_uri);
+            }
+            show(VaultFeedbacks.vaultLoading);
+            self.bridge.socket.send(command);
+            while (true) {
+                var json = await self.bridge.waitBackendMessage();
+                if (json.command === 'showMessage') {
+                    showMessage(json);
+                    if (json.type === "Error") {
+                        showRetry();
+                        return false;
+                    }
+                }
+                if (json.command == 'done') {
+                    return true;
+                }
+            }
+        }
         this.askForDisplayAddress = async function (rootedKeyPath) {
             if (!await self.ensureConnectedToBackend())
                 return false;

@@ -83,8 +83,11 @@ namespace BTCPayServer.HostedServices
             var installedPlugins =
                 pluginService.LoadedPlugins.ToDictionary(plugin => plugin.Identifier, plugin => plugin.Version);
             var remotePlugins = await pluginService.GetRemotePlugins();
+            //take the latest version of each plugin
             var remotePluginsList = remotePlugins
-                .Where(pair => installedPlugins.ContainsKey(pair.Identifier) || disabledPlugins.Contains(pair.Name))
+                .GroupBy(plugin => plugin.Identifier)
+                .Select(group => group.OrderByDescending(plugin => plugin.Version).First())
+                .Where(pair => installedPlugins.ContainsKey(pair.Identifier) || disabledPlugins.ContainsKey(pair.Name))
                 .ToDictionary(plugin => plugin.Identifier, plugin => plugin.Version);
             var notify = new HashSet<string>();
             foreach (var pair in remotePluginsList)
@@ -92,8 +95,10 @@ namespace BTCPayServer.HostedServices
                 if (dh.LastVersions.TryGetValue(pair.Key, out var lastVersion) && lastVersion >= pair.Value)
                     continue;
                 if (installedPlugins.TryGetValue(pair.Key, out var installedVersion) && installedVersion < pair.Value)
+                {
                     notify.Add(pair.Key);
-                if (disabledPlugins.Contains(pair.Key))
+                }
+                else if (disabledPlugins.TryGetValue(pair.Key, out var disabledVersion) && disabledVersion < pair.Value)
                 {
                     notify.Add(pair.Key);
                 }

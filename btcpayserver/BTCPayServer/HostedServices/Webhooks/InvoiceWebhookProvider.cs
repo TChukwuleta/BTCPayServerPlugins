@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Controllers.Greenfield;
@@ -72,7 +72,8 @@ public class InvoiceWebhookProvider : WebhookProvider<InvoiceEvent>
             case InvoiceEventCode.MarkedCompleted:
                 return new WebhookInvoiceSettledEvent(storeId)
                 {
-                    ManuallyMarked = eventCode == InvoiceEventCode.MarkedCompleted
+                    ManuallyMarked = eventCode == InvoiceEventCode.MarkedCompleted,
+                    OverPaid = invoiceEvent.Invoice.ExceptionStatus == InvoiceExceptionStatus.PaidOver
                 };
             case InvoiceEventCode.Created:
                 return new WebhookInvoiceEvent(WebhookEventType.InvoiceCreated, storeId);
@@ -96,9 +97,9 @@ public class InvoiceWebhookProvider : WebhookProvider<InvoiceEvent>
                 return new WebhookInvoiceReceivedPaymentEvent(WebhookEventType.InvoiceReceivedPayment, storeId)
                 {
                     AfterExpiration =
-                        invoiceEvent.Invoice.Status.ToModernStatus() == InvoiceStatus.Expired ||
-                        invoiceEvent.Invoice.Status.ToModernStatus() == InvoiceStatus.Invalid,
-                    PaymentMethod = invoiceEvent.Payment.GetPaymentMethodId().ToStringNormalized(),
+                        invoiceEvent.Invoice.Status == InvoiceStatus.Expired ||
+                        invoiceEvent.Invoice.Status == InvoiceStatus.Invalid,
+                    PaymentMethodId = invoiceEvent.Payment.PaymentMethodId.ToString(),
                     Payment = GreenfieldInvoiceController.ToPaymentModel(invoiceEvent.Invoice, invoiceEvent.Payment),
                     StoreId = invoiceEvent.Invoice.StoreId
                 };
@@ -106,11 +107,10 @@ public class InvoiceWebhookProvider : WebhookProvider<InvoiceEvent>
                 return new WebhookInvoiceReceivedPaymentEvent(WebhookEventType.InvoicePaymentSettled, storeId)
                 {
                     AfterExpiration =
-                        invoiceEvent.Invoice.Status.ToModernStatus() == InvoiceStatus.Expired ||
-                        invoiceEvent.Invoice.Status.ToModernStatus() == InvoiceStatus.Invalid,
-                    PaymentMethod = invoiceEvent.Payment.GetPaymentMethodId().ToStringNormalized(),
+                        invoiceEvent.Invoice.Status == InvoiceStatus.Expired ||
+                        invoiceEvent.Invoice.Status == InvoiceStatus.Invalid,
+                    PaymentMethodId = invoiceEvent.Payment.PaymentMethodId.ToString(),
                     Payment = GreenfieldInvoiceController.ToPaymentModel(invoiceEvent.Invoice, invoiceEvent.Payment),
-                    OverPaid = invoiceEvent.Invoice.ExceptionStatus == InvoiceExceptionStatus.PaidOver,
                     StoreId = invoiceEvent.Invoice.StoreId
                 };
             default:

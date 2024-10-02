@@ -27,6 +27,8 @@ namespace BTCPayServer.Plugins.PointOfSale.Models
 
         [Display(Name = "Point of Sale Style")]
         public PosViewType DefaultView { get; set; }
+        [Display(Name = "Display item selection for keypad")]
+        public bool ShowItems { get; set; }
         [Display(Name = "User can input custom amount")]
         public bool ShowCustomAmount { get; set; }
         [Display(Name = "User can input discount in %")]
@@ -65,11 +67,8 @@ namespace BTCPayServer.Plugins.PointOfSale.Models
         [Display(Name = "Tip percentage amounts (comma separated)")]
         public string CustomTipPercentages { get; set; }
 
-        [MaxLength(500)]
-        [Display(Name = "Custom CSS URL")]
-        public string CustomCSSLink { get; set; }
-
         public string Id { get; set; }
+        public Dictionary<string, string> StoreUsers { get; set; }
 
         [Display(Name = "Redirect invoice to redirect url automatically after paid")]
         public string RedirectAutomatically { get; set; } = string.Empty;
@@ -97,8 +96,6 @@ namespace BTCPayServer.Plugins.PointOfSale.Models
                 }
             }, nameof(SelectListItem.Value), nameof(SelectListItem.Text), RedirectAutomatically);
 
-        [Display(Name = "Custom CSS Code")]
-        public string EmbeddedCSS { get; set; }
         public string Description { get; set; }
 
         [Display(Name = "Request customer data on checkout")]
