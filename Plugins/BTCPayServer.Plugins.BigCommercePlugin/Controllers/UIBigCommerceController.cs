@@ -151,6 +151,7 @@ public class UIBigCommerceController : Controller
 
 
     [AllowAnonymous]
+    [XFrameOptions(XFrameOptionsAttribute.XFrameOptions.Unset)]
     [HttpGet("~/stores/{storeId}/plugins/bigcommerce/auth/install")]
     public async Task<IActionResult> Install(string storeId, [FromQuery] string account_uuid, [FromQuery] string code, [FromQuery] string context, [FromQuery] string scope)
     {
@@ -196,7 +197,7 @@ public class UIBigCommerceController : Controller
             bigCommerceStore = await helper.UploadCheckoutScript(bigCommerceStore, Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId }, Request.Scheme));
             ctx.Update(bigCommerceStore);
             await ctx.SaveChangesAsync();
-            return Ok("Big commerce store installation was successful");
+            return Content(BigCommerceIframeResponse(bigCommerceStore), "text/html");
         }
         catch (Exception)
         {
@@ -226,53 +227,7 @@ public class UIBigCommerceController : Controller
         {
             return BadRequest("Invalid signed_payload_jwt parameter");
         }
-        var htmlContent = $@"
-            <!DOCTYPE html>
-            <html lang='en'>
-            <head>
-                <meta charset='utf-8' />
-                <title>BTCPay Plugin Configuration</title>
-                <meta name='viewport' content='width=device-width, initial-scale=1.0' />
-                <style>
-                    table {{
-                        width: 60%;
-                        border-collapse: collapse;
-                        margin: 20px auto;
-                    }}
-                    th, td {{
-                        border: 1px solid #ddd;
-                        padding: 8px;
-                        text-align: left;
-                    }}
-                    th {{
-                        background-color: #f2f2f2;
-                    }}
-                </style>
-            </head>
-            <body>
-                <h2 style='text-align: center;'>BTCPay Plugin Configuration</h2>
-                <table>
-                    <tr>
-                        <th>BTCPay Server Store Name</th>
-                        <td>{bigCommerceStore.StoreName}</td>
-                    </tr>
-                    <tr>
-                        <th>Auth Callback URL</th>
-                        <td>{Url.Action("Install", "UIBigCommerce", new { storeId = bigCommerceStore.StoreId }, Request.Scheme)}</td>
-                    </tr>
-                    <tr>
-                        <th>Load Callback URL</th>
-                        <td>{Url.Action("Load", "UIBigCommerce", new { storeId = bigCommerceStore.StoreId }, Request.Scheme)}</td>
-                    </tr>
-                    <tr>
-                        <th>Uninstall Callback URL</th>
-                        <td>{Url.Action("Uninstall", "UIBigCommerce", new { storeId = bigCommerceStore.StoreId }, Request.Scheme)}</td>
-                    </tr>
-                </table>
-            </body>
-            </html>";
-
-        return Content(htmlContent, "text/html");
+        return Content(BigCommerceIframeResponse(bigCommerceStore), "text/html");
     }
 
 
@@ -400,6 +355,55 @@ public class UIBigCommerceController : Controller
             paymentMethodConfigurations.Add(paymentMethodId, strat.Value);
         }
         return paymentMethodConfigurations;
+    }
+
+    private string BigCommerceIframeResponse(BigCommerceStore bigCommerceStore)
+    {
+        return $@"
+            <!DOCTYPE html>
+            <html lang='en'>
+            <head>
+                <meta charset='utf-8' />
+                <title>BTCPay Plugin Configuration</title>
+                <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+                <style>
+                    table {{
+                        width: 60%;
+                        border-collapse: collapse;
+                        margin: 20px auto;
+                    }}
+                    th, td {{
+                        border: 1px solid #ddd;
+                        padding: 8px;
+                        text-align: left;
+                    }}
+                    th {{
+                        background-color: #f2f2f2;
+                    }}
+                </style>
+            </head>
+            <body>
+                <h2 style='text-align: center;'>BTCPay Plugin Configuration</h2>
+                <table>
+                    <tr>
+                        <th>BTCPay Server Store Name</th>
+                        <td>{bigCommerceStore.StoreName}</td>
+                    </tr>
+                    <tr>
+                        <th>Auth Callback URL</th>
+                        <td>{Url.Action("Install", "UIBigCommerce", new { storeId = bigCommerceStore.StoreId }, Request.Scheme)}</td>
+                    </tr>
+                    <tr>
+                        <th>Load Callback URL</th>
+                        <td>{Url.Action("Load", "UIBigCommerce", new { storeId = bigCommerceStore.StoreId }, Request.Scheme)}</td>
+                    </tr>
+                    <tr>
+                        <th>Uninstall Callback URL</th>
+                        <td>{Url.Action("Uninstall", "UIBigCommerce", new { storeId = bigCommerceStore.StoreId }, Request.Scheme)}</td>
+                    </tr>
+                </table>
+            </body>
+            </html>";
     }
 
     private string GetUserId() => _userManager.GetUserId(User);
