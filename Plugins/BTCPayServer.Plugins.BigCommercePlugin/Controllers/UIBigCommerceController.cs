@@ -165,11 +165,11 @@ public class UIBigCommerceController : Controller
             var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
             if (bigCommerceStore == null)
             {
-                return BadRequest("Invalid request");
+                return BadRequest("Invalid request. Kindly confirm that your client Id and secret are configured on your BTCPay instance");
             }
             if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(context) || string.IsNullOrEmpty(scope))
             {
-                return BadRequest("Missing required query parameters.");
+                return BadRequest("Missing required query parameters");
             }
             var installRequest = new InstallBigCommerceApplicationRequestModel
             {
@@ -199,9 +199,9 @@ public class UIBigCommerceController : Controller
             await ctx.SaveChangesAsync();
             return Content(BigCommerceIframeResponse(bigCommerceStore), "text/html");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return BadRequest("An error occurred while completing Big commerce installation");
+            return BadRequest($"An error occurred while completing Big commerce installation. {JsonConvert.SerializeObject(ex.Message)}");
         }
     }
 
@@ -214,7 +214,7 @@ public class UIBigCommerceController : Controller
         _logger.LogInformation(signed_payload_jwt);
         if (string.IsNullOrEmpty(signed_payload_jwt))
         {
-            return BadRequest("Missing signed_payload_jwt parameter");
+            return BadRequest("Missing JWT parameter. Kindly refresh this page");
         }
         await using var ctx = _dbContextFactory.CreateContext();
         var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
@@ -237,7 +237,7 @@ public class UIBigCommerceController : Controller
     {
         if (string.IsNullOrEmpty(signed_payload_jwt))
         {
-            return BadRequest("Missing signed_payload_jwt parameter");
+            return BadRequest("Missing JWT parameter. Kindly refresh this page");
         }
         await using var ctx = _dbContextFactory.CreateContext();
         var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
