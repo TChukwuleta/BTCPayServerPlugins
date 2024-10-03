@@ -225,7 +225,7 @@ public class UIBigCommerceController : Controller
         var claims = helper.DecodeJwtPayload(signed_payload_jwt);
         if (!helper.ValidateClaims(bigCommerceStore, claims))
         {
-            return BadRequest("Invalid signed_payload_jwt parameter");
+            return BadRequest("Invalid JWT parameter. Kindly refresh this page");
         }
         return Content(BigCommerceIframeResponse(bigCommerceStore), "text/html");
     }
@@ -248,7 +248,7 @@ public class UIBigCommerceController : Controller
         var claims = helper.DecodeJwtPayload(signed_payload_jwt);
         if (!helper.ValidateClaims(bigCommerceStore, claims))
         {
-            return BadRequest("Invalid signed_payload_jwt parameter");
+            return BadRequest("Invalid JWT parameter. Kindly refresh this page");
         }
         ctx.Remove(bigCommerceStore);
         await ctx.SaveChangesAsync();
