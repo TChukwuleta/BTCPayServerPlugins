@@ -2,9 +2,12 @@
 using BTCPayServer.Plugins.Shopify.Models;
 using BTCPayServer.Plugins.ShopifyPlugin.Data;
 using BTCPayServer.Plugins.ShopifyPlugin.Services;
+using BTCPayServer.Plugins.ShopifyPlugin.ViewModels.Models;
 using NBitcoin;
 using NBXplorer;
 using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin.Helper;
 
@@ -33,11 +36,10 @@ public static class ShopifyExtensions
             {
                 return new Serializer(null).ToObject<ShopifySettings>(rawS.Value<string>());
             }
-
         }
-
         return null;
     }
+
     public static void SetShopifySettings(this StoreBlob storeBlob, ShopifySettings settings)
     {
         if (settings is null)
@@ -48,5 +50,43 @@ public static class ShopifyExtensions
         {
             storeBlob.AdditionalData.AddOrReplace(StoreBlobKey, new Serializer(null).ToString(settings));
         }
+    }
+
+    public static ShopifyOrderResponseViewModel GetShopifyOrderResponse(this ShopifyOrderVm order)
+    {
+        return new ShopifyOrderResponseViewModel
+        {
+            Id = order.Id,
+            CartToken = order.CartToken,
+            CheckoutId = order.CheckoutId,
+            CheckoutToken = order.CheckoutToken,
+            ConfirmationNumber = order.ConfirmationNumber,
+            Confirmed = order.Confirmed,
+            Currency = order.Currency,
+            CurrentSubtotalPrice = order.CurrentSubtotalPrice,
+            CurrentTotalPrice = order.CurrentTotalPrice,
+            FinancialStatus = order.FinancialStatus,
+            Number = order.Number,
+            OrderNumber = order.OrderNumber
+        };
+    }
+
+    public static List<ShopifyOrderResponseViewModel> GetShopifyOrderResponse(this List<ShopifyOrderVm> orders)
+    {
+        return orders.Select(order => new ShopifyOrderResponseViewModel
+        {
+            Id = order.Id,
+            CartToken = order.CartToken,
+            CheckoutId = order.CheckoutId,
+            CheckoutToken = order.CheckoutToken,
+            ConfirmationNumber = order.ConfirmationNumber,
+            Confirmed = order.Confirmed,
+            Currency = order.Currency,
+            CurrentSubtotalPrice = order.CurrentSubtotalPrice,
+            CurrentTotalPrice = order.CurrentTotalPrice,
+            FinancialStatus = order.FinancialStatus,
+            Number = order.Number,
+            OrderNumber = order.OrderNumber
+        }).ToList();
     }
 }

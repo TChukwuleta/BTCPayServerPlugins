@@ -294,6 +294,26 @@ public class UIShopifyController : Controller
     }
 
     [AllowAnonymous]
+    [HttpGet("~/plugins/stores/{storeId}/shopify/orders")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> RetrieveOrderDetails(string storeId, string checkoutToken)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var shopifySetting = ctx.ShopifySettings.FirstOrDefault(c => c.ShopName == storeId);
+        if (shopifySetting == null || !shopifySetting.IntegratedAt.HasValue)
+        {
+            return BadRequest("Invalid Shopify BTCPay store specified");
+        }
+        ShopifyApiClient client = new ShopifyApiClient(_clientFactory, shopifySetting.CreateShopifyApiCredentials());
+        var orders = await client.RetrieveAllOrders();
+        if (string.IsNullOrEmpty(checkoutToken))
+        {
+            orders = orders.Where(c => c.CheckoutToken == checkoutToken).ToList();
+        }
+        return Ok(ShopifyExtensions.GetShopifyOrderResponse(orders));
+    }
+
+    [AllowAnonymous]
     [HttpGet("~/plugins/stores/{storeId}/shopify/validate")]
     [EnableCors("AllowAllOrigins")]
     public async Task<IActionResult> ValidateShopifyAccount(string storeId)

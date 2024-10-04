@@ -37,6 +37,22 @@ public class ShopifyOrderVm
     public Customer Customer { get; set; }
 }
 
+public class ShopifyOrderResponseViewModel
+{
+    public long Id { get; set; }
+    public string CartToken { get; set; }
+    public long CheckoutId { get; set; }
+    public string CheckoutToken { get; set; }
+    public string ConfirmationNumber { get; set; }
+    public bool Confirmed { get; set; }
+    public string Currency { get; set; }
+    public string CurrentSubtotalPrice { get; set; }
+    public string CurrentTotalPrice { get; set; }
+    public string FinancialStatus { get; set; }
+    public int Number { get; set; }
+    public string OrderNumber { get; set; }
+}
+
 
 public class ClientDetails
 {
