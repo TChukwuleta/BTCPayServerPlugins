@@ -26,7 +26,7 @@
 
 <partial name="_StatusMessage" />
 
-@if (Model.HasStore)
+@if (Model.HasWallet)
 {
     <div class="row">
         <div class="col-xxl-constrain col-xl-8">
@@ -59,6 +59,12 @@
                     <label asp-for="ApiKey" class="form-label"></label>
                     <input asp-for="ApiKey" class="form-control" readonly="@shopifyCredsSet" />
                     <span asp-validation-for="ApiKey" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="ApiSecret" class="form-label"></label>
+                    <input asp-for="ApiSecret" class="form-control" type="password" value="@Model?.Password" readonly="@shopifyCredsSet" />
+                    <span asp-validation-for="ApiSecret" class="text-danger"></span>
                 </div>
 
                 <div class="form-group">

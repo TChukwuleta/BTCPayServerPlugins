@@ -14,6 +14,7 @@ public class ShopifyDbContext : DbContext
     }
 
     public DbSet<ShopifySetting> ShopifySettings { get; set; }
+    public DbSet<Order> Orders { get; set; }
     public DbSet<Transaction> Transactions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

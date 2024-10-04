@@ -14,9 +14,10 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
     public class ShopifyApiClient
     {
         private readonly HttpClient _httpClient;
+        private readonly ILogger<ShopifyApiClient> _logger;
         private readonly ShopifyApiClientCredentials _credentials;
 
-        public ShopifyApiClient(IHttpClientFactory httpClientFactory, ShopifyApiClientCredentials credentials)
+        public ShopifyApiClient(IHttpClientFactory httpClientFactory, ShopifyApiClientCredentials credentials, ILogger<ShopifyApiClient> logger)
         {
             if (httpClientFactory != null)
             {
@@ -26,6 +27,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
             {
                 _httpClient = new HttpClient();
             }
+            _logger = logger;
             _credentials = credentials;
 
             var bearer = $"{_credentials.ApiKey}:{_credentials.ApiPassword}";
@@ -48,6 +50,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
             using var resp = await _httpClient.SendAsync(req);
 
             var strResp = await resp.Content.ReadAsStringAsync();
+            _logger.LogInformation($"Response is: {strResp}");
             if (strResp.StartsWith("{", StringComparison.OrdinalIgnoreCase) && JObject.Parse(strResp)["errors"]?.Value<string>() is string error)
             {
                 if (error == "Not Found")
@@ -60,10 +63,28 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
         public async Task<CreateWebhookResponse> CreateWebhook(string topic, string address, string format = "json")
         {
             var req = CreateRequest(_credentials.ShopName, HttpMethod.Post, $"webhooks.json");
-            req.Content = new StringContent(JsonConvert.SerializeObject(new { topic, address, format }), Encoding.UTF8,
-                "application/json");
+            var payload = new
+            {
+                webhook = new { address= "https://cf57-102-88-63-23.ngrok-free.app/stores/Hs6vzQFDYk6cFgaXYpZp8qeaRfnfoano2dJvQY73jL37/plugins/shopify/{shopName}/webhook/order-created", topic, format }
+            };
+            _logger.LogInformation($"Payload is {JsonConvert.SerializeObject(payload)}");
+            req.Content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+            _logger.LogInformation($"Request is {JsonConvert.SerializeObject(req)}");
             var strResp = await SendRequest(req);
+            return JsonConvert.DeserializeObject<CreateWebhookResponse>(strResp);
+        }
 
+        public async Task<List<CreateWebhookResponse>> RetrieveWebhooks()
+        {
+            var req = CreateRequest(_credentials.ShopName, HttpMethod.Get, $"webhooks.json");
+            var strResp = await SendRequest(req);
+            return JsonConvert.DeserializeObject<List<CreateWebhookResponse>>(strResp);
+        }
+
+        public async Task<CreateWebhookResponse> RetrieveWebhook(string id)
+        {
+            var req = CreateRequest(_credentials.ShopName, HttpMethod.Get, $"webhooks/{id}.json");
+            var strResp = await SendRequest(req);
             return JsonConvert.DeserializeObject<CreateWebhookResponse>(strResp);
         }
 

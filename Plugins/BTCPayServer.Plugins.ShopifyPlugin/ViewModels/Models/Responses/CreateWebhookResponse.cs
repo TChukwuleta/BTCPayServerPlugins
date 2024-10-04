@@ -11,7 +11,7 @@ public class CreateWebhookResponse
 
 public class Webhook
 {
-    [JsonProperty("id")] public int Id { get; set; }
+    [JsonProperty("id")] public long Id { get; set; }
 
     [JsonProperty("address")] public string Address { get; set; }
 

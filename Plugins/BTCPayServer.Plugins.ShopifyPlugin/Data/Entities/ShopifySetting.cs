@@ -21,6 +21,8 @@ public class ShopifySetting
     public string Password { get; set; }
     public string StoreId { get; set; }
     public string StoreName { get; set; }
+    public string ApiSecret { get; set; }
+    public string WebhookId { get; set; }
     public string ApplicationUserId { get; set; }
 
     public bool CredentialsPopulated()
@@ -28,7 +30,8 @@ public class ShopifySetting
         return
             !string.IsNullOrWhiteSpace(ShopName) &&
             !string.IsNullOrWhiteSpace(ApiKey) &&
-            !string.IsNullOrWhiteSpace(Password);
+            !string.IsNullOrWhiteSpace(Password) &&
+            !string.IsNullOrWhiteSpace(ApiSecret);
     }
 
     public DateTimeOffset? IntegratedAt { get; set; }
@@ -43,7 +46,7 @@ public class ShopifySetting
     }
 
     [NotMapped]
-    public bool HasStore { get; set; } = true;
+    public bool HasWallet { get; set; } = true;
 
     [NotMapped]
     public string CryptoCode { get; set; }

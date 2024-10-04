@@ -21,6 +21,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services;
 
 public class ShopifyHostedService : EventHostedServiceBase
 {
+    private readonly ILogger<ShopifyApiClient> _clientLogger;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ShopifyDbContextFactory _dbContextFactory;
@@ -29,8 +30,10 @@ public class ShopifyHostedService : EventHostedServiceBase
         InvoiceRepository invoiceRepository,
         IHttpClientFactory httpClientFactory,
         ShopifyDbContextFactory dbContextFactory,
+        ILogger<ShopifyApiClient> clientLogger,
         Logs logs) : base(eventAggregator, logs)
     {
+        _clientLogger = clientLogger;
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
         _httpClientFactory = httpClientFactory;
@@ -66,7 +69,6 @@ public class ShopifyHostedService : EventHostedServiceBase
                     _ when new[] { "invalid", "expired" }.Contains(invoiceStatus) => false,
                     _ => (bool?)null
                 };
-
                 if (success.HasValue)
                     await RegisterTransaction(invoice, shopifyOrderId, success.Value);
             }
@@ -77,7 +79,7 @@ public class ShopifyHostedService : EventHostedServiceBase
     private async Task RegisterTransaction(InvoiceEntity invoice, string shopifyOrderId, bool success)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var userStore = ctx.ShopifySettings.FirstOrDefault(c => c.StoreId == invoice.StoreId);
+        var userStore = ctx.ShopifySettings.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId);
 
         // ensure that store in question has shopify integration turned on 
         // and that invoice's orderId has shopify specific prefix
@@ -110,10 +112,9 @@ public class ShopifyHostedService : EventHostedServiceBase
         }
     }
 
-
     private ShopifyApiClient CreateShopifyApiClient(ShopifySetting shopify)
     {
-        return new ShopifyApiClient(_httpClientFactory, shopify.CreateShopifyApiCredentials());
+        return new ShopifyApiClient(_httpClientFactory, shopify.CreateShopifyApiCredentials(), _clientLogger);
     }
 
     private static string[] _keywords = new[] { "bitcoin", "btc", "btcpayserver", "btcpay server" };
