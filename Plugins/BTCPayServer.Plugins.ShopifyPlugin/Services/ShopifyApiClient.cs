@@ -14,10 +14,9 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
     public class ShopifyApiClient
     {
         private readonly HttpClient _httpClient;
-        private readonly ILogger<ShopifyApiClient> _logger;
         private readonly ShopifyApiClientCredentials _credentials;
 
-        public ShopifyApiClient(IHttpClientFactory httpClientFactory, ShopifyApiClientCredentials credentials, ILogger<ShopifyApiClient> logger)
+        public ShopifyApiClient(IHttpClientFactory httpClientFactory, ShopifyApiClientCredentials credentials)
         {
             if (httpClientFactory != null)
             {
@@ -27,7 +26,6 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
             {
                 _httpClient = new HttpClient();
             }
-            _logger = logger;
             _credentials = credentials;
 
             var bearer = $"{_credentials.ApiKey}:{_credentials.ApiPassword}";
@@ -50,7 +48,6 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
             using var resp = await _httpClient.SendAsync(req);
 
             var strResp = await resp.Content.ReadAsStringAsync();
-            _logger.LogInformation($"Response is: {strResp}");
             if (strResp.StartsWith("{", StringComparison.OrdinalIgnoreCase) && JObject.Parse(strResp)["errors"]?.Value<string>() is string error)
             {
                 if (error == "Not Found")
@@ -65,11 +62,9 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
             var req = CreateRequest(_credentials.ShopName, HttpMethod.Post, $"webhooks.json");
             var payload = new
             {
-                webhook = new { address= "https://cf57-102-88-63-23.ngrok-free.app/stores/Hs6vzQFDYk6cFgaXYpZp8qeaRfnfoano2dJvQY73jL37/plugins/shopify/{shopName}/webhook/order-created", topic, format }
+                webhook = new { address, topic, format }
             };
-            _logger.LogInformation($"Payload is {JsonConvert.SerializeObject(payload)}");
             req.Content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
-            _logger.LogInformation($"Request is {JsonConvert.SerializeObject(req)}");
             var strResp = await SendRequest(req);
             return JsonConvert.DeserializeObject<CreateWebhookResponse>(strResp);
         }

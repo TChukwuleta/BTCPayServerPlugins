@@ -6,10 +6,9 @@ using BTCPayServer.Plugins.ShopifyPlugin.Data;
 using BTCPayServer.Plugins.ShopifyPlugin.Helper;
 using BTCPayServer.Plugins.ShopifyPlugin.ViewModels.Models;
 using BTCPayServer.Services.Invoices;
-using BTCPayServer.Services.Stores;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using NBitpayClient;
+using Newtonsoft.Json;
 using System;
 using System.Globalization;
 using System.Linq;
@@ -21,7 +20,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services;
 
 public class ShopifyHostedService : EventHostedServiceBase
 {
-    private readonly ILogger<ShopifyApiClient> _clientLogger;
+    private readonly ILogger<ShopifyHostedService> _clientLogger;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ShopifyDbContextFactory _dbContextFactory;
@@ -30,7 +29,7 @@ public class ShopifyHostedService : EventHostedServiceBase
         InvoiceRepository invoiceRepository,
         IHttpClientFactory httpClientFactory,
         ShopifyDbContextFactory dbContextFactory,
-        ILogger<ShopifyApiClient> clientLogger,
+        ILogger<ShopifyHostedService> clientLogger,
         Logs logs) : base(eventAggregator, logs)
     {
         _clientLogger = clientLogger;
@@ -114,7 +113,7 @@ public class ShopifyHostedService : EventHostedServiceBase
 
     private ShopifyApiClient CreateShopifyApiClient(ShopifySetting shopify)
     {
-        return new ShopifyApiClient(_httpClientFactory, shopify.CreateShopifyApiCredentials(), _clientLogger);
+        return new ShopifyApiClient(_httpClientFactory, shopify.CreateShopifyApiCredentials());
     }
 
     private static string[] _keywords = new[] { "bitcoin", "btc", "btcpayserver", "btcpay server" };
@@ -126,7 +125,6 @@ public class ShopifyHostedService : EventHostedServiceBase
         var result = new InvoiceLogs();
         currency = currency.ToUpperInvariant().Trim();
         var existingShopifyOrderTransactions = (await client.TransactionsList(orderId)).transactions;
-
         //if there isn't a record for btcpay payment gateway, abort
         var baseParentTransaction = existingShopifyOrderTransactions.FirstOrDefault(holder =>
             _keywords.Any(a => holder.gateway.Contains(a, StringComparison.InvariantCultureIgnoreCase)));
@@ -135,7 +133,6 @@ public class ShopifyHostedService : EventHostedServiceBase
             result.Write("Couldn't find the order on Shopify.", InvoiceEventData.EventSeverity.Error);
             return result;
         }
-
         //technically, this exploit should not be possible as we use internal invoice tags to verify that the invoice was created by our controlled, dedicated endpoint.
         if (currency.ToUpperInvariant().Trim() != baseParentTransaction.currency.ToUpperInvariant().Trim())
         {
@@ -204,23 +201,25 @@ public class ShopifyHostedService : EventHostedServiceBase
             }
         };
         var createResp = await client.TransactionCreate(orderId, createTransaction);
-
-        var orderTransaction = ctx.Transactions.AsNoTracking().FirstOrDefault(c => c.InvoiceId == invoiceId);
-        if (orderTransaction != null)
-        {
-            orderTransaction.TransactionStatus = success ? TransactionStatus.Success : TransactionStatus.Failed;
-            orderTransaction.InvoiceStatus = invoiceStatus;
-            ctx.Update(orderTransaction);
-            ctx.SaveChanges();
-        }
-
         if (createResp.transaction is null)
         {
             result.Write("Failed to register the transaction on Shopify.", InvoiceEventData.EventSeverity.Error);
         }
         else
         {
-            // Update our transaction somewhere here
+            var orderTransaction = ctx.Transactions.AsNoTracking().FirstOrDefault(c => c.InvoiceId == invoiceId);
+            var btcpayOrder = ctx.Orders.AsNoTracking().FirstOrDefault(c => c.OrderId == orderId);
+            if (orderTransaction != null)
+            {
+                orderTransaction.TransactionStatus = success ? TransactionStatus.Success : TransactionStatus.Failed;
+                orderTransaction.InvoiceStatus = invoiceStatus;
+                ctx.Update(orderTransaction);
+            }
+            if (btcpayOrder != null)
+            {
+                btcpayOrder.FulfilmentStatus = success ? "success" : "failure";
+                ctx.Update(btcpayOrder);
+            }
             result.Write(
                 $"Successfully registered the transaction on Shopify. tx status:{createResp.transaction.status}, kind: {createResp.transaction.kind}, order id:{createResp.transaction.order_id}",
                 InvoiceEventData.EventSeverity.Info);
@@ -239,7 +238,7 @@ public class ShopifyHostedService : EventHostedServiceBase
                     InvoiceEventData.EventSeverity.Error);
             }
         }
-
+        ctx.SaveChanges();
         return result;
     }
 }

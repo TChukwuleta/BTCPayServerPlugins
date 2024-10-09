@@ -42,6 +42,10 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis" Version="4.10.0" />
+  </ItemGroup>
+
 	
   <ItemGroup>
 	<ProjectReference Include="..\..\btcpayserver\BTCPayServer\BTCPayServer.csproj" />

@@ -17,8 +17,6 @@
             window.btcpay.setApiUrlPrefix("@Model.BTCPayServerUrl");
             window.btcpay.showInvoice("@Model.InvoiceId");
 
-            console.log('Shall we');
-
             let invoice_paid = false;
             window.btcpay.onModalReceiveMessage(function (event) {
                 if (isObject(event.data)) {
@@ -29,7 +27,7 @@
                         case 'processing':
                         case 'settled':
                             invoice_paid = true;
-                            //showOrderConfirmation(data.orderId, data.id);
+                            showOrderConfirmation(data.orderId, data.id);
                             console.log('Invoice paid.');
                             break;
                         case 'expired':
@@ -45,7 +43,7 @@
                     }
                 } else if (event.data === 'close') {
                     if (invoice_paid === true) {
-                        //showOrderConfirmation(data.orderId, data.id);
+                        showOrderConfirmation(data.orderId, data.id);
                         console.log('Invoice paid.');
                     }
                     console.log('Modal closed.');
@@ -65,7 +63,6 @@
             showBTCPayModal();
         });
     </script>
-
 </head>
 <body>
     
