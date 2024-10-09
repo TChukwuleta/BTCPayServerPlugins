@@ -1,7 +1,6 @@
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
-using BTCPayServer.Plugins.MassStoreGenerator.Services;
 using BTCPayServer.Plugins.Template.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,7 +17,5 @@ public class Plugin : BaseBTCPayServerPlugin
     {
         services.AddSingleton<IUIExtension>(new UIExtension("MassStoreGeneratorPluginHeaderNav", "header-nav"));
         services.AddHostedService<ApplicationPartsLogger>();
-        services.AddHostedService<PluginMigrationRunner>();
-        services.AddSingleton<MassStoreGeneratorDbContextFactory>();
     }
 }
