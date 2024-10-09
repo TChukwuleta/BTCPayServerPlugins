@@ -20,7 +20,7 @@ Our integration with [BigCommerce](https://bigcommerce.com/) allows you to conne
 Before diving into the setup process, ensure you have the following:
 
 - [A BigCommerce Account](https://login.bigcommerce.com/)
-- BTCPay Server - [self-hosted](https://docs.btcpayserver.org/Deployment/) or run by a [third-party host](https://docs.btcpayserver.org/Deployment/ThirdPartyHosting/) v1.4.8 or later.
+- BTCPay Server - [self-hosted](https://docs.btcpayserver.org/Deployment/) or run by a [third-party host](https://docs.btcpayserver.org/Deployment/ThirdPartyHosting/) v2.0.0 or later.
 - [Created BTCPay Server store](https://docs.btcpayserver.org/CreateStore/) with [wallet set up](https://docs.btcpayserver.org/WalletSetup/)
   
 ## Setting up BTCPay Server with BigCommerce
