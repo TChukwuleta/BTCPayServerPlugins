@@ -14,7 +14,6 @@ public class Order
     public string CheckoutId { get; set; }
     public string CheckoutToken { get; set; }
     public string OrderNumber { get; set; }
-    public string FulfilmentStatus { get; set; }
 
 
     internal static void OnModelCreating(ModelBuilder modelBuilder)

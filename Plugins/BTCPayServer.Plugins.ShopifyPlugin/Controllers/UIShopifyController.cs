@@ -32,7 +32,6 @@ using System.Text;
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using StoreData = BTCPayServer.Data.StoreData;
-using MailKit.Search;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -213,8 +212,7 @@ public class UIShopifyController : Controller
                 FinancialStatus = orderData.financial_status,
                 CheckoutId = orderData.checkout_id,
                 CheckoutToken = orderData.checkout_token,
-                OrderNumber = orderData.order_number,
-                FulfilmentStatus = orderData.fulfillment_status
+                OrderNumber = orderData.order_number
             };
             ctx.Add(order);
             await ctx.SaveChangesAsync();
@@ -282,7 +280,6 @@ public class UIShopifyController : Controller
         }
         ShopifyApiClient client = new ShopifyApiClient(_clientFactory, shopifySetting.CreateShopifyApiCredentials());
         ShopifyOrder order = await client.GetOrder(model.orderId);
-        _logger.LogInformation($"Shopify order....details: {JsonConvert.SerializeObject(order)}");
         var store = await _storeRepo.FindStore(shopifySetting.StoreId);
         if (order == null || store == null)
         {
@@ -329,7 +326,7 @@ public class UIShopifyController : Controller
                 new CreateInvoiceRequest()
                 {
                     Amount = Math.Max(model.total, order.TotalOutstanding),
-                    Currency = order.PresentmentCurrency, /*"SATS",*/
+                    Currency = order.PresentmentCurrency,
                     Metadata = new JObject
                     {
                         ["orderId"] = order.OrderNumber,
@@ -344,17 +341,6 @@ public class UIShopifyController : Controller
                     }
                 }, store,
                 Request.GetAbsoluteRoot(), new List<string>() { shopifySearchTerm });
-            var entity = new Transaction
-            {
-                ShopName = shopName,
-                StoreId = store.Id,
-                OrderId = shopifySearchTerm,
-                InvoiceId = invoice.Id,
-                TransactionStatus = Data.TransactionStatus.Pending,
-                InvoiceStatus = InvoiceStatus.New.ToString().ToLower(),
-            };
-            ctx.Add(entity);
-            await ctx.SaveChangesAsync();
             return Ok(new { invoiceId = invoice.Id, 
                 status = invoice.Status.ToString().ToLowerInvariant(),
                 externalPaymentLink = Url.Action("InitiatePayment", "UIShopify", new { invoiceId = invoice.Id, shopName, orderId = shopifySearchTerm }, Request.Scheme)

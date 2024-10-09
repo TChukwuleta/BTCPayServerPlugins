@@ -207,24 +207,17 @@ public class ShopifyHostedService : EventHostedServiceBase
         }
         else
         {
-            var orderTransaction = ctx.Transactions.AsNoTracking().FirstOrDefault(c => c.InvoiceId == invoiceId);
             var btcpayOrder = ctx.Orders.AsNoTracking().FirstOrDefault(c => c.OrderId == orderId);
-            if (orderTransaction != null)
-            {
-                orderTransaction.TransactionStatus = success ? TransactionStatus.Success : TransactionStatus.Failed;
-                orderTransaction.InvoiceStatus = invoiceStatus;
-                ctx.Update(orderTransaction);
-            }
             if (btcpayOrder != null)
             {
-                btcpayOrder.FulfilmentStatus = success ? "success" : "failure";
+                btcpayOrder.FinancialStatus = success ? "success" : "failure";
                 ctx.Update(btcpayOrder);
+                ctx.SaveChanges();
             }
             result.Write(
                 $"Successfully registered the transaction on Shopify. tx status:{createResp.transaction.status}, kind: {createResp.transaction.kind}, order id:{createResp.transaction.order_id}",
                 InvoiceEventData.EventSeverity.Info);
         }
-
         if (!success)
         {
             try
@@ -238,7 +231,6 @@ public class ShopifyHostedService : EventHostedServiceBase
                     InvoiceEventData.EventSeverity.Error);
             }
         }
-        ctx.SaveChanges();
         return result;
     }
 }

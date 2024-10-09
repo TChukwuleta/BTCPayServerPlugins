@@ -6,13 +6,32 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace BTCPayServer.Plugins.ShopifyPlugin.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialMigration : Migration
+    public partial class initialShopifyPluginMigration : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.EnsureSchema(
                 name: "BTCPayServer.Plugins.Shopify");
+
+            migrationBuilder.CreateTable(
+                name: "Orders",
+                schema: "BTCPayServer.Plugins.Shopify",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    ShopName = table.Column<string>(type: "text", nullable: true),
+                    StoreId = table.Column<string>(type: "text", nullable: true),
+                    OrderId = table.Column<string>(type: "text", nullable: true),
+                    FinancialStatus = table.Column<string>(type: "text", nullable: true),
+                    CheckoutId = table.Column<string>(type: "text", nullable: true),
+                    CheckoutToken = table.Column<string>(type: "text", nullable: true),
+                    OrderNumber = table.Column<string>(type: "text", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Orders", x => x.Id);
+                });
 
             migrationBuilder.CreateTable(
                 name: "ShopifySettings",
@@ -25,6 +44,8 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Data.Migrations
                     Password = table.Column<string>(type: "text", nullable: true),
                     StoreId = table.Column<string>(type: "text", nullable: true),
                     StoreName = table.Column<string>(type: "text", nullable: true),
+                    ApiSecret = table.Column<string>(type: "text", nullable: true),
+                    WebhookId = table.Column<string>(type: "text", nullable: true),
                     ApplicationUserId = table.Column<string>(type: "text", nullable: true),
                     IntegratedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
@@ -32,35 +53,17 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Data.Migrations
                 {
                     table.PrimaryKey("PK_ShopifySettings", x => x.Id);
                 });
-
-            migrationBuilder.CreateTable(
-                name: "Transactions",
-                schema: "BTCPayServer.Plugins.Shopify",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    ShopName = table.Column<string>(type: "text", nullable: true),
-                    StoreId = table.Column<string>(type: "text", nullable: true),
-                    OrderId = table.Column<string>(type: "text", nullable: true),
-                    InvoiceId = table.Column<string>(type: "text", nullable: true),
-                    InvoiceStatus = table.Column<string>(type: "text", nullable: true),
-                    TransactionStatus = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Transactions", x => x.Id);
-                });
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "ShopifySettings",
+                name: "Orders",
                 schema: "BTCPayServer.Plugins.Shopify");
 
             migrationBuilder.DropTable(
-                name: "Transactions",
+                name: "ShopifySettings",
                 schema: "BTCPayServer.Plugins.Shopify");
         }
     }

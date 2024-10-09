@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.ShopifyPlugin.Data.Migrations
 {
     [DbContext(typeof(ShopifyDbContext))]
-    [Migration("20241007091743_includeOrderTable")]
-    partial class includeOrderTable
+    [Migration("20241009131610_initialShopifyPluginMigration")]
+    partial class initialShopifyPluginMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -39,9 +39,6 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Data.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("FinancialStatus")
-                        .HasColumnType("text");
-
-                    b.Property<string>("FulfilmentStatus")
                         .HasColumnType("text");
 
                     b.Property<string>("OrderId")
@@ -97,38 +94,6 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("ShopifySettings", "BTCPayServer.Plugins.Shopify");
-                });
-
-            modelBuilder.Entity("BTCPayServer.Plugins.ShopifyPlugin.Data.Transaction", b =>
-                {
-                    b.Property<string>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text");
-
-                    b.Property<string>("CheckoutToken")
-                        .HasColumnType("text");
-
-                    b.Property<string>("InvoiceId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("InvoiceStatus")
-                        .HasColumnType("text");
-
-                    b.Property<string>("OrderId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ShopName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("StoreId")
-                        .HasColumnType("text");
-
-                    b.Property<int>("TransactionStatus")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Transactions", "BTCPayServer.Plugins.Shopify");
                 });
 #pragma warning restore 612, 618
         }
