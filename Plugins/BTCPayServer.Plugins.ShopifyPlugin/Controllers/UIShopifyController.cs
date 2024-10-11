@@ -38,6 +38,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIShopifyController : Controller
 {
+    private readonly string[] _keywords = new[] { "bitcoin", "btc", "btcpayserver", "btcpay server" };
     private readonly ShopifyHostedService _shopifyService;
     private readonly ILogger<UIShopifyController> _logger;
     private readonly StoreRepository _storeRepo;
@@ -157,8 +158,8 @@ public class UIShopifyController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError($"General error: {ex.Message}");
-            throw;
+            TempData[WellKnownTempData.ErrorMessage] = $"An error occurred on shopify plugin. {ex.Message}";
+            return RedirectToAction(nameof(Index), new { storeId = CurrentStore.Id });
         }
     }
 
@@ -166,10 +167,8 @@ public class UIShopifyController : Controller
     [HttpGet("~/stores/{storeId}/plugins/shopify/validate/{shopName}")]
     public async Task<IActionResult> ValidateShopifyAccount(string storeId, string shopName)
     {
-        _logger.LogInformation("This endpoint was triggered");
         await using var ctx = _dbContextFactory.CreateContext();
         var shopifySetting = ctx.ShopifySettings.AsNoTracking().FirstOrDefault(c => c.ShopName == shopName && c.StoreId == storeId);
-        _logger.LogInformation($"Shopify information: {JsonConvert.SerializeObject(shopifySetting)}");
         if (shopifySetting == null || !shopifySetting.IntegratedAt.HasValue)
         {
             return BadRequest("Invalid Shopify BTCPay store specified. Kindly ensure you have setup Shopify plugin on BTCPay Server");
@@ -204,18 +203,23 @@ public class UIShopifyController : Controller
                 return Unauthorized("Invalid HMAC signature");
             }
             var orderData = JsonConvert.DeserializeObject<dynamic>(requestBody);
-            Order order = new Order
+            var paymentGatewayNames = ((IEnumerable<dynamic>)orderData.payment_gateway_names).Select(pg => (string)pg).ToList();
+            var containsKeyword = _keywords.Any(keyword => paymentGatewayNames.Any(pgName => pgName.Contains(keyword, StringComparison.OrdinalIgnoreCase)));
+            if (containsKeyword)
             {
-                ShopName = shopifySetting.ShopName,
-                StoreId = shopifySetting.StoreId,
-                OrderId = orderData.id,
-                FinancialStatus = orderData.financial_status,
-                CheckoutId = orderData.checkout_id,
-                CheckoutToken = orderData.checkout_token,
-                OrderNumber = orderData.order_number
-            };
-            ctx.Add(order);
-            await ctx.SaveChangesAsync();
+                Order order = new Order
+                {
+                    ShopName = shopifySetting.ShopName,
+                    StoreId = shopifySetting.StoreId,
+                    OrderId = orderData.id,
+                    FinancialStatus = orderData.financial_status,
+                    CheckoutId = orderData.checkout_id,
+                    CheckoutToken = orderData.checkout_token,
+                    OrderNumber = orderData.order_number
+                };
+                ctx.Add(order);
+                await ctx.SaveChangesAsync();
+            }
             return Ok();
         }
         catch (Exception ex)
@@ -230,14 +234,14 @@ public class UIShopifyController : Controller
     [EnableCors("AllowAllOrigins")]
     public async Task<IActionResult> RetrieveOrderDetailsUsingCheckoutToken(string storeId, string shopName, string checkoutToken)
     {
+        _logger.LogInformation($"Checkout token: {checkoutToken}");
         await using var ctx = _dbContextFactory.CreateContext();
         var shopifySetting = ctx.ShopifySettings.AsNoTracking().FirstOrDefault(c => c.ShopName == shopName && c.StoreId == storeId);
         if (shopifySetting == null || !shopifySetting.IntegratedAt.HasValue)
         {
             return BadRequest("Invalid Shopify BTCPay store specified");
         }
-        Order order = ctx.Orders.AsNoTracking().FirstOrDefault(c => c.CheckoutToken == checkoutToken);
-        _logger.LogInformation($"THe checkout is: {checkoutToken}.. The order details is: {JsonConvert.SerializeObject(order)}");
+        Order order = ctx.Orders.AsNoTracking().FirstOrDefault(c => c.CheckoutToken == checkoutToken && !c.FinancialStatus.ToLower().Equals("success"));
         if (order == null) { return BadRequest("No order found for this checkout token"); }
         return Ok(new
         {
@@ -300,7 +304,6 @@ public class UIShopifyController : Controller
                 new[] { "settled", "processing", "confirmed", "paid", "complete" }
                     .Contains(
                         entity.GetInvoiceState().Status.ToString().ToLower()));
-
         try
         {
             if (firstInvoiceSettled != null)
@@ -320,8 +323,6 @@ public class UIShopifyController : Controller
                     externalPaymentLink = Url.Action("InitiatePayment", "UIShopify", new { invoiceId = firstInvoiceSettled.Id, shopName, orderId = shopifySearchTerm }, Request.Scheme)
                 });
             }
-
-            _logger.LogInformation("About to create invoice");
             var invoice = await _invoiceController.CreateInvoiceCoreRaw(
                 new CreateInvoiceRequest()
                 {
