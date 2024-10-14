@@ -239,10 +239,15 @@ public class UIShopifyController : Controller
         var shopifySetting = ctx.ShopifySettings.AsNoTracking().FirstOrDefault(c => c.ShopName == shopName && c.StoreId == storeId);
         if (shopifySetting == null || !shopifySetting.IntegratedAt.HasValue)
         {
+            _logger.LogError("Invalid Shopify BTCPay store specified");
             return BadRequest("Invalid Shopify BTCPay store specified");
         }
         Order order = ctx.Orders.AsNoTracking().FirstOrDefault(c => c.CheckoutToken == checkoutToken && !c.FinancialStatus.ToLower().Equals("success"));
-        if (order == null) { return BadRequest("No order found for this checkout token"); }
+        if (order == null)
+        {
+            _logger.LogError("No order found for this checkout token");
+            return BadRequest("No order found for this checkout token"); 
+        }
         return Ok(new
         {
             OrderId = order.OrderId,
