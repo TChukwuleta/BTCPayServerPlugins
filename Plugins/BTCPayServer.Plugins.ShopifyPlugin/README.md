@@ -25,7 +25,7 @@ Our integration with Shopify allows you connect your self-hosted BTCPay Server w
 Before diving into the setup process, ensure you have the following:
 
 - Shopify account
-- BTCPay Server - [self-hosted](Deployment.md) or run by a [third-party host](/Deployment/ThirdPartyHosting.md) v1.4.8 or later.
+- BTCPay Server - [self-hosted](Deployment.md) or run by a [third-party host](/Deployment/ThirdPartyHosting.md) v2.0.0 or later.
 - [Created BTCPay Server store](CreateStore.md) with [wallet set up](WalletSetup.md)
 
 [![BTCPay Server - Shopify Video](https://img.youtube.com/vi/jJjAyvgWVfk/mqdefault.jpg)](https://www.youtube.com/watch?v=jJjAyvgWVfk)
@@ -48,18 +48,11 @@ Shopify might give false flags on deprecated API calls. The most likely answer w
 10. Reveal `Admin API access token` and `copy` it
 11. In your BTCPay Server, go to your store and on the left sidebar click on `Shopify`
 12. In the first field, `Shop name` enter the subdomain of your Shopify store e.g. SOME_ID.myshopify.com then enter SOME_ID
-13. In third field, `Admin API access token` paste the `Admin API access token` you just copied from Shopify
-14. In the second field, `API key` paste the `API key` from Shopify - which you can find at the bottom of the same page where you copied the Admin API access token
+13. In the second field, `API key` paste the `API key` from Shopify - which you can find at the bottom of the same page where you copied the Admin API access token. Do the same for the third field, paste the `API Secret` from Shopify and paste in the `API Secret` filed
+14. In the last field, `Admin API access token` paste the `Admin API access token` you just copied from Shopify
 15. Click `Save` on BTCPay Shopify settings page
-16. Back on Shopify: On left menu select `Checkout` scroll down to "Order status page" and paste the HTML `<script>` code you see in BTCPay Shopify settings into the "Additional scripts" text field.
-17. Click `Save` and scroll back up to the top
-18. Now click on `Payments` in the left sidebar, scroll down to "Manual payment methods", click on `(+) Manual payment method` and select `Create custom payment method` on the dropdown.
-19. In `Custom payment method name` fill in `Bitcoin with BTCPay Server`, optionally you can fill in other fields, but it's not required.
-20. Hit `Activate` and you've set up Shopify and BTCPay Server successfully.
 
-:::tip
-"Custom Payment method name" **must** contain at least one of the following words (case-insensitive): `bitcoin`, `btcpayserver`, `btcpay server` or `btc` to work.
-:::
+	N.B: It's good to note, The configuration creates an order/create webhook. 
 
 Below are step by step visuals describing the process outlined above.
 
@@ -86,6 +79,25 @@ Below are step by step visuals describing the process outlined above.
 ![BTCPay Server shopify step 11](./img/shopify/btcpayshopify11.png)
 
 ![BTCPay Server shopify step 12](./img/shopify/btcpayshopify12.png)
+	
+
+16. Now click on `Payments` in the left sidebar, scroll down to "Manual payment methods", click on `(+) Manual payment method` and select `Create custom payment method` on the dropdown.
+17. In `Custom payment method name` fill in `Bitcoin with BTCPay Server`, optionally you can fill in other fields, but it's not required.
+	However you would need to inform your customers that payment with Bitcoin comes on the next screen after checkout, so you would need to inform them in the `Additional details` of the `Manual payment method`
+18. Hit `Activate` and you've set up Shopify and BTCPay Server successfully.
+
+:::tip
+"Custom Payment method name" **must** contain at least one of the following words (case-insensitive): `bitcoin`, `btcpayserver`, `btcpay server` or `btc` to work.
+:::
+
+16. The next step would be to install the BTCPay Shopify application on shopify store.
+17. Once installed, fill in your details such as your BTCPay instance URL as well as the storeId for which you uploaded the BTCPay plugin on. 
+18. Hit `Save` button, and once the details are verified, it would be saved successfully.
+	
+
+	// You need to document installing the extension on the thank you page. 
+
+Below are step by step visuals describing the process outlined above.
 
 ![BTCPay Server shopify step 13](./img/shopify/btcpayshopify13.png)
 

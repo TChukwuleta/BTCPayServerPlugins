@@ -19,9 +19,11 @@ public class ShopifySetting
 
     [Display(Name = "Admin API access token")]
     public string Password { get; set; }
+
+    [Display(Name = "API Secret")]
+    public string ApiSecret { get; set; }
     public string StoreId { get; set; }
     public string StoreName { get; set; }
-    public string ApiSecret { get; set; }
     public string WebhookId { get; set; }
     public string ApplicationUserId { get; set; }
 
