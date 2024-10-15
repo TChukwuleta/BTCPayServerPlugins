@@ -5,7 +5,7 @@
 
   <!-- Plugin specific properties -->
   <PropertyGroup>
-    <Product>Mass Store Generator</Product>
+    <Product>Stores Generator</Product>
     <Description>Allows users to generate multiple stores at a go, enabling businesses setup at scale</Description>
     <Version>1.0.0</Version>
   </PropertyGroup>
