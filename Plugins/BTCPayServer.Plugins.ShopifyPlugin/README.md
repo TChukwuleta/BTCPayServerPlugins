@@ -1,6 +1,6 @@
 # Accept Bitcoin in Shopify with BTCPay Server
 
-Introducing BTCPay Server for Shopify – open-source payment gateway that enables you accept bitcoin payments directly on your website or stores from customers with no fee.
+Introducing BTCPay Server for Shopify â€“ open-source payment gateway that enables you accept bitcoin payments directly on your website or stores from customers with no fee.
 
 Our integration with Shopify allows you connect your self-hosted BTCPay Server with your [Shopify store](https://www.shopify.com/), enabling you accept Bitcoin payments swiftly and securely.
 
@@ -15,7 +15,7 @@ Our integration with Shopify allows you connect your self-hosted BTCPay Server w
 - **Lightning Network integrated**: Instant, fast and low cost payments and payouts
 - **Easy CSV exports**
 - **Versatile plugin system**: Extend functionality according to your needs
-- **Point-of-sale integration** – Accept payments in your physical shops
+- **Point-of-sale integration** â€“ Accept payments in your physical shops
 - **Multilingual ready**: Serve a global audience right out of the box.
 - **Community-driven support**: Get responsive assistance from our dedicated community ([Mattermost](http://chat.btcpayserver.org/) or [Telegram](https://t.me/btcpayserver)).
 
@@ -55,9 +55,28 @@ Shopify might give false flags on deprecated API calls. The most likely answer w
 
 Below are step by step visuals describing the process outlined above.
 
-![BTCPay Server shopify step 1](./img/shopify/btcpayshopify1.png)
+![BTCPay Server shopify step 1](https://github.com/user-attachments/assets/92222ec3-85c7-44ea-8291-581d0d237d25)
 
-![BTCPay Server shopify step 2](./img/shopify/btcpayshopify2.png)
+![BTCPay Server shopify step 2](https://github.com/user-attachments/assets/f22c3ca8-3c8b-4eaa-bf16-13fd004612c7)
+
+![BTCPay Server shopify step 3](https://github.com/user-attachments/assets/1343c374-eb63-4839-9689-6049ffd27bbb)
+
+![BTCPay Server shopify step 4](https://github.com/user-attachments/assets/3f60bac1-bd3c-4c31-8e68-39fa827a3fbd)
+
+![BTCPay Server shopify step 5](https://github.com/user-attachments/assets/5e8b24b8-9ee0-4d86-a127-98eb1421dd0f)
+
+![BTCPay Server shopify step 6](https://github.com/user-attachments/assets/2496fef6-2733-46b8-be0b-e6fcf5290280)
+
+![BTCPay Server shopify step 7](https://github.com/user-attachments/assets/6c00ef02-2d13-46d3-ad5e-3fee90f32394)
+
+![BTCPay Server shopify step 8](https://github.com/user-attachments/assets/71c1cdcb-75d5-463c-8d3a-1ba4a8d19122)
+
+
+
+
+
+
+
 
 ![BTCPay Server shopify step 3](./img/shopify/btcpayshopify3.png)
 
