@@ -48,11 +48,10 @@ Shopify might give false flags on deprecated API calls. The most likely answer w
 10. Reveal `Admin API access token` and `copy` it
 11. In your BTCPay Server, go to your store and on the left sidebar click on `Shopify`
 12. In the first field, `Shop name` enter the subdomain of your Shopify store e.g. SOME_ID.myshopify.com then enter SOME_ID
-13. In the second field, `API key` paste the `API key` from Shopify - which you can find at the bottom of the same page where you copied the Admin API access token. Do the same for the third field, paste the `API Secret` from Shopify and paste in the `API Secret` filed
-14. In the last field, `Admin API access token` paste the `Admin API access token` you just copied from Shopify
+13. In the last field, `Admin API access token` paste the `Admin API access token` you just copied from Shopify
+14. In the second field, `API key` paste the `API key` from Shopify - which you can find at the bottom of the same page where you copied the Admin API access token. Do the same for the third field, paste the `API Secret` from Shopify and paste in the `API Secret` filed
 15. Click `Save` on BTCPay Shopify settings page
-
-	N.B: It's good to note, The configuration creates an order/create webhook. 
+16. BTCPay then validates the credentials, and once validated, creates an create order webhook, and finally saves the credentials.
 
 Below are step by step visuals describing the process outlined above.
 
