@@ -242,7 +242,7 @@ public class UIShopifyController : Controller
             _logger.LogError("Invalid Shopify BTCPay store specified");
             return BadRequest("Invalid Shopify BTCPay store specified");
         }
-        Order order = ctx.Orders.AsNoTracking().FirstOrDefault(c => c.CheckoutToken == checkoutToken && !c.FinancialStatus.ToLower().Equals("success"));
+        Order order = ctx.Orders.AsNoTracking().FirstOrDefault(c => c.CheckoutToken == checkoutToken);
         if (order == null)
         {
             _logger.LogError("No order found for this checkout token");
@@ -253,7 +253,7 @@ public class UIShopifyController : Controller
             OrderId = order.OrderId,
             OrderNumber = order.OrderNumber,
             CheckoutId = order.CheckoutId,
-            FinancialStatus = order.FinancialStatus
+            FinancialStatus = order.FinancialStatus.ToLower()
         });
     }
 

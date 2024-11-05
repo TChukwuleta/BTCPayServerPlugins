@@ -207,11 +207,11 @@ public class ShopifyHostedService : EventHostedServiceBase
         }
         else
         {
-            var btcpayOrder = ctx.Orders.AsNoTracking().FirstOrDefault(c => c.OrderId == orderId);
-            if (btcpayOrder != null)
+            var btcpayOrders = ctx.Orders.AsNoTracking().Where(c => c.OrderId == orderId).ToList();
+            if (btcpayOrders.Any())
             {
-                btcpayOrder.FinancialStatus = success ? "success" : "failure";
-                ctx.Update(btcpayOrder);
+                btcpayOrders.ForEach(c => c.FinancialStatus = success ? "success" : "failure");
+                ctx.UpdateRange(btcpayOrders);
                 ctx.SaveChanges();
             }
             result.Write(
