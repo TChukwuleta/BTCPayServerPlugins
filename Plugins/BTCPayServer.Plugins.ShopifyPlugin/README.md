@@ -134,10 +134,18 @@ Below are step by step visuals describing the process outlined above. The steps 
 
 Demo Checkout flow after everything is set up:
 
-![BTCPay Server shopify step 15](./img/shopify/btcpayshopify15.png)
+![BTCPay Server shopify step 15](./img/Shopify/payment_option.png)
 
-![BTCPay Server shopify step 16](./img/shopify/btcpayshopify16.png)
+![BTCPay Server shopify step 16](./img/Shopify/complete_payment.png)
 
-![BTCPay Server shopify step 17](./img/shopify/btcpayshopify17.png)
+![BTCPay Server shopify step 17](./img/Shopify/pay_with_btcpay_modal.png)
 
-![BTCPay Server shopify step 18](./img/shopify/btcpayshopify18.png)
+![BTCPay Server shopify step 18](./img/Shopify/pay_with_btcpay_modal_invoice.png)
+
+![BTCPay Server shopify step 19](./img/Shopify/payment_invoice.png)
+
+![BTCPay Server shopify step 20](./img/Shopify/paid_invoice.png)
+
+![BTCPay Server shopify step 21](./img/Shopify/paid_invoice_btcpay.png)
+
+![BTCPay Server shopify step 21](./img/Shopify/invoice_payment_details.png)
