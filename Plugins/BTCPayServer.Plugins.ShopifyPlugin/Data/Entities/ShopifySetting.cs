@@ -11,7 +11,7 @@ public class ShopifySetting
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public string Id { get; set; }
 
-    [Display(Name = "Shop Name")]
+    [Display(Name = "Shopify Store URL")]
     public string ShopName { get; set; }
 
     [Display(Name = "API Key")]
