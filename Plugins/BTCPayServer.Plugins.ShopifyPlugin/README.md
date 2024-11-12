@@ -131,8 +131,9 @@ or use the application supported by the team.
 
 If you are a developer or would love to have your own instance, you would need to create and deploy your own application.
 ##### Prerequisite:
- Database
- Cloud instance to deploy your shopify application
+ 1. Database
+ 2. Cloud/Server instance to deploy your shopify application
+ 3. Shopify plugin installed in your BTCPay instance
 
 ##### Guidelines
 1. First you would need to create a shopify partner account. You can create one using [this link](https://www.shopify.com/partners)
@@ -154,18 +155,27 @@ If you are a developer or would love to have your own instance, you would need t
 
 8. Now, you have your Shopify application and extension setup. Next step is to download [this repository](https://github.com/TChukwuleta/btcpayshopifyplugin). 
 9. Once downloaded, open both application in your editor i.e the one you generated, and the one you downloaded.
-10. Replace the contents of `app > routes > app._index.js` in your generated application with that of the downloaded application.
-11. You would need to create a new jsx file called `api.btcpaystores.jsx` in the `app > routes` folder. Copy the content of `api.btcpaystores.jsx` in the downloaded application into the just created file
-12. In your `app.jsx` file, you can remove `Additional page` route link from it, as it is not important for this implementation. 
-13. Now unto databases. Navigate to `prisma > schema.prisma`, update the file with the `BTCPayServerStore` model as shown in the downloaded application
+10. You only need to install the remix install package by running the command `npm install remix-utils`
+11. Replace the contents of `app > routes > app._index.jsx` in your generated application with that of the downloaded application.
+12. You would need to create a new jsx file called `api.btcpaystores.jsx` in the `app > routes` folder. Copy the content of `api.btcpaystores.jsx` in the downloaded application into the just created file
+13. In your `app.jsx` file, you can remove `Additional page` route link from it, as it is not important for this implementation. 
+14. Now unto databases. Navigate to `prisma > schema.prisma`, update the file with the `BTCPayServerStore` model as shown in the downloaded application
 	In the same file, change the provider from "sqlite" to your preferred database provider. You can leave as "sqlite" if that is your database.
 	Also, change the url from "file:dev.sqlite" env("DATABASE_URL"). Create a .env file and declare a variable `DATABASE_URL` and use the connection string as the value.
+15. We would need to run migraiton. On your terminal run the command `npm run prisma migrate dev --name init` to create a new migration script. 
+	Shopify app uses Prisma as its orm. To learn more about migration in [Prisma](https://www.prisma.io/), you can visit this [link](https://www.prisma.io/docs/orm/prisma-migrate/getting-started)
+16. To view your application so far, you can run `npm run shopify app dev` to run the application locally.
 	
+All should be fine. Now unto the extension part. But before we get there. I'd suggest you deploy your application to your cloud or server instance. Once done, you can continue with the nextg steps.
+
+17. Now unto the extension bit, navigate to `extensions > {extension name} > src > Checkout.jsx`, copy the content in the downloaded application Checkout file to your extention app file.
+18. In your shopify.extension.toml file, uncomment `network_access = true`. In the same file, change the target from `purchase.checkout.block.render` to ``
+19. In your shopify.app.toml file, set `automatically_update_urls_on_dev` to false; change the value `application_url` to your deployed URL; change the base url in all `redirect_urls` to your deployed URL
+
+
+## Demo Checkout flow after everything is set up:
 
 ![BTCPay Server shopify step 16](./img/Shopify/complete_payment.png)
-
-
-Demo Checkout flow after everything is set up:
 
 ![BTCPay Server shopify step 15](./img/Shopify/payment_option.png)
 
