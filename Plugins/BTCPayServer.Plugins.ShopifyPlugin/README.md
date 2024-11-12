@@ -53,7 +53,7 @@ Shopify might give false flags on deprecated API calls. The most likely answer w
 15. You can decide to edit the payment method description text. This basically defines the text that the user sees when the invoice loads on shopify.
 16. Click `Save` on BTCPay Shopify settings page 
 17. BTCPay then validates the credentials, and once validated, creates an create order webhook, and finally saves the credentials.
-18. Back to Shopify, on the home page, click on `Payments` >> `Payments` in the left sidebar, scroll down to "Manual payment methods", click on `(+) Manual payment method` and select `Create custom payment method` on the dropdown.
+18. Back to Shopify, on the home page, click on `Settings` >> `Payments` in the left sidebar, scroll down to "Manual payment methods", click on `(+) Manual payment method` and select `Create custom payment method` on the dropdown.
 19. In `Custom payment method name` fill in `Bitcoin with BTCPay Server`, optionally you can fill in other fields, but it's not required.
 	However you would need to inform your customers that payment with Bitcoin comes on the next screen (Thank you) after checkout, so you would need to inform them in the `Additional details` of the `Manual payment method`.
 	The payment option can have a delay between 2 - 10 seconds on the Thank you page, before it is displayed so this also needs to be communicated with the customers.
