@@ -92,37 +92,77 @@ Below are step by step visuals describing the process outlined above. The steps 
 
 ### Install BTCPay-Shopify application on Shopify
 
+The second piece of this installation guide is setting up the BTCPay-Shopify application. You can decided to host your own btcpay-shopify application 
+or use the application supported by the team.
 
-20. Now we need to install the BTCPay - Shopify app. Visit the [Shopify app store](https://apps.shopify.com/) search for and install the BTCPay Server plugin application
-21. Once installed, you can go to your dashboard, click on `Apps >` in the left sidebar, then you would see the list of installed application, including the just installed BTCPay plugin app. 
-22. Select the BTCPay app, and in the view input your BTCPay Server domain url (e.g btcpay.example.com) and the storeId to which your shopify plugin is connected on the BTCPay instance
+#### Using BTCPay-shopify hosted application
 
-![BTCPay Server shopify step 14](https://github.com/user-attachments/assets/40469ad5-6545-4231-85ff-c9e35e729f76)
+1. Now we need to install the BTCPay - Shopify app. Visit the [Shopify app store](https://apps.shopify.com/) search for and install the BTCPay Server plugin application
+2. Once installed, you can go to your dashboard, click on `Apps >` in the left sidebar, then you would see the list of installed application, including the just installed BTCPay plugin app. 
+3. Select the BTCPay app, and in the view input your BTCPay Server domain url (e.g btcpay.example.com) and the storeId to which your shopify plugin is connected on the BTCPay instance
 
-![BTCPay Server shopify step 15](https://github.com/user-attachments/assets/f498488c-e0e6-4ac6-8cab-fdb3db5a2746)
+![BTCPay Server shopify step 13](https://github.com/user-attachments/assets/40469ad5-6545-4231-85ff-c9e35e729f76)
 
-23. In your shopify dashboard, click on `Settings`, whch is located on the bottom of the left nav panel, select `Checkout` and then `Customize`
-24. In the editor change the selected page to the Thank you page
+![BTCPay Server shopify step 14](https://github.com/user-attachments/assets/f498488c-e0e6-4ac6-8cab-fdb3db5a2746)
 
-![BTCPay Server shopify step 16](https://github.com/user-attachments/assets/62c850db-dfaf-46c2-b7a3-4d911e96bd15)
+4. In your shopify dashboard, click on `Settings`, whch is located on the bottom of the left nav panel, select `Checkout` and then `Customize`
+5. In the editor change the selected page to the Thank you page
 
-![BTCPay Server shopify step 17](https://github.com/user-attachments/assets/a8651278-0272-47bd-b685-a55eb41de6c9)
+![BTCPay Server shopify step 15](https://github.com/user-attachments/assets/62c850db-dfaf-46c2-b7a3-4d911e96bd15)
 
-![BTCPay Server shopify step 18](https://github.com/user-attachments/assets/cebb68c7-9593-4c52-ad49-89d2858f155f)
+![BTCPay Server shopify step 16](https://github.com/user-attachments/assets/a8651278-0272-47bd-b685-a55eb41de6c9)
 
-![BTCPay Server shopify step 19](https://github.com/user-attachments/assets/cde0f703-dd72-45c0-9746-e9462a3b77ab)
+![BTCPay Server shopify step 17](https://github.com/user-attachments/assets/cebb68c7-9593-4c52-ad49-89d2858f155f)
+
+![BTCPay Server shopify step 18](https://github.com/user-attachments/assets/cde0f703-dd72-45c0-9746-e9462a3b77ab)
+
+6. Click on `Sections` icon on the left panel > `Add app block` on the bottom of the section tab
+7. Select the BTCPay Server extensions.
+8. Click `Save` button on the top right corner of the page to save the changes
 
 
-23. Click on `Sections` icon on the left panel > `Add app block` on the bottom of the section tab
-24. Select the BTCPay Server extensions.
-25. Click `Save` button on the top right corner of the page to save the changes
+![BTCPay Server shopify step 19](https://github.com/user-attachments/assets/4756be6d-513d-41c0-9e28-4c5b1086cd84)
 
+![BTCPay Server shopify step 20](https://github.com/user-attachments/assets/bdc64c5e-af81-417e-b247-85c610687fb7)
 
-![BTCPay Server shopify step 20](https://github.com/user-attachments/assets/4756be6d-513d-41c0-9e28-4c5b1086cd84)
+![BTCPay Server shopify step 21](https://github.com/user-attachments/assets/19cf8823-23a5-4c40-8a1d-8db56ae2b54b)
 
-![BTCPay Server shopify step 21](https://github.com/user-attachments/assets/bdc64c5e-af81-417e-b247-85c610687fb7)
+#### Self hosting the BTCPay-shopify application
 
-![BTCPay Server shopify step 22](https://github.com/user-attachments/assets/19cf8823-23a5-4c40-8a1d-8db56ae2b54b)
+If you are a developer or would love to have your own instance, you would need to create and deploy your own application.
+##### Prerequisite:
+ Database
+ Cloud instance to deploy your shopify application
+
+##### Guidelines
+1. First you would need to create a shopify partner account. You can create one using [this link](https://www.shopify.com/partners)
+2. Once you have your partner account all set up, you would need to create a new shopify application. Open your command prompt and enter the command `npm init @shopify/app@latest`
+3. On the prompt to select app type, make sure to select Remix application.
+4. On the next prompt you get to choose the language for the application (Javascript or Typescript), choose the one more suitable for you.
+5. The last prompt before the app gets created is to specify the name of the application. Whatever you type is what Shopify would recognize as the application name
+6. Press enter when done, and the app would get created. Once done, you can go back to your Shopify partner dashboard and verify that it has been created.
+
+![BTCPay Server shopify step 15](./img/Shopify/step_13.png)
+
+![BTCPay Server shopify step 16](./img/Shopify/step_14.png)
+
+7. Once the application has been created, the next thing is to create a checkout extension. Navigate to the working directory of your just created application: `cd igbala`
+8. Run the command `shopify app generate extension` to generate an application extension.
+9. Select Checout UI as type of extension, give your extension a name and select a language you would like to work with. See the image below. 
+
+![BTCPay Server shopify step 15](./img/Shopify/step_15.png)
+
+8. Now, you have your Shopify application and extension setup. Next step is to download [this repository](https://github.com/TChukwuleta/btcpayshopifyplugin). 
+9. Once downloaded, open both application in your editor i.e the one you generated, and the one you downloaded.
+10. Replace the contents of `app > routes > app._index.js` in your generated application with that of the downloaded application.
+11. You would need to create a new jsx file called `api.btcpaystores.jsx` in the `app > routes` folder. Copy the content of `api.btcpaystores.jsx` in the downloaded application into the just created file
+12. In your `app.jsx` file, you can remove `Additional page` route link from it, as it is not important for this implementation. 
+13. Now unto databases. Navigate to `prisma > schema.prisma`, update the file with the `BTCPayServerStore` model as shown in the downloaded application
+	In the same file, change the provider from "sqlite" to your preferred database provider. You can leave as "sqlite" if that is your database.
+	Also, change the url from "file:dev.sqlite" env("DATABASE_URL"). Create a .env file and declare a variable `DATABASE_URL` and use the connection string as the value.
+	
+
+![BTCPay Server shopify step 16](./img/Shopify/complete_payment.png)
 
 
 Demo Checkout flow after everything is set up:
