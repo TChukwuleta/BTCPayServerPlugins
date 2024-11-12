@@ -93,6 +93,7 @@ public class UIShopifyController : Controller
         }
         await using var ctx = _dbContextFactory.CreateContext();
         var userStore = ctx.ShopifySettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new ShopifySetting();
+        userStore.PaymentText ??= "Pay with Bitcoin / Lightning Network (BTCPay)";
         return View(userStore);
     }
 
@@ -103,6 +104,7 @@ public class UIShopifyController : Controller
         try
         {
             await using var ctx = _dbContextFactory.CreateContext();
+            var shopifySetting = ctx.ShopifySettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
             switch (command)
             {
                 case "ShopifySaveCredentials":
@@ -142,7 +144,6 @@ public class UIShopifyController : Controller
                     }
                 case "ShopifyClearCredentials":
                     {
-                        var shopifySetting = ctx.ShopifySettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
                         if (shopifySetting != null)
                         {
                             var apiClient = new ShopifyApiClient(_clientFactory, shopifySetting.CreateShopifyApiCredentials());
@@ -153,6 +154,16 @@ public class UIShopifyController : Controller
                         TempData[WellKnownTempData.SuccessMessage] = "Shopify plugin credentials cleared";
                         break;
                     }
+                case "UpdatePaymentMethodText":
+                    if (shopifySetting != null)
+                    {
+                        shopifySetting.PaymentText = vm.PaymentText;
+                        ctx.Update(shopifySetting);
+                        await ctx.SaveChangesAsync();
+                        TempData[WellKnownTempData.SuccessMessage] = "Shopify payment method description updated successfully";
+                    }
+                    break;
+
             }
             return RedirectToAction(nameof(Index), new { storeId = CurrentStore.Id });
         }
@@ -253,7 +264,8 @@ public class UIShopifyController : Controller
             OrderId = order.OrderId,
             OrderNumber = order.OrderNumber,
             CheckoutId = order.CheckoutId,
-            FinancialStatus = order.FinancialStatus.ToLower()
+            FinancialStatus = order.FinancialStatus.ToLower(),
+            PaymentMethodDescription = shopifySetting.PaymentText
         });
     }
 

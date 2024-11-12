@@ -26,6 +26,8 @@ public class ShopifySetting
     public string StoreName { get; set; }
     public string WebhookId { get; set; }
     public string ApplicationUserId { get; set; }
+    [Display(Name = "Payment method description")]
+    public string PaymentText { get; set; }
 
     public bool CredentialsPopulated()
     {
