@@ -124,14 +124,14 @@ or use the application supported by the team.
 
 ![BTCPay Server shopify step 19](./img/Shopify/step_19.png)
 
-![BTCPay Server shopify step 20](./img/Shopify/step_20.png)
-
 
 ![BTCPay Server shopify step 21](https://github.com/user-attachments/assets/4756be6d-513d-41c0-9e28-4c5b1086cd84)
 
 ![BTCPay Server shopify step 22](https://github.com/user-attachments/assets/bdc64c5e-af81-417e-b247-85c610687fb7)
 
 ![BTCPay Server shopify step 23](https://github.com/user-attachments/assets/19cf8823-23a5-4c40-8a1d-8db56ae2b54b)
+
+![BTCPay Server shopify step 20](./img/Shopify/step_20.png)
 
 #### Self hosting the BTCPay-shopify application
 
