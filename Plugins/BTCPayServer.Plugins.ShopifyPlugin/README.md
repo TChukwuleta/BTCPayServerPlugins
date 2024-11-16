@@ -171,8 +171,7 @@ Please note, if you want to use a different database other than postgres, naviga
 	3. DATABASE_URL = Your database connection string
 	4. SHOPIFY_{EXTENSION_NAME}_ID => the Id generated in .env by shopify on deploy
 
-Congratulation on deploying your application. Let's get back to our configuration
-13. Now unto the extension bit, navigate to `extensions > {extension name} > src > Checkout.jsx`, there is a variable called `shopifyApplicaitonUrl`, replace the value with your deployed URL.
+13. Congratulation on deploying your application. Let's get back to our configuration. Now unto the extension bit, navigate to `extensions > {extension name} > src > Checkout.jsx`, there is a variable called `shopifyApplicaitonUrl`, replace the value with your deployed URL.
 14. In your shopify.app.toml file, change the value `application_url` to your deployed URL; change the base url in all `redirect_urls` to your deployed URL
 15. To your server environment variables, add SHOPIFY_APP_URL => your deployed URL
 16. Re-deploy your code changes to your server and also to shopify using the command `npm run deploy`.
