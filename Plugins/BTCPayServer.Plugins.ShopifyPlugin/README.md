@@ -137,69 +137,52 @@ or use the application supported by the team.
 
 If you are a developer or would love to have your own instance, you would need to create and deploy your own application.
 ##### Prerequisite:
- 1. Database
+ 1. Database (postgresql)
  2. Cloud/Server instance to deploy your shopify application
  3. Shopify plugin installed in your BTCPay instance
 
-##### Guidelines
-1. First you would need to create a shopify partner account. You can create one using [this link](https://www.shopify.com/partners)
-2. Once you have your partner account all set up, you would need to create a new shopify application. Open your command prompt and enter the command `npm init @shopify/app@latest`
-3. On the prompt to select app type, make sure to select Remix application.
-4. On the next prompt you get to choose the language for the application (Javascript or Typescript), choose the one more suitable for you.
-5. The last prompt before the app gets created is to specify the name of the application. Whatever you type is what Shopify would recognize as the application name
-6. Press enter when done, and the app would get created. Once done, you can go back to your Shopify partner dashboard and verify that it has been created.
-
-![BTCPay Server shopify step 24](./img/Shopify/step_13.png)
-
-![BTCPay Server shopify step 25](./img/Shopify/step_14.png)
-
-7. Once the application has been created, the next thing is to create a checkout extension. Navigate to the working directory of your just created application: `cd igbala`
-8. Run the command `shopify app generate extension` to generate an application extension.
-9. Select Checout UI as type of extension, give your extension a name and select a language you would like to work with. See the image below. 
-
-![BTCPay Server shopify step 26](./img/Shopify/step_15.png)
-
-8. Now, you have your Shopify application and extension setup. Next step is to download [this repository](https://github.com/TChukwuleta/btcpayshopifyplugin). 
-9. Once downloaded, open both application in your editor i.e the one you generated, and the one you downloaded.
-10. You only need to install the remix install package by running the command `npm install remix-utils`
-11. Replace the contents of `app > routes > app._index.jsx` in your generated application with that of the downloaded application.
-12. You would need to create a new jsx file called `api.btcpaystores.jsx` in the `app > routes` folder. Copy the content of `api.btcpaystores.jsx` in the downloaded application into the just created file
-13. In your `app.jsx` file, you can remove `Additional page` route link from it, as it is not important for this implementation. 
-14. Now unto databases. Navigate to `prisma > schema.prisma`, update the file with the `BTCPayServerStore` model as shown in the downloaded application
-	In the same file, change the provider from "sqlite" to your preferred database provider. You can leave as "sqlite" if that is your database.
-	Also, change the url from "file:dev.sqlite" env("DATABASE_URL"). Create a .env file and declare a variable `DATABASE_URL` and use the connection string as the value.
-15. We would need to run migraiton. On your terminal run the command `npm run prisma migrate dev --name init` to create a new migration script. 
-	Shopify app uses Prisma as its orm. To learn more about migration in [Prisma](https://www.prisma.io/), you can visit this [link](https://www.prisma.io/docs/orm/prisma-migrate/getting-started)
-16. To view your application so far, you can run `npm run shopify app dev` to run the application locally.
+##### Guidelines 
+1. To begin, create a [shopify partner account](https://www.shopify.com/partners)
+2. Click on `Apps` > `All Apps` > `Create App` > `Create app manually`. Enter the name you want to call the application and click `Create`.
+3. Once created it would take you to a screen displaying your client Id and secret.
+4. Next, you would need to clone or download this [repository](https://github.com/TChukwuleta/btcpayshopifyplugin)
+5. Once you have the repository cloned, install the dependencies. Open your command prompt and enter the command `npm install`
+6. In your application, you have an extension which can be found in the `extensions` folder.
+7. Create a .env file. Paste the following variables.
+	1. SHOPIFY_API_KEY => Represents the Client ID associated with the shopify app created
+	2. SHOPIFY_API_SECRET => Represents the Client Secret associated with the shopify app
+	3. DATABASE_URL = Your database connection string
 	
-At this point you'd need to deploy your application to your cloud or server instance.
+Please note, if you want to use a different database other than postgres, navigate to `prisma` > `schema.prisma`, change the provider from postgresql to your database of choice.
 
-17. To deploy your application on your instance, would need to deploy first on Shopify, as there are some environment variables that would need to be configured.
-	To deploy, run the following command: `npm run deploy`.
-18. Once your application has been deployed successfully, you would see a new variable being generated in your .env file. SHOPIFY_{app_extension_name}_ID
-19. The following are the enviroment variables that needs to be set successfully on your server.
+8. In your `shopify.app.toml` file, the following changes would also be needed:
+	Change the value of `client_id` to your shopify Client Id. (Same value as SHOPIFY_API_KEY) 
+	Change `name` and `handle` to the name of your shopify application during creation on your partner dashboard. Both names must be the same
+	You can also change the name of your extensions. Go to `extensions` > `shopify.extension.toml` and change `name` and `handle` to your desired name for extensions. Both names must be the same
+9. You can test your application by running the command `npm run dev` which would load a dev instance of the shopify application. 
+10. Once done deploy your application to shopify. Run the command `npm run deploy`. Once deployed go back to your shopify partner application select the application
+    click on `Release` > `Versions`, you should see a new version with the same timestamp as to when you deployed. 
+11. At the same time, if you open your .env file, you would see a new variable generated: `SHOPIFY_{EXTENSION_NAME}_ID`
+
+At this point you'd need to deploy your application to your cloud or server instance.
+12. The following are required enviroment variables that needs to be set on your server.
 
 	1. SHOPIFY_API_KEY => Represents the Client ID associated with the shopify app
 	2. SHOPIFY_API_SECRET => Represents the Client Secret associated with the shopify app
 	3. DATABASE_URL = Your database connection string
-	4. SHOPIFY_BTCPAYSERVERPLUGINEXTENSION_ID => the Id generated in .env by shopify on deploy
+	4. SHOPIFY_{EXTENSION_NAME}_ID => the Id generated in .env by shopify on deploy
 
 Congratulation on deploying your application. Let's get back to our configuration
-20. Now unto the extension bit, navigate to `extensions > {extension name} > src > Checkout.jsx`, copy the content in the downloaded application Checkout file to your extention app file.
-21. In your shopify.extension.toml file, uncomment `network_access = true`. In the same file, change the target from `purchase.checkout.block.render` to ``
-22. In your shopify.app.toml file, set `automatically_update_urls_on_dev` to false; change the value `application_url` to your deployed URL; change the base url in all `redirect_urls` to your deployed URL
-23. In your Checkout.jsx file, there is a variable called `shopifyApplicaitonUrl`, replace the value with your deployed URL
-24. One last change, in the package.json file, change the build value to: `"build": "prisma generate && prisma migrate deploy && remix vite:build"`
-25. One more environment variable to include to the 4 listed above, SHOPIFY_APP_URL => your deployed URL
-26. Once done, re-deploy your changes to shopify and your server instance. 
-27. Head back to your application dashboard on your partner account. Select configuration. Confirm that the App Url and the redirection Url match your deployed URL.
-28. Select `API Access` on the navigation panel. Scroll down to `Allow network access in checkout and account UI extensions` and ensure it is enabled.
+13. Now unto the extension bit, navigate to `extensions > {extension name} > src > Checkout.jsx`, there is a variable called `shopifyApplicaitonUrl`, replace the value with your deployed URL.
+14. In your shopify.app.toml file, change the value `application_url` to your deployed URL; change the base url in all `redirect_urls` to your deployed URL
+15. To your server environment variables, add SHOPIFY_APP_URL => your deployed URL
+16. Re-deploy your code changes to your server and also to shopify using the command `npm run deploy`.
+17. Head back to your application dashboard on your partner account. Select configuration. Confirm that the App Url and the redirection Url match your deployed URL.
+18. Select `API Access` on the navigation panel. Scroll down to `Allow network access in checkout and account UI extensions` and ensure it is enabled.
 
-Congratulations on getting here, if all goes well, you should have something as shown in the image below. You can decide to customize the view to suit business needs
+Congratulations on getting here, if all goes well, your deployed URL should a similar image as below:  You can decide to customize the view to suit business needs
 
 ![BTCPay Server shopify step 27](./img/Shopify/step_16.png)
-
-
 
 Now it is time to deploy your application to the Shopify store that you are linking to BTCPay server. On your application dashboard, select distribution >> Custom distribution
 Please note that selecting custom distribution would mean that you can only use the application on only one shopify store. This is irreversible.
