@@ -164,8 +164,7 @@ Please note, if you want to use a different database other than postgres, naviga
     click on `Release` > `Versions`, you should see a new version with the same timestamp as to when you deployed. 
 11. At the same time, if you open your .env file, you would see a new variable generated: `SHOPIFY_{EXTENSION_NAME}_ID`
 
-At this point you'd need to deploy your application to your cloud or server instance.
-12. The following are required enviroment variables that needs to be set on your server.
+12. At this point you'd need to deploy your application to your cloud or server instance. The following are required enviroment variables that needs to be set on your server.
 
 	1. SHOPIFY_API_KEY => Represents the Client ID associated with the shopify app
 	2. SHOPIFY_API_SECRET => Represents the Client Secret associated with the shopify app
