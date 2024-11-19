@@ -71,12 +71,12 @@ Shopify might give false flags on deprecated API calls. The most likely answer w
 14. In the second field, `API key` paste the `API key` from Shopify - which you can find at the bottom of the same page where you copied the Admin API access token. Do the same for the third field, paste the `API Secret` from Shopify and paste in the `API Secret` filed
 15. You can decide to edit the payment method description text. This basically defines the text that the user sees when the invoice loads on shopify.
 16. Click `Save` on BTCPay Shopify settings page 
+17. BTCPay then validates the credentials, and once validated, creates an create order webhook, and finally saves the credentials.
 
 ![BTCPay Server shopify step 9](./img/Shopify/step_9.png)
 
 ![BTCPay Server shopify step 10](./img/Shopify/step_10.png)
 
-17. BTCPay then validates the credentials, and once validated, creates an create order webhook, and finally saves the credentials.
 18. Back to Shopify, on the home page, click on `Settings` >> `Payments` in the left sidebar, scroll down to "Manual payment methods", click on `(+) Manual payment method` and select `Create custom payment method` on the dropdown.
 19. In `Custom payment method name` fill in `Bitcoin with BTCPay Server`, optionally you can fill in other fields, but it's not required.
 	However you would need to inform your customers that payment with Bitcoin comes on the next screen (Thank you) after checkout, so you would need to inform them in the `Additional details` of the `Manual payment method`.
@@ -185,7 +185,7 @@ Congratulations on getting here, if all goes well, your deployed URL should a si
 
 ![BTCPay Server shopify step 27](./img/Shopify/step_16.png)
 
-Now it is time to deploy your application to the Shopify store that you are linking to BTCPay server. On your application dashboard, select distribution >> Custom distribution
+Now it is time to deploy your application to the Shopify store that you are linking to BTCPay server. On your application dashboard, select distribution >> Custom distribution.
 Please note that selecting custom distribution would mean that you can only use the application on only one shopify store. This is irreversible.
 
 On the next screen enter the Shopify store url that you want to link the application to.
