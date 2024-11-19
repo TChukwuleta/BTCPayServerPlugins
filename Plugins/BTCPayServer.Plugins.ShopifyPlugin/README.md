@@ -71,6 +71,11 @@ Shopify might give false flags on deprecated API calls. The most likely answer w
 14. In the second field, `API key` paste the `API key` from Shopify - which you can find at the bottom of the same page where you copied the Admin API access token. Do the same for the third field, paste the `API Secret` from Shopify and paste in the `API Secret` filed
 15. You can decide to edit the payment method description text. This basically defines the text that the user sees when the invoice loads on shopify.
 16. Click `Save` on BTCPay Shopify settings page 
+
+![BTCPay Server shopify step 9](./img/Shopify/step_9.png)
+
+![BTCPay Server shopify step 10](./img/Shopify/step_10.png)
+
 17. BTCPay then validates the credentials, and once validated, creates an create order webhook, and finally saves the credentials.
 18. Back to Shopify, on the home page, click on `Settings` >> `Payments` in the left sidebar, scroll down to "Manual payment methods", click on `(+) Manual payment method` and select `Create custom payment method` on the dropdown.
 19. In `Custom payment method name` fill in `Bitcoin with BTCPay Server`, optionally you can fill in other fields, but it's not required.
@@ -83,9 +88,6 @@ Shopify might give false flags on deprecated API calls. The most likely answer w
 "Custom Payment method name" **must** contain at least one of the following words (case-insensitive): `bitcoin`, `btcpayserver`, `btcpay server` or `btc` to work.
 :::
 
-![BTCPay Server shopify step 9](./img/Shopify/step_9.png)
-
-![BTCPay Server shopify step 10](./img/Shopify/step_10.png)
 
 ![BTCPay Server shopify step 11](./img/Shopify/step_11.png)
 
