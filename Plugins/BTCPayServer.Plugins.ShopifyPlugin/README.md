@@ -46,25 +46,7 @@ Shopify might give false flags on deprecated API calls. The most likely answer w
 8. In `Orders` enable `read_orders` and `write_orders` and then click `Save`
 9. Click on the API credential tab, and then click on the `Install App` in the top right corner and when pop-up window appears click `Install`
 10. Reveal `Admin API access token` and `copy` it
-11. In your BTCPay Server, go to your store and on the left sidebar click on `Shopify`
-12. In the first field, `Shop name` enter the subdomain of your Shopify store e.g. SOME_ID.myshopify.com then enter SOME_ID
-13. In the last field, `Admin API access token` paste the `Admin API access token` you just copied from Shopify
-14. In the second field, `API key` paste the `API key` from Shopify - which you can find at the bottom of the same page where you copied the Admin API access token. Do the same for the third field, paste the `API Secret` from Shopify and paste in the `API Secret` filed
-15. You can decide to edit the payment method description text. This basically defines the text that the user sees when the invoice loads on shopify.
-16. Click `Save` on BTCPay Shopify settings page 
-17. BTCPay then validates the credentials, and once validated, creates an create order webhook, and finally saves the credentials.
-18. Back to Shopify, on the home page, click on `Settings` >> `Payments` in the left sidebar, scroll down to "Manual payment methods", click on `(+) Manual payment method` and select `Create custom payment method` on the dropdown.
-19. In `Custom payment method name` fill in `Bitcoin with BTCPay Server`, optionally you can fill in other fields, but it's not required.
-	However you would need to inform your customers that payment with Bitcoin comes on the next screen (Thank you) after checkout, so you would need to inform them in the `Additional details` of the `Manual payment method`.
-	The payment option can have a delay between 2 - 10 seconds on the Thank you page, before it is displayed so this also needs to be communicated with the customers.
-    	
-20. Hit `Activate` and you've set up Shopify and BTCPay Server payment method successfully.
 
-:::tip
-"Custom Payment method name" **must** contain at least one of the following words (case-insensitive): `bitcoin`, `btcpayserver`, `btcpay server` or `btc` to work.
-:::
-
-Below are step by step visuals describing the process outlined above. The steps continue after the images.
 
 ![BTCPay Server shopify step 1](./img/Shopify/step_1.png)
 
@@ -82,9 +64,30 @@ Below are step by step visuals describing the process outlined above. The steps 
 
 ![BTCPay Server shopify step 8](./img/Shopify/step_8.png)
 
+
+11. In your BTCPay Server, go to your plugins, find and install Shopify plugin. Once done, on the left sidebar click on `Shopify`
+12. In the first field, `Shop name` enter the subdomain of your Shopify store e.g. SOME_ID.myshopify.com then enter SOME_ID
+13. In the last field, `Admin API access token` paste the `Admin API access token` you just copied from Shopify
+14. In the second field, `API key` paste the `API key` from Shopify - which you can find at the bottom of the same page where you copied the Admin API access token. Do the same for the third field, paste the `API Secret` from Shopify and paste in the `API Secret` filed
+15. You can decide to edit the payment method description text. This basically defines the text that the user sees when the invoice loads on shopify.
+16. Click `Save` on BTCPay Shopify settings page 
+17. BTCPay then validates the credentials, and once validated, creates an create order webhook, and finally saves the credentials.
+
 ![BTCPay Server shopify step 9](./img/Shopify/step_9.png)
 
 ![BTCPay Server shopify step 10](./img/Shopify/step_10.png)
+
+18. Back to Shopify, on the home page, click on `Settings` >> `Payments` in the left sidebar, scroll down to "Manual payment methods", click on `(+) Manual payment method` and select `Create custom payment method` on the dropdown.
+19. In `Custom payment method name` fill in `Bitcoin with BTCPay Server`, optionally you can fill in other fields, but it's not required.
+	However you would need to inform your customers that payment with Bitcoin comes on the next screen (Thank you) after checkout, so you would need to inform them in the `Additional details` of the `Manual payment method`.
+	The payment option can have a delay between 2 - 10 seconds on the Thank you page, before it is displayed so this also needs to be communicated with the customers.
+    	
+20. Hit `Activate` and you've set up Shopify and BTCPay Server payment method successfully.
+
+:::tip
+"Custom Payment method name" **must** contain at least one of the following words (case-insensitive): `bitcoin`, `btcpayserver`, `btcpay server` or `btc` to work.
+:::
+
 
 ![BTCPay Server shopify step 11](./img/Shopify/step_11.png)
 
@@ -182,7 +185,7 @@ Congratulations on getting here, if all goes well, your deployed URL should a si
 
 ![BTCPay Server shopify step 27](./img/Shopify/step_16.png)
 
-Now it is time to deploy your application to the Shopify store that you are linking to BTCPay server. On your application dashboard, select distribution >> Custom distribution
+Now it is time to deploy your application to the Shopify store that you are linking to BTCPay server. On your application dashboard, select distribution >> Custom distribution.
 Please note that selecting custom distribution would mean that you can only use the application on only one shopify store. This is irreversible.
 
 On the next screen enter the Shopify store url that you want to link the application to.
