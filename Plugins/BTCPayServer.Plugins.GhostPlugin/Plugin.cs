@@ -1,7 +1,8 @@
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
-using BTCPayServer.Plugins.ShopifyPlugin.Services;
+using BTCPayServer.Plugins.GhostPlugin;
+using BTCPayServer.Plugins.GhostPlugin.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -12,19 +13,19 @@ public class Plugin : BaseBTCPayServerPlugin
 {
     public override IBTCPayServerPlugin.PluginDependency[] Dependencies { get; } =
     {
-        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.0.0" }
+        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=1.12.0" }
     };
 
     public override void Execute(IServiceCollection services)
     {
-        services.AddSingleton<IUIExtension>(new UIExtension("ShopifyPluginHeaderNav", "header-nav"));
-        services.AddSingleton<ShopifyHostedService>();
-        services.AddHostedService<ShopifyHostedService>();
+        services.AddSingleton<IUIExtension>(new UIExtension("GhostPluginHeaderNav", "header-nav"));
+        services.AddSingleton<GhostHostedService>();
+        services.AddHostedService<GhostHostedService>();
         services.AddHostedService<ApplicationPartsLogger>();
-        services.AddSingleton<ShopifyDbContextFactory>();
-        services.AddDbContext<ShopifyDbContext>((provider, o) =>
+        services.AddSingleton<GhostDbContextFactory>();
+        services.AddDbContext<GhostDbContext>((provider, o) =>
         {
-            var factory = provider.GetRequiredService<ShopifyDbContextFactory>();
+            var factory = provider.GetRequiredService<GhostDbContextFactory>();
             factory.ConfigureBuilder(o);
         });
         services.AddHostedService<PluginMigrationRunner>();

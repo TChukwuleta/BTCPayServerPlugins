@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35208.52
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BTCPayServer.Plugins.GhostPlugin", "BTCPayServer.Plugins.GhostPlugin.csproj", "{4E54D8A8-6210-4D34-9DDC-AD8BC89A6214}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4E54D8A8-6210-4D34-9DDC-AD8BC89A6214}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E54D8A8-6210-4D34-9DDC-AD8BC89A6214}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E54D8A8-6210-4D34-9DDC-AD8BC89A6214}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E54D8A8-6210-4D34-9DDC-AD8BC89A6214}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C1D60C50-8226-4EEA-ADAD-3C7814D6545D}
+	EndGlobalSection
+EndGlobal
