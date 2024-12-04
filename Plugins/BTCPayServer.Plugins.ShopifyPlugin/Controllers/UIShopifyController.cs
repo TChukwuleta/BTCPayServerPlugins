@@ -154,16 +154,6 @@ public class UIShopifyController : Controller
                         TempData[WellKnownTempData.SuccessMessage] = "Shopify plugin credentials cleared";
                         break;
                     }
-                case "UpdatePaymentMethodText":
-                    if (shopifySetting != null)
-                    {
-                        shopifySetting.PaymentText = vm.PaymentText;
-                        ctx.Update(shopifySetting);
-                        await ctx.SaveChangesAsync();
-                        TempData[WellKnownTempData.SuccessMessage] = "Shopify payment method description updated successfully";
-                    }
-                    break;
-
             }
             return RedirectToAction(nameof(Index), new { storeId = CurrentStore.Id });
         }

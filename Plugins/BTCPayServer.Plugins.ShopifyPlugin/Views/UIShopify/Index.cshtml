@@ -73,20 +73,6 @@
                     <span asp-validation-for="Password" class="text-danger"></span>
                 </div>
 
-                <div class="form-group">
-                    <label asp-for="PaymentText" class="form-label"></label>
-                    <div class="input-group">
-                        <input asp-for="PaymentText" class="form-control" value="@Model?.PaymentText" />
-                        @if (shopifyCredsSet)
-                        {
-                            <button name="command" type="submit" class="btn btn-secondary" value="UpdatePaymentMethodText">
-                                Update
-                            </button>
-                        }
-                    </div>
-                    <span asp-validation-for="PaymentText" class="text-danger"></span>
-                </div>
-
                 @if (shopifyCredsSet)
                 {
                     <p class="alert alert-success">
