@@ -76,9 +76,9 @@ Shopify might give false flags on deprecated API calls. The most likely answer w
 ### Set up payment method in Shopify
 1. Back to Shopify, on the home page, click on `Settings` >> `Payments` in the left sidebar, scroll down to "Manual payment methods", click on `(+) Manual payment method` and select `Create custom payment method` on the dropdown.
 ![Create payment method step 1](./img/Shopify/pm_step_1.png)
-2. In `Custom payment method name` fill in `Bitcoin with BTCPay Server`, optionally you can fill in other fields, but it's not required.
-	However you would need to inform your customers that payment with Bitcoin comes on the next screen (Thank you) after checkout, so you would need to inform them in the `Additional details` of the `Manual payment method`.
-	The payment option can have a delay between 2 - 10 seconds on the Thank you page, before it is displayed so this also needs to be communicated with the customers.
+2. In `Custom payment method name` fill in `Bitcoin with BTCPay Server` (also see TIP box below), optionally you can fill in other fields, but it's not required.
+	However you would need to inform your customers that payment with Bitcoin comes on the next screen after checkout on the "Thank you" page. Ideally you would inform your customers in the `Additional details` field.
+	The payment option can have a delay between 2 - 10 seconds on the "Thank you" page, before it is displayed so this also needs to be communicated with the customers. Suggested text: `Please note that the Bitcoin payment option will be displayed on the "Thank you" page after a few seconds. If it does not show up after 5-10 seconds please contact our support.`
 3. Hit `Activate` and you've set up Shopify and BTCPay Server payment method successfully.
 ![Create payment method step 2 and 3](./img/Shopify/pm_step_2_and_3.png)
 
@@ -124,7 +124,6 @@ or use the application supported by the team.
 
 ![BTCPay Server shopify step 19](./img/Shopify/step_19.png)
 
-
 ![BTCPay Server shopify step 21](https://github.com/user-attachments/assets/4756be6d-513d-41c0-9e28-4c5b1086cd84)
 
 ![BTCPay Server shopify step 22](https://github.com/user-attachments/assets/bdc64c5e-af81-417e-b247-85c610687fb7)
@@ -137,9 +136,8 @@ or use the application supported by the team.
 
 If you are a developer or would love to have your own instance, you would need to create and deploy your own application.
 ##### Prerequisite:
- 1. Database (postgresql)
- 2. Cloud/Server instance to deploy your shopify application
- 3. Shopify plugin installed in your BTCPay instance
+1. Cloud/Server instance to deploy your shopify application
+2. Shopify plugin installed in your BTCPay instance
 
 ##### Guidelines 
 1. To begin, create a [shopify partner account](https://www.shopify.com/partners)
@@ -152,19 +150,21 @@ If you are a developer or would love to have your own instance, you would need t
 	1. SHOPIFY_API_KEY => Represents the Client ID associated with the shopify app created
 	2. SHOPIFY_API_SECRET => Represents the Client Secret associated with the shopify app
 	3. DATABASE_URL = Your database connection string
-	
-Please note, if you want to use a different database other than postgres, navigate to `prisma` > `schema.prisma`, change the provider from postgresql to your database of choice.
 
 8. In your `shopify.app.toml` file, the following changes would also be needed:
 	Change the value of `client_id` to your shopify Client Id. (Same value as SHOPIFY_API_KEY) 
-	Change `name` and `handle` to the name of your shopify application during creation on your partner dashboard. Both names must be the same
-	You can also change the name of your extensions. Go to `extensions` > `shopify.extension.toml` and change `name` and `handle` to your desired name for extensions. Both names must be the same
+	Change `name` and `handle` to the name of your shopify application during creation on your partner dashboard. E.g. `name = "BTCPay Server"` and `handle = "btcpay-server"`
+    Change `application_url` to your deployed URL. E.g. `application_url = "https://yourdeployedurl.com"`
+    Change the value of `dev_store_url` to your shopify store url. E.g. `dev_store_url = "https://yourstore.myshopify.com"`
+    In the `redirect_urls` array, replace YOUR_HOSTED_APP_URL.COM with your deployed URL and keep the paths. E.g. `https://yourdeployedurl.com/auth/callback`
+    
+    You can also change the name of your extensions. Go to `extensions` > `shopify.extension.toml` and change `name` and `handle` to your desired name for extensions.
 9. You can test your application by running the command `npm run dev` which would load a dev instance of the shopify application. 
 10. Once done deploy your application to shopify. Run the command `npm run deploy`. Once deployed go back to your shopify partner application select the application
     click on `Release` > `Versions`, you should see a new version with the same timestamp as to when you deployed. 
 11. At the same time, if you open your .env file, you would see a new variable generated: `SHOPIFY_{EXTENSION_NAME}_ID`
 
-12. At this point you'd need to deploy your application to your cloud or server instance. The following are required enviroment variables that needs to be set on your server.
+12. At this point you'd need to deploy your application to your cloud or server instance. The following are required environment variables that needs to be set on your server.
 
 	1. SHOPIFY_API_KEY => Represents the Client ID associated with the shopify app
 	2. SHOPIFY_API_SECRET => Represents the Client Secret associated with the shopify app
