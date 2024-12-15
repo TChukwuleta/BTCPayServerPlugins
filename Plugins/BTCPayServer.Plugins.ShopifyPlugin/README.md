@@ -45,12 +45,12 @@ Shopify might give false flags on deprecated API calls. The most likely answer w
 ![BTCPay Server shopify step 3](./img/Shopify/step_3.png)
 4. If prompted, click on `Allow custom app development`   
 ![BTCPay Server shopify step 4](./img/Shopify/step_4.png) 
-5. `Create an app` and name it, e.g. BTCPay Server   
+5. `Create an app` and name it, e.g. BTCPay Server, click on `Create App`      
 ![BTCPay Server shopify step 5](./img/Shopify/step_5.png)
-6. On the app page, in `Overview` tab, click on the `Configure Admin API scopes`   
 ![BTCPay Server shopify step 6](./img/Shopify/step_6.png)
-7. In the filter admin access scopes type in `Orders`   
+6. On the app page, in `Overview` tab, click on the `Configure Admin API scopes`   
 ![BTCPay Server shopify step 7](./img/Shopify/step_7.png)
+7. In the filter admin access scopes type in `Orders`
 8. In `Orders` enable `read_orders` and `write_orders` and then click `Save`     
 ![BTCPay Server shopify step 8](./img/Shopify/step_8.png)   
 9. Click on the "API credentials" tab, and then click on the `Install App` in the top right corner and when pop-up window appears click `Install`   
