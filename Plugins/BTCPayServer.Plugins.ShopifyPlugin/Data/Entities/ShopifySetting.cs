@@ -26,10 +26,6 @@ public class ShopifySetting
     public string StoreName { get; set; }
     public string WebhookId { get; set; }
     public string ApplicationUserId { get; set; }
-    [Display(Name = "Payment method description")]
-    [Required(ErrorMessage = "Payment method description is required.")]
-    public string PaymentText { get; set; }
-
     public bool CredentialsPopulated()
     {
         return

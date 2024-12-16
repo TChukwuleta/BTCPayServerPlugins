@@ -93,7 +93,6 @@ public class UIShopifyController : Controller
         }
         await using var ctx = _dbContextFactory.CreateContext();
         var userStore = ctx.ShopifySettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new ShopifySetting();
-        userStore.PaymentText ??= "Pay with Bitcoin / Lightning Network (BTCPay)";
         return View(userStore);
     }
 
@@ -137,7 +136,6 @@ public class UIShopifyController : Controller
                         vm.WebhookId = webhookResponse.Webhook.Id.ToString();
                         vm.ApplicationUserId = GetUserId();
                         vm.StoreName = CurrentStore.StoreName;
-                        vm.PaymentText = "Pay with Bitcoin";
                         ctx.Update(vm);
                         await ctx.SaveChangesAsync();
                         TempData[WellKnownTempData.SuccessMessage] = "Shopify plugin successfully updated";
@@ -256,7 +254,7 @@ public class UIShopifyController : Controller
             OrderNumber = order.OrderNumber,
             CheckoutId = order.CheckoutId,
             FinancialStatus = order.FinancialStatus.ToLower(),
-            PaymentMethodDescription = shopifySetting.PaymentText
+            PaymentMethodDescription = "Pay with Bitcoin/Lightning Network"
         });
     }
 
