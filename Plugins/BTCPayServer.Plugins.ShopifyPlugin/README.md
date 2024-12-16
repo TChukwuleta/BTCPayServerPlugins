@@ -74,7 +74,7 @@ Shopify might give false flags on deprecated API calls. The most likely answer w
 "Custom Payment method name" **must** contain at least one of the following words (case-insensitive): `bitcoin`, `btcpayserver`, `btcpay server` or `btc` to work.
 :::
 
-### Install BTCPay Server Shopify plugin
+## Install BTCPay Server Shopify plugin
 1. In your BTCPay Server, go to your plugins, find and install Shopify plugin. Once done, on the left sidebar click on `Shopify`
 2. In the first field, `Shopify Store URL` enter the subdomain of your Shopify store e.g. SOME_ID.myshopify.com then enter SOME_ID
 3. In the second field, `API key` paste the `API key` from Shopify - see steps above.
@@ -88,12 +88,12 @@ Shopify might give false flags on deprecated API calls. The most likely answer w
 
    
 
-### Install BTCPay-Shopify application on Shopify
+## Install BTCPay-Shopify application on Shopify
 
 The second piece of this installation guide is setting up the BTCPay-Shopify app. You can choose to self-host your own BTCPay-Shopify app 
 or use the app we submitted to the Shopify App Store.
 
-#### Using BTCPay-Shopify from Shopify App Store
+### Using BTCPay-Shopify from Shopify App Store
 
 :::warning
 As of now, the BTCPay-Shopify app is not yet available on the Shopify App Store. We are working on getting it published.
@@ -134,20 +134,42 @@ As of now, the BTCPay-Shopify app is not yet available on the Shopify App Store.
 
 ![BTCPay Server shopify step 20](./img/Shopify/step_20.png)
 
-#### Self-hosting the BTCPay-shopify app
+### Self-hosting the BTCPay-shopify app
 
 If you are a developer or would love to have total control, you would need to create and deploy your own application.
-##### Requirements:
+#### Requirements:
 1. A Linux VPS instance to deploy your shopify app to
 2. The VPS should have [Docker Engine installed](https://docs.docker.com/engine/install/)
 3. A domain/subdomain with an DNS A-record to the IP of your VPS instance, in our example below we use the placeholder "YOUR_HOSTED_APP_URL.COM", e.g. btcpaypp.example.com
 4. Shopify plugin installed in your BTCPay Server instance
 5. A [shopify partner account](https://www.shopify.com/partners)
 
-##### Installation instructions: 
-1. On Shopify Partner [dashboard](https://partners.shopify.com), click on `Apps` > `All Apps` > `Create App` > `Create app manually`. Enter the name you want to call the app (e.g. My BTCPay App) and click `Create`.
+#### Installation instructions: 
+
+##### Create a Shopify app on partner account
+1. On Shopify Partner [dashboard](https://partners.shopify.com), click on `Apps` > `All Apps` > `Create App` > `Create app manually`. Enter the name you want to call the app (e.g. BTCPay Server APPNAME) and click `Create`.
 2. Once created displays your "Client ID" and "Client secret", which we need in a minute. 
-3. Next on your VPS switch to root user and clone or download [this repository](https://github.com/btcpayserver/btcpayshopifyapp) and go into that directory
+3. On the left sidebar click on `Configuration`
+4. In the `App URL` field, enter the URL of your hosted app, e.g. `https://YOUR_HOSTED_APP_URL.COM`
+5. In the `Allowed redirection URL(s)` field, enter:
+``` 
+https://YOUR_HOSTED_APP_URL.COM/auth/callback
+https://YOUR_HOSTED_APP_URL.COM/auth/shopify/callback
+https://YOUR_HOSTED_APP_URL.COM/api/auth/callback
+```
+6. In the fields in the "Compliance webhooks" section, enter the following:
+`Customer data request endpoint` => https://YOUR_HOSTED_APP_URL.COM/webhooks/customers/data_request
+`Customer data erasure endpoint` => https://YOUR_HOSTED_APP_URL.COM/webhooks/customers/redact
+`Shop data erasure endpoint` => https://YOUR_HOSTED_APP_URL.COM/webhooks/shop/redact
+IMAGE
+7. Click on `Save` to save the changes
+8. On the left sidebar click on `API Access`
+9. Scroll down to "Allow network access in checkout and account UI extensions" and click on `Request access`
+IMAGE
+
+##### Deploy the BTCPay-Shopify app 
+
+5. Next on your VPS switch to root user and clone or download [this repository](https://github.com/btcpayserver/btcpayshopifyapp) and go into that directory
    ```bash
    git clone https://github.com/btcpayserver/btcpayshopifyapp.git
    cd btcpayshopifyapp
@@ -169,11 +191,12 @@ SHOPIFY_API_SECRET=your_client_secret
 DOMAIN=YOUR_HOSTED_APP_URL.COM
 LETSENCRYPT_EMAIL=johndoe@example.com
 ```
-Replace SHOPIFY_API_KEY, SHOPIFY_API_SECRET, DOMAIN and LETSENCRYPT_EMAIL with your values. Do not change the value of DATABASE_URL and SHOPIFY_APP_URL.
+Replace the values of `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, DOMAIN and `LETSENCRYPT_EMAIL` with your values. Don't change the value of `DATABASE_URL` and `SHOPIFY_APP_URL`.
 
-7. In your `shopify.app.toml` file, the following changes would also be needed:
-	Change the value of `client_id` to your shopify Client Id. (Same value as SHOPIFY_API_KEY) 
-	Change `name` and `handle` to the name of your shopify application during creation on your partner dashboard. E.g. `name = "BTCPay Server"` and `handle = "btcpay-server"`
+7. Now you need to adjust the app config file. Rename `shopify.app.toml.example` to `shopify.app.toml` and change the following values:
+	Change the value of `client_id` to your apps Client ID. (Same value as SHOPIFY_API_KEY) 
+	Change `name` and `handle` to the name of your app (created in step 1. above) e.g. `name = "BTCPay Server"` and `handle = "btcpay-server"`
+    Change `handle` to the handle of your app (created in step 1. above, you can see it in  e.g. `handle = "btcpay-server-appname"`
     Change `application_url` to your deployed URL. E.g. `application_url = "https://yourdeployedurl.com"`
     Change the value of `dev_store_url` to your shopify store url. E.g. `dev_store_url = "https://yourstore.myshopify.com"`
     In the `redirect_urls` array, replace YOUR_HOSTED_APP_URL.COM with your deployed URL and keep the paths. E.g. `https://yourdeployedurl.com/auth/callback`
