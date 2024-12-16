@@ -137,6 +137,7 @@ public class UIShopifyController : Controller
                         vm.WebhookId = webhookResponse.Webhook.Id.ToString();
                         vm.ApplicationUserId = GetUserId();
                         vm.StoreName = CurrentStore.StoreName;
+                        vm.PaymentText = "Pay with Bitcoin";
                         ctx.Update(vm);
                         await ctx.SaveChangesAsync();
                         TempData[WellKnownTempData.SuccessMessage] = "Shopify plugin successfully updated";
