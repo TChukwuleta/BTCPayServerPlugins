@@ -5,7 +5,7 @@
 
   <!-- Plugin specific properties -->
   <PropertyGroup>
-    <Product>BTCPay Server Shopify Plugin</Product>
+    <Product>BTCPay Server Shopify Plugin v2</Product>
     <Description>BTCPay server integration with Shopify.</Description>
     <Version>1.0.0</Version>
   </PropertyGroup>
