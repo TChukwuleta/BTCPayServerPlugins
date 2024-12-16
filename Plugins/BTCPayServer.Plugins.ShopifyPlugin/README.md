@@ -138,20 +138,38 @@ As of now, the BTCPay-Shopify app is not yet available on the Shopify App Store.
 
 If you are a developer or would love to have total control, you would need to create and deploy your own application.
 ##### Requirements:
-1. A VPS instance to deploy your shopify app to
-2. Shopify plugin installed in your BTCPay Server instance
-3. A [shopify partner account](https://www.shopify.com/partners)
+1. A Linux VPS instance to deploy your shopify app to
+2. The VPS should have [Docker Engine installed](https://docs.docker.com/engine/install/)
+3. A domain/subdomain with an DNS A-record to the IP of your VPS instance, in our example below we use the placeholder "YOUR_HOSTED_APP_URL.COM", e.g. btcpaypp.example.com
+4. Shopify plugin installed in your BTCPay Server instance
+5. A [shopify partner account](https://www.shopify.com/partners)
 
-##### Instructions: 
-1. Click on `Apps` > `All Apps` > `Create App` > `Create app manually`. Enter the name you want to call the app (e.g. My BTCPay App) and click `Create`.
-2. Once created it would take you to a screen displaying your clientId and secret.
-3. Next, you would need to clone or download [this repository](https://github.com/TChukwuleta/btcpayshopifyplugin)
-4. Once you have the repository cloned, install the dependencies. Open your command prompt and enter the command `npm install`
-5. In your application, you have an extension which can be found in the `extensions` folder.
-6. Create a .env file. Paste the following variables.
-	1. SHOPIFY_API_KEY => Represents the Client ID associated with the shopify app created
-	2. SHOPIFY_API_SECRET => Represents the Client Secret associated with the shopify app
-	3. DATABASE_URL = Your database connection string
+##### Installation instructions: 
+1. On Shopify Partner [dashboard](https://partners.shopify.com), click on `Apps` > `All Apps` > `Create App` > `Create app manually`. Enter the name you want to call the app (e.g. My BTCPay App) and click `Create`.
+2. Once created displays your "Client ID" and "Client secret", which we need in a minute. 
+3. Next on your VPS switch to root user and clone or download [this repository](https://github.com/btcpayserver/btcpayshopifyapp) and go into that directory
+   ```bash
+   git clone https://github.com/btcpayserver/btcpayshopifyapp.git
+   cd btcpayshopifyapp
+   ``` 
+
+6. Copy `.env.example` to `.env` file, it contains the following environment variables:
+- DATABASE_URL => Your database connection string, keep it as is if you are using the default sqlite database
+- SHOPIFY_API_KEY => Represents the "Client ID" associated with the shopify app created (step 2 above)
+- SHOPIFY_API_SECRET => Represents the "Client Secret" associated with the shopify app (step 2 above)
+- SHOPIFY_APP_URL => Internal URL to reach your app, e.g. `http://localhost:3000`
+- DOMAIN => Your app domain, e.g. YOUR_HOSTED_APP_URL.COM
+- LETSENCRYPT_EMAIL => Your email address for Let's Encrypt
+
+```dotenv
+DATABASE_URL=file:/app/data/database.sqlite
+SHOPIFY_APP_URL=http://localhost:3000
+SHOPIFY_API_KEY=your_client_id
+SHOPIFY_API_SECRET=your_client_secret
+DOMAIN=YOUR_HOSTED_APP_URL.COM
+LETSENCRYPT_EMAIL=johndoe@example.com
+```
+Replace SHOPIFY_API_KEY, SHOPIFY_API_SECRET, DOMAIN and LETSENCRYPT_EMAIL with your values. Do not change the value of DATABASE_URL and SHOPIFY_APP_URL.
 
 7. In your `shopify.app.toml` file, the following changes would also be needed:
 	Change the value of `client_id` to your shopify Client Id. (Same value as SHOPIFY_API_KEY) 
@@ -161,7 +179,9 @@ If you are a developer or would love to have total control, you would need to cr
     In the `redirect_urls` array, replace YOUR_HOSTED_APP_URL.COM with your deployed URL and keep the paths. E.g. `https://yourdeployedurl.com/auth/callback`
     
     You can also change the name of your extensions. Go to `extensions` > `shopify.extension.toml` and change `name` and `handle` to your desired name for extensions.
-8. You can test your application by running the command `npm run dev` which would load a dev instance of the shopify application. 
+
+4. Now you can run `docker compose up -d` and it will spin up a nodeJS, Nginx and Let's encrypt container making sure the app is reachable over SSL. It will also install all the dependencies needed for the app to run.
+10. You can test your application by running the command `npm run dev` which would load a dev instance of the shopify application. 
 9. Once done deploy your application to shopify. Run the command `npm run deploy`. Once deployed go back to your shopify partner application select the application
     click on `Release` > `Versions`, you should see a new version with the same timestamp as to when you deployed. 
 10. At the same time, if you open your .env file, you would see a new variable generated: `SHOPIFY_{EXTENSION_NAME}_ID`
