@@ -161,21 +161,24 @@ https://YOUR_HOSTED_APP_URL.COM/api/auth/callback
 `Customer data request endpoint` => https://YOUR_HOSTED_APP_URL.COM/webhooks/customers/data_request
 `Customer data erasure endpoint` => https://YOUR_HOSTED_APP_URL.COM/webhooks/customers/redact
 `Shop data erasure endpoint` => https://YOUR_HOSTED_APP_URL.COM/webhooks/shop/redact
-IMAGE
+[Shopify-App: configuration.png](./img/Shopify/partner-app_configuration.png)
 7. Click on `Save` to save the changes
 8. On the left sidebar click on `API Access`
 9. Scroll down to "Allow network access in checkout and account UI extensions" and click on `Request access`
-IMAGE
+![Shopify-App: Allow network access](./img/Shopify/partner-app_allow-network-access.png)
+:::tip
+When you get an error "Could not grant checkout ui extension scope 'read_checkout_external_data' when you try to enable network access, then go to your partner profile and fill out the first and last name and it will work.
+:::
 
 ##### Deploy the BTCPay-Shopify app 
 
-5. Next on your VPS switch to root user and clone or download [this repository](https://github.com/btcpayserver/btcpayshopifyapp) and go into that directory
+1. Next on your VPS switch to root user and clone or download [this repository](https://github.com/btcpayserver/btcpayshopifyapp) and go into that directory
    ```bash
    git clone https://github.com/btcpayserver/btcpayshopifyapp.git
    cd btcpayshopifyapp
    ``` 
 
-6. Copy `.env.example` to `.env` file, it contains the following environment variables:
+2. Copy `.env.example` to `.env` file, it contains the following environment variables:
 - DATABASE_URL => Your database connection string, keep it as is if you are using the default sqlite database
 - SHOPIFY_API_KEY => Represents the "Client ID" associated with the shopify app created (step 2 above)
 - SHOPIFY_API_SECRET => Represents the "Client Secret" associated with the shopify app (step 2 above)
@@ -193,54 +196,55 @@ LETSENCRYPT_EMAIL=johndoe@example.com
 ```
 Replace the values of `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, DOMAIN and `LETSENCRYPT_EMAIL` with your values. Don't change the value of `DATABASE_URL` and `SHOPIFY_APP_URL`.
 
-7. Now you need to adjust the app config file. Rename `shopify.app.toml.example` to `shopify.app.toml` and change the following values:
+3. Next, rename `shopify.app.toml.example` to `shopify.app.toml` and change the following values:
 	Change the value of `client_id` to your apps Client ID. (Same value as SHOPIFY_API_KEY) 
-	Change `name` and `handle` to the name of your app (created in step 1. above) e.g. `name = "BTCPay Server"` and `handle = "btcpay-server"`
+	Change `name` to the name of your app (created in step 1. above) e.g. `name = "BTCPay Server APPNAME"`
     Change `handle` to the handle of your app (created in step 1. above, you can see it in  e.g. `handle = "btcpay-server-appname"`
-    Change `application_url` to your deployed URL. E.g. `application_url = "https://yourdeployedurl.com"`
-    Change the value of `dev_store_url` to your shopify store url. E.g. `dev_store_url = "https://yourstore.myshopify.com"`
-    In the `redirect_urls` array, replace YOUR_HOSTED_APP_URL.COM with your deployed URL and keep the paths. E.g. `https://yourdeployedurl.com/auth/callback`
-    
-    You can also change the name of your extensions. Go to `extensions` > `shopify.extension.toml` and change `name` and `handle` to your desired name for extensions.
+    Change `application_url` to your deployed URL. E.g. `application_url = "https://YOUR_HOSTED_APP_URL.COM"`
+    Change the value of `dev_store_url` to your shopify store url. E.g. `dev_store_url = "https://yourdevstore.myshopify.com"`
+    In the `redirect_urls` array, replace YOUR_HOSTED_APP_URL.COM with your deployed URL and keep the paths. E.g. `https://YOUR_HOSTED_APP_URL.COM/auth/callback`
 
-4. Now you can run `docker compose up -d` and it will spin up a nodeJS, Nginx and Let's encrypt container making sure the app is reachable over SSL. It will also install all the dependencies needed for the app to run.
-10. You can test your application by running the command `npm run dev` which would load a dev instance of the shopify application. 
-9. Once done deploy your application to shopify. Run the command `npm run deploy`. Once deployed go back to your shopify partner application select the application
-    click on `Release` > `Versions`, you should see a new version with the same timestamp as to when you deployed. 
-10. At the same time, if you open your .env file, you would see a new variable generated: `SHOPIFY_{EXTENSION_NAME}_ID`
-11. At this point you'd need to deploy your application to your cloud or server instance. The following are required environment variables that needs to be set on your server.
+4. Next we need to edit the file located in `extensions/btcpaycheckout/src/Checkout.jsx` and replace the value of the constant `shopifyApplicaitonUrl` which is `https://YOUR_HOSTED_APP_URL.COM` with your deployed URL.
 
-	1. SHOPIFY_API_KEY => Represents the Client ID associated with the shopify app
-	2. SHOPIFY_API_SECRET => Represents the Client Secret associated with the shopify app
-	3. DATABASE_URL = Your database connection string
-	4. SHOPIFY_{EXTENSION_NAME}_ID => the Id generated in .env by shopify on deploy
+5. Now you can run `docker compose up -d` and it will spin up a nodeJS, Nginx and Let's encrypt container making sure the app is reachable over SSL. It will also install all the dependencies needed for the app to run.
+6. Once done you need to go into the container and deploy a release. `docker exec -it shopify-app sh`
+7. Now run `npm run deploy`. It will ask you to hit a key and it will show an authentication URL.
+![App deploy: deploy and auth page](./img/Shopify/app-deploy_loginto-container-auth-start.png)
+8. Copy the URL into the browser and login to your partner account.
+![App deploy: login to partner account](./img/Shopify/app-deploy_partner_login_email.png)
+9. Confirm and login.
+![App deploy: Confirm CLI login](./img/Shopify/app-deploy_login-confirmation.png)
+10. You should see a success message in the browser and the terminal should continue.
+![App deploy: Login successful](./img/Shopify/app-deploy_login_success.png)
+11. On terminal it will ask you if you want to release a new version, hit 'enter' to confirm. It will deploy and show you a success message.
+![App deploy: Deployment successful](./img/Shopify/app-deploy_deployment_done.png)
 
-13. Congratulations on deploying your application. Let's get back to our configuration. Now unto the extension bit, navigate to `extensions > {extension name} > src > Checkout.jsx`, there is a variable called `shopifyApplicaitonUrl`, replace the value with your deployed URL.
-14. In your shopify.app.toml file, change the value `application_url` to your deployed URL; change the base url in all `redirect_urls` to your deployed URL
-15. To your server environment variables, add SHOPIFY_APP_URL => your deployed URL
-16. Re-deploy your code changes to your server and also to shopify using the command `npm run deploy`.
-17. Head back to your application dashboard on your partner account. Select configuration. Confirm that the App Url and the redirection Url match your deployed URL.
-18. Select `API Access` on the navigation panel. Scroll down to `Allow network access in checkout and account UI extensions` and ensure it is enabled.
+12. Once deployed let's double-check a few things. 
+    Go back to your shopify partner app dashboard and on left sidebar click on `Versions`, you should see a new version with the same timestamp as to when you deployed. 
+    In your browser visit https://YOUR_HOSTED_APP_URL.COM and you should see a screen similar to this:
+![App deployment: Check app deployed in browser](./img/Shopify/app-deploy_deployment_url_browser.png)
 
-Congratulations on getting here, if all goes well, your deployed URL should a similar image as below:  You can decide to customize the view to suit business needs
+Congrats! You have successfully deployed the BTCPay-Shopify app, only a few steps left.
 
-![BTCPay Server shopify step 27](./img/Shopify/step_16.png)
+13. Now it is time to deploy your application to the Shopify store that you are linking to BTCPay server. On your partner account app overview, click on `Choose distribution` and select `Custom distribution`. Confirm the selection.
+:::tip
+Please note that selecting custom distribution would mean that you can only use the application on only one Shopify store. This is irreversible. You can deploy multiple apps though if you have more than one store.
+:::
+![App deploy: select custom distribution](./img/Shopify/app-deploy_custom-distribution-1.png)
+![App deploy: confirm custom distribution](./img/Shopify/app-deploy_distribution-confirm.png)
 
-Now it is time to deploy your application to the Shopify store that you are linking to BTCPay server. On your application dashboard, select distribution >> Custom distribution.
-Please note that selecting custom distribution would mean that you can only use the application on only one shopify store. This is irreversible.
+14. On the next screen enter the Shopify store URL that you want to link the application to. This is typically the internal store url you see on configuring the store, e.g. something-random.myshopify.com.
+![App deploy: enter your store url](./img/Shopify/app-deploy_distribution-generate-link.png)
+15. Click on `Generate link` and you will see a link generated.
+![App deploy: link generated](./img/Shopify/app-deploy_distribution-generated-link-copy.png)
+15. Open the link generated on a new tab. Select the store to install the app on (ensure it matches with the store you just set in the URL field).
+![app-deploy_distribution-choose-store.png](./img/Shopify/app-deploy_distribution-choose-store.png)
+16. You will see your app listed and you can now install it by clicking on `Install`.
+![app-deploy_distribution-install-to-store-confirm.png](./img/Shopify/app-deploy_distribution-install-to-store-confirm.png)
+17. Once installed, you will see the app settings page. 
+![app-deploy_distribution-install-complete-config-app.png](img/Shopify/app-deploy_distribution-install-complete-config-app.png)
 
-On the next screen enter the Shopify store url that you want to link the application to.
-
-Open the link generated on a new tab. Select the store to install the app on (ensure it matches with the store you inputted). Go ahead and install the application. 
-
-![BTCPay Server shopify step 28](./img/Shopify/step_17.png)
-
-![BTCPay Server shopify step 29](./img/Shopify/step_18.png)
-
-
-CONGRATULATION!!!!... You made it. 
-
-Go back to `Using BTCPay-shopify hosted application` section of this docs and continue from step 2 - 8.
+Go back to [Using BTCPay-Shopify from Shopify App Store](#using-btcpay-shopify-from-shopify-app-store) section above and continue from step 3.
 
 
 ## Demo Checkout flow after everything is set up:
