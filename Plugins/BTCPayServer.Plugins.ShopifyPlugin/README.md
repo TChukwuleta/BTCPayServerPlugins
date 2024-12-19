@@ -160,10 +160,10 @@ When you get an error "Could not grant checkout ui extension scope 'read_checkou
 
 ##### Deploy the BTCPay-Shopify app 
 
-1. Next on your VPS switch to root user and clone or download [this repository](https://github.com/btcpayserver/btcpayshopifyapp) and go into that directory
+1. Next on your VPS switch to root user and clone or download [this repository](https://github.com/btcpayserver/shopify-app) and go into that directory
    ```bash
-   git clone https://github.com/btcpayserver/btcpayshopifyapp.git
-   cd btcpayshopifyapp
+   git clone https://github.com/btcpayserver/shopify-app.git shopify-app 
+   cd shopify-app
    ``` 
 
 2. Copy `.env.example` to `.env` file, it contains the following environment variables:
