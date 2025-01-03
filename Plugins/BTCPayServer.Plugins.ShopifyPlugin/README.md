@@ -28,7 +28,6 @@ Before diving into the setup process, ensure you have the following:
 - BTCPay Server - [self-hosted](Deployment.md) or run by a [third-party host](/Deployment/ThirdPartyHosting.md) v2.0.0 or later.
 - [Created BTCPay Server store](CreateStore.md) with [wallet set up](WalletSetup.md)
 
-[![BTCPay Server - Shopify Video](https://img.youtube.com/vi/jJjAyvgWVfk/mqdefault.jpg)](https://www.youtube.com/watch?v=jJjAyvgWVfk)
 
 :::warning
 Shopify might give false flags on deprecated API calls. The most likely answer we could find, due to a change by Shopify to specific fields of the `Order` resource and is assumed to get used in BTCPay Server. Find more details [here](https://github.com/btcpayserver/btcpayserver/issues/4510)
@@ -75,6 +74,11 @@ Shopify might give false flags on deprecated API calls. The most likely answer w
 :::
 
 ## Install BTCPay Server Shopify plugin
+
+:::warning
+This plugin is currently in pre-release mode. To view, you can enable "Show plugins in pre-release" in your server settings.
+:::
+
 1. In your BTCPay Server, go to your plugins, find and install Shopify plugin. Once done, on the left sidebar click on `Shopify`
 2. In the first field, `Shopify Store URL` enter the subdomain of your Shopify store e.g. SOME_ID.myshopify.com then enter SOME_ID
 3. In the second field, `API key` paste the `API key` from Shopify - see steps above.
