@@ -29,10 +29,6 @@ Before diving into the setup process, ensure you have the following:
 - [Created BTCPay Server store](CreateStore.md) with [wallet set up](WalletSetup.md)
 
 
-:::warning
-Shopify might give false flags on deprecated API calls. The most likely answer we could find, due to a change by Shopify to specific fields of the `Order` resource and is assumed to get used in BTCPay Server. Find more details [here](https://github.com/btcpayserver/btcpayserver/issues/4510)
-:::
-
 ## Setting up BTCPay Server with Shopify
 
 ### Create an app and get API credentials from Shopify
