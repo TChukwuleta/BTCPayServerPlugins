@@ -192,38 +192,36 @@ Replace the values of `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, DOMAIN and `LETSE
     Change the value of `dev_store_url` to your shopify store url. E.g. `dev_store_url = "https://yourdevstore.myshopify.com"`
     In the `redirect_urls` array, replace YOUR_HOSTED_APP_URL.COM with your deployed URL and keep the paths. E.g. `https://YOUR_HOSTED_APP_URL.COM/auth/callback`
 
-4. Next we need to edit the file located in `extensions/btcpaycheckout/src/Checkout.jsx` and replace the value of the constant `shopifyApplicaitonUrl` which is `https://YOUR_HOSTED_APP_URL.COM` with your deployed URL.
-
-5. Now you can run `docker compose up -d` and it will spin up a nodeJS, Nginx and Let's encrypt container making sure the app is reachable over SSL. It will also install all the dependencies needed for the app to run.
-6. Once done you need to go into the container and deploy a release. `docker exec -it shopify-app sh`
-7. Now run `npm run deploy`. It will ask you to hit a key and it will show an authentication URL.
+4. Now you can run `docker compose up -d` and it will spin up a nodeJS, Nginx and Let's encrypt container making sure the app is reachable over SSL. It will also install all the dependencies needed for the app to run.
+5. Once done you need to go into the container and deploy a release. `docker exec -it shopify-app sh`
+6. Now run `npm run deploy`. It will ask you to hit a key and it will show an authentication URL.
 ![App deploy: deploy and auth page](./img/Shopify/app-deploy_loginto-container-auth-start.png)
-8. Copy the URL into the browser and login to your partner account.
+7. Copy the URL into the browser and login to your partner account.
 ![App deploy: login to partner account](./img/Shopify/app-deploy_partner_login_email.png)
-9. Confirm and login.
+8. Confirm and login.
 ![App deploy: Confirm CLI login](./img/Shopify/app-deploy_login-confirmation.png)
-10. You should see a success message in the browser and the terminal should continue.
+9. You should see a success message in the browser and the terminal should continue.
 ![App deploy: Login successful](./img/Shopify/app-deploy_login_success.png)
-11. On terminal it will ask you if you want to release a new version, hit 'enter' to confirm. It will deploy and show you a success message.
+10. On terminal it will ask you if you want to release a new version, hit 'enter' to confirm. It will deploy and show you a success message.
 ![App deploy: Deployment successful](./img/Shopify/app-deploy_deployment_done.png)
 
-12. Once deployed let's double-check a few things. 
+11. Once deployed let's double-check a few things. 
     Go back to your shopify partner app dashboard and on left sidebar click on `Versions`, you should see a new version with the same timestamp as to when you deployed. 
     In your browser visit https://YOUR_HOSTED_APP_URL.COM and you should see a screen similar to this:
 ![App deployment: Check app deployed in browser](./img/Shopify/app-deploy_deployment_url_browser.png)
 
 Congrats! You have successfully deployed the BTCPay-Shopify app, only a few steps left.
 
-13. Now it is time to deploy your application to the Shopify store that you are linking to BTCPay server. On your partner account app overview, click on `Choose distribution` and select `Custom distribution`. Confirm the selection.
+12. Now it is time to deploy your application to the Shopify store that you are linking to BTCPay server. On your partner account app overview, click on `Choose distribution` and select `Custom distribution`. Confirm the selection.
 :::tip
 Please note that selecting custom distribution would mean that you can only use the application on only one Shopify store. This is irreversible. You can deploy multiple apps though if you have more than one store.
 :::
 ![App deploy: select custom distribution](./img/Shopify/app-deploy_custom-distribution-1.png)
 ![App deploy: confirm custom distribution](./img/Shopify/app-deploy_distribution-confirm.png)
 
-14. On the next screen enter the Shopify store URL that you want to link the application to. This is typically the internal store url you see on configuring the store, e.g. something-random.myshopify.com.
+13. On the next screen enter the Shopify store URL that you want to link the application to. This is typically the internal store url you see on configuring the store, e.g. something-random.myshopify.com.
 ![App deploy: enter your store url](./img/Shopify/app-deploy_distribution-generate-link.png)
-15. Click on `Generate link` and you will see a link generated.
+14. Click on `Generate link` and you will see a link generated.
 ![App deploy: link generated](./img/Shopify/app-deploy_distribution-generated-link-copy.png)
 15. Open the link generated on a new tab. Select the store to install the app on (ensure it matches with the store you just set in the URL field).
 ![app-deploy_distribution-choose-store.png](./img/Shopify/app-deploy_distribution-choose-store.png)
