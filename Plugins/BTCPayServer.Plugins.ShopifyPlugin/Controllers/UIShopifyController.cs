@@ -32,6 +32,8 @@ using System.Text;
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using StoreData = BTCPayServer.Data.StoreData;
+using BTCPayServer.Services;
+using BTCPayServer.Models;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -42,25 +44,31 @@ public class UIShopifyController : Controller
     private readonly ShopifyHostedService _shopifyService;
     private readonly ILogger<UIShopifyController> _logger;
     private readonly StoreRepository _storeRepo;
+    private readonly UriResolver _uriResolver;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly UIInvoiceController _invoiceController;
+    private readonly ApplicationDbContextFactory _context;
     private readonly ShopifyDbContextFactory _dbContextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly BTCPayNetworkProvider _networkProvider;
     private readonly IHttpClientFactory _clientFactory;
     private ShopifyHelper helper;
     public UIShopifyController
-        (StoreRepository storeRepo,
+        (UriResolver uriResolver,
+        StoreRepository storeRepo,
         BTCPayNetworkProvider networkProvider,
         UIInvoiceController invoiceController,
         UserManager<ApplicationUser> userManager,
         ShopifyHostedService shopifyService,
+        ApplicationDbContextFactory context,
         ShopifyDbContextFactory dbContextFactory,
         InvoiceRepository invoiceRepository,
         IHttpClientFactory clientFactory,
         ILogger<UIShopifyController> logger)
     {
+        _context = context;
         _storeRepo = storeRepo;
+        _uriResolver = uriResolver;
         _userManager = userManager;
         _clientFactory = clientFactory;
         _shopifyService = shopifyService;
@@ -264,8 +272,17 @@ public class UIShopifyController : Controller
     public async Task<IActionResult> InitiatePayment(string invoiceId, string shopName, string orderId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
+        var shopifySetting = ctx.ShopifySettings.AsNoTracking().FirstOrDefault(c => c.ShopName == shopName);
+
+
+        await using var dbMain = _context.CreateContext();
+        var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == shopifySetting.StoreId);
+
         return View(new ShopifyOrderViewModel
         {
+            StoreId = store.Id,
+            StoreName = store.StoreName,
+            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
             BTCPayServerUrl = Request.GetAbsoluteRoot(),
             InvoiceId = invoiceId,
             OrderId = orderId,

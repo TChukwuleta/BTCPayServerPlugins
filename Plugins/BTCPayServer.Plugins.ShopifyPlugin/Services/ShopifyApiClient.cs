@@ -51,7 +51,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
             if (strResp.StartsWith("{", StringComparison.OrdinalIgnoreCase) && JObject.Parse(strResp)["errors"]?.Value<string>() is string error)
             {
                 if (error == "Not Found")
-                    error = "Shop not found";
+                    error = "Shop or Order not found";
                 throw new ShopifyApiException(error);
             }
             return strResp;
