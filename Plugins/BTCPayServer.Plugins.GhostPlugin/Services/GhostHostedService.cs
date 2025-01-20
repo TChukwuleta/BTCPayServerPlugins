@@ -1,13 +1,10 @@
-﻿using BTCPayServer.Data;
-using BTCPayServer.Events;
+﻿using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
-using BTCPayServer.Plugins.ShopifyPlugin.ViewModels.Models;
 using BTCPayServer.Services.Invoices;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
