@@ -14,12 +14,13 @@ public class GhostDbContext : DbContext
     }
 
     public DbSet<GhostSetting> GhostSettings { get; set; }
+    public DbSet<GhostMember> GhostMembers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.Ghost");
-
         GhostSetting.OnModelCreating(modelBuilder);
+        GhostMember.OnModelCreating(modelBuilder);
     }
 }

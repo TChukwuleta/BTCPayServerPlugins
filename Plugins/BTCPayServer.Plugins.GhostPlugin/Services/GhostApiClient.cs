@@ -40,6 +40,12 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             return tiers;
         }
 
+        public async Task CreateGhostMember(string name, string email)
+        {
+            var req = CreateRequest(_credentials.ShopName, HttpMethod.Get, "tiers?include=monthly_price,yearly_price,benefits");
+            var tiers = await SendRequest(req);
+        }
+
         private string GenerateGhostApiToken()
         {
             // In accordance to this docs: https://ghost.org/docs/admin-api/#token-authentication
