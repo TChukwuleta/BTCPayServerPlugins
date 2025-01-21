@@ -11,18 +11,24 @@ public class GhostSetting
     public string Id { get; set; }
 
     [Display(Name = "Ghost API URL")]
-    public string ApiUrl { get; set; }
+    public string ShopName { get; set; } // https://tobses-1.ghost.io
+
+    [Display(Name = "Ghost Admin Domain")]
+    public string AdminDomain { get; set; }
 
     [Display(Name = "Admin API Key")]
     public string AdminApiKey { get; set; }
 
     [Display(Name = "Content API Key")]
     public string ContentApiKey { get; set; }
+    public string StoreId { get; set; }
+    public string StoreName { get; set; }
+    public string ApplicationUserId { get; set; }
     public DateTimeOffset? IntegratedAt { get; set; }
     public bool CredentialsPopulated()
     {
         return
-            !string.IsNullOrWhiteSpace(ApiUrl) &&
+            !string.IsNullOrWhiteSpace(ShopName) &&
             !string.IsNullOrWhiteSpace(AdminApiKey) &&
             !string.IsNullOrWhiteSpace(ContentApiKey);
     }
