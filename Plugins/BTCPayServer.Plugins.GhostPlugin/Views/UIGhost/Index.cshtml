@@ -45,10 +45,10 @@
                         }
                         <input asp-for="ShopName" class="form-control" readonly="@ghostCredsSet" />
 
-                        @if (!ghostCredsSet || !Model?.ShopName?.Contains(".") is true)
+                        @* @if (!ghostCredsSet || !Model?.ShopName?.Contains(".") is true)
                         {
-                            <span class="input-group-text">.myghost.com</span>
-                        }
+                            <span class="input-group-text">.ghost.io</span>
+                        } *@
                     </div>
                     <span asp-validation-for="ShopName" class="text-danger"></span>
                 </div>
@@ -90,7 +90,7 @@ else
 {
     <div class="alert alert-warning alert-dismissible mb-4" role="alert">
         <p class="mb-0" style="font-size: 0.9rem;">
-            To proceed with Shopify plugin on this store, you need to
+            To proceed with Ghost plugin on this store, you need to
             <a href="@Url.Action(nameof(UIStoresController.SetupWallet), "UIStores", new { cryptoCode = Model.CryptoCode, storeId = Model.StoreId })" class="alert-link">
                 set up a wallet
             </a>

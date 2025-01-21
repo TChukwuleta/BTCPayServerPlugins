@@ -1,0 +1,105 @@
+@using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models
+@model CreateMemberViewModel
+@{
+    Layout = "_GhostPublicLayout";
+    ViewBag.Title = "Pay with BTCPay Server...";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-6 col-md-8">
+        <div class="text-center mb-4">
+            <h1 class="fw-bold">Your Brand</h1>
+        </div>
+        <div class="card shadow p-4">
+            <form id="subscription-form" method="POST" action="/create-invoice">
+                <!-- Name -->
+                <div class="mb-3">
+                    <label for="name" class="form-label">Name</label>
+                    <input type="text" class="form-control" id="name" name="name" placeholder="Jamie Larson" required>
+                </div>
+                <!-- Email -->
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" class="form-control" id="email" name="email" placeholder="jamie@example.com" required>
+                </div>
+                <!-- Tier Selection -->
+                <div class="mb-4">
+                    <label for="tier" class="form-label">Select Tier</label>
+                    <select id="tier" class="form-select" name="tier" required>
+                        <option value="" disabled selected>Select a tier</option>
+                        <option value="basic" data-monthly="$10" data-yearly="$100">Basic</option>
+                        <option value="premium" data-monthly="$20" data-yearly="$200">Premium</option>
+                        <option value="vip" data-monthly="$30" data-yearly="$300">VIP</option>
+                    </select>
+                </div>
+                <!-- Payment Frequency Tabs -->
+                <div id="frequency-tabs" class="hidden">
+                    <div class="d-flex justify-content-center mb-4">
+                        <div class="btn-group" role="group" aria-label="Payment Frequency">
+                            <input type="radio" class="btn-check" name="frequency" id="monthly" value="monthly" checked>
+                            <label class="btn btn-outline-success" for="monthly">Monthly</label>
+
+                            <input type="radio" class="btn-check" name="frequency" id="yearly" value="yearly">
+                            <label class="btn btn-outline-success" for="yearly">Yearly <span class="text-muted">(save more!)</span></label>
+                        </div>
+                    </div>
+                </div>
+                <!-- Pricing Details -->
+                <div id="pricing-card" class="hidden">
+                    <div class="card border-success">
+                        <div class="card-body text-center">
+                            <h5 id="tier-title" class="card-title fw-bold"></h5>
+                            <p id="tier-price" class="card-text fs-4"></p>
+                            <p id="tier-description" class="text-muted"></p>
+                            <button type="submit" class="btn btn-success w-100">Subscribe</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section PageFootContent {
+    <script>
+        // DOM Elements
+        const tierSelect = document.getElementById('tier');
+        const frequencyTabs = document.getElementById('frequency-tabs');
+        const pricingCard = document.getElementById('pricing-card');
+        const monthlyTab = document.getElementById('monthly');
+        const yearlyTab = document.getElementById('yearly');
+        const tierTitle = document.getElementById('tier-title');
+        const tierPrice = document.getElementById('tier-price');
+        const tierDescription = document.getElementById('tier-description');
+
+        // Event Listener for Tier Dropdown
+        tierSelect.addEventListener('change', (event) => {
+            const selectedOption = event.target.options[event.target.selectedIndex];
+            const tierName = selectedOption.text;
+            const monthlyPrice = selectedOption.getAttribute('data-monthly');
+            const yearlyPrice = selectedOption.getAttribute('data-yearly');
+
+            // Show Frequency Tabs
+            frequencyTabs.classList.remove('hidden');
+
+            // Default to Monthly Details
+            tierTitle.textContent = `${tierName} - Monthly Plan`;
+            tierPrice.textContent = monthlyPrice;
+            tierDescription.textContent = `Billed monthly at ${monthlyPrice}.`;
+            pricingCard.classList.remove('hidden');
+
+            // Update Pricing Details on Tab Change
+            monthlyTab.addEventListener('change', () => {
+                tierTitle.textContent = `${tierName} - Monthly Plan`;
+                tierPrice.textContent = monthlyPrice;
+                tierDescription.textContent = `Billed monthly at ${monthlyPrice}.`;
+            });
+
+            yearlyTab.addEventListener('change', () => {
+                tierTitle.textContent = `${tierName} - Yearly Plan`;
+                tierPrice.textContent = yearlyPrice;
+                tierDescription.textContent = `Billed yearly at ${yearlyPrice}.`;
+            });
+        });
+    </script>
+}

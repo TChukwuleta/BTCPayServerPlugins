@@ -5,6 +5,7 @@ namespace BTCPayServer.Plugins.GhostPlugin;
 
 public class GhostDbContext : DbContext
 {
+    // dotnet ef migrations add initialMigration -o Data/Migrations
     private readonly bool _designTime;
 
     public GhostDbContext(DbContextOptions<GhostDbContext> options, bool designTime = false)

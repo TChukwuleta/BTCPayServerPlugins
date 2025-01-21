@@ -19,6 +19,8 @@ using System;
 using System.Net.Http;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.Plugins.GhostPlugin;
+using Newtonsoft.Json;
+using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -71,6 +73,7 @@ public class UIGhostController : Controller
     [HttpPost("~/plugins/stores/{storeId}/ghost")]
     public async Task<IActionResult> Index(string storeId, GhostSetting vm, string command = "")
     {
+        Console.WriteLine(JsonConvert.SerializeObject(vm));
         try
         {
             await using var ctx = _dbContextFactory.CreateContext();
@@ -122,6 +125,12 @@ public class UIGhostController : Controller
             TempData[WellKnownTempData.ErrorMessage] = $"An error occurred on Ghost plugin. {ex.Message}";
             return RedirectToAction(nameof(Index), new { storeId = CurrentStore.Id });
         }
+    }
+
+    [HttpGet("~/plugins/{storeId}/ghost/create-member")]
+    public async Task<IActionResult> CreateMember(string storeId)
+    {
+        return View(new CreateMemberViewModel());
     }
 
     private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(StoreData storeData, bool onlyEnabled = false)

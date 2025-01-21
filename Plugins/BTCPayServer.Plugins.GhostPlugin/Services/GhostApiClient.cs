@@ -30,6 +30,7 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             var url = $"https://{(_credentials.ShopName.Contains('.', StringComparison.InvariantCulture) ? $"{_credentials.ShopName}/ghost/api/admin/site" : $"{_credentials.ShopName}.ghost.io")}/ghost/api/admin/site";
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Ghost", jwt);
             var response = await _httpClient.GetAsync(url);
+            Console.WriteLine(response.Content);
             return response.IsSuccessStatusCode;
         }
 
