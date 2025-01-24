@@ -15,12 +15,12 @@
                 <!-- Name -->
                 <div class="mb-3">
                     <label for="name" class="form-label">Name</label>
-                    <input type="text" class="form-control" id="name" name="name" placeholder="Jamie Larson" required>
+                    <input type="text" class="form-control" id="name" name="name" placeholder="Enter your full name" required>
                 </div>
                 <!-- Email -->
                 <div class="mb-3">
                     <label for="email" class="form-label">Email</label>
-                    <input type="email" class="form-control" id="email" name="email" placeholder="jamie@example.com" required>
+                    <input type="email" class="form-control" id="email" name="email" placeholder="member@example.com" required>
                 </div>
                 <!-- Tier Selection -->
                 <div class="mb-4">
@@ -62,7 +62,6 @@
 
 @section PageFootContent {
     <script>
-        // DOM Elements
         const tierSelect = document.getElementById('tier');
         const frequencyTabs = document.getElementById('frequency-tabs');
         const pricingCard = document.getElementById('pricing-card');
@@ -71,6 +70,14 @@
         const tierTitle = document.getElementById('tier-title');
         const tierPrice = document.getElementById('tier-price');
         const tierDescription = document.getElementById('tier-description');
+        const submitButton = document.querySelector('button[type="submit"]');
+
+        // Disable Submit Button Initially
+        submitButton.disabled = true;
+
+        // Hide Frequency Tabs and Pricing Card Initially
+        frequencyTabs.classList.add('hidden');
+        pricingCard.classList.add('hidden');
 
         // Event Listener for Tier Dropdown
         tierSelect.addEventListener('change', (event) => {
@@ -79,27 +86,35 @@
             const monthlyPrice = selectedOption.getAttribute('data-monthly');
             const yearlyPrice = selectedOption.getAttribute('data-yearly');
 
-            // Show Frequency Tabs
-            frequencyTabs.classList.remove('hidden');
+            if (tierSelect.value) {
+                // Enable Submit Button and Show Frequency Tabs
+                submitButton.disabled = false;
+                frequencyTabs.classList.remove('hidden');
 
-            // Default to Monthly Details
-            tierTitle.textContent = `${tierName} - Monthly Plan`;
-            tierPrice.textContent = monthlyPrice;
-            tierDescription.textContent = `Billed monthly at ${monthlyPrice}.`;
-            pricingCard.classList.remove('hidden');
-
-            // Update Pricing Details on Tab Change
-            monthlyTab.addEventListener('change', () => {
+                // Default to Monthly Details
                 tierTitle.textContent = `${tierName} - Monthly Plan`;
                 tierPrice.textContent = monthlyPrice;
                 tierDescription.textContent = `Billed monthly at ${monthlyPrice}.`;
-            });
+                pricingCard.classList.remove('hidden');
 
-            yearlyTab.addEventListener('change', () => {
-                tierTitle.textContent = `${tierName} - Yearly Plan`;
-                tierPrice.textContent = yearlyPrice;
-                tierDescription.textContent = `Billed yearly at ${yearlyPrice}.`;
-            });
+                // Update Pricing Details on Tab Change
+                monthlyTab.addEventListener('change', () => {
+                    tierTitle.textContent = `${tierName} - Monthly Plan`;
+                    tierPrice.textContent = monthlyPrice;
+                    tierDescription.textContent = `Billed monthly at ${monthlyPrice}.`;
+                });
+
+                yearlyTab.addEventListener('change', () => {
+                    tierTitle.textContent = `${tierName} - Yearly Plan`;
+                    tierPrice.textContent = yearlyPrice;
+                    tierDescription.textContent = `Billed yearly at ${yearlyPrice}.`;
+                });
+            } else {
+                // Disable Submit Button and Hide UI Elements
+                submitButton.disabled = true;
+                frequencyTabs.classList.add('hidden');
+                pricingCard.classList.add('hidden');
+            }
         });
     </script>
 }

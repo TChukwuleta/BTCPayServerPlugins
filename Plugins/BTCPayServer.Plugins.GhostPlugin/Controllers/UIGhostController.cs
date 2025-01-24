@@ -87,7 +87,7 @@ public class UIGhostController : Controller
                             TempData[WellKnownTempData.ErrorMessage] = "Please provide valid Ghost credentials";
                             return View(vm);
                         }
-                        var apiClient = new GhostApiClient(_clientFactory, vm.CreateGhsotApiCredentials());
+                        var apiClient = new GhostAdminApiClient(_clientFactory, vm.CreateGhsotApiCredentials());
                         try
                         {
                             await apiClient.ValidateGhostCredentials();
@@ -130,6 +130,11 @@ public class UIGhostController : Controller
     [HttpGet("~/plugins/{storeId}/ghost/create-member")]
     public async Task<IActionResult> CreateMember(string storeId)
     {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+
+        var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
+        var ghostTiers = await apiClient.RetrieveGhostTiers();
         return View(new CreateMemberViewModel());
     }
 
