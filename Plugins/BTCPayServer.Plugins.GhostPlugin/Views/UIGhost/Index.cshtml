@@ -12,14 +12,7 @@
 }
 
 <div class="sticky-header">
-    <h2 class="my-1">
-        @ViewData["Title"]
-        @* <small>
-            <a href="https://docs.btcpayserver.org/Shopify" target="_blank" rel="noreferrer noopener" title="More information...">
-                <vc:icon symbol="info" />
-            </a>
-        </small> *@
-    </h2>
+    <h2 class="my-1">@ViewData["Title"]</h2>
 </div>
 
 <partial name="_StatusMessage" />
@@ -37,38 +30,46 @@
 
             <form method="post" id="ghostForm">
                 <div class="form-group">
-                    <label asp-for="ShopName" class="form-label"></label>
+                    <label asp-for="ApiUrl" class="form-label"></label>
                     <div class="input-group">
-                        @if (!Model?.ShopName?.Contains(".") is true)
+                        @* @if (!Model?.ApiUrl?.Contains(".") is true)
                         {
                             <span class="input-group-text">https://</span>
-                        }
-                        <input asp-for="ShopName" class="form-control" readonly="@ghostCredsSet" />
-
-                        @* @if (!ghostCredsSet || !Model?.ShopName?.Contains(".") is true)
-                        {
-                            <span class="input-group-text">.ghost.io</span>
                         } *@
+                        <span class="input-group-text">https://</span>
+                        <input asp-for="ApiUrl" class="form-control" readonly="@ghostCredsSet" />
                     </div>
-                    <span asp-validation-for="ShopName" class="text-danger"></span>
-                </div>
-
-                <div class="form-group">
-                    <label asp-for="AdminApiKey" class="form-label"></label>
-                    <input asp-for="AdminApiKey" class="form-control" readonly="@ghostCredsSet" />
-                    <span asp-validation-for="AdminApiKey" class="text-danger"></span>
+                    <span asp-validation-for="ApiUrl" class="text-danger"></span>
                 </div>
 
                 <div class="form-group">
                     <label asp-for="ContentApiKey" class="form-label"></label>
-                    <input asp-for="ContentApiKey" class="form-control" type="password" value="@Model?.ContentApiKey" readonly="@ghostCredsSet" />
+                    <input asp-for="ContentApiKey" class="form-control" readonly="@ghostCredsSet" />
                     <span asp-validation-for="ContentApiKey" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Username" class="form-label"></label>
+                    <input asp-for="Username" class="form-control" readonly="@ghostCredsSet" />
+                    <span asp-validation-for="Username" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="AdminApiKey" class="form-label"></label>
+                    <input asp-for="AdminApiKey" class="form-control" type="password" value="@Model?.AdminApiKey" readonly="@ghostCredsSet" />
+                    <span asp-validation-for="AdminApiKey" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Password" class="form-label"></label>
+                    <input asp-for="Password" class="form-control" type="password" value="@Model?.Password" readonly="@ghostCredsSet" />
+                    <span asp-validation-for="Password" class="text-danger"></span>
                 </div>
 
                 @if (ghostCredsSet)
                 {
                     <p class="alert alert-success">
-                        Orders on <b>@Model.ShopName</b>.ghost.io will be marked as paid on successful invoice payment.
+                        Orders on <b>@Model.ApiUrl</b> will be marked as paid on successful invoice payment.
                         Started: @Model.IntegratedAt.Value.ToBrowserDate()
                     </p>
 

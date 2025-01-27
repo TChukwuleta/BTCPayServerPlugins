@@ -1,8 +1,6 @@
 ﻿using System;
-using JWT.Builder;
 using System.Net;
 using System.Text;
-using JWT.Algorithms;
 using System.Net.Http;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
@@ -18,11 +16,12 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
     {
         private readonly HttpClient _httpClient;
         private readonly GhostApiClientCredentials _credentials;
-        private readonly string ApiVersion = "v5.0"; 
-        private readonly string sessionUrl = "https://tobses-1.ghost.io/ghost/api/admin/session"; // make it dynamic..
+        private readonly string ApiVersion = "v5.0";
+        private readonly string sessionUrl;
         public GhostAdminApiClient(IHttpClientFactory httpClientFactory, GhostApiClientCredentials credentials)
         {
             _credentials = credentials;
+            sessionUrl = $"https://{_credentials.ApiUrl}/ghost/api/admin/session";
             if (httpClientFactory != null)
             {
                 _httpClient = httpClientFactory.CreateClient(nameof(GhostAdminApiClient));
@@ -51,10 +50,13 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             var sessionResponse = await _httpClient.PostAsync(sessionUrl, jsonContent);
             if (sessionResponse.StatusCode != HttpStatusCode.Created)
                 return false;
-            var token = GhostAdminAPIToken();
-            var url = $"https://{(_credentials.ShopName.Contains('.', StringComparison.InvariantCulture) ? $"{_credentials.ShopName}/ghost/api/admin/site" : $"{_credentials.ShopName}.ghost.io")}/ghost/api/admin/site";
+            var token = GenerateGhostApiToken();
+            var url = $"https://{_credentials.ApiUrl}/ghost/api/admin/site";
+            Console.WriteLine(url);
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Ghost", token);
             var response = await _httpClient.GetAsync(url);
+            Console.WriteLine(response.StatusCode);
+            Console.WriteLine($"Admin site url: {response.Content.ReadAsStringAsync()}");
             return response.IsSuccessStatusCode;
         }
 
@@ -78,8 +80,7 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
 
         private HttpRequestMessage CreateRequest(HttpMethod method, string relativeUrl)
         {
-            var url =
-                $"https://{(_credentials.ShopName.Contains('.', StringComparison.InvariantCulture) ? $"{_credentials.ShopName}/ghost/api/admin/{relativeUrl}" : $"{_credentials.ShopName}.ghost.io")}/ghost/api/admin/{relativeUrl}";
+            var url = $"https://{_credentials.ApiUrl}/ghost/api/admin/{relativeUrl}";
             var req = new HttpRequestMessage(method, url);
             return req;
         }
@@ -87,7 +88,7 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
 
         private async Task<string> SendRequest(HttpRequestMessage req)
         {
-            string bearer = GhostAdminAPIToken();
+            string bearer = GenerateGhostApiToken();
             var postData = new
             {
                 username = _credentials.UserName, // make it dynamic..
@@ -104,25 +105,6 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             return responseContent;
         }
 
-        private string GhostAdminAPIToken()
-        {
-            // In accordance to this docs: https://ghost.org/docs/admin-api/#token-authentication
-            var adminKeyParts = _credentials.AdminApiKey.Split(':');
-            var id = adminKeyParts[0];
-            var secret = adminKeyParts[1];
-            var unixEpochInSeconds = new DateTimeOffset(DateTime.Now).ToUnixTimeSeconds();
-
-            var token = new JwtBuilder().WithAlgorithm(new HMACSHA256Algorithm())
-                                        .WithSecret(Convert.FromHexString(secret))
-                                        .AddHeader(HeaderName.KeyId, id)
-                                        .AddHeader(HeaderName.Type, "JWT")
-                                        .AddClaim("exp", unixEpochInSeconds + 300)
-                                        .AddClaim("iat", unixEpochInSeconds)
-                                        .AddClaim("aud", "/admin/")
-                                        .Encode();
-            return token;
-        }
-
         private string GenerateGhostApiToken()
         {
             // In accordance to this docs: https://ghost.org/docs/admin-api/#token-authentication
@@ -131,7 +113,7 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             string secret = keyParts[1];
             var securityKey = new SymmetricSecurityKey(HexStringToByteArray(secret));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-            var header = new System.IdentityModel.Tokens.Jwt.JwtHeader(credentials)
+            var header = new JwtHeader(credentials)
             {
                 { "kid", id }
             };

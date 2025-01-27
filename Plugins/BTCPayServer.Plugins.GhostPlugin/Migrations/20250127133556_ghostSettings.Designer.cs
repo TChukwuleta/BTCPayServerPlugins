@@ -9,11 +9,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
+namespace BTCPayServer.Plugins.GhostPlugin.Migrations
 {
     [DbContext(typeof(GhostDbContext))]
-    [Migration("20250121162850_initialMigration")]
-    partial class initialMigration
+    [Migration("20250127133556_ghostSettings")]
+    partial class ghostSettings
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -76,6 +76,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     b.Property<string>("AdminDomain")
                         .HasColumnType("text");
 
+                    b.Property<string>("ApiUrl")
+                        .HasColumnType("text");
+
                     b.Property<string>("ApplicationUserId")
                         .HasColumnType("text");
 
@@ -85,13 +88,16 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     b.Property<DateTimeOffset?>("IntegratedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("ShopName")
+                    b.Property<string>("Password")
                         .HasColumnType("text");
 
                     b.Property<string>("StoreId")
                         .HasColumnType("text");
 
                     b.Property<string>("StoreName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Username")
                         .HasColumnType("text");
 
                     b.HasKey("Id");

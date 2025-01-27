@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
+namespace BTCPayServer.Plugins.GhostPlugin.Migrations
 {
     /// <inheritdoc />
-    public partial class initialMigration : Migration
+    public partial class ghostSettings : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -41,10 +41,12 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "text", nullable: false),
-                    ShopName = table.Column<string>(type: "text", nullable: true),
+                    ApiUrl = table.Column<string>(type: "text", nullable: true),
                     AdminDomain = table.Column<string>(type: "text", nullable: true),
                     AdminApiKey = table.Column<string>(type: "text", nullable: true),
                     ContentApiKey = table.Column<string>(type: "text", nullable: true),
+                    Username = table.Column<string>(type: "text", nullable: true),
+                    Password = table.Column<string>(type: "text", nullable: true),
                     StoreId = table.Column<string>(type: "text", nullable: true),
                     StoreName = table.Column<string>(type: "text", nullable: true),
                     ApplicationUserId = table.Column<string>(type: "text", nullable: true),

@@ -11,7 +11,7 @@ public class GhostSetting
     public string Id { get; set; }
 
     [Display(Name = "Ghost API URL")]
-    public string ShopName { get; set; } // https://tobses-1.ghost.io
+    public string ApiUrl { get; set; }
 
     [Display(Name = "Ghost Admin Domain")]
     public string AdminDomain { get; set; }
@@ -21,6 +21,10 @@ public class GhostSetting
 
     [Display(Name = "Content API Key")]
     public string ContentApiKey { get; set; }
+
+    [Display(Name = "Ghost Username/Email")]
+    public string Username { get; set; }
+    public string Password { get; set; }
     public string StoreId { get; set; }
     public string StoreName { get; set; }
     public string ApplicationUserId { get; set; }
@@ -28,9 +32,10 @@ public class GhostSetting
     public bool CredentialsPopulated()
     {
         return
-            !string.IsNullOrWhiteSpace(ShopName) &&
+            !string.IsNullOrWhiteSpace(ApiUrl) &&
             !string.IsNullOrWhiteSpace(AdminApiKey) &&
-            !string.IsNullOrWhiteSpace(ContentApiKey);
+            !string.IsNullOrWhiteSpace(Username) &&
+            !string.IsNullOrWhiteSpace(Password);
     }
 
     [NotMapped]

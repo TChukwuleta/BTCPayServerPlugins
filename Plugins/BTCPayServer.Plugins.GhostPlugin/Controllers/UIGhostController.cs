@@ -81,6 +81,7 @@ public class UIGhostController : Controller
             {
                 case "GhostSaveCredentials":
                     {
+                        vm.ApiUrl = vm.ApiUrl?.TrimEnd('/');
                         var validCreds = vm?.CredentialsPopulated() == true;
                         if (!validCreds)
                         {
@@ -90,7 +91,12 @@ public class UIGhostController : Controller
                         var apiClient = new GhostAdminApiClient(_clientFactory, vm.CreateGhsotApiCredentials());
                         try
                         {
-                            await apiClient.ValidateGhostCredentials();
+                            var validCredentials = await apiClient.ValidateGhostCredentials();
+                            if (!validCredentials)
+                            {
+                                TempData[WellKnownTempData.ErrorMessage] = $"Invalid Ghost credentials";
+                                return View(vm);
+                            }
                         }
                         catch (GhostApiException err)
                         {

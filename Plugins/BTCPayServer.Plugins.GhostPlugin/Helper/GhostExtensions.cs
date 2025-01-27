@@ -1,5 +1,4 @@
 ﻿using BTCPayServer.Plugins.GhostPlugin.Data;
-using BTCPayServer.Plugins.GhostPlugin.Services;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Helper;
 
@@ -9,8 +8,11 @@ public static class GhostExtensions
     {
         return new GhostApiClientCredentials
         {
-            ShopName = ghost.ShopName,
-            AdminApiKey = ghost.AdminApiKey
+            ApiUrl = ghost.ApiUrl,
+            AdminApiKey = ghost.AdminApiKey,
+            ContentApiKey = ghost.ContentApiKey,
+            UserName = ghost.Username,
+            Password = ghost.Password
         };
     }
 }
