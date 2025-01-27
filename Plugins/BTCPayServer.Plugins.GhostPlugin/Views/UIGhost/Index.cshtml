@@ -32,10 +32,6 @@
                 <div class="form-group">
                     <label asp-for="ApiUrl" class="form-label"></label>
                     <div class="input-group">
-                        @* @if (!Model?.ApiUrl?.Contains(".") is true)
-                        {
-                            <span class="input-group-text">https://</span>
-                        } *@
                         <span class="input-group-text">https://</span>
                         <input asp-for="ApiUrl" class="form-control" readonly="@ghostCredsSet" />
                     </div>

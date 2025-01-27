@@ -1,0 +1,139 @@
+@using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models
+@model CreateMemberViewModel
+@{
+    Layout = "_GhostPublicLayout";
+    ViewBag.Title = "Pay with BTCPay Server...";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-6 col-md-8">
+        <div class="text-center mb-4">
+            <h1 class="fw-bold">@Model.ShopName</h1>
+        </div>
+        <div class="card shadow p-4">
+            <form id="subscription-form" method="POST">
+
+                <div class="form-group">
+                    <label asp-for="Name" class="form-label"></label>
+                    <input asp-for="Name" class="form-control" required />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Email" class="form-label"></label>
+                    <input asp-for="Email" class="form-control" required />
+                    <span asp-validation-for="Email" class="text-danger"></span>
+                </div>
+
+                <div class="mb-4">
+                    @if (Model.GhostTiers != null && Model.GhostTiers.Any())
+                    {
+                        <label asp-for="GhostTiers" class="form-label"></label>
+                        <select id="tier" class="form-select" name="TierId" required>
+                            <option value="" disabled selected>Select a tier</option>
+                            @foreach (var tier in Model.GhostTiers)
+                            {
+                                <option value="@tier.id"
+                                        data-monthly-price="@tier.monthly_price"
+                                        data-yearly-price="@tier.yearly_price"
+                                        data-currency="@tier.currency"
+                                        data-trial-days="@tier.trial_days"
+                                        data-description="@tier.description">
+                                    @tier.name
+                                </option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">No tiers available. Please check back later or contact admin.</div>
+                    }
+                </div>
+
+                <div id="frequency-tabs" class="hidden">
+                    <div class="d-flex justify-content-center mb-4">
+                        <div class="btn-group" role="group" aria-label="Payment Frequency">
+                            <input type="radio" class="btn-check" asp-for="TierSubscriptionFrequency" id="monthly" value="Monthly" checked>
+                            <label class="btn btn-outline-success" for="monthly">Monthly</label>
+
+                            <input type="radio" class="btn-check" asp-for="TierSubscriptionFrequency" id="yearly" value="Yearly">
+                            <label class="btn btn-outline-success" for="yearly">Yearly</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="pricing-card" class="hidden">
+                    <div class="card border-success">
+                        <div class="card-body text-center">
+                            <h5 id="tier-title" class="card-title fw-bold"></h5>
+                            <p id="tier-price" class="card-text fs-4"></p>
+                            <p id="tier-description" class="text-muted"></p>
+                            <button type="submit" class="btn btn-success w-100">Subscribe</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section PageFootContent {
+    <script>
+        const tierSelect = document.getElementById('tier');
+        const frequencyTabs = document.getElementById('frequency-tabs');
+        const pricingCard = document.getElementById('pricing-card');
+        const monthlyTab = document.getElementById('monthly');
+        const yearlyTab = document.getElementById('yearly');
+        const tierTitle = document.getElementById('tier-title');
+        const tierPrice = document.getElementById('tier-price');
+        const tierDescription = document.getElementById('tier-description');
+        const submitButton = document.querySelector('button[type="submit"]');
+
+        submitButton.disabled = true;
+
+        frequencyTabs.classList.add('hidden');
+        pricingCard.classList.add('hidden');
+
+        tierSelect.addEventListener('change', (event) => {
+            const selectedOption = event.target.options[event.target.selectedIndex];
+            const tierName = selectedOption.text;
+            const monthlyPriceCents = selectedOption.getAttribute('data-monthly-price');
+            const yearlyPriceCents = selectedOption.getAttribute('data-yearly-price');
+            const currency = selectedOption.getAttribute('data-currency');
+            const trialDays = selectedOption.getAttribute('data-trial-days');
+
+            function formatPrice(value) {
+                return (value / 100).toFixed(2);
+            }
+
+            if (tierSelect.value) {
+                submitButton.disabled = false;
+                frequencyTabs.classList.remove('hidden');
+                
+                const monthlyPrice = formatPrice(monthlyPriceCents);
+                const yearlyPrice = formatPrice(yearlyPriceCents);
+
+                tierTitle.textContent = `${tierName} - Monthly Plan`;
+                tierPrice.textContent = `${currency} ${monthlyPrice}`;
+                tierDescription.textContent = `Billed monthly at ${currency} ${monthlyPrice}. ${trialDays > 0 ? `Includes a ${trialDays}-day free trial.` : ''}`;
+                pricingCard.classList.remove('hidden');
+
+                monthlyTab.addEventListener('change', () => {
+                    tierTitle.textContent = `${tierName} - Monthly Plan`;
+                    tierPrice.textContent = `${currency} ${monthlyPrice}`;
+                    tierDescription.textContent = `Billed monthly at ${currency} ${monthlyPrice}. ${trialDays > 0 ? `Includes a ${trialDays}-day free trial.` : ''}`;
+                });
+
+                yearlyTab.addEventListener('change', () => {
+                    tierTitle.textContent = `${tierName} - Yearly Plan`;
+                    tierPrice.textContent = `${currency} ${yearlyPrice}`;
+                    tierDescription.textContent = `Billed yearly at ${currency} ${yearlyPrice}. ${trialDays > 0 ? `Includes a ${trialDays}-day free trial.` : ''}`;
+                });
+            } else {
+                submitButton.disabled = true;
+                frequencyTabs.classList.add('hidden');
+                pricingCard.classList.add('hidden');
+            }
+        });
+    </script>
+}
