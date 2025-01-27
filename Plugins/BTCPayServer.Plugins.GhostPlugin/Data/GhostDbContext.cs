@@ -5,6 +5,7 @@ namespace BTCPayServer.Plugins.GhostPlugin;
 
 public class GhostDbContext : DbContext
 {
+    // dotnet ef migrations add initialMigration -o Data/Migrations
     private readonly bool _designTime;
 
     public GhostDbContext(DbContextOptions<GhostDbContext> options, bool designTime = false)
@@ -14,12 +15,13 @@ public class GhostDbContext : DbContext
     }
 
     public DbSet<GhostSetting> GhostSettings { get; set; }
+    public DbSet<GhostMember> GhostMembers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.Ghost");
-
         GhostSetting.OnModelCreating(modelBuilder);
+        GhostMember.OnModelCreating(modelBuilder);
     }
 }
