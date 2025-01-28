@@ -17,22 +17,6 @@ If you're offering premium content or memberships on your Ghost site (like artic
 Enable one-time payments for digital products, merchandise, or services through Ghost's commerce platform using Bitcoin. For instance, eBooks, online courses, or physical items.
 3. Donations or Crowdfunding
 Set up a seamless way to accept donations in Bitcoin for specific campaigns or ongoing funding. This can be particularly useful for creators, nonprofits, or activists.
-4. Global Transactions
-Accept payments from a global audience without worrying about currency conversion fees or payment gateway restrictions. Bitcoin allows you to receive payments from anywhere in the world instantly.
-5. Privacy-Conscious Payments
-Offer a payment method for users who prioritize privacy and don't want to use traditional payment methods like credit cards or PayPal.
-6. Cost Reduction
-Lower transaction fees compared to credit cards and other traditional payment processors, saving money on each transaction.
-7. Incentives for Bitcoin Adoption
-Promote Bitcoin adoption by offering discounts or rewards for customers who choose to pay with Bitcoin.
-8. Recurring Billing (Advanced)
-If you want to support recurring payments for subscriptions in Bitcoin, you can use BTCPay Server's API or Lightning Network integration for automation. This may require additional development.
-9. Microtransactions
-Accept microtransactions via the Lightning Network for small payments like access to a single article or short-term content subscriptions.
-10. Integration with Other Platforms
-Use BTCPay Server's integrations with wallets, accounting tools, or invoicing systems to streamline your business operations and financial tracking.
-	1. 
-	1. 
 
 
 ## Receiving Donations on Ghost through BTCPay Server
