@@ -13,9 +13,6 @@ public class GhostSetting
     [Display(Name = "Ghost API URL")]
     public string ApiUrl { get; set; }
 
-    [Display(Name = "Ghost Admin Domain")]
-    public string AdminDomain { get; set; }
-
     [Display(Name = "Admin API Key")]
     public string AdminApiKey { get; set; }
 
@@ -38,11 +35,6 @@ public class GhostSetting
             !string.IsNullOrWhiteSpace(Password);
     }
 
-    [NotMapped]
-    public bool HasWallet { get; set; } = true;
-
-    [NotMapped]
-    public string CryptoCode { get; set; }
     internal static void OnModelCreating(ModelBuilder modelBuilder)
     {
     }

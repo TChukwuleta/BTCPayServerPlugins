@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace BTCPayServer.Plugins.GhostPlugin.Migrations
+namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class ghostSettings : Migration
+    public partial class ghostSetup : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -28,6 +28,7 @@ namespace BTCPayServer.Plugins.GhostPlugin.Migrations
                     TierId = table.Column<string>(type: "text", nullable: true),
                     UnsubscribeUrl = table.Column<string>(type: "text", nullable: true),
                     StoreId = table.Column<string>(type: "text", nullable: true),
+                    Frequency = table.Column<int>(type: "integer", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
@@ -42,7 +43,6 @@ namespace BTCPayServer.Plugins.GhostPlugin.Migrations
                 {
                     Id = table.Column<string>(type: "text", nullable: false),
                     ApiUrl = table.Column<string>(type: "text", nullable: true),
-                    AdminDomain = table.Column<string>(type: "text", nullable: true),
                     AdminApiKey = table.Column<string>(type: "text", nullable: true),
                     ContentApiKey = table.Column<string>(type: "text", nullable: true),
                     Username = table.Column<string>(type: "text", nullable: true),
@@ -56,6 +56,28 @@ namespace BTCPayServer.Plugins.GhostPlugin.Migrations
                 {
                     table.PrimaryKey("PK_GhostSettings", x => x.Id);
                 });
+
+            migrationBuilder.CreateTable(
+                name: "GhostTransactions",
+                schema: "BTCPayServer.Plugins.Ghost",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    StoreId = table.Column<string>(type: "text", nullable: true),
+                    InvoiceId = table.Column<string>(type: "text", nullable: true),
+                    InvoiceStatus = table.Column<string>(type: "text", nullable: true),
+                    Amount = table.Column<decimal>(type: "numeric", nullable: false),
+                    TierId = table.Column<string>(type: "text", nullable: true),
+                    MemberId = table.Column<string>(type: "text", nullable: true),
+                    Frequency = table.Column<int>(type: "integer", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    TransactionStatus = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_GhostTransactions", x => x.Id);
+                });
         }
 
         /// <inheritdoc />
@@ -67,6 +89,10 @@ namespace BTCPayServer.Plugins.GhostPlugin.Migrations
 
             migrationBuilder.DropTable(
                 name: "GhostSettings",
+                schema: "BTCPayServer.Plugins.Ghost");
+
+            migrationBuilder.DropTable(
+                name: "GhostTransactions",
                 schema: "BTCPayServer.Plugins.Ghost");
         }
     }

@@ -19,8 +19,7 @@ using System;
 using System.Net.Http;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.Plugins.GhostPlugin;
-using Newtonsoft.Json;
-using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
+using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -29,6 +28,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIGhostController : Controller
 {
+    private GhostHelper helper;
     private readonly StoreRepository _storeRepo;
     private readonly IHttpClientFactory _clientFactory;
     private readonly BTCPayNetworkProvider _networkProvider;
@@ -42,6 +42,7 @@ public class UIGhostController : Controller
         UserManager<ApplicationUser> userManager)
     {
         _storeRepo = storeRepo;
+        helper = new GhostHelper();
         _userManager = userManager;
         _clientFactory = clientFactory;
         _networkProvider = networkProvider;
@@ -59,7 +60,7 @@ public class UIGhostController : Controller
         var storeHasWallet = GetPaymentMethodConfigs(storeData, true).Any();
         if (!storeHasWallet)
         {
-            return View(new GhostSetting
+            return View(new GhostSettingViewModel
             {
                 CryptoCode = _networkProvider.DefaultNetwork.CryptoCode,
                 StoreId = storeId,
@@ -67,15 +68,17 @@ public class UIGhostController : Controller
             });
         }
         await using var ctx = _dbContextFactory.CreateContext();
-        var userStore = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new GhostSetting();
-        return View(userStore);
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new GhostSetting();
+        var viewModel = helper.GhostSettingsToViewModel(ghostSetting);
+        viewModel.MemberCreationUrl = Url.Action("CreateMember", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
+        viewModel.DonationUrl = Url.Action("Donate", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
+        return View(viewModel);
     }
 
 
     [HttpPost]
-    public async Task<IActionResult> Index(string storeId, GhostSetting vm, string command = "")
+    public async Task<IActionResult> Index(string storeId, GhostSettingViewModel vm, string command = "")
     {
-        Console.WriteLine(JsonConvert.SerializeObject(vm));
         try
         {
             await using var ctx = _dbContextFactory.CreateContext();
@@ -83,14 +86,15 @@ public class UIGhostController : Controller
             {
                 case "GhostSaveCredentials":
                     {
-                        vm.ApiUrl = vm.ApiUrl?.TrimEnd('/');
-                        var validCreds = vm?.CredentialsPopulated() == true;
+                        var entity = helper.GhostSettingsViewModelToEntity(vm);
+                        entity.ApiUrl = entity.ApiUrl?.TrimEnd('/');
+                        var validCreds = entity?.CredentialsPopulated() == true;
                         if (!validCreds)
                         {
                             TempData[WellKnownTempData.ErrorMessage] = "Please provide valid Ghost credentials";
                             return View(vm);
                         }
-                        var apiClient = new GhostAdminApiClient(_clientFactory, vm.CreateGhsotApiCredentials());
+                        var apiClient = new GhostAdminApiClient(_clientFactory, entity.CreateGhsotApiCredentials());
                         try
                         {
                             var validCredentials = await apiClient.ValidateGhostCredentials();
@@ -105,11 +109,11 @@ public class UIGhostController : Controller
                             TempData[WellKnownTempData.ErrorMessage] = $"Invalid Ghost credentials: {err.Message}";
                             return View(vm);
                         }
-                        vm.IntegratedAt = DateTimeOffset.UtcNow;
-                        vm.StoreId = CurrentStore.Id;
-                        vm.StoreName = CurrentStore.StoreName;
-                        vm.ApplicationUserId = GetUserId();
-                        ctx.Update(vm);
+                        entity.IntegratedAt = DateTimeOffset.UtcNow;
+                        entity.StoreId = CurrentStore.Id;
+                        entity.StoreName = CurrentStore.StoreName;
+                        entity.ApplicationUserId = GetUserId();
+                        ctx.Update(entity);
                         await ctx.SaveChangesAsync();
                         TempData[WellKnownTempData.SuccessMessage] = "Ghost plugin successfully updated";
                         break;
@@ -133,18 +137,6 @@ public class UIGhostController : Controller
             TempData[WellKnownTempData.ErrorMessage] = $"An error occurred on Ghost plugin. {ex.Message}";
             return RedirectToAction(nameof(Index), new { storeId = CurrentStore.Id });
         }
-    }
-
-    [HttpGet("~/plugins/stores/{storeId}/ghost/create-member")]
-    public async Task<IActionResult> CreateMember(string storeId)
-    {
-        await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-
-        var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
-        var ghostTiers = await apiClient.RetrieveGhostTiers();
-        Console.WriteLine(JsonConvert.SerializeObject(ghostTiers, Formatting.Indented));
-        return View(new CreateMemberViewModel());
     }
 
     private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(StoreData storeData, bool onlyEnabled = false)

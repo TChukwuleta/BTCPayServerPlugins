@@ -126,7 +126,7 @@ public class GhostHostedService : EventHostedServiceBase
                     ghostMember.MemberId = response.members[0].id;
                     ghostMember.SubscriptionId = response.members[0].subscriptions.First().id;
                     ctx.UpdateRange(ghostMember);
-                    result.Write($"Successfully created member with name: {ghostMember.Name} on Ghsot.", InvoiceEventData.EventSeverity.Info);
+                    result.Write($"Successfully created member with name: {ghostMember.Name} on Ghost.", InvoiceEventData.EventSeverity.Info);
                 }
                 catch (Exception ex)
                 {

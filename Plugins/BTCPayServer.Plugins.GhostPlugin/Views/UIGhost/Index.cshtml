@@ -2,10 +2,10 @@
 @using BTCPayServer.Abstractions.Services
 @using BTCPayServer.Client
 @using BTCPayServer.Controllers
-@using BTCPayServer.Data
 @using BTCPayServer.Plugins.GhostPlugin.Data
+@using BTCPayServer.Plugins.GhostPlugin.ViewModels
 @using Microsoft.AspNetCore.Routing
-@model GhostSetting
+@model GhostSettingViewModel
 @{
     ViewData.SetActivePage(PluginNavPages.Index, "Ghost");
     var ghostCredsSet = Model?.IntegratedAt.HasValue is true;
@@ -64,6 +64,16 @@
 
                 @if (ghostCredsSet)
                 {
+                    
+                    <div class="form-group">
+                        <label asp-for="MemberCreationUrl" class="form-label"></label>
+                        <input asp-for="MemberCreationUrl" class="form-control" readonly />
+                    </div>
+                    <div class="form-group">
+                        <label asp-for="DonationUrl" class="form-label"></label>
+                        <input asp-for="DonationUrl" class="form-control" readonly />
+                    </div>
+
                     <p class="alert alert-success">
                         Orders on <b>@Model.ApiUrl</b> will be marked as paid on successful invoice payment.
                         Started: @Model.IntegratedAt.Value.ToBrowserDate()

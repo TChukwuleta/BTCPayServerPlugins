@@ -14,4 +14,5 @@ public class GhostOrderViewModel : BaseGhostPublicViewModel
 {
     public string InvoiceId { get; set; }
     public string BTCPayServerUrl { get; set; }
+    public string RedirectUrl { get; set; }
 }
