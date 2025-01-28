@@ -16,6 +16,7 @@ public class GhostDbContext : DbContext
 
     public DbSet<GhostSetting> GhostSettings { get; set; }
     public DbSet<GhostMember> GhostMembers { get; set; }
+    public DbSet<GhostTransaction> GhostTransactions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

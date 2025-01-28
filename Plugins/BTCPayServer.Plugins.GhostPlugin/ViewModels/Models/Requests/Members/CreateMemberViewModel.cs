@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using BTCPayServer.Plugins.GhostPlugin.Data.Enums;
+using BTCPayServer.Plugins.GhostPlugin.Data;
 
 namespace BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 
