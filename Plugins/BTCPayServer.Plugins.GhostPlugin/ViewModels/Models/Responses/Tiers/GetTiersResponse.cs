@@ -6,7 +6,7 @@ namespace BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 public class GetTiersResponse
 {
     public List<Tier> tiers { get; set; }
-    public GhostMetaDataResponse meta { get; set; }
+    public object meta { get; set; }
 }
 
 public class Tier

@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
+using System.Collections.Generic;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services
 {
@@ -60,13 +61,12 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             return response.IsSuccessStatusCode;
         }
 
-        public async Task<string> RetrieveGhostTiers()
+        public async Task<List<Tier>> RetrieveGhostTiers()
         {
-            Console.WriteLine(JsonConvert.SerializeObject(_credentials));
             var req = CreateRequest(HttpMethod.Get, "tiers?include=monthly_price,yearly_price,benefits");
-            var tiers = await SendRequest(req);
-            Console.WriteLine(tiers);
-            return tiers;
+            var response = await SendRequest(req);
+            var tiers = JsonConvert.DeserializeObject<GetTiersResponse>(response);
+            return tiers.tiers;
         }
 
         public async Task<CreateMemberResponseModel> CreateGhostMember(CreateGhostMemberRequest requestModel)

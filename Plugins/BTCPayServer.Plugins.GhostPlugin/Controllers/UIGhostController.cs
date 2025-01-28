@@ -24,6 +24,8 @@ using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
+
+[Route("~/plugins/{storeId}/ghost/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIGhostController : Controller
 {
@@ -47,7 +49,7 @@ public class UIGhostController : Controller
     }
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
-    [Route("~/plugins/stores/{storeId}/ghost")]
+    [HttpGet]
     public async Task<IActionResult> Index(string storeId)
     {
         if (string.IsNullOrEmpty(storeId))
@@ -70,7 +72,7 @@ public class UIGhostController : Controller
     }
 
 
-    [HttpPost("~/plugins/stores/{storeId}/ghost")]
+    [HttpPost]
     public async Task<IActionResult> Index(string storeId, GhostSetting vm, string command = "")
     {
         Console.WriteLine(JsonConvert.SerializeObject(vm));
@@ -133,7 +135,7 @@ public class UIGhostController : Controller
         }
     }
 
-    [HttpGet("~/plugins/{storeId}/ghost/create-member")]
+    [HttpGet("~/plugins/stores/{storeId}/ghost/create-member")]
     public async Task<IActionResult> CreateMember(string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
@@ -141,6 +143,7 @@ public class UIGhostController : Controller
 
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
         var ghostTiers = await apiClient.RetrieveGhostTiers();
+        Console.WriteLine(JsonConvert.SerializeObject(ghostTiers, Formatting.Indented));
         return View(new CreateMemberViewModel());
     }
 
