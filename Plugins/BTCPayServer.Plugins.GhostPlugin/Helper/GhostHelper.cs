@@ -1,12 +1,16 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using BTCPayServer.Plugins.GhostPlugin.Data;
+using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Helper;
 
 public class GhostHelper
-{public async Task<(bool succeeded, string response)> GetCustomJavascript(string storeId, string baseUrl)
+{
+    public async Task<(bool succeeded, string response)> GetCustomJavascript(string storeId, string baseUrl)
     {
         string[] fileUrls = new[]
         {
@@ -35,5 +39,34 @@ public class GhostHelper
         string jsVariables = $"var BTCPAYSERVER_URL = '{baseUrl}'; var STORE_ID = '{storeId}';";
         combinedJavascript.Insert(0, jsVariables + Environment.NewLine);
         return (true, combinedJavascript.ToString());
+    }
+
+    public GhostSettingViewModel GhostSettingsToViewModel(GhostSetting ghostSetting)
+    {
+        return new GhostSettingViewModel
+        {
+            AdminApiKey = ghostSetting.AdminApiKey,
+            ApiUrl = ghostSetting.ApiUrl,
+            ContentApiKey = ghostSetting.ContentApiKey,
+            Username = ghostSetting.Username,
+            Password = ghostSetting.Password,
+            StoreId = ghostSetting.StoreId,
+            StoreName = ghostSetting.StoreName,
+            IntegratedAt = ghostSetting.IntegratedAt
+        };
+    }
+
+    public GhostSetting GhostSettingsViewModelToEntity(GhostSettingViewModel vm)
+    {
+        return new GhostSetting
+        {
+            AdminApiKey = vm.AdminApiKey,
+            ApiUrl = vm.ApiUrl,
+            ContentApiKey = vm.ContentApiKey,
+            Username = vm.Username,
+            Password = vm.Password,
+            StoreId = vm.StoreId,
+            StoreName = vm.StoreName
+        };
     }
 }

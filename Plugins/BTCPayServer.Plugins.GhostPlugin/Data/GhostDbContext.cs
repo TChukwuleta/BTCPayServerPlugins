@@ -24,5 +24,6 @@ public class GhostDbContext : DbContext
         modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.Ghost");
         GhostSetting.OnModelCreating(modelBuilder);
         GhostMember.OnModelCreating(modelBuilder);
+        GhostTransaction.OnModelCreating(modelBuilder);
     }
 }

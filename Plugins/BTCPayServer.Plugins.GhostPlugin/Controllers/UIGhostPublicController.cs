@@ -1,7 +1,6 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using BTCPayServer.Data;
-using Microsoft.AspNetCore.Identity;
 using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using BTCPayServer.Services.Stores;
@@ -9,27 +8,27 @@ using BTCPayServer.Plugins.GhostPlugin.Services;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Net.Http;
-using BTCPayServer.Plugins.GhostPlugin.Helper;
-using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using BTCPayServer.Models;
 using BTCPayServer.Services;
-using BTCPayServer.Plugins.GhostPlugin.Data;
 using System.Collections.Generic;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Controllers;
-using BTCPayServer.Abstractions.Extensions;
 using Newtonsoft.Json.Linq;
 using System.Globalization;
 using BTCPayServer.Client.Models;
 using Microsoft.AspNetCore.Cors;
+using BTCPayServer.Abstractions.Extensions;
+using BTCPayServer.Plugins.GhostPlugin.Data;
+using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
+using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 
 [AllowAnonymous]
 [Route("~/plugins/{storeId}/ghost/public/")]
-public class UIPublicController : Controller
+public class UIGhostPublicController : Controller
 {
     private readonly UriResolver _uriResolver;
     private readonly StoreRepository _storeRepo;
@@ -37,28 +36,22 @@ public class UIPublicController : Controller
     private readonly InvoiceRepository _invoiceRepository;
     private readonly ApplicationDbContextFactory _context;
     private readonly UIInvoiceController _invoiceController;
-    private readonly BTCPayNetworkProvider _networkProvider;
     private readonly GhostDbContextFactory _dbContextFactory;
-    private readonly UserManager<ApplicationUser> _userManager;
     private GhostHelper helper;
-    public UIPublicController
+    public UIGhostPublicController
         (UriResolver uriResolver,
         StoreRepository storeRepo,
         IHttpClientFactory clientFactory,
         ApplicationDbContextFactory context,
         InvoiceRepository invoiceRepository,
-        BTCPayNetworkProvider networkProvider,
         UIInvoiceController invoiceController,
-        GhostDbContextFactory dbContextFactory,
-        UserManager<ApplicationUser> userManager)
+        GhostDbContextFactory dbContextFactory)
     {
         helper = new GhostHelper();
         _context = context;
         _storeRepo = storeRepo;
         _uriResolver = uriResolver;
-        _userManager = userManager;
         _clientFactory = clientFactory;
-        _networkProvider = networkProvider;
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
         _invoiceController = invoiceController;
@@ -66,6 +59,28 @@ public class UIPublicController : Controller
 
     private const string GHOST_MEMBER_ID_PREFIX = "Ghost_member-";
 
+    [HttpGet("donate")]
+    public async Task<IActionResult> Donate(string storeId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
+            return NotFound();
+
+        var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
+        var ghostTiers = await apiClient.RetrieveGhostTiers();
+
+        var storeData = await _storeRepo.FindStore(storeId);
+
+        return View(new CreateMemberViewModel
+        {
+            GhostTiers = ghostTiers,
+            StoreId = storeId,
+            StoreName = storeData?.StoreName,
+            ShopName = ghostSetting.ApiUrl,
+            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, storeData?.GetStoreBlob()),
+        });
+    }
 
     [HttpGet("create-member")]
     public async Task<IActionResult> CreateMember(string storeId)
@@ -130,27 +145,18 @@ public class UIPublicController : Controller
         };
         ctx.Add(transaction);
         await ctx.SaveChangesAsync();
-        return RedirectToAction(nameof(InitiatePayment), new { memberId = entity.Id, invoiceId = invoice.Id });
-    }
-
-
-    [HttpGet("initiate-payment/{memberId}/{invoiceId}")]
-    [EnableCors("AllowAllOrigins")]
-    public async Task<IActionResult> InitiatePayment(string memberId, string invoiceId)
-    {
-        await using var ctx = _dbContextFactory.CreateContext();
-        var ghostMember = ctx.GhostMembers.AsNoTracking().FirstOrDefault(c => c.Id == memberId);
 
         await using var dbMain = _context.CreateContext();
-        var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == ghostMember.StoreId);
+        var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == storeId);
 
-        return View(new GhostOrderViewModel
+        return View("InitiatePayment", new GhostOrderViewModel
         {
-            StoreId = store.Id,
+            StoreId = storeId,
             StoreName = store.StoreName,
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
             BTCPayServerUrl = Request.GetAbsoluteRoot(),
-            InvoiceId = invoiceId
+            RedirectUrl = $"https://{ghostSetting.ApiUrl}/#/portal/signin",
+            InvoiceId = invoice.Id
         });
     }
 
@@ -176,7 +182,6 @@ public class UIPublicController : Controller
 
     private async Task<InvoiceEntity> CreateInvoiceAsync(Data.StoreData store, Tier tier, GhostMember member)
     {
-
         var shopifySearchTerm = $"{GHOST_MEMBER_ID_PREFIX}{member.Id}";
         var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
         {
@@ -207,7 +212,7 @@ public class UIPublicController : Controller
                 },
                 AdditionalSearchTerms = new[]
                 {
-                        member.MemberId.ToString(CultureInfo.InvariantCulture),
+                        member.Id.ToString(CultureInfo.InvariantCulture),
                         shopifySearchTerm
                 }
             }, store,

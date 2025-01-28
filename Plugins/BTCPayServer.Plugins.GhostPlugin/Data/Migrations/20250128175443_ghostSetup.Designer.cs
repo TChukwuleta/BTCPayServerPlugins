@@ -3,17 +3,20 @@ using System;
 using BTCPayServer.Plugins.GhostPlugin;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace BTCPayServer.Plugins.GhostPlugin.Migrations
+namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 {
     [DbContext(typeof(GhostDbContext))]
-    partial class GhostDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250128175443_ghostSetup")]
+    partial class ghostSetup
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -34,6 +37,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Migrations
 
                     b.Property<string>("Email")
                         .HasColumnType("text");
+
+                    b.Property<int>("Frequency")
+                        .HasColumnType("integer");
 
                     b.Property<string>("MemberId")
                         .HasColumnType("text");
@@ -70,9 +76,6 @@ namespace BTCPayServer.Plugins.GhostPlugin.Migrations
                     b.Property<string>("AdminApiKey")
                         .HasColumnType("text");
 
-                    b.Property<string>("AdminDomain")
-                        .HasColumnType("text");
-
                     b.Property<string>("ApiUrl")
                         .HasColumnType("text");
 
@@ -100,6 +103,47 @@ namespace BTCPayServer.Plugins.GhostPlugin.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("GhostSettings", "BTCPayServer.Plugins.Ghost");
+                });
+
+            modelBuilder.Entity("BTCPayServer.Plugins.GhostPlugin.Data.GhostTransaction", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Frequency")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("InvoiceId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("InvoiceStatus")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MemberId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("StoreId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TierId")
+                        .HasColumnType("text");
+
+                    b.Property<int>("TransactionStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("GhostTransactions", "BTCPayServer.Plugins.Ghost");
                 });
 #pragma warning restore 612, 618
         }
