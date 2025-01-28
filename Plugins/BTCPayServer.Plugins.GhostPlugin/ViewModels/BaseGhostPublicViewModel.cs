@@ -8,3 +8,10 @@ public class BaseGhostPublicViewModel
     public string StoreName { get; set; }
     public StoreBrandingViewModel StoreBranding { get; set; }
 }
+
+
+public class GhostOrderViewModel : BaseGhostPublicViewModel
+{
+    public string InvoiceId { get; set; }
+    public string BTCPayServerUrl { get; set; }
+}

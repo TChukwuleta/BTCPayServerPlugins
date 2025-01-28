@@ -10,19 +10,19 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Net.Http;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
-using Newtonsoft.Json;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using BTCPayServer.Models;
 using BTCPayServer.Services;
 using BTCPayServer.Plugins.GhostPlugin.Data;
 using System.Collections.Generic;
-using BTCPayServer.Plugins.GhostPlugin.Data.Enums;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Controllers;
 using BTCPayServer.Abstractions.Extensions;
 using Newtonsoft.Json.Linq;
 using System.Globalization;
 using BTCPayServer.Client.Models;
+using Microsoft.AspNetCore.Cors;
+using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -34,29 +34,37 @@ public class UIPublicController : Controller
     private readonly UriResolver _uriResolver;
     private readonly StoreRepository _storeRepo;
     private readonly IHttpClientFactory _clientFactory;
+    private readonly InvoiceRepository _invoiceRepository;
+    private readonly ApplicationDbContextFactory _context;
     private readonly UIInvoiceController _invoiceController;
     private readonly BTCPayNetworkProvider _networkProvider;
     private readonly GhostDbContextFactory _dbContextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
+    private GhostHelper helper;
     public UIPublicController
         (UriResolver uriResolver,
         StoreRepository storeRepo,
         IHttpClientFactory clientFactory,
+        ApplicationDbContextFactory context,
+        InvoiceRepository invoiceRepository,
         BTCPayNetworkProvider networkProvider,
         UIInvoiceController invoiceController,
         GhostDbContextFactory dbContextFactory,
         UserManager<ApplicationUser> userManager)
     {
+        helper = new GhostHelper();
+        _context = context;
         _storeRepo = storeRepo;
         _uriResolver = uriResolver;
         _userManager = userManager;
         _clientFactory = clientFactory;
         _networkProvider = networkProvider;
         _dbContextFactory = dbContextFactory;
+        _invoiceRepository = invoiceRepository;
         _invoiceController = invoiceController;
     }
 
-    private const string GHOST_MEMBER_ID_PREFIX = "ghost_member-";
+    private const string GHOST_MEMBER_ID_PREFIX = "Ghost_member-";
 
 
     [HttpGet("create-member")]
@@ -90,7 +98,6 @@ public class UIPublicController : Controller
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
-        Console.WriteLine(JsonConvert.SerializeObject(vm, Formatting.Indented));
         var storeData = await _storeRepo.FindStore(storeId);
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
         var ghostTiers = await apiClient.RetrieveGhostTiers();
@@ -98,71 +105,114 @@ public class UIPublicController : Controller
         if (tier == null)
             return NotFound();
 
-        var response = await apiClient.CreateGhostMember(new CreateGhostMemberRequest { members = new List<Member>
-            {
-                new Member
-                {
-                    email = vm.Email,
-                    name = vm.Name,
-                    tiers = new List<MemberTier>
-                    {
-                        new MemberTier
-                        {
-                            id = vm.TierId,
-                            expiry_at = vm.TierSubscriptionFrequency == TierSubscriptionFrequency.Monthly ? DateTime.UtcNow.AddMonths(1) : DateTime.UtcNow.AddYears(1)
-                        }
-                    }
-                }
-            }
-        });
         GhostMember entity = new GhostMember
         {
             CreatedAt = DateTime.UtcNow,
-            MemberId = response.members[0].id,
-            MemberUuid = response.members[0].uuid,
             Name = vm.Name,
             Email = vm.Email,
-            SubscriptionId = response.members[0].subscriptions.First().id,
+            Frequency = vm.TierSubscriptionFrequency,
             TierId = vm.TierId,
-            UnsubscribeUrl = response.members[0].unsubscribe_url,
             StoreId = storeId
         };
-        Console.WriteLine(JsonConvert.SerializeObject(entity));
         ctx.Add(entity);
         await ctx.SaveChangesAsync();
-        return RedirectToAction(nameof(CreateMember), new {  storeId });
+        InvoiceEntity invoice = await CreateInvoiceAsync(storeData, tier, entity);
+        GhostTransaction transaction = new GhostTransaction
+        {
+            StoreId = storeId,
+            InvoiceId = invoice.Id,
+            MemberId = entity.Id,
+            TransactionStatus = GhostPlugin.Data.TransactionStatus.Pending,
+            TierId = vm.TierId,
+            Frequency = vm.TierSubscriptionFrequency,
+            CreatedAt = DateTime.UtcNow,
+            Amount = (decimal)(vm.TierSubscriptionFrequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price)
+        };
+        ctx.Add(transaction);
+        await ctx.SaveChangesAsync();
+        return RedirectToAction(nameof(InitiatePayment), new { memberId = entity.Id, invoiceId = invoice.Id });
     }
 
 
-    private async Task CreateInvoiceAsync(Data.StoreData store, Tier tier, GhostMember member, TierSubscriptionFrequency frequency)
+    [HttpGet("initiate-payment/{memberId}/{invoiceId}")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> InitiatePayment(string memberId, string invoiceId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ghostMember = ctx.GhostMembers.AsNoTracking().FirstOrDefault(c => c.Id == memberId);
+
+        await using var dbMain = _context.CreateContext();
+        var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == ghostMember.StoreId);
+
+        return View(new GhostOrderViewModel
+        {
+            StoreId = store.Id,
+            StoreName = store.StoreName,
+            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
+            BTCPayServerUrl = Request.GetAbsoluteRoot(),
+            InvoiceId = invoiceId
+        });
+    }
+
+
+    [HttpGet("btcpay-ghost.js")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> GetBtcPayJavascript(string storeId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var userStore = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        if (userStore == null || !userStore.CredentialsPopulated())
+        {
+            return BadRequest("Invalid BTCPay store specified");
+        }
+        var jsFile = await helper.GetCustomJavascript(userStore.StoreId, Request.GetAbsoluteRoot());
+        if (!jsFile.succeeded)
+        {
+            return BadRequest(jsFile.response);
+        }
+        return Content(jsFile.response, "text/javascript");
+    }
+
+
+    private async Task<InvoiceEntity> CreateInvoiceAsync(Data.StoreData store, Tier tier, GhostMember member)
     {
 
-        var shopifySearchTerm = $"{GHOST_MEMBER_ID_PREFIX}{member.MemberId}";
-        var invoice = await _invoiceController.CreateInvoiceCoreRaw(
-                new CreateInvoiceRequest()
-                {
-                    Amount = frequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price,
-                    Currency = tier.currency,
-                    Metadata = new JObject
-                    {
-                        ["MemberId"] = member.MemberId,
-                        ["MemberUuid"] = member.MemberUuid,
-                        ["SubscriptionId"] = member.SubscriptionId
-                    },
-                    AdditionalSearchTerms = new[]
-                    {
-                            member.MemberId.ToString(CultureInfo.InvariantCulture),
-                            member.MemberUuid.ToString(CultureInfo.InvariantCulture),
-                            member.SubscriptionId.ToString(CultureInfo.InvariantCulture),
-                            shopifySearchTerm
-                    }
-                }, store,
-                Request.GetAbsoluteRoot(), new List<string>() { shopifySearchTerm });
-        /*return Ok(new
+        var shopifySearchTerm = $"{GHOST_MEMBER_ID_PREFIX}{member.Id}";
+        var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
         {
-            invoiceId = invoice.Id,
-            status = invoice.Status.ToString().ToLowerInvariant(),
-            externalPaymentLink = Url.Action("InitiatePayment", "UIPublic", new { invoiceId = invoice.Id, shopName, orderId = shopifySearchTerm }, Request.Scheme)
-        });*/
+            TextSearch = shopifySearchTerm,
+            StoreId = new[] { store.Id }
+        });
+
+        matchedExistingInvoices = matchedExistingInvoices.Where(entity =>
+                entity.GetInternalTags(shopifySearchTerm).Any(s => s == member.Id.ToString())).ToArray();
+
+        var firstInvoiceSettled =
+            matchedExistingInvoices.LastOrDefault(entity =>
+                new[] { "settled", "processing", "confirmed", "paid", "complete" }
+                    .Contains(
+                        entity.GetInvoiceState().Status.ToString().ToLower()));
+
+        if (firstInvoiceSettled != null)
+            return firstInvoiceSettled;
+
+        var invoice = await _invoiceController.CreateInvoiceCoreRaw(
+            new CreateInvoiceRequest()
+            {
+                Amount = member.Frequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price,
+                Currency = tier.currency,
+                Metadata = new JObject
+                {
+                    ["MemberId"] = member.Id
+                },
+                AdditionalSearchTerms = new[]
+                {
+                        member.MemberId.ToString(CultureInfo.InvariantCulture),
+                        shopifySearchTerm
+                }
+            }, store,
+            Request.GetAbsoluteRoot(), new List<string>() { shopifySearchTerm });
+
+        return invoice;
     }
 }

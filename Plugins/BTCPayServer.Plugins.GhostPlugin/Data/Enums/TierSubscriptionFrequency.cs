@@ -1,4 +1,4 @@
-﻿namespace BTCPayServer.Plugins.GhostPlugin.Data.Enums
+﻿namespace BTCPayServer.Plugins.GhostPlugin.Data
 {
     public enum TierSubscriptionFrequency
     {
