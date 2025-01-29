@@ -72,6 +72,7 @@ public class UIGhostController : Controller
         var viewModel = helper.GhostSettingsToViewModel(ghostSetting);
         viewModel.MemberCreationUrl = Url.Action("CreateMember", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
         viewModel.DonationUrl = Url.Action("Donate", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
+        viewModel.WebhookUrl = Url.Action("ReceiveWebhook", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
         return View(viewModel);
     }
 

@@ -51,6 +51,12 @@
                 </div>
 
                 <div class="form-group">
+                    <label asp-for="WebhookSecret" class="form-label"></label>
+                    <input asp-for="WebhookSecret" class="form-control" type="password" value="@Model?.WebhookSecret" readonly="@ghostCredsSet" />
+                    <span asp-validation-for="WebhookSecret" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
                     <label asp-for="AdminApiKey" class="form-label"></label>
                     <input asp-for="AdminApiKey" class="form-control" type="password" value="@Model?.AdminApiKey" readonly="@ghostCredsSet" />
                     <span asp-validation-for="AdminApiKey" class="text-danger"></span>
@@ -60,6 +66,11 @@
                     <label asp-for="Password" class="form-label"></label>
                     <input asp-for="Password" class="form-control" type="password" value="@Model?.Password" readonly="@ghostCredsSet" />
                     <span asp-validation-for="Password" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="WebhookUrl" class="form-label"></label>
+                    <input asp-for="WebhookUrl" class="form-control" readonly= />
                 </div>
 
                 @if (ghostCredsSet)

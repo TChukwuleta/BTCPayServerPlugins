@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 {
     [DbContext(typeof(GhostDbContext))]
-    [Migration("20250128175443_ghostSetup")]
-    partial class ghostSetup
+    [Migration("20250129162334_ghostSettings")]
+    partial class ghostSettings
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -98,6 +98,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("Username")
+                        .HasColumnType("text");
+
+                    b.Property<string>("WebhookSecret")
                         .HasColumnType("text");
 
                     b.HasKey("Id");

@@ -1,4 +1,4 @@
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using BTCPayServer.Data;
 using System.Linq;
@@ -25,6 +25,13 @@ using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using BTCPayServer.Controllers.Greenfield;
 using Microsoft.AspNetCore.Routing;
 using Newtonsoft.Json;
+using System.Text;
+using System.Security.Cryptography;
+using System.IO;
+using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection;
+using AngleSharp.Dom;
+using Microsoft.Extensions.Primitives;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -105,9 +112,8 @@ public class UIGhostPublicController : Controller
 
         var url = GreenfieldInvoiceController.ToModel(invoice, _linkGenerator, HttpContext.Request).CheckoutLink;
         return Redirect(url);
-
-
     }
+
 
     [HttpGet("create-member")]
     public async Task<IActionResult> CreateMember(string storeId)
@@ -206,6 +212,88 @@ public class UIGhostPublicController : Controller
         return Content(jsFile.response, "text/javascript");
     }
 
+
+    [HttpPost("webhook")]
+    public async Task<IActionResult> ReceiveWebhook(string storeId)
+    {
+        try
+        {
+            using var reader = new StreamReader(Request.Body, Encoding.UTF8);
+            var requestBody = await reader.ReadToEndAsync();
+            var webhookResponse = JsonConvert.DeserializeObject<GhostWebhookResponse>(requestBody);
+            Console.WriteLine(JsonConvert.SerializeObject(webhookResponse, Formatting.Indented));
+
+            await using var ctx = _dbContextFactory.CreateContext();
+            var webhookMember = webhookResponse.member;
+            string memberId = webhookMember?.previous?.id ?? webhookMember?.current?.id;
+            if (string.IsNullOrEmpty(memberId))
+                return NotFound();
+
+            var member = ctx.GhostMembers.AsNoTracking().FirstOrDefault(c => c.MemberId == memberId);
+            var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+            if (member == null || ghostSetting == null)
+                return NotFound();
+
+            if (!string.IsNullOrEmpty(ghostSetting.WebhookSecret))
+            {
+                if (!Request.Headers.TryGetValue("X-Ghost-Signature", out var signatureHeader))
+                    return Unauthorized("Missing X-Ghost-Signature header");
+
+                var signatureParts = signatureHeader.ToString().Split(", ");
+                if (signatureParts.Length != 2 || !signatureParts[0].StartsWith("sha256=") || !signatureParts[1].StartsWith("t="))
+                    return Unauthorized("Invalid signature format");
+
+                var receivedSignature = signatureParts[0].Replace("sha256=", "").Trim();
+                if (!VerifyWebhookSignature(requestBody, receivedSignature, ghostSetting.WebhookSecret))
+                    return Unauthorized("Invalid webhook signature");
+            }
+
+            // Ghost webhook doesn't contain the kind of event triggered.But contains two member objects: previous and current.
+            // These objects represents the previous state before the event and the state afterwards. With this I am inferring the event type:
+            // If "previous" exists but "current" does not → Member was deleted(member.deleted)
+            // If both "previous" and "current" exist → Member was updated(member.updated)
+            if (webhookMember.previous != null && webhookMember.current == null)
+            {
+                var transactions = ctx.GhostTransactions.AsNoTracking().Where(c => c.MemberId == member.Id).ToList();
+                if (transactions.Any())
+                    ctx.RemoveRange(transactions);
+
+                ctx.Remove(member);
+                await ctx.SaveChangesAsync();
+            }
+            else if (webhookMember.previous != null && webhookMember.current != null)
+            {
+                member.Email = webhookMember.current.email;
+                member.Name = webhookMember.current.name;
+                ctx.Update(member);
+                await ctx.SaveChangesAsync();
+            }
+            return Ok(new { message = "Webhook processed successfully." });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, "Internal Server Error.");
+        }
+    }
+
+    private static bool VerifyWebhookSignature(string requestBody, string receivedSignature, string secret)
+    {
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(requestBody));
+        var computedSignature = BitConverter.ToString(hash).Replace("-", "").ToLower();
+        return computedSignature == receivedSignature;
+
+    }
+    /*private static bool VerifyWebhookSignature(string requestBody, string shopifyHmacHeader, string clientSecret)
+    {
+        var keyBytes = Encoding.UTF8.GetBytes(clientSecret);
+        using (var hmac = new HMACSHA256(keyBytes))
+        {
+            var hashBytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(requestBody));
+            var hashString = Convert.ToBase64String(hashBytes);
+            return hashString.Equals(shopifyHmacHeader, StringComparison.OrdinalIgnoreCase);
+        }
+    }*/
 
     private async Task<InvoiceEntity> CreateInvoiceAsync(Data.StoreData store, Tier tier, GhostMember member)
     {
