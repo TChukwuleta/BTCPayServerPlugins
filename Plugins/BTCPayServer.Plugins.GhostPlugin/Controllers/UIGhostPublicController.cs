@@ -22,16 +22,20 @@ using BTCPayServer.Plugins.GhostPlugin.Data;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
+using BTCPayServer.Controllers.Greenfield;
+using Microsoft.AspNetCore.Routing;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 
 [AllowAnonymous]
-[Route("~/plugins/{storeId}/ghost/public/")]
+[Route("~/plugins/{storeId}/ghost/api/")]
 public class UIGhostPublicController : Controller
 {
     private readonly UriResolver _uriResolver;
     private readonly StoreRepository _storeRepo;
+    private readonly LinkGenerator _linkGenerator;
     private readonly IHttpClientFactory _clientFactory;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly ApplicationDbContextFactory _context;
@@ -41,6 +45,7 @@ public class UIGhostPublicController : Controller
     public UIGhostPublicController
         (UriResolver uriResolver,
         StoreRepository storeRepo,
+        LinkGenerator linkGenerator,
         IHttpClientFactory clientFactory,
         ApplicationDbContextFactory context,
         InvoiceRepository invoiceRepository,
@@ -51,6 +56,7 @@ public class UIGhostPublicController : Controller
         _context = context;
         _storeRepo = storeRepo;
         _uriResolver = uriResolver;
+        _linkGenerator = linkGenerator;
         _clientFactory = clientFactory;
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
@@ -62,24 +68,45 @@ public class UIGhostPublicController : Controller
     [HttpGet("donate")]
     public async Task<IActionResult> Donate(string storeId)
     {
+
+        var store = await _storeRepo.FindStore(storeId);
+        if (store == null)
+            return NotFound();
+
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
-        var ghostTiers = await apiClient.RetrieveGhostTiers();
+        var ghostSettings = await apiClient.RetrieveGhostSettings();
+        Console.WriteLine(JsonConvert.SerializeObject(ghostSettings));
 
-        var storeData = await _storeRepo.FindStore(storeId);
+        var donationsCurrency = ghostSettings.FirstOrDefault(s => s.key == "donations_currency")?.value?.ToString();
+        Console.WriteLine($"Donation currency: {donationsCurrency}");
+        donationsCurrency ??= "USD";
 
-        return View(new CreateMemberViewModel
+        string id = Guid.NewGuid().ToString();
+
+        InvoiceEntity invoice = await _invoiceController.CreateInvoiceCoreRaw(new CreateInvoiceRequest()
         {
-            GhostTiers = ghostTiers,
-            StoreId = storeId,
-            StoreName = storeData?.StoreName,
-            ShopName = ghostSetting.ApiUrl,
-            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, storeData?.GetStoreBlob()),
-        });
+            Amount = null,
+            Currency = donationsCurrency,
+            Metadata = new JObject
+            {
+                ["GhostDonationUuid"] = id
+            },
+            AdditionalSearchTerms = new[]
+            {
+                    id.ToString(CultureInfo.InvariantCulture),
+                    $"Ghost_{id}"
+            }
+        }, store, HttpContext.Request.GetAbsoluteRoot(), new List<string>() { $"Ghost_{id}" });
+
+        var url = GreenfieldInvoiceController.ToModel(invoice, _linkGenerator, HttpContext.Request).CheckoutLink;
+        return Redirect(url);
+
+
     }
 
     [HttpGet("create-member")]
@@ -182,15 +209,15 @@ public class UIGhostPublicController : Controller
 
     private async Task<InvoiceEntity> CreateInvoiceAsync(Data.StoreData store, Tier tier, GhostMember member)
     {
-        var shopifySearchTerm = $"{GHOST_MEMBER_ID_PREFIX}{member.Id}";
+        var ghostSearchTerm = $"{GHOST_MEMBER_ID_PREFIX}{member.Id}";
         var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
         {
-            TextSearch = shopifySearchTerm,
+            TextSearch = ghostSearchTerm,
             StoreId = new[] { store.Id }
         });
 
         matchedExistingInvoices = matchedExistingInvoices.Where(entity =>
-                entity.GetInternalTags(shopifySearchTerm).Any(s => s == member.Id.ToString())).ToArray();
+                entity.GetInternalTags(ghostSearchTerm).Any(s => s == member.Id.ToString())).ToArray();
 
         var firstInvoiceSettled =
             matchedExistingInvoices.LastOrDefault(entity =>
@@ -213,10 +240,10 @@ public class UIGhostPublicController : Controller
                 AdditionalSearchTerms = new[]
                 {
                         member.Id.ToString(CultureInfo.InvariantCulture),
-                        shopifySearchTerm
+                        ghostSearchTerm
                 }
             }, store,
-            Request.GetAbsoluteRoot(), new List<string>() { shopifySearchTerm });
+            Request.GetAbsoluteRoot(), new List<string>() { ghostSearchTerm });
 
         return invoice;
     }
