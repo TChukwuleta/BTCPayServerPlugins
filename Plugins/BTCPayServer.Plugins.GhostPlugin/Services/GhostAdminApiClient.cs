@@ -69,6 +69,14 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             return tiers.tiers;
         }
 
+        public async Task<List<GhostSettingResponseVm>> RetrieveGhostSettings()
+        {
+            var req = CreateRequest(HttpMethod.Get, "settings");
+            var response = await SendRequest(req);
+            var settings = JsonConvert.DeserializeObject<GhostSettingsResponse>(response);
+            return settings.settings;
+        }
+
         public async Task<CreateMemberResponseModel> CreateGhostMember(CreateGhostMemberRequest requestModel)
         {
             var postJson = JsonConvert.SerializeObject(requestModel);
@@ -91,8 +99,8 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             string bearer = GenerateGhostApiToken();
             var postData = new
             {
-                username = _credentials.UserName, // make it dynamic..
-                password = _credentials.Password // make it dynamic..
+                username = _credentials.UserName,
+                password = _credentials.Password
             };
             var jsonContent = new StringContent(JsonConvert.SerializeObject(postData), Encoding.UTF8, "application/json");
             await _httpClient.PostAsync(sessionUrl, jsonContent);

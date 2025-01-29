@@ -21,6 +21,7 @@ public class GhostSetting
 
     [Display(Name = "Ghost Username/Email")]
     public string Username { get; set; }
+    public string WebhookSecret { get; set; }
     public string Password { get; set; }
     public string StoreId { get; set; }
     public string StoreName { get; set; }

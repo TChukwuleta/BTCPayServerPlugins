@@ -52,7 +52,8 @@ public class GhostHelper
             Password = ghostSetting.Password,
             StoreId = ghostSetting.StoreId,
             StoreName = ghostSetting.StoreName,
-            IntegratedAt = ghostSetting.IntegratedAt
+            IntegratedAt = ghostSetting.IntegratedAt,
+            WebhookSecret = ghostSetting.WebhookSecret
         };
     }
 
@@ -66,7 +67,8 @@ public class GhostHelper
             Username = vm.Username,
             Password = vm.Password,
             StoreId = vm.StoreId,
-            StoreName = vm.StoreName
+            StoreName = vm.StoreName,
+            WebhookSecret= vm.WebhookSecret
         };
     }
 }

@@ -29,5 +29,11 @@ public class GhostSettingViewModel
     [Display(Name = "Donation Url")]
     public string DonationUrl { get; set; }
 
+    [Display(Name = "Webhook Url")]
+    public string WebhookUrl { get; set; }
+
+    [Display(Name = "Ghost Webhook Secret (If any)")]
+    public string WebhookSecret { get; set; }
+
     public DateTimeOffset? IntegratedAt { get; set; }
 }
