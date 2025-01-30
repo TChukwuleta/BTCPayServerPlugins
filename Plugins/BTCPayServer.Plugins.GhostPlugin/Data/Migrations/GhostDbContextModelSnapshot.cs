@@ -97,9 +97,6 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     b.Property<string>("Username")
                         .HasColumnType("text");
 
-                    b.Property<string>("WebhookSecret")
-                        .HasColumnType("text");
-
                     b.HasKey("Id");
 
                     b.ToTable("GhostSettings", "BTCPayServer.Plugins.Ghost");

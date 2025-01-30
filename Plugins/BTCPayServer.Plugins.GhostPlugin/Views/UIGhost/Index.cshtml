@@ -51,12 +51,6 @@
                 </div>
 
                 <div class="form-group">
-                    <label asp-for="WebhookSecret" class="form-label"></label>
-                    <input asp-for="WebhookSecret" class="form-control" type="password" value="@Model?.WebhookSecret" readonly="@ghostCredsSet" />
-                    <span asp-validation-for="WebhookSecret" class="text-danger"></span>
-                </div>
-
-                <div class="form-group">
                     <label asp-for="AdminApiKey" class="form-label"></label>
                     <input asp-for="AdminApiKey" class="form-control" type="password" value="@Model?.AdminApiKey" readonly="@ghostCredsSet" />
                     <span asp-validation-for="AdminApiKey" class="text-danger"></span>

@@ -46,7 +46,6 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     AdminApiKey = table.Column<string>(type: "text", nullable: true),
                     ContentApiKey = table.Column<string>(type: "text", nullable: true),
                     Username = table.Column<string>(type: "text", nullable: true),
-                    WebhookSecret = table.Column<string>(type: "text", nullable: true),
                     Password = table.Column<string>(type: "text", nullable: true),
                     StoreId = table.Column<string>(type: "text", nullable: true),
                     StoreName = table.Column<string>(type: "text", nullable: true),
