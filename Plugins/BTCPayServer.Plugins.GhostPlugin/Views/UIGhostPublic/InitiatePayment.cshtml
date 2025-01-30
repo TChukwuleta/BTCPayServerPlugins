@@ -3,7 +3,7 @@
 @{
     Layout = "_GhostPublicLayout";
     ViewBag.Title = "Pay with BTCPay Server...";
-    string btcpayScriptUrl = $"{Model.BTCPayServerUrl}/plugins/{Model.StoreId}/ghost/public/btcpay-ghost.js";
+    string btcpayScriptUrl = $"{Model.BTCPayServerUrl}/plugins/{Model.StoreId}/ghost/api/btcpay-ghost.js";
 }
 
 <div class="public-page-wrap" style="--wrap-max-width: 576px;">
@@ -16,7 +16,7 @@
                     Please wait while we load your payment modal. If you encounter any issues, try refreshing the page or contact support.
                 </p>
                 <div id="statusButton" style="display: none;">
-                    <p>If you have not completed payment, kindly refresh this page to complete the payment. Otherwise, thank you for completing your payment.</p>
+                    <p>Thank you for completing your payment.</p>
                     @if (!string.IsNullOrEmpty(Model.RedirectUrl))
                     {
                         <a class="btn btn-success" href="@Model.RedirectUrl">Kindly click the link to continue with Ghost</a>

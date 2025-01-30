@@ -28,10 +28,7 @@ using Newtonsoft.Json;
 using System.Text;
 using System.Security.Cryptography;
 using System.IO;
-using System.Text.Json;
-using Microsoft.AspNetCore.DataProtection;
 using AngleSharp.Dom;
-using Microsoft.Extensions.Primitives;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -216,12 +213,12 @@ public class UIGhostPublicController : Controller
     [HttpPost("webhook")]
     public async Task<IActionResult> ReceiveWebhook(string storeId)
     {
+        Console.WriteLine($"Store Id: {storeId}");
         try
         {
             using var reader = new StreamReader(Request.Body, Encoding.UTF8);
             var requestBody = await reader.ReadToEndAsync();
             var webhookResponse = JsonConvert.DeserializeObject<GhostWebhookResponse>(requestBody);
-            Console.WriteLine(JsonConvert.SerializeObject(webhookResponse, Formatting.Indented));
 
             await using var ctx = _dbContextFactory.CreateContext();
             var webhookMember = webhookResponse.member;
@@ -233,20 +230,6 @@ public class UIGhostPublicController : Controller
             var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
             if (member == null || ghostSetting == null)
                 return NotFound();
-
-            if (!string.IsNullOrEmpty(ghostSetting.WebhookSecret))
-            {
-                if (!Request.Headers.TryGetValue("X-Ghost-Signature", out var signatureHeader))
-                    return Unauthorized("Missing X-Ghost-Signature header");
-
-                var signatureParts = signatureHeader.ToString().Split(", ");
-                if (signatureParts.Length != 2 || !signatureParts[0].StartsWith("sha256=") || !signatureParts[1].StartsWith("t="))
-                    return Unauthorized("Invalid signature format");
-
-                var receivedSignature = signatureParts[0].Replace("sha256=", "").Trim();
-                if (!VerifyWebhookSignature(requestBody, receivedSignature, ghostSetting.WebhookSecret))
-                    return Unauthorized("Invalid webhook signature");
-            }
 
             // Ghost webhook doesn't contain the kind of event triggered.But contains two member objects: previous and current.
             // These objects represents the previous state before the event and the state afterwards. With this I am inferring the event type:
@@ -275,25 +258,6 @@ public class UIGhostPublicController : Controller
             return StatusCode(500, "Internal Server Error.");
         }
     }
-
-    private static bool VerifyWebhookSignature(string requestBody, string receivedSignature, string secret)
-    {
-        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(requestBody));
-        var computedSignature = BitConverter.ToString(hash).Replace("-", "").ToLower();
-        return computedSignature == receivedSignature;
-
-    }
-    /*private static bool VerifyWebhookSignature(string requestBody, string shopifyHmacHeader, string clientSecret)
-    {
-        var keyBytes = Encoding.UTF8.GetBytes(clientSecret);
-        using (var hmac = new HMACSHA256(keyBytes))
-        {
-            var hashBytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(requestBody));
-            var hashString = Convert.ToBase64String(hashBytes);
-            return hashString.Equals(shopifyHmacHeader, StringComparison.OrdinalIgnoreCase);
-        }
-    }*/
 
     private async Task<InvoiceEntity> CreateInvoiceAsync(Data.StoreData store, Tier tier, GhostMember member)
     {

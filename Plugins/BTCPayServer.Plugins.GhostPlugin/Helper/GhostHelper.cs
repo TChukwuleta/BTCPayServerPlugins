@@ -1,5 +1,4 @@
 ﻿using System;
-using System.ComponentModel.DataAnnotations;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -52,8 +51,7 @@ public class GhostHelper
             Password = ghostSetting.Password,
             StoreId = ghostSetting.StoreId,
             StoreName = ghostSetting.StoreName,
-            IntegratedAt = ghostSetting.IntegratedAt,
-            WebhookSecret = ghostSetting.WebhookSecret
+            IntegratedAt = ghostSetting.IntegratedAt
         };
     }
 
@@ -67,8 +65,7 @@ public class GhostHelper
             Username = vm.Username,
             Password = vm.Password,
             StoreId = vm.StoreId,
-            StoreName = vm.StoreName,
-            WebhookSecret= vm.WebhookSecret
+            StoreName = vm.StoreName
         };
     }
 }
