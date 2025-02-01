@@ -17,6 +17,8 @@ public class GhostTransaction
     public TierSubscriptionFrequency Frequency { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
+    public DateTimeOffset? SubscriptionEndDate { get; set; }
+    public DateTimeOffset? SubscriptionStartDate { get; set; }
     public TransactionStatus TransactionStatus { get; set; }
     internal static void OnModelCreating(ModelBuilder modelBuilder)
     {

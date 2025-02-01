@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 {
     [DbContext(typeof(GhostDbContext))]
-    [Migration("20250130141857_ghostSettings")]
-    partial class ghostSettings
+    [Migration("20250131155443_ghostpluginSettings")]
+    partial class ghostpluginSettings
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -131,6 +131,12 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 
                     b.Property<string>("StoreId")
                         .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("SubscriptionEndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("SubscriptionStartDate")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("TierId")
                         .HasColumnType("text");

@@ -1,0 +1,103 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Plugins.GhostPlugin.Data
+@using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models
+@model GhostMembersViewModel
+@{
+    ViewData.SetActivePage(PluginNavPages.Index, "Ghost Members");
+}
+
+
+<div class="sticky-header">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <a id="page-primary" asp-action="Index" asp-controller="UIGhost" asp-route-storeId="@Model.StoreId" class="btn btn-primary" role="button">
+        View Credentials
+    </a>
+</div>
+<partial name="_StatusMessage" />
+
+
+@if(Model.Members != null && Model.Members.Any()){
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>
+                        Email
+                        @* <a asp-action="ListUsers"
+                       asp-route-sortOrder="@(nextUserEmailSortOrder ?? "asc")"
+                       class="text-nowrap"
+                       title="@(nextUserEmailSortOrder == "desc" ? sortByAsc : sortByDesc)">
+                        Email
+                        <vc:icon symbol="actions-sort-alpha-@(userEmailSortOrder ?? nextUserEmailSortOrder ?? "desc")" />
+                    </a> *@
+                    </th>
+                    <th>Tier</th>
+                    <th>Tier Frequency</th>
+                    <th>Created Date</th>
+                    <th>Next Subscription Date</th>
+                    <th class="actions-col"></th>
+                    <th class="w-75px"></th>
+                </tr>
+            </thead>
+            <tbody id="UsersList">
+                @foreach (var member in Model.Members)
+                {
+
+                    var detailsId = member.Subscriptions.Any() ? $"user_details_{member.Id}" : null;
+                    <tr id="user_@member.Id" class="user-overview-row mass-action-row">
+                        <td>@member.Name</td>
+                        <td>@member.Email</td>
+                        <td>@member.TierName</td>
+                        <td>@member.Frequency.ToString()</td>
+                        <td>@member.CreatedDate.ToString("M/d/yy, hh:mm tt")</td>
+                        <td>@member.PeriodEndDate.ToString("M/d/yy, hh:mm tt")</td>
+                        <td class="actions-col">
+                            <div class="d-inline-flex align-items-center gap-3">
+                                <a asp-action="SendReminder" asp-route-storeId="@member.StoreId" class="delete-user">Send Reminder</a>
+                            </div>
+                        </td>
+                        <td class="text-end">
+                            @if (detailsId != null)
+                            {
+                                <button class="accordion-button w-auto collapsed only-for-js ms-0 d-inline-flex align-items-center gap-1" type="button" data-bs-toggle="collapse" data-bs-target="#@detailsId" aria-expanded="false" aria-controls="@detailsId">
+                                    <span>View Orders</span>
+                                    <vc:icon symbol="caret-down" css-class="ms-0" />
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                    @if (detailsId != null)
+                    {
+                        @foreach (var subscription in member.Subscriptions)
+                        {
+                            <tr id="@detailsId" class="user-details-row collapse">
+                                <td colspan="6" class="border-top-0">
+                                    @if (member.Subscriptions.Any())
+                                    {
+                                        <ul class="mb-0 p-0 d-flex gap-4 list-unstyled">
+                                            <li>
+                                                <a asp-controller="UIInvoice" asp-action="Invoice" asp-route-invoiceId="@subscription.InvoiceId">
+                                                    @subscription.InvoiceId
+                                                </a>
+                                            </li>
+                                            <li>@subscription.Amount @subscription.Currency</li>
+                                            <li>@member.PeriodEndDate.ToString("M/d/yy, hh:mm tt")</li>
+                                        </ul>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-secondary">No Subscription</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else{
+    <p>No Ghost member record found</p>
+}

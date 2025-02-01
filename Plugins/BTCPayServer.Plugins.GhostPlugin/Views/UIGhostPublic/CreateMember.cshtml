@@ -113,11 +113,17 @@
                 const monthlyPrice = formatPrice(monthlyPriceCents);
                 const yearlyPrice = formatPrice(yearlyPriceCents);
 
-                tierTitle.textContent = `${tierName} - Monthly Plan`;
-                tierPrice.textContent = `${currency} ${monthlyPrice}`;
-                tierDescription.textContent = `Billed monthly at ${currency} ${monthlyPrice}. ${trialDays > 0 ? `Includes a ${trialDays}-day free trial.` : ''}`;
-                pricingCard.classList.remove('hidden');
+                const isYearlySelected = yearlyTab.checked;
 
+                if (isYearlySelected) {
+                    tierTitle.textContent = `${tierName} - Yearly Plan`;
+                    tierPrice.textContent = `${currency} ${yearlyPrice}`;
+                    tierDescription.textContent = `Billed yearly at ${currency} ${yearlyPrice}. ${trialDays > 0 ? `Includes a ${trialDays}-day free trial.` : ''}`;
+                } else {
+                    tierTitle.textContent = `${tierName} - Monthly Plan`;
+                    tierPrice.textContent = `${currency} ${monthlyPrice}`;
+                    tierDescription.textContent = `Billed monthly at ${currency} ${monthlyPrice}. ${trialDays > 0 ? `Includes a ${trialDays}-day free trial.` : ''}`;
+                }
                 monthlyTab.addEventListener('change', () => {
                     tierTitle.textContent = `${tierName} - Monthly Plan`;
                     tierPrice.textContent = `${currency} ${monthlyPrice}`;

@@ -14,6 +14,8 @@ using System.Threading.Tasks;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using System.Collections.Generic;
+using Newtonsoft.Json;
+using System.Timers;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
@@ -88,18 +90,15 @@ public class GhostHostedService : EventHostedServiceBase
                 await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
                 return;
             }
-
-            var status = success ? "success" : "failure";
             transaction.InvoiceStatus = invoice.Status.ToString().ToLower();
             transaction.TransactionStatus = success ? TransactionStatus.Success : TransactionStatus.Failed;
             transaction.UpdatedAt = DateTime.UtcNow;
-            ctx.UpdateRange(transaction);
-
-            if (status == "success")
+            if (success)
             {
                 try
                 {
                     var ghostMember = ctx.GhostMembers.AsNoTracking().FirstOrDefault(c => c.Id == transaction.MemberId);
+                    var expirationDate = ghostMember.Frequency == TierSubscriptionFrequency.Monthly ? DateTime.UtcNow.AddMonths(1) : DateTime.UtcNow.AddYears(1);
                     var client = new GhostAdminApiClient(_httpClientFactory, ghostSetting.CreateGhsotApiCredentials());
                     var response = await client.CreateGhostMember(new CreateGhostMemberRequest
                     {
@@ -109,17 +108,20 @@ public class GhostHostedService : EventHostedServiceBase
                             {
                                 email = ghostMember.Email,
                                 name = ghostMember.Name,
+                                comped = false,
                                 tiers = new List<MemberTier>
                                 {
                                     new MemberTier
                                     {
                                         id = ghostMember.TierId,
-                                        expiry_at = ghostMember.Frequency == TierSubscriptionFrequency.Monthly ? DateTime.UtcNow.AddMonths(1) : DateTime.UtcNow.AddYears(1)
+                                        expiry_at = expirationDate
                                     }
                                 }
                             }
                         }
                     });
+                    transaction.SubscriptionStartDate = DateTime.UtcNow;
+                    transaction.SubscriptionEndDate = expirationDate;
                     ghostMember.MemberId = response.members[0].id;
                     ghostMember.MemberUuid = response.members[0].uuid;
                     ghostMember.UnsubscribeUrl = response.members[0].unsubscribe_url;
@@ -136,6 +138,7 @@ public class GhostHostedService : EventHostedServiceBase
                 }
 
             }
+            ctx.UpdateRange(transaction);
             ctx.SaveChanges();
             await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
         }

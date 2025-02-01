@@ -87,8 +87,8 @@ public class UIGhostPublicController : Controller
         Console.WriteLine(JsonConvert.SerializeObject(ghostSettings));
 
         var donationsCurrency = ghostSettings.FirstOrDefault(s => s.key == "donations_currency")?.value?.ToString();
-        Console.WriteLine($"Donation currency: {donationsCurrency}");
-        donationsCurrency ??= "USD";
+        var storeBlob = store.GetStoreBlob();
+        donationsCurrency ??= storeBlob.DefaultCurrency;
 
         string id = Guid.NewGuid().ToString();
 
@@ -162,6 +162,8 @@ public class UIGhostPublicController : Controller
         ctx.Add(entity);
         await ctx.SaveChangesAsync();
         InvoiceEntity invoice = await CreateInvoiceAsync(storeData, tier, entity);
+        // Amount is in lower denomination, so divided by 100
+        var price = vm.TierSubscriptionFrequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price;
         GhostTransaction transaction = new GhostTransaction
         {
             StoreId = storeId,
@@ -171,7 +173,7 @@ public class UIGhostPublicController : Controller
             TierId = vm.TierId,
             Frequency = vm.TierSubscriptionFrequency,
             CreatedAt = DateTime.UtcNow,
-            Amount = (decimal)(vm.TierSubscriptionFrequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price)
+            Amount = (decimal)(price / 100)
         };
         ctx.Add(transaction);
         await ctx.SaveChangesAsync();
@@ -213,7 +215,6 @@ public class UIGhostPublicController : Controller
     [HttpPost("webhook")]
     public async Task<IActionResult> ReceiveWebhook(string storeId)
     {
-        Console.WriteLine($"Store Id: {storeId}");
         try
         {
             using var reader = new StreamReader(Request.Body, Encoding.UTF8);
@@ -280,10 +281,12 @@ public class UIGhostPublicController : Controller
         if (firstInvoiceSettled != null)
             return firstInvoiceSettled;
 
+        // Amount is in lower denomination, so divided by 100
+        var price = member.Frequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price;
         var invoice = await _invoiceController.CreateInvoiceCoreRaw(
             new CreateInvoiceRequest()
             {
-                Amount = member.Frequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price,
+                Amount = price / 100,
                 Currency = tier.currency,
                 Metadata = new JObject
                 {
