@@ -12,6 +12,7 @@ public class Member
 {
     public string email { get; set; }
     public string name { get; set; }
+    public bool comped { get; set; }
     public List<MemberTier> tiers { get; set; }
 }
 

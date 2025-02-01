@@ -129,6 +129,12 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     b.Property<string>("StoreId")
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("SubscriptionEndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("SubscriptionStartDate")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("TierId")
                         .HasColumnType("text");
 
