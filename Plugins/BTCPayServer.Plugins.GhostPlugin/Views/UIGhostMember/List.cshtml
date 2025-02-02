@@ -61,7 +61,7 @@
                             @if (detailsId != null)
                             {
                                 <button class="accordion-button w-auto collapsed only-for-js ms-0 d-inline-flex align-items-center gap-1" type="button" data-bs-toggle="collapse" data-bs-target="#@detailsId" aria-expanded="false" aria-controls="@detailsId">
-                                    <span>View Orders</span>
+                                    <span>View</span>
                                     <vc:icon symbol="caret-down" css-class="ms-0" />
                                 </button>
                             }
@@ -82,7 +82,6 @@
                                                 </a>
                                             </li>
                                             <li>@subscription.Amount @subscription.Currency</li>
-                                            <li>@member.PeriodEndDate.ToString("M/d/yy, hh:mm tt")</li>
                                         </ul>
                                     }
                                     else

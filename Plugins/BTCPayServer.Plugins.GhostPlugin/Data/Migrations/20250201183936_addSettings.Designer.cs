@@ -3,6 +3,7 @@ using System;
 using BTCPayServer.Plugins.GhostPlugin;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 {
     [DbContext(typeof(GhostDbContext))]
-    partial class GhostDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250201183936_addSettings")]
+    partial class addSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

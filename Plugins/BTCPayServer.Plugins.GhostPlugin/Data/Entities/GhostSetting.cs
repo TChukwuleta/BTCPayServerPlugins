@@ -26,6 +26,7 @@ public class GhostSetting
     public string StoreName { get; set; }
     public string ApplicationUserId { get; set; }
     public DateTimeOffset? IntegratedAt { get; set; }
+    public string Setting { get; set; }
     public bool CredentialsPopulated()
     {
         return
