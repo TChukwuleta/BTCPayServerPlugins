@@ -13,8 +13,13 @@ namespace BTCPayServer.Plugins.GhostPlugin
         private readonly LinkGenerator _linkGenerator;
         private readonly IOptions<BTCPayServerOptions> _options;
         public const string AppType = "Ghost";
+        public const string MemberIdKey = "memberId";
         public const string AppName = "GhostSubscription";
+        public const string PaymentRequestSourceKey = "source";
+        public const string PaymentRequestAppId = "appId";
+        public const string PaymentRequestSubscriptionIdKey = "ghostsubscriptionId";
         public const string GHOST_MEMBER_ID_PREFIX = "Ghost_member-";
+        public const string GhostSubscriptionRenewalRequested = "GhostSubscriptionRenewalRequested";
 
         public GhostApp(
             LinkGenerator linkGenerator,
