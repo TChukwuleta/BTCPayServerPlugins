@@ -162,7 +162,7 @@ public class UIGhostPublicController : Controller
         await ctx.SaveChangesAsync();
         InvoiceEntity invoice = await _ghostPluginService.CreateInvoiceAsync(storeData, tier, entity, Request.GetAbsoluteRoot());
         // Amount is in lower denomination, so divided by 100
-        var price = vm.TierSubscriptionFrequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price;
+        var price = Convert.ToDecimal(vm.TierSubscriptionFrequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price) / 100;
         GhostTransaction transaction = new GhostTransaction
         {
             StoreId = storeId,
@@ -172,7 +172,7 @@ public class UIGhostPublicController : Controller
             TierId = vm.TierId,
             Frequency = vm.TierSubscriptionFrequency,
             CreatedAt = DateTime.UtcNow,
-            Amount = (decimal)(price / 100)
+            Amount = price
         };
         ctx.Add(transaction);
         await ctx.SaveChangesAsync();

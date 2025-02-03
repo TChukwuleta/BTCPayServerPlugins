@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json.Converters;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Data;
 
@@ -18,6 +21,12 @@ public class GhostMember
     public string StoreId { get; set; }
     public TierSubscriptionFrequency Frequency { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+
+    [JsonConverter(typeof(StringEnumConverter))]
+    public GhostSubscriptionStatus Status { get; set; }
+    [JsonConverter(typeof(NBitcoin.JsonConverters.DateTimeToUnixTimeConverter))]
+    public DateTimeOffset Start { get; set; }
+    public ICollection<GhostTransaction> GhostTransactions { get; set; } 
     internal static void OnModelCreating(ModelBuilder modelBuilder)
     {
     }
