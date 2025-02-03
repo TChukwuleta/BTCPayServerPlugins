@@ -37,6 +37,7 @@ public class GhostHostedService : EventHostedServiceBase
     }
 
     private const string GHOST_MEMBER_ID_PREFIX = "Ghost_member-";
+    public const string AppName = "GhostSubscription";
 
     protected override void SubscribeToEvents()
     {

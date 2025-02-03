@@ -31,6 +31,5 @@ public class GhostSettingViewModel
 
     [Display(Name = "Webhook Url")]
     public string WebhookUrl { get; set; }
-
     public DateTimeOffset? IntegratedAt { get; set; }
 }

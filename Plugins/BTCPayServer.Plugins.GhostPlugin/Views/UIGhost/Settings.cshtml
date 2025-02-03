@@ -76,6 +76,24 @@
                 <input type="number" class="form-control mt-2 d-none" id="customDaysInput" asp-for="CustomReminderDays" min="1" placeholder="Enter custom days">
             </div>
 
+            @* <div class="mb-3">
+                <label class="form-label fw-bold">Reminder Email Timing</label>
+
+                @foreach (var value in Enum.GetValues(typeof(ReminderDaysEnum)).Cast<ReminderDaysEnum>())
+                {
+                    var field = typeof(ReminderDaysEnum).GetField(value.ToString());
+                    var displayAttribute = field.GetCustomAttribute<DisplayAttribute>();
+                    var displayName = displayAttribute != null ? displayAttribute.Name : value.ToString();
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" asp-for="ReminderDays" value="@((int)value)" id="reminder@(value)">
+                        <label class="form-check-label" for="reminder@(value)">@displayName</label>
+                    </div>
+                }
+
+                <input type="number" class="form-control mt-2 d-none" id="customDaysInput" asp-for="CustomReminderDays" min="1" placeholder="Enter custom days">
+            </div> *@
+
 
             <div class="form-group d-flex align-items-center">
                 <input asp-for="SendAutomatedSubscriptionRemider" type="checkbox" class="btcpay-toggle me-3" disabled="@(Model.AllowSubscriptionEmail ? null : "disabled")" />

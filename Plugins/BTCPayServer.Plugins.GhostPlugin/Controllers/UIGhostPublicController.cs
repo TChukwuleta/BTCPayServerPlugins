@@ -26,9 +26,8 @@ using BTCPayServer.Controllers.Greenfield;
 using Microsoft.AspNetCore.Routing;
 using Newtonsoft.Json;
 using System.Text;
-using System.Security.Cryptography;
 using System.IO;
-using AngleSharp.Dom;
+using BTCPayServer.Services.Apps;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -37,42 +36,42 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 [Route("~/plugins/{storeId}/ghost/api/")]
 public class UIGhostPublicController : Controller
 {
+    private readonly AppService _appService;
     private readonly UriResolver _uriResolver;
     private readonly StoreRepository _storeRepo;
     private readonly LinkGenerator _linkGenerator;
     private readonly IHttpClientFactory _clientFactory;
-    private readonly InvoiceRepository _invoiceRepository;
     private readonly ApplicationDbContextFactory _context;
+    private readonly GhostPluginService _ghostPluginService;
     private readonly UIInvoiceController _invoiceController;
     private readonly GhostDbContextFactory _dbContextFactory;
     private GhostHelper helper;
     public UIGhostPublicController
-        (UriResolver uriResolver,
+        (AppService appService,
+        UriResolver uriResolver,
         StoreRepository storeRepo,
         LinkGenerator linkGenerator,
         IHttpClientFactory clientFactory,
         ApplicationDbContextFactory context,
-        InvoiceRepository invoiceRepository,
+        GhostPluginService ghostPluginService,
         UIInvoiceController invoiceController,
         GhostDbContextFactory dbContextFactory)
     {
-        helper = new GhostHelper();
+        _appService = appService;
+        helper = new GhostHelper(_appService);
         _context = context;
         _storeRepo = storeRepo;
         _uriResolver = uriResolver;
         _linkGenerator = linkGenerator;
         _clientFactory = clientFactory;
         _dbContextFactory = dbContextFactory;
-        _invoiceRepository = invoiceRepository;
         _invoiceController = invoiceController;
     }
 
-    private const string GHOST_MEMBER_ID_PREFIX = "Ghost_member-";
 
     [HttpGet("donate")]
     public async Task<IActionResult> Donate(string storeId)
     {
-
         var store = await _storeRepo.FindStore(storeId);
         if (store == null)
             return NotFound();
@@ -161,7 +160,7 @@ public class UIGhostPublicController : Controller
         };
         ctx.Add(entity);
         await ctx.SaveChangesAsync();
-        InvoiceEntity invoice = await CreateInvoiceAsync(storeData, tier, entity);
+        InvoiceEntity invoice = await _ghostPluginService.CreateInvoiceAsync(storeData, tier, entity, Request.GetAbsoluteRoot());
         // Amount is in lower denomination, so divided by 100
         var price = vm.TierSubscriptionFrequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price;
         GhostTransaction transaction = new GhostTransaction
@@ -258,48 +257,5 @@ public class UIGhostPublicController : Controller
         {
             return StatusCode(500, "Internal Server Error.");
         }
-    }
-
-    private async Task<InvoiceEntity> CreateInvoiceAsync(Data.StoreData store, Tier tier, GhostMember member)
-    {
-        var ghostSearchTerm = $"{GHOST_MEMBER_ID_PREFIX}{member.Id}";
-        var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
-        {
-            TextSearch = ghostSearchTerm,
-            StoreId = new[] { store.Id }
-        });
-
-        matchedExistingInvoices = matchedExistingInvoices.Where(entity =>
-                entity.GetInternalTags(ghostSearchTerm).Any(s => s == member.Id.ToString())).ToArray();
-
-        var firstInvoiceSettled =
-            matchedExistingInvoices.LastOrDefault(entity =>
-                new[] { "settled", "processing", "confirmed", "paid", "complete" }
-                    .Contains(
-                        entity.GetInvoiceState().Status.ToString().ToLower()));
-
-        if (firstInvoiceSettled != null)
-            return firstInvoiceSettled;
-
-        // Amount is in lower denomination, so divided by 100
-        var price = member.Frequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price;
-        var invoice = await _invoiceController.CreateInvoiceCoreRaw(
-            new CreateInvoiceRequest()
-            {
-                Amount = price / 100,
-                Currency = tier.currency,
-                Metadata = new JObject
-                {
-                    ["MemberId"] = member.Id
-                },
-                AdditionalSearchTerms = new[]
-                {
-                        member.Id.ToString(CultureInfo.InvariantCulture),
-                        ghostSearchTerm
-                }
-            }, store,
-            Request.GetAbsoluteRoot(), new List<string>() { ghostSearchTerm });
-
-        return invoice;
     }
 }

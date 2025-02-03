@@ -25,7 +25,6 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIGhostMemberController : Controller
 {
-    private GhostHelper helper;
     private readonly StoreRepository _storeRepo;
     private readonly IHttpClientFactory _clientFactory;
     private readonly GhostDbContextFactory _dbContextFactory;
@@ -35,7 +34,6 @@ public class UIGhostMemberController : Controller
         GhostDbContextFactory dbContextFactory)
     {
         _storeRepo = storeRepo;
-        helper = new GhostHelper();
         _clientFactory = clientFactory;
         _dbContextFactory = dbContextFactory;
     }

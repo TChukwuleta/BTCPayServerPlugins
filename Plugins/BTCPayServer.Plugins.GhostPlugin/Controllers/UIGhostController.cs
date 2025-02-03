@@ -23,6 +23,7 @@ using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 using BTCPayServer.Services.Mails;
 using Microsoft.AspNetCore.Routing;
 using Newtonsoft.Json;
+using BTCPayServer.Services.Apps;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -32,6 +33,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 public class UIGhostController : Controller
 {
     private GhostHelper helper;
+    private readonly AppService _appService;
     private readonly StoreRepository _storeRepo;
     private readonly IHttpClientFactory _clientFactory;
     private readonly EmailSenderFactory _emailSenderFactory;
@@ -39,7 +41,8 @@ public class UIGhostController : Controller
     private readonly GhostDbContextFactory _dbContextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
     public UIGhostController
-        (StoreRepository storeRepo,
+        (AppService appService,
+        StoreRepository storeRepo,
         IHttpClientFactory clientFactory,
         EmailSenderFactory emailSenderFactory,
         BTCPayNetworkProvider networkProvider,
@@ -47,7 +50,8 @@ public class UIGhostController : Controller
         UserManager<ApplicationUser> userManager)
     {
         _storeRepo = storeRepo;
-        helper = new GhostHelper();
+        _appService = appService;
+        helper = new GhostHelper(_appService);
         _userManager = userManager;
         _clientFactory = clientFactory;
         _networkProvider = networkProvider;
@@ -89,6 +93,7 @@ public class UIGhostController : Controller
         try
         {
             await using var ctx = _dbContextFactory.CreateContext();
+            var store = await _storeRepo.FindStore(CurrentStore.Id);
             switch (command)
             {
                 case "GhostSaveCredentials":
@@ -128,8 +133,17 @@ public class UIGhostController : Controller
                             var settingModel = new GhostSettingsPageViewModel { StoreId = storeId, ReminderDays = ReminderDaysEnum.SameDay };
                             entity.Setting = JsonConvert.SerializeObject(settingModel);
                         }
+                        var storeBlob = store.GetStoreBlob();
+                        var newApp = await helper.CreateGhostApp(CurrentStore.Id, storeBlob.DefaultCurrency);
+                        var app = await _appService.GetApp(newApp.Id, GhostApp.AppType, true, true);
+                        entity.AppId = newApp.Id;
                         ctx.Update(entity);
                         await ctx.SaveChangesAsync();
+                        var old = app.GetSettings<GhostSetting>();
+                        entity.Members = old.Members;
+                        app.SetSettings(entity);
+                        app.Name = GhostApp.AppName;
+                        await _appService.UpdateOrCreateApp(app);
                         TempData[WellKnownTempData.SuccessMessage] = "Ghost plugin successfully updated";
                         break;
                     }
@@ -138,6 +152,7 @@ public class UIGhostController : Controller
                         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
                         if (ghostSetting != null)
                         {
+                            await helper.DeleteGhostApp(CurrentStore.Id);
                             ctx.Remove(ghostSetting);
                             await ctx.SaveChangesAsync();
                         }

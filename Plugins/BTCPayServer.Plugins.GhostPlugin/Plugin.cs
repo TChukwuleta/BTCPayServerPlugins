@@ -19,9 +19,10 @@ public class Plugin : BaseBTCPayServerPlugin
     {
         services.AddSingleton<IUIExtension>(new UIExtension("GhostPluginHeaderNav", "header-nav"));
         services.AddSingleton<GhostHostedService>();
+        services.AddSingleton<GhostPluginService>();
+        services.AddSingleton<GhostDbContextFactory>();
         services.AddHostedService<GhostHostedService>();
         services.AddHostedService<ApplicationPartsLogger>();
-        services.AddSingleton<GhostDbContextFactory>();
         services.AddDbContext<GhostDbContext>((provider, o) =>
         {
             var factory = provider.GetRequiredService<GhostDbContextFactory>();

@@ -13,6 +13,7 @@ public class GhostTransaction
     public string InvoiceStatus { get; set; }
     public decimal Amount { get; set; }
     public string TierId { get; set; }
+    public string PaymentRequestId { get; set; }
     public string MemberId { get; set; }
     public TierSubscriptionFrequency Frequency { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
