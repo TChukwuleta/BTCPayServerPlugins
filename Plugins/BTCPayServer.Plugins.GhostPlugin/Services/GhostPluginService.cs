@@ -21,7 +21,6 @@ using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.HostedServices.Webhooks;
 using TransactionStatus = BTCPayServer.Plugins.GhostPlugin.Data.TransactionStatus;
 using Newtonsoft.Json;
-using BTCPayServer.Services;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
@@ -57,9 +56,7 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
-
         await base.StartAsync(cancellationToken);
-        Console.WriteLine("Fr");
         _ = ScheduleChecks();
     }
 
@@ -78,24 +75,19 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
         {
             case SequentialExecute sequentialExecute:
                 {
-                    Console.WriteLine("Hey");
+                    Console.WriteLine("Hello from this side");
                     var task = await sequentialExecute.Action();
                     sequentialExecute.TaskCompletionSource.SetResult(task);
                     return;
                 }
             case PaymentRequestEvent { Type: PaymentRequestEvent.StatusChanged } paymentRequestStatusUpdated:
                 {
-                    var prBlob = paymentRequestStatusUpdated.Data.GetBlob();
+                    Console.WriteLine("wRITING LINE");
+                    /*var prBlob = paymentRequestStatusUpdated.Data.GetBlob();
                     prBlob.AdditionalData.TryGetValue(GhostApp.PaymentRequestSourceKey, out var src);
-                    if (src == null || src.Value<string>() != GhostApp.AppName)
-                        return;
-
-                    if (!prBlob.AdditionalData.TryGetValue(GhostApp.GhostSettingtAppId, out var ghostSettingIdToken) ||
-                        ghostSettingIdToken.Value<string>() is not { } ghostSettingId)
-                    {
-                        return;
-                    }
                     prBlob.AdditionalData.TryGetValue(GhostApp.MemberIdKey, out var memberIdToken);
+                    if (src == null || src.Value<string>() != GhostApp.AppName || memberIdToken == null)
+                        return;
 
                     if (paymentRequestStatusUpdated.Data.Status == Client.Models.PaymentRequestData.PaymentRequestStatus.Completed)
                     {
@@ -103,8 +95,8 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
                         var blob = paymentRequestStatusUpdated.Data.GetBlob();
                         var memberEmail = blob.Email;
 
-                        await HandlePaidMembershipSubscription(ghostSettingId, memberId, paymentRequestStatusUpdated.Data.Id, memberEmail);
-                    }
+                        await HandlePaidMembershipSubscription(memberId, paymentRequestStatusUpdated.Data.Id, memberEmail);
+                    }*/
                     await _checkTcs.CancelAsync();
                     break;
                 }
@@ -118,7 +110,6 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
         {
             try
             {
-                Console.WriteLine("Fore");
                 await CreatePaymentRequestForActiveSubscriptionCloseToEnding();
             }
             catch (Exception e)
@@ -217,45 +208,46 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
         return invoice;
     }
 
-    public async Task HandlePaidMembershipSubscription(string ghostSettingId, string memberId, string paymentRequestId, string email)
+    public async Task HandlePaidMembershipSubscription(PaymentRequestBaseData pr, string memberId, string paymentRequestId, string email)
     {
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.Id == ghostSettingId);
-        var member = ctx.GhostMembers.AsNoTracking().FirstOrDefault(c => c.StoreId == ghostSetting.StoreId && c.Id == memberId);
-        var start = DateOnly.FromDateTime(DateTimeOffset.UtcNow.DateTime);
+        var member = ctx.GhostMembers.AsNoTracking().FirstOrDefault(c => c.Id == memberId);
+        if (!string.Equals(member?.Email?.Trim(), email?.Trim(), StringComparison.OrdinalIgnoreCase))
+            return;
 
+        Console.WriteLine(pr.ExpiryDate);
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == member.StoreId);
+        var startDate = pr.ExpiryDate.HasValue ? pr.ExpiryDate.Value.UtcDateTime : (ctx.GhostTransactions
+            .AsNoTracking().Where(t => t.StoreId == member.StoreId && t.TransactionStatus == TransactionStatus.Success && t.MemberId == memberId)
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstOrDefault()).PeriodEnd;
+
+        var start = DateOnly.FromDateTime(startDate);
+        bool change = false;
         if (member != null)
         {
             var end = member.Frequency == TierSubscriptionFrequency.Monthly ? start.AddMonths(1).ToDateTime(TimeOnly.MaxValue) : start.AddYears(1).ToDateTime(TimeOnly.MaxValue);
             var existingPayment = ctx.GhostTransactions.AsNoTracking().First(p => p.PaymentRequestId == paymentRequestId);
-            if (existingPayment is null)
+            Console.WriteLine(JsonConvert.SerializeObject(existingPayment, Formatting.Indented));
+            if (existingPayment is not null)
             {
-                GhostTransaction transaction = new GhostTransaction
-                {
-                    StoreId = member.StoreId,
-                    PaymentRequestId = paymentRequestId,
-                    MemberId = member.Id,
-                    TransactionStatus = TransactionStatus.Success,
-                    TierId = member.TierId,
-                    Frequency = member.Frequency,
-                    CreatedAt = DateTime.UtcNow,
-                    PeriodStart = start.ToDateTime(TimeOnly.MinValue),
-                    PeriodEnd = end
-                };
-                ctx.Add(transaction);
-            }
-            else
-            {
+                existingPayment.PeriodStart = start.ToDateTime(TimeOnly.MinValue);
+                existingPayment.PeriodEnd = end;
                 existingPayment.TransactionStatus = TransactionStatus.Success;
                 ctx.Update(existingPayment);
+                change = true;
             }
             if (member.Status == GhostSubscriptionStatus.New)
             {
                 member.Status = GhostSubscriptionStatus.Renew;
                 ctx.Update(member);
+                change = true;
             }
-            ctx.SaveChanges();
+            if (change)
+            {
+                ctx.SaveChanges();
+            }
         }
     }
 
@@ -264,10 +256,8 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
     {
         await using var ctx = _dbContextFactory.CreateContext();
         var tcs = new TaskCompletionSource<object>();
-
         PushEvent(new SequentialExecute(async () =>
         {
-            Console.WriteLine("Be");
             var apps = await _appService.GetApps(GhostApp.AppType);
             apps = apps.Where(data => !data.Archived).ToList();
             Console.WriteLine(JsonConvert.SerializeObject(apps));
@@ -278,7 +268,7 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
                 if (ghostSetting == null)
                     continue;
 
-                Console.WriteLine("Bee");
+                Console.WriteLine($"Ghost setting: {ghostSetting.StoreName}");
                 var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
                 var ghostTiers = await apiClient.RetrieveGhostTiers();
                 var ghostMembers = ctx.GhostMembers.AsNoTracking().Where(c => c.StoreId == ghostSetting.StoreId).ToList();

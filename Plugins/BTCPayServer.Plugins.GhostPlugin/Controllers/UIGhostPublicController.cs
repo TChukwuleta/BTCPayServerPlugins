@@ -180,7 +180,7 @@ public class UIGhostPublicController : Controller
         await ctx.SaveChangesAsync();
         var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
         InvoiceEntity invoice = await _ghostPluginService.CreateInvoiceAsync(storeData, tier, entity, txnId, Request.GetAbsoluteRoot());
-        await GetTransaction(ctx, tier, entity, invoice, txnId);
+        await GetTransaction(ctx, tier, entity, invoice, null, txnId);
         await using var dbMain = _context.CreateContext();
         var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == storeId);
 
@@ -211,14 +211,14 @@ public class UIGhostPublicController : Controller
             return NotFound();
 
         var storeData = await _storeRepo.FindStore(storeId);
-
-
         var latestTransaction = ctx.GhostTransactions
             .AsNoTracking().Where(t => t.StoreId == storeId && t.TransactionStatus == GhostPlugin.Data.TransactionStatus.Success && t.MemberId == memberId)
             .OrderByDescending(t => t.CreatedAt)
             .FirstOrDefault();
 
+        var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
         var pr = await _ghostPluginService.CreatePaymentRequest(member, tier, ghostSetting.AppId, latestTransaction.PeriodEnd);
+        await GetTransaction(ctx, tier, member, null, pr, txnId);
         return RedirectToAction("ViewPaymentRequest", "UIPaymentRequest", new { payReqId = pr.Id });
 
         /*var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
@@ -306,7 +306,7 @@ public class UIGhostPublicController : Controller
         }
     }
 
-    private async Task GetTransaction(GhostDbContext ctx, Tier tier, GhostMember member, InvoiceEntity invoice, string txnId)
+    private async Task GetTransaction(GhostDbContext ctx, Tier tier, GhostMember member, InvoiceEntity invoice, Data.PaymentRequestData paymentRequest, string txnId)
     {
         // Amount is in lower denomination, so divided by 100
         var price = Convert.ToDecimal(member.Frequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price) / 100;
@@ -314,7 +314,8 @@ public class UIGhostPublicController : Controller
         {
             StoreId = member.StoreId,
             TxnId = txnId,
-            InvoiceId = invoice.Id,
+            InvoiceId = invoice?.Id,
+            PaymentRequestId = paymentRequest?.Id,
             MemberId = member.Id,
             TransactionStatus = GhostPlugin.Data.TransactionStatus.Pending,
             TierId = member.TierId,

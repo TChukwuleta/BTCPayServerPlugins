@@ -16,7 +16,6 @@ using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using System.Collections.Generic;
 using BTCPayServer.Services.PaymentRequests;
 using Newtonsoft.Json.Linq;
-using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
@@ -80,30 +79,25 @@ public class GhostHostedService : EventHostedServiceBase
 
             case PaymentRequestEvent { Type: PaymentRequestEvent.StatusChanged } paymentRequestStatusUpdated:
                 {
-                    var prBlob = paymentRequestStatusUpdated.Data.GetBlob();
-                    prBlob.AdditionalData.TryGetValue(GhostApp.PaymentRequestSourceKey, out var src);
-                    if (src == null || src.Value<string>() != GhostApp.AppName)
-                        return;
-
-                    if (!prBlob.AdditionalData.TryGetValue(GhostApp.GhostSettingtAppId, out var ghostSettingIdToken) ||
-                        ghostSettingIdToken.Value<string>() is not { } ghostSettingId)
-                    {
-                        return;
-                    }
-
-                    prBlob.AdditionalData.TryGetValue(GhostApp.MemberIdKey, out var memberIdToken);
                     if (paymentRequestStatusUpdated.Data.Status == Client.Models.PaymentRequestData.PaymentRequestStatus.Completed)
                     {
-                        var memberId = memberIdToken?.Value<string>();
-                        var blob = paymentRequestStatusUpdated.Data.GetBlob();
-                        var memberEmail = blob.Email;
+                        var prBlob = paymentRequestStatusUpdated.Data.GetBlob();
+                        prBlob.AdditionalData.TryGetValue(GhostApp.PaymentRequestSourceKey, out var src);
+                        prBlob.AdditionalData.TryGetValue(GhostApp.MemberIdKey, out var memberIdToken);
+                        if (src == null || src.Value<string>() != GhostApp.AppName || memberIdToken == null)
+                            return;
 
-                        await _ghostPluginService.HandlePaidMembershipSubscription(ghostSettingId, memberId, paymentRequestStatusUpdated.Data.Id, memberEmail);
+                        if (paymentRequestStatusUpdated.Data.Status == Client.Models.PaymentRequestData.PaymentRequestStatus.Completed)
+                        {
+                            var memberId = memberIdToken?.Value<string>();
+                            var blob = paymentRequestStatusUpdated.Data.GetBlob();
+                            var memberEmail = blob.Email;
+                            await _ghostPluginService.HandlePaidMembershipSubscription(prBlob, memberId, paymentRequestStatusUpdated.Data.Id, memberEmail);
+                        }
                     }
                     break;
                 }
         }
-
         await base.ProcessEvent(evt, cancellationToken);
     }
 
