@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 {
     [DbContext(typeof(GhostDbContext))]
-    [Migration("20250131155443_ghostpluginSettings")]
-    partial class ghostpluginSettings
+    [Migration("20250204125442_ghostSettings")]
+    partial class ghostSettings
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -50,10 +50,10 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     b.Property<string>("Name")
                         .HasColumnType("text");
 
-                    b.Property<string>("StoreId")
-                        .HasColumnType("text");
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
 
-                    b.Property<string>("SubscriptionId")
+                    b.Property<string>("StoreId")
                         .HasColumnType("text");
 
                     b.Property<string>("TierId")
@@ -79,6 +79,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     b.Property<string>("ApiUrl")
                         .HasColumnType("text");
 
+                    b.Property<string>("AppId")
+                        .HasColumnType("text");
+
                     b.Property<string>("ApplicationUserId")
                         .HasColumnType("text");
 
@@ -89,6 +92,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Password")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Setting")
                         .HasColumnType("text");
 
                     b.Property<string>("StoreId")
@@ -129,14 +135,17 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     b.Property<string>("MemberId")
                         .HasColumnType("text");
 
-                    b.Property<string>("StoreId")
+                    b.Property<string>("PaymentRequestId")
                         .HasColumnType("text");
 
-                    b.Property<DateTimeOffset?>("SubscriptionEndDate")
+                    b.Property<DateTime>("PeriodEnd")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTimeOffset?>("SubscriptionStartDate")
+                    b.Property<DateTime>("PeriodStart")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("StoreId")
+                        .HasColumnType("text");
 
                     b.Property<string>("TierId")
                         .HasColumnType("text");
@@ -144,8 +153,8 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     b.Property<int>("TransactionStatus")
                         .HasColumnType("integer");
 
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<string>("TxnId")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 

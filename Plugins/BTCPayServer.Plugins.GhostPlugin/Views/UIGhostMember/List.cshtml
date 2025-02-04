@@ -53,15 +53,18 @@
                         <td>@member.CreatedDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td>@member.PeriodEndDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td class="actions-col">
-                            <div class="d-inline-flex align-items-center gap-3">
+                            @* <div class="d-inline-flex align-items-center gap-3">
                                 <a asp-action="SendReminder" asp-route-storeId="@member.StoreId" class="delete-user">Send Reminder</a>
+                            </div> *@
+                            <div class="d-inline-flex align-items-center gap-3">
+                                <a asp-action="Subscribe" asp-controller="UIGhostPublic" asp-route-storeId="@member.StoreId" asp-route-memberId="@member.Id" class="delete-user">Send Reminder</a>
                             </div>
                         </td>
                         <td class="text-end">
                             @if (detailsId != null)
                             {
                                 <button class="accordion-button w-auto collapsed only-for-js ms-0 d-inline-flex align-items-center gap-1" type="button" data-bs-toggle="collapse" data-bs-target="#@detailsId" aria-expanded="false" aria-controls="@detailsId">
-                                    <span>View Orders</span>
+                                    <span>View</span>
                                     <vc:icon symbol="caret-down" css-class="ms-0" />
                                 </button>
                             }
@@ -82,7 +85,6 @@
                                                 </a>
                                             </li>
                                             <li>@subscription.Amount @subscription.Currency</li>
-                                            <li>@member.PeriodEndDate.ToString("M/d/yy, hh:mm tt")</li>
                                         </ul>
                                     }
                                     else

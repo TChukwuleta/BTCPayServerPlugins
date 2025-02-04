@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Identity;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authorization;
-using BTCPayServer.Client;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Services.Stores;
 using System.Collections.Generic;
@@ -20,6 +19,11 @@ using System.Net.Http;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.Plugins.GhostPlugin;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
+using BTCPayServer.Services.Mails;
+using Microsoft.AspNetCore.Routing;
+using Newtonsoft.Json;
+using BTCPayServer.Services.Apps;
+using BTCPayServer.Client;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -29,24 +33,30 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 public class UIGhostController : Controller
 {
     private GhostHelper helper;
+    private readonly AppService _appService;
     private readonly StoreRepository _storeRepo;
     private readonly IHttpClientFactory _clientFactory;
+    private readonly EmailSenderFactory _emailSenderFactory;
     private readonly BTCPayNetworkProvider _networkProvider;
     private readonly GhostDbContextFactory _dbContextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
     public UIGhostController
-        (StoreRepository storeRepo,
+        (AppService appService,
+        StoreRepository storeRepo,
         IHttpClientFactory clientFactory,
+        EmailSenderFactory emailSenderFactory,
         BTCPayNetworkProvider networkProvider,
         GhostDbContextFactory dbContextFactory,
         UserManager<ApplicationUser> userManager)
     {
         _storeRepo = storeRepo;
-        helper = new GhostHelper();
+        _appService = appService;
+        helper = new GhostHelper(_appService);
         _userManager = userManager;
         _clientFactory = clientFactory;
         _networkProvider = networkProvider;
         _dbContextFactory = dbContextFactory;
+        _emailSenderFactory = emailSenderFactory;
     }
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
@@ -83,6 +93,7 @@ public class UIGhostController : Controller
         try
         {
             await using var ctx = _dbContextFactory.CreateContext();
+            var store = await _storeRepo.FindStore(CurrentStore.Id);
             switch (command)
             {
                 case "GhostSaveCredentials":
@@ -114,6 +125,17 @@ public class UIGhostController : Controller
                         entity.StoreId = CurrentStore.Id;
                         entity.StoreName = CurrentStore.StoreName;
                         entity.ApplicationUserId = GetUserId();
+                        Console.WriteLine("ANother banger");
+                        var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStore.Id);
+                        var isEmailSetup = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+                        if (isEmailSetup)
+                        {
+                            var settingModel = new GhostSettingsPageViewModel { StoreId = storeId, ReminderDays = ReminderDaysEnum.SameDay };
+                            entity.Setting = JsonConvert.SerializeObject(settingModel);
+                        }
+                        var storeBlob = store.GetStoreBlob();
+                        var newApp = await helper.CreateGhostApp(CurrentStore.Id, storeBlob.DefaultCurrency);
+                        entity.AppId = newApp.Id;
                         ctx.Update(entity);
                         await ctx.SaveChangesAsync();
                         TempData[WellKnownTempData.SuccessMessage] = "Ghost plugin successfully updated";
@@ -124,6 +146,7 @@ public class UIGhostController : Controller
                         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
                         if (ghostSetting != null)
                         {
+                            await helper.DeleteGhostApp(CurrentStore.Id);
                             ctx.Remove(ghostSetting);
                             await ctx.SaveChangesAsync();
                         }
@@ -138,6 +161,42 @@ public class UIGhostController : Controller
             TempData[WellKnownTempData.ErrorMessage] = $"An error occurred on Ghost plugin. {ex.Message}";
             return RedirectToAction(nameof(Index), new { storeId = CurrentStore.Id });
         }
+    }
+
+
+    [HttpGet("settings")]
+    public async Task<IActionResult> Settings(string storeId)
+    {
+        if (CurrentStore is null)
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var settingJson = ctx.GhostSettings.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id).Select(c => c.Setting).FirstOrDefault();
+
+        var ghostSetting = settingJson != null
+            ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(settingJson) 
+            : new GhostSettingsPageViewModel { StoreId = storeId, ReminderDays = ReminderDaysEnum.SameDay };
+
+        var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStore.Id);
+        ViewData["StoreEmailSettingsConfigured"] = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+        return View(ghostSetting);
+    }
+
+
+    [HttpPost("settings")]
+    public async Task<IActionResult> Settings(string storeId, GhostSettingsPageViewModel model)
+    {
+        Console.WriteLine(JsonConvert.SerializeObject(model));
+        if (CurrentStore is null)
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var entity = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+        entity.Setting = JsonConvert.SerializeObject(model);
+        ctx.Update(entity);
+        await ctx.SaveChangesAsync();
+        TempData[WellKnownTempData.SuccessMessage] = "Ghost plugin settings successfully updated";
+        return Ok();
     }
 
     private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(StoreData storeData, bool onlyEnabled = false)

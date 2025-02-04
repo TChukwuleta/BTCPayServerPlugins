@@ -2,6 +2,7 @@
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Data;
 
@@ -23,9 +24,11 @@ public class GhostSetting
     public string Username { get; set; }
     public string Password { get; set; }
     public string StoreId { get; set; }
+    public string AppId { get; set; }
     public string StoreName { get; set; }
     public string ApplicationUserId { get; set; }
     public DateTimeOffset? IntegratedAt { get; set; }
+    public string Setting { get; set; }
     public bool CredentialsPopulated()
     {
         return

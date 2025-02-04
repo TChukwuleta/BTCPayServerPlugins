@@ -25,7 +25,6 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIGhostMemberController : Controller
 {
-    private GhostHelper helper;
     private readonly StoreRepository _storeRepo;
     private readonly IHttpClientFactory _clientFactory;
     private readonly GhostDbContextFactory _dbContextFactory;
@@ -35,7 +34,6 @@ public class UIGhostMemberController : Controller
         GhostDbContextFactory dbContextFactory)
     {
         _storeRepo = storeRepo;
-        helper = new GhostHelper();
         _clientFactory = clientFactory;
         _dbContextFactory = dbContextFactory;
     }
@@ -66,7 +64,7 @@ public class UIGhostMemberController : Controller
             .Select(member =>
             {
                 var tier = ghostTiers.FirstOrDefault(t => t.id == member.TierId);
-                var transactions = ghostTransactions.Where(t => t.MemberId == member.Id).OrderByDescending(t => t.SubscriptionEndDate).ToList();
+                var transactions = ghostTransactions.Where(t => t.MemberId == member.Id).OrderByDescending(t => t.PeriodEnd).ToList();
                 var mostRecentTransaction = transactions.FirstOrDefault();
                 return new GhostMemberListViewModel
                 {
@@ -78,7 +76,7 @@ public class UIGhostMemberController : Controller
                     StoreId = storeId,
                     Frequency = member.Frequency,
                     CreatedDate = member.CreatedAt,
-                    PeriodEndDate = (DateTimeOffset)(mostRecentTransaction?.SubscriptionEndDate),
+                    PeriodEndDate = (DateTimeOffset)(mostRecentTransaction?.PeriodEnd),
                     TierName = tier?.name ?? "",
                     Subscriptions = transactions.Select(t => new GhostTransactionViewModel
                     {
@@ -88,8 +86,8 @@ public class UIGhostMemberController : Controller
                         Amount = t.Amount,
                         Currency = tier?.currency,
                         MemberId = member.MemberId,
-                        PeriodStartDate = t.SubscriptionStartDate.Value,
-                        PeriodEndDate = t.SubscriptionEndDate.Value
+                        PeriodStartDate = t.PeriodStart,
+                        PeriodEndDate = t.PeriodEnd
                     }).ToList()
                 };
             }).ToList();

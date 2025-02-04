@@ -2,13 +2,21 @@
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using BTCPayServer.Data;
 using BTCPayServer.Plugins.GhostPlugin.Data;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
+using BTCPayServer.Services.Apps;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Helper;
 
 public class GhostHelper
 {
+    private readonly AppService _appService;
+    public GhostHelper(AppService appService)
+    {
+        _appService = appService;
+    }
+
     public async Task<(bool succeeded, string response)> GetCustomJavascript(string storeId, string baseUrl)
     {
         string[] fileUrls = new[]
@@ -38,6 +46,32 @@ public class GhostHelper
         string jsVariables = $"var BTCPAYSERVER_URL = '{baseUrl}'; var STORE_ID = '{storeId}';";
         combinedJavascript.Insert(0, jsVariables + Environment.NewLine);
         return (true, combinedJavascript.ToString());
+    }
+
+    public async Task<AppData> CreateGhostApp(string storeId, string defaultCurrency)
+    {
+        var type = _appService.GetAppType(GhostApp.AppType);
+        var appData = new AppData
+        {
+            StoreDataId = storeId,
+            Name = GhostApp.AppName,
+            AppType = type != null ? type!.Type : GhostApp.AppType
+        };
+        await _appService.SetDefaultSettings(appData, defaultCurrency);
+        await _appService.UpdateOrCreateApp(appData);
+        return appData;
+    }
+
+    public async Task DeleteGhostApp(string storeId)
+    {
+        var type = _appService.GetAppType(GhostApp.AppType);
+        var appData = new AppData
+        {
+            StoreDataId = storeId,
+            Name = GhostApp.AppName,
+            AppType = type != null ? type!.Type : GhostApp.AppType
+        };
+        await _appService.DeleteApp(appData);
     }
 
     public GhostSettingViewModel GhostSettingsToViewModel(GhostSetting ghostSetting)

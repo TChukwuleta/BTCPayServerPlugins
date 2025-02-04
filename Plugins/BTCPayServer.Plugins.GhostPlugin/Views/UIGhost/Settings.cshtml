@@ -1,0 +1,141 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Services
+@using BTCPayServer.Client
+@using BTCPayServer.Controllers
+@using BTCPayServer.Plugins.GhostPlugin.Data
+@using BTCPayServer.Plugins.GhostPlugin.ViewModels
+@using Microsoft.AspNetCore.Routing
+@model GhostSettingsPageViewModel
+@{
+    ViewData.SetActivePage(PluginNavPages.Index, "Ghost Settings");
+}
+
+<div class="sticky-header d-flex align-items-center justify-content-between">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <div class="d-flex gap-2">
+        <a id="page-primary" asp-action="Index" asp-controller="UIGhost" asp-route-storeId="@Model.StoreId" class="btn btn-primary" role="button">
+            View Credentials
+        </a>
+        <input type="submit" value="Save Changes" class="btn btn-success" id="Edit" form="settingsForm" />
+    </div>
+</div>
+
+<partial name="_StatusMessage" />
+
+<form method="post" asp-action="Settings" id="settingsForm">
+    <div class="row">
+        <div class="col-md-6"> 
+            <div class="form-group d-flex align-items-center">
+                @{
+                    var storeEmailSettingsConfigured = (bool)ViewData["StoreEmailSettingsConfigured"];
+                }
+                <input asp-for="AllowSubscriptionEmail" type="checkbox" class="btcpay-toggle me-3" id="emailToggle" disabled="@(storeEmailSettingsConfigured ? null : "disabled")" />
+                <div>
+                    <label asp-for="AllowSubscriptionEmail" class="form-check-label"></label>
+                    <span asp-validation-for="AllowSubscriptionEmail" class="text-danger"></span>
+                    @if (!storeEmailSettingsConfigured)
+                    {
+                        <div class="text-secondary">
+                            <span text-translate="true">Your email server has not been configured.</span>
+                            <a asp-controller="UIStores" asp-action="StoreEmailSettings" text-translate="true" asp-route-storeId="@Model.StoreId">Please configure it first.</a>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div id="emailTemplateGroup" style="display: none;">
+                <div class="form-group">
+                    <label asp-for="SubscriptionEmailSubject" class="form-label">Customize Subject</label>
+                    <input asp-for="SubscriptionEmailSubject" class="form-control" />
+                    <span asp-validation-for="SubscriptionEmailSubject" class="text-danger"></span>
+                </div>
+                <div class="form-group">
+                    <label asp-for="SubscriptionEmailBody" class="form-label">Customize Email Template</label>
+                    <textarea asp-for="SubscriptionEmailBody" class="form-control" rows="8"></textarea>
+                    <span asp-validation-for="SubscriptionEmailBody" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Reminder Email Timing</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" asp-for="ReminderDays" value="1" id="reminder1">
+                    <label class="form-check-label" for="reminder1">1 Day Before</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" asp-for="ReminderDays" value="3" id="reminder3">
+                    <label class="form-check-label" for="reminder3">3 Days Before</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" asp-for="ReminderDays" value="7" id="reminder7">
+                    <label class="form-check-label" for="reminder7">7 Days Before</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" asp-for="ReminderDays" value="custom" id="reminderCustom">
+                    <label class="form-check-label" for="reminderCustom">Custom</label>
+                </div>
+                <input type="number" class="form-control mt-2 d-none" id="customDaysInput" asp-for="CustomReminderDays" min="1" placeholder="Enter custom days">
+            </div>
+
+            @* <div class="mb-3">
+                <label class="form-label fw-bold">Reminder Email Timing</label>
+
+                @foreach (var value in Enum.GetValues(typeof(ReminderDaysEnum)).Cast<ReminderDaysEnum>())
+                {
+                    var field = typeof(ReminderDaysEnum).GetField(value.ToString());
+                    var displayAttribute = field.GetCustomAttribute<DisplayAttribute>();
+                    var displayName = displayAttribute != null ? displayAttribute.Name : value.ToString();
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" asp-for="ReminderDays" value="@((int)value)" id="reminder@(value)">
+                        <label class="form-check-label" for="reminder@(value)">@displayName</label>
+                    </div>
+                }
+
+                <input type="number" class="form-control mt-2 d-none" id="customDaysInput" asp-for="CustomReminderDays" min="1" placeholder="Enter custom days">
+            </div> *@
+
+
+            <div class="form-group d-flex align-items-center">
+                <input asp-for="SendAutomatedSubscriptionRemider" type="checkbox" class="btcpay-toggle me-3" disabled="@(Model.AllowSubscriptionEmail ? null : "disabled")" />
+                <label asp-for="SendAutomatedSubscriptionRemider" class="form-label mb-0 me-1"></label>
+                <span asp-validation-for="SendAutomatedSubscriptionRemider" class="text-danger"></span>
+            </div>
+        </div>
+    </div>
+</form>
+
+
+@section PageFootContent {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const emailToggle = document.getElementById('emailToggle');
+            const emailTemplateGroup = document.getElementById('emailTemplateGroup');
+            const toggleEmailTemplateVisibility = () => {
+                emailTemplateGroup.style.display = emailToggle.checked ? 'block' : 'none';
+            };
+            emailToggle.addEventListener('change', toggleEmailTemplateVisibility);
+            toggleEmailTemplateVisibility();
+
+
+            const customReminderRadio = document.getElementById('reminderCustom');
+            const customDaysInput = document.getElementById('customDaysInput');
+            const reminderRadios = document.querySelectorAll('input[name="ReminderDays"]');
+
+            function toggleCustomDays() {
+                if (customReminderRadio.checked) {
+                    customDaysInput.classList.remove('d-none');
+                    customDaysInput.required = true;
+                } else {
+                    customDaysInput.classList.add('d-none');
+                    customDaysInput.required = false;
+                }
+            }
+
+            reminderRadios.forEach(radio => {
+                radio.addEventListener('change', toggleCustomDays);
+            });
+
+            toggleCustomDays(); // Initialize on page load
+        });
+    </script>
+}

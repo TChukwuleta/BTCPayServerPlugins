@@ -10,6 +10,8 @@ using System.IdentityModel.Tokens.Jwt;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using System.Collections.Generic;
+using System.Text.Json;
+using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services
 {
@@ -76,6 +78,15 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             var settings = JsonConvert.DeserializeObject<GhostSettingsResponse>(response);
             return settings.settings;
         }
+
+        public async Task<List<SingleMember>> RetrieveMember(string email)
+        {
+            var req = CreateRequest(HttpMethod.Get, $"members/?limit=all&filter=email:'{email}'");
+            var response = await SendRequest(req);
+            var member = JsonConvert.DeserializeObject<GetMemberResponse>(response);
+            return member.members;
+        }
+
 
         public async Task<CreateMemberResponseModel> CreateGhostMember(CreateGhostMemberRequest requestModel)
         {
