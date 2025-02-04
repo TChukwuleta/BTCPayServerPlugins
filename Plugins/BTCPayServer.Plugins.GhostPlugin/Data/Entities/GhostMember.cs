@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +14,6 @@ public class GhostMember
     public string MemberUuid { get; set; }
     public string Name { get; set; }
     public string Email { get; set; }
-    public string SubscriptionId { get; set; }
     public string TierId { get; set; }
     public string UnsubscribeUrl { get; set; }
     public string StoreId { get; set; }
@@ -24,9 +22,6 @@ public class GhostMember
 
     [JsonConverter(typeof(StringEnumConverter))]
     public GhostSubscriptionStatus Status { get; set; }
-    [JsonConverter(typeof(NBitcoin.JsonConverters.DateTimeToUnixTimeConverter))]
-    public DateTimeOffset Start { get; set; }
-    public ICollection<GhostTransaction> GhostTransactions { get; set; } 
     internal static void OnModelCreating(ModelBuilder modelBuilder)
     {
     }

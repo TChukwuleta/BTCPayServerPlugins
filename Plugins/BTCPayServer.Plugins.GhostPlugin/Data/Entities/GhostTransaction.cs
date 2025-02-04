@@ -9,6 +9,7 @@ public class GhostTransaction
 {
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public string Id { get; set; }
+    public string TxnId { get; set; }
     public string StoreId { get; set; }
     public string InvoiceId { get; set; }
     public string InvoiceStatus { get; set; }

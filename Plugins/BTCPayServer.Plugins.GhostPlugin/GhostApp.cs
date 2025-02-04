@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using BTCPayServer.Configuration;
 using BTCPayServer.Data;
+using BTCPayServer.Plugins.GhostPlugin.Data;
 using BTCPayServer.Services.Apps;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
@@ -16,7 +17,7 @@ namespace BTCPayServer.Plugins.GhostPlugin
         public const string MemberIdKey = "memberId";
         public const string AppName = "GhostSubscription";
         public const string PaymentRequestSourceKey = "source";
-        public const string PaymentRequestAppId = "appId";
+        public const string GhostSettingtAppId = "ghostsettingId";
         public const string PaymentRequestSubscriptionIdKey = "ghostsubscriptionId";
         public const string GHOST_MEMBER_ID_PREFIX = "Ghost_member-";
         public const string GhostSubscriptionRenewalRequested = "GhostSubscriptionRenewalRequested";
@@ -39,10 +40,10 @@ namespace BTCPayServer.Plugins.GhostPlugin
         {
             throw new NotImplementedException();
         }
-
         public override Task SetDefaultSettings(AppData appData, string defaultCurrency)
         {
-            throw new NotImplementedException();
+            appData.SetSettings(new GhostSetting());
+            return Task.CompletedTask;
         }
 
         public override Task<string> ViewLink(AppData app)

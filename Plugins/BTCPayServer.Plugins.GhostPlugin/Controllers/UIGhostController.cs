@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Identity;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authorization;
-using BTCPayServer.Client;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Services.Stores;
 using System.Collections.Generic;
@@ -24,6 +23,7 @@ using BTCPayServer.Services.Mails;
 using Microsoft.AspNetCore.Routing;
 using Newtonsoft.Json;
 using BTCPayServer.Services.Apps;
+using BTCPayServer.Client;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -125,7 +125,7 @@ public class UIGhostController : Controller
                         entity.StoreId = CurrentStore.Id;
                         entity.StoreName = CurrentStore.StoreName;
                         entity.ApplicationUserId = GetUserId();
-
+                        Console.WriteLine("ANother banger");
                         var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStore.Id);
                         var isEmailSetup = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
                         if (isEmailSetup)
@@ -135,15 +135,9 @@ public class UIGhostController : Controller
                         }
                         var storeBlob = store.GetStoreBlob();
                         var newApp = await helper.CreateGhostApp(CurrentStore.Id, storeBlob.DefaultCurrency);
-                        var app = await _appService.GetApp(newApp.Id, GhostApp.AppType, true, true);
                         entity.AppId = newApp.Id;
                         ctx.Update(entity);
                         await ctx.SaveChangesAsync();
-                        var old = app.GetSettings<GhostSetting>();
-                        entity.Members = old.Members;
-                        app.SetSettings(entity);
-                        app.Name = GhostApp.AppName;
-                        await _appService.UpdateOrCreateApp(app);
                         TempData[WellKnownTempData.SuccessMessage] = "Ghost plugin successfully updated";
                         break;
                     }

@@ -51,34 +51,25 @@ public class GhostHelper
     public async Task<AppData> CreateGhostApp(string storeId, string defaultCurrency)
     {
         var type = _appService.GetAppType(GhostApp.AppType);
-        if (type is null)
-        {
-            // Know how to handle error...
-        }
         var appData = new AppData
         {
             StoreDataId = storeId,
             Name = GhostApp.AppName,
-            AppType = type!.Type
+            AppType = type != null ? type!.Type : GhostApp.AppType
         };
         await _appService.SetDefaultSettings(appData, defaultCurrency);
         await _appService.UpdateOrCreateApp(appData);
-        var url = await type.ConfigureLink(appData);
         return appData;
     }
 
     public async Task DeleteGhostApp(string storeId)
     {
         var type = _appService.GetAppType(GhostApp.AppType);
-        if (type is null)
-        {
-            // Know how to handle error...
-        }
         var appData = new AppData
         {
             StoreDataId = storeId,
             Name = GhostApp.AppName,
-            AppType = type!.Type
+            AppType = type != null ? type!.Type : GhostApp.AppType
         };
         await _appService.DeleteApp(appData);
     }

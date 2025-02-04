@@ -29,7 +29,6 @@ public class GhostSetting
     public string ApplicationUserId { get; set; }
     public DateTimeOffset? IntegratedAt { get; set; }
     public string Setting { get; set; }
-    public Dictionary<string, GhostMember> Members { get; set; } = new();
     public bool CredentialsPopulated()
     {
         return

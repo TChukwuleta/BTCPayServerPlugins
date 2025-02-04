@@ -16,47 +16,40 @@ using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using System.Collections.Generic;
 using BTCPayServer.Services.PaymentRequests;
 using Newtonsoft.Json.Linq;
-using Microsoft.AspNetCore.Routing;
-using BTCPayServer.Services.Apps;
-using AngleSharp.Dom;
-using NBitpayClient;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
 public class GhostHostedService : EventHostedServiceBase
 {
-    private readonly AppService _appService;
+    private readonly GhostPluginService _ghostPluginService;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly GhostDbContextFactory _dbContextFactory;
 
-    public const string PaymentRequestSubscriptionIdKey = "ghostsubscriptionId";
-    public const string MemberIdKey = "memberId";
-    public const string PaymentRequestSourceKey = "source";
-    public const string PaymentRequestSourceValue = "subscription";
-    public const string PaymentRequestAppId = "appId";
-
-    public GhostHostedService(AppService appService,
-        EventAggregator eventAggregator,
+    public GhostHostedService(EventAggregator eventAggregator,
         InvoiceRepository invoiceRepository,
         IHttpClientFactory httpClientFactory,
+        GhostPluginService ghostPluginService,
         GhostDbContextFactory dbContextFactory,
         Logs logs) : base(eventAggregator, logs)
     {
-        _appService = appService;
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
         _httpClientFactory = httpClientFactory;
+        _ghostPluginService = ghostPluginService;
     }
 
     protected override void SubscribeToEvents()
     {
         Subscribe<InvoiceEvent>();
+        Subscribe<PaymentRequestEvent>();
         base.SubscribeToEvents();
     }
 
     protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
     {
+        Console.WriteLine($"Event type: {evt}");
         switch (evt)
         {
             case InvoiceEvent invoiceEvent when new[]
@@ -88,40 +81,25 @@ public class GhostHostedService : EventHostedServiceBase
             case PaymentRequestEvent { Type: PaymentRequestEvent.StatusChanged } paymentRequestStatusUpdated:
                 {
                     var prBlob = paymentRequestStatusUpdated.Data.GetBlob();
-                    if (!prBlob.AdditionalData.TryGetValue(PaymentRequestSourceKey, out var src) ||
-                        src.Value<string>() != GhostApp.AppName ||
-                        !prBlob.AdditionalData.TryGetValue(PaymentRequestAppId, out var subscriptionAppidToken) ||
-                        subscriptionAppidToken.Value<string>() is not { } subscriptionAppId)
+                    prBlob.AdditionalData.TryGetValue(GhostApp.PaymentRequestSourceKey, out var src);
+                    if (src == null || src.Value<string>() != GhostApp.AppName)
+                        return;
+
+                    if (!prBlob.AdditionalData.TryGetValue(GhostApp.GhostSettingtAppId, out var ghostSettingIdToken) ||
+                        ghostSettingIdToken.Value<string>() is not { } ghostSettingId)
                     {
                         return;
                     }
 
-                    var isNew = !prBlob.AdditionalData.TryGetValue(PaymentRequestSubscriptionIdKey, out var subscriptionIdToken);
-
-                    prBlob.AdditionalData.TryGetValue(MemberIdKey, out var memberIdToken);
-
-                    if (isNew && paymentRequestStatusUpdated.Data.Status !=
-                        Client.Models.PaymentRequestData.PaymentRequestStatus.Completed)
-                    {
-                        return;
-                    }
-
+                    prBlob.AdditionalData.TryGetValue(GhostApp.MemberIdKey, out var memberIdToken);
                     if (paymentRequestStatusUpdated.Data.Status == Client.Models.PaymentRequestData.PaymentRequestStatus.Completed)
                     {
                         var memberId = memberIdToken?.Value<string>();
                         var blob = paymentRequestStatusUpdated.Data.GetBlob();
                         var memberEmail = blob.Email;
 
-                        await HandlePaidMembershipSubscription(subscriptionAppId, memberId, paymentRequestStatusUpdated.Data.Id, memberEmail);
+                        await _ghostPluginService.HandlePaidMembershipSubscription(ghostSettingId, memberId, paymentRequestStatusUpdated.Data.Id, memberEmail);
                     }
-                    /*else if (!isNew)
-                    {
-                        await HandleUnSettledSubscription(subscriptionAppId, subscriptionIdToken.Value<string>(),
-                            paymentRequestStatusUpdated.Data.Id);
-
-
-                    }*/
-                    // Add your additional logic here
                     break;
                 }
         }
@@ -130,8 +108,9 @@ public class GhostHostedService : EventHostedServiceBase
     }
 
 
-    private async Task RegisterTransaction(InvoiceEntity invoice, string shopifyOrderId, bool success)
+    private async Task RegisterTransaction(InvoiceEntity invoice, string orderId, bool success)
     {
+        Console.WriteLine(orderId);
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId);
 
@@ -182,8 +161,6 @@ public class GhostHostedService : EventHostedServiceBase
                     ghostMember.MemberUuid = response.members[0].uuid;
                     ghostMember.UnsubscribeUrl = response.members[0].unsubscribe_url;
                     ghostMember.MemberId = response.members[0].id;
-                    ghostMember.SubscriptionId = response.members[0].subscriptions.First().id;
-                    ghostMember.Status = GhostSubscriptionStatus.New;
                     ctx.UpdateRange(ghostMember);
                     result.Write($"Successfully created member with name: {ghostMember.Name} on Ghost.", InvoiceEventData.EventSeverity.Info);
                 }
@@ -199,51 +176,5 @@ public class GhostHostedService : EventHostedServiceBase
             ctx.SaveChanges();
             await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
         }
-    }
-    
-
-    private async Task HandlePaidMembershipSubscription(string appId, string memberId, string paymentRequestId, string email)
-    {
-        await using var ctx = _dbContextFactory.CreateContext();
-        var app = await _appService.GetApp(appId, GhostApp.AppType, false, true);
-        if (app == null)
-        {
-            return;
-        }
-        var settings = app.GetSettings<GhostSetting>();
-        var start = DateOnly.FromDateTime(DateTimeOffset.UtcNow.DateTime);
-
-        if (!settings.Members.TryGetValue(memberId, out var member))
-        {
-            var end = member.Frequency == TierSubscriptionFrequency.Monthly ? start.AddMonths(1).ToDateTime(TimeOnly.MaxValue) : start.AddYears(1).ToDateTime(TimeOnly.MaxValue);
-            var existingPayment = member.GhostTransactions.First(p => p.PaymentRequestId == paymentRequestId);
-            if (existingPayment is null)
-            {
-                GhostTransaction transaction = new GhostTransaction
-                {
-                    StoreId = member.StoreId,
-                    PaymentRequestId = paymentRequestId,
-                    MemberId = member.Id,
-                    TransactionStatus = TransactionStatus.Pending,
-                    TierId = member.TierId,
-                    Frequency = member.Frequency,
-                    CreatedAt = DateTime.UtcNow,
-                    PeriodStart = start.ToDateTime(TimeOnly.MinValue),
-                    PeriodEnd = end
-                };
-                ctx.UpdateRange(transaction);
-                member.GhostTransactions.Add(transaction);
-            }
-            else
-            {
-                existingPayment.PeriodStart = start.ToDateTime(TimeOnly.MinValue);
-                existingPayment.PeriodEnd = end;
-                existingPayment.TransactionStatus = TransactionStatus.Success;
-                ctx.UpdateRange(existingPayment);
-            }
-            ctx.SaveChanges();
-        }
-        app.SetSettings(settings);
-        await _appService.UpdateOrCreateApp(app);
     }
 }

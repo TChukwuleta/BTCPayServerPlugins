@@ -53,8 +53,11 @@
                         <td>@member.CreatedDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td>@member.PeriodEndDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td class="actions-col">
-                            <div class="d-inline-flex align-items-center gap-3">
+                            @* <div class="d-inline-flex align-items-center gap-3">
                                 <a asp-action="SendReminder" asp-route-storeId="@member.StoreId" class="delete-user">Send Reminder</a>
+                            </div> *@
+                            <div class="d-inline-flex align-items-center gap-3">
+                                <a asp-action="Subscribe" asp-controller="UIGhostPublic" asp-route-storeId="@member.StoreId" asp-route-memberId="@member.Id" class="delete-user">Send Reminder</a>
                             </div>
                         </td>
                         <td class="text-end">

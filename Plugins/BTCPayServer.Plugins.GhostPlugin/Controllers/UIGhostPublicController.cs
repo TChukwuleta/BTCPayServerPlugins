@@ -28,6 +28,11 @@ using Newtonsoft.Json;
 using System.Text;
 using System.IO;
 using BTCPayServer.Services.Apps;
+using AngleSharp.Dom;
+using NBitpayClient;
+using BTCPayServer.Plugins.GhostPlugin;
+using NBitcoin.DataEncoders;
+using NBitcoin;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -66,6 +71,7 @@ public class UIGhostPublicController : Controller
         _clientFactory = clientFactory;
         _dbContextFactory = dbContextFactory;
         _invoiceController = invoiceController;
+        _ghostPluginService = ghostPluginService;
     }
 
 
@@ -145,12 +151,24 @@ public class UIGhostPublicController : Controller
         var storeData = await _storeRepo.FindStore(storeId);
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
         var ghostTiers = await apiClient.RetrieveGhostTiers();
+        vm.GhostTiers = ghostTiers;
+        vm.StoreName = storeData?.StoreName;
+        vm.ShopName = ghostSetting.ApiUrl;
         Tier tier = ghostTiers.FirstOrDefault(c => c.id == vm.TierId);
         if (tier == null)
             return NotFound();
 
+        var member = await apiClient.RetrieveMember(vm.Email);
+        if (member.Any())
+        {
+            ModelState.Clear();
+            ModelState.AddModelError(nameof(vm.Email), "A member with this email already exist");
+            return View(vm);
+        }
+
         GhostMember entity = new GhostMember
         {
+            Status = GhostSubscriptionStatus.New,
             CreatedAt = DateTime.UtcNow,
             Name = vm.Name,
             Email = vm.Email,
@@ -160,23 +178,9 @@ public class UIGhostPublicController : Controller
         };
         ctx.Add(entity);
         await ctx.SaveChangesAsync();
-        InvoiceEntity invoice = await _ghostPluginService.CreateInvoiceAsync(storeData, tier, entity, Request.GetAbsoluteRoot());
-        // Amount is in lower denomination, so divided by 100
-        var price = Convert.ToDecimal(vm.TierSubscriptionFrequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price) / 100;
-        GhostTransaction transaction = new GhostTransaction
-        {
-            StoreId = storeId,
-            InvoiceId = invoice.Id,
-            MemberId = entity.Id,
-            TransactionStatus = GhostPlugin.Data.TransactionStatus.Pending,
-            TierId = vm.TierId,
-            Frequency = vm.TierSubscriptionFrequency,
-            CreatedAt = DateTime.UtcNow,
-            Amount = price
-        };
-        ctx.Add(transaction);
-        await ctx.SaveChangesAsync();
-
+        var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
+        InvoiceEntity invoice = await _ghostPluginService.CreateInvoiceAsync(storeData, tier, entity, txnId, Request.GetAbsoluteRoot());
+        await GetTransaction(ctx, tier, entity, invoice, txnId);
         await using var dbMain = _context.CreateContext();
         var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == storeId);
 
@@ -191,6 +195,47 @@ public class UIGhostPublicController : Controller
         });
     }
 
+    [HttpGet("subscription/{memberId}/subscribe")]
+    public async Task<IActionResult> Subscribe(string storeId, string memberId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var member = ctx.GhostMembers.AsNoTracking().FirstOrDefault(c => c.Id == memberId && c.StoreId == storeId);
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        if (member == null || ghostSetting == null || !ghostSetting.CredentialsPopulated())
+            return NotFound();
+
+        var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
+        var ghostTiers = await apiClient.RetrieveGhostTiers();
+        Tier tier = ghostTiers.FirstOrDefault(c => c.id == member.TierId);
+        if(tier == null)
+            return NotFound();
+
+        var storeData = await _storeRepo.FindStore(storeId);
+
+
+        var latestTransaction = ctx.GhostTransactions
+            .AsNoTracking().Where(t => t.StoreId == storeId && t.TransactionStatus == GhostPlugin.Data.TransactionStatus.Success && t.MemberId == memberId)
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstOrDefault();
+
+        var pr = await _ghostPluginService.CreatePaymentRequest(member, tier, ghostSetting.AppId, latestTransaction.PeriodEnd);
+        return RedirectToAction("ViewPaymentRequest", "UIPaymentRequest", new { payReqId = pr.Id });
+
+        /*var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
+        InvoiceEntity invoice = await _ghostPluginService.CreateInvoiceAsync(storeData, tier, member, txnId, Request.GetAbsoluteRoot());
+        await GetTransaction(ctx, tier, member, invoice, txnId);
+        await using var dbMain = _context.CreateContext();
+        var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == storeId);
+
+        return View("InitiatePayment", new GhostOrderViewModel
+        {
+            StoreId = storeId,
+            StoreName = store.StoreName,
+            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
+            BTCPayServerUrl = Request.GetAbsoluteRoot(),
+            InvoiceId = invoice.Id
+        });*/
+    }
 
     [HttpGet("btcpay-ghost.js")]
     [EnableCors("AllowAllOrigins")]
@@ -239,7 +284,9 @@ public class UIGhostPublicController : Controller
             {
                 var transactions = ctx.GhostTransactions.AsNoTracking().Where(c => c.MemberId == member.Id).ToList();
                 if (transactions.Any())
+                {
                     ctx.RemoveRange(transactions);
+                }
 
                 ctx.Remove(member);
                 await ctx.SaveChangesAsync();
@@ -257,5 +304,25 @@ public class UIGhostPublicController : Controller
         {
             return StatusCode(500, "Internal Server Error.");
         }
+    }
+
+    private async Task GetTransaction(GhostDbContext ctx, Tier tier, GhostMember member, InvoiceEntity invoice, string txnId)
+    {
+        // Amount is in lower denomination, so divided by 100
+        var price = Convert.ToDecimal(member.Frequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price) / 100;
+        GhostTransaction transaction = new GhostTransaction
+        {
+            StoreId = member.StoreId,
+            TxnId = txnId,
+            InvoiceId = invoice.Id,
+            MemberId = member.Id,
+            TransactionStatus = GhostPlugin.Data.TransactionStatus.Pending,
+            TierId = member.TierId,
+            Frequency = member.Frequency,
+            CreatedAt = DateTime.UtcNow,
+            Amount = price
+        };
+        ctx.Add(transaction);
+        await ctx.SaveChangesAsync();
     }
 }
