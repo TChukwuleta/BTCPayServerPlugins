@@ -12,6 +12,7 @@ public class GhostTransaction
     public string TxnId { get; set; }
     public string StoreId { get; set; }
     public string InvoiceId { get; set; }
+    public string Currency { get; set; }
     public string InvoiceStatus { get; set; }
     public decimal Amount { get; set; }
     public string TierId { get; set; }

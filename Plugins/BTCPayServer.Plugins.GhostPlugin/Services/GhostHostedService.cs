@@ -16,7 +16,6 @@ using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using System.Collections.Generic;
 using BTCPayServer.Services.PaymentRequests;
 using Newtonsoft.Json.Linq;
-using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
@@ -49,7 +48,6 @@ public class GhostHostedService : EventHostedServiceBase
 
     protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
     {
-        Console.WriteLine($"Event type: {evt}");
         switch (evt)
         {
             case InvoiceEvent invoiceEvent when new[]
@@ -78,32 +76,23 @@ public class GhostHostedService : EventHostedServiceBase
                     break;
                 }
 
-            case PaymentRequestEvent { Type: PaymentRequestEvent.StatusChanged } paymentRequestStatusUpdated:
+            case PaymentRequestEvent { Type: PaymentRequestEvent.StatusChanged, Data.Status: Client.Models.PaymentRequestData.PaymentRequestStatus.Completed } paymentRequestStatusUpdated:
                 {
                     var prBlob = paymentRequestStatusUpdated.Data.GetBlob();
-                    prBlob.AdditionalData.TryGetValue(GhostApp.PaymentRequestSourceKey, out var src);
-                    if (src == null || src.Value<string>() != GhostApp.AppName)
-                        return;
-
-                    if (!prBlob.AdditionalData.TryGetValue(GhostApp.GhostSettingtAppId, out var ghostSettingIdToken) ||
-                        ghostSettingIdToken.Value<string>() is not { } ghostSettingId)
+                    if (!prBlob.AdditionalData.TryGetValue(GhostApp.PaymentRequestSourceKey, out var src) ||
+                        src?.Value<string>() != GhostApp.AppName ||
+                        !prBlob.AdditionalData.TryGetValue(GhostApp.MemberIdKey, out var memberIdToken))
                     {
                         return;
                     }
-
-                    prBlob.AdditionalData.TryGetValue(GhostApp.MemberIdKey, out var memberIdToken);
-                    if (paymentRequestStatusUpdated.Data.Status == Client.Models.PaymentRequestData.PaymentRequestStatus.Completed)
-                    {
-                        var memberId = memberIdToken?.Value<string>();
-                        var blob = paymentRequestStatusUpdated.Data.GetBlob();
-                        var memberEmail = blob.Email;
-
-                        await _ghostPluginService.HandlePaidMembershipSubscription(ghostSettingId, memberId, paymentRequestStatusUpdated.Data.Id, memberEmail);
-                    }
+                    Console.WriteLine("Aka aka ya");
+                    var memberId = memberIdToken.Value<string>();
+                    var memberEmail = prBlob.Email;
+                    await _ghostPluginService.HandlePaidMembershipSubscription(prBlob, memberId, paymentRequestStatusUpdated.Data.Id, memberEmail);
                     break;
                 }
-        }
 
+        }
         await base.ProcessEvent(evt, cancellationToken);
     }
 
@@ -157,6 +146,7 @@ public class GhostHostedService : EventHostedServiceBase
                     });
                     transaction.PeriodStart = DateTime.UtcNow;
                     transaction.PeriodEnd = expirationDate;
+                    //transaction.PeriodEnd = DateTime.UtcNow.AddDays(2);
                     ghostMember.MemberId = response.members[0].id;
                     ghostMember.MemberUuid = response.members[0].uuid;
                     ghostMember.UnsubscribeUrl = response.members[0].unsubscribe_url;

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class ghostSettings : Migration
+    public partial class ghostSetup : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -25,11 +25,13 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     Name = table.Column<string>(type: "text", nullable: true),
                     Email = table.Column<string>(type: "text", nullable: true),
                     TierId = table.Column<string>(type: "text", nullable: true),
+                    TierName = table.Column<string>(type: "text", nullable: true),
                     UnsubscribeUrl = table.Column<string>(type: "text", nullable: true),
                     StoreId = table.Column<string>(type: "text", nullable: true),
                     Frequency = table.Column<int>(type: "integer", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    Status = table.Column<int>(type: "integer", nullable: false)
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    LastReminderSent = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -68,6 +70,7 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     TxnId = table.Column<string>(type: "text", nullable: true),
                     StoreId = table.Column<string>(type: "text", nullable: true),
                     InvoiceId = table.Column<string>(type: "text", nullable: true),
+                    Currency = table.Column<string>(type: "text", nullable: true),
                     InvoiceStatus = table.Column<string>(type: "text", nullable: true),
                     Amount = table.Column<decimal>(type: "numeric", nullable: false),
                     TierId = table.Column<string>(type: "text", nullable: true),

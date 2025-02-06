@@ -34,5 +34,8 @@ public class GhostTransactionViewModel
 public class GhostMembersViewModel
 {
     public List<GhostMemberListViewModel> Members { get; set; }
-    public string StoreId { get; set; }
+    public List<GhostMemberListViewModel> DisplayedMembers { get; set; }
+    public bool Active { get; set; }
+    public bool SoonToExpire { get; set; }
+    public bool Expired { get; set; }
 }

@@ -19,13 +19,14 @@ public class Plugin : BaseBTCPayServerPlugin
     public override void Execute(IServiceCollection services)
     {
         services.AddSingleton<IUIExtension>(new UIExtension("GhostPluginHeaderNav", "header-nav"));
+        services.AddSingleton<EmailService>();
+        services.AddSingleton<GhostPluginService>();
         services.AddSingleton<GhostHostedService>();
         services.AddSingleton<GhostDbContextFactory>();
-        services.AddSingleton<GhostPluginService>();
-        services.AddSingleton<IWebhookProvider>(o => o.GetRequiredService<GhostPluginService>());
-        services.AddHostedService(s => s.GetRequiredService<GhostPluginService>());
         services.AddHostedService<GhostHostedService>();
         services.AddHostedService<ApplicationPartsLogger>();
+        services.AddHostedService(s => s.GetRequiredService<GhostPluginService>());
+        services.AddSingleton<IWebhookProvider>(o => o.GetRequiredService<GhostPluginService>());
         services.AddDbContext<GhostDbContext>((provider, o) =>
         {
             var factory = provider.GetRequiredService<GhostDbContextFactory>();

@@ -25,7 +25,13 @@
       <ExcludeAssets>runtime;native;build;buildTransitive;contentFiles</ExcludeAssets>
     </ProjectReference>
   </ItemDefinitionGroup>
-	
+
+    <ItemGroup>
+	    <Content Remove="Templates\SubscriptionExpirationReminder.cshtml" />
+    </ItemGroup>
+    <ItemGroup>
+	    <EmbeddedResource Include="Templates\SubscriptionExpirationReminder.cshtml" />
+    </ItemGroup>
 	
 		<!-- If you need Entity Framework, you can uncomment this. This will make it usable in your project without publishing assemblies
   already referenced by BTCPay Server Core project -->

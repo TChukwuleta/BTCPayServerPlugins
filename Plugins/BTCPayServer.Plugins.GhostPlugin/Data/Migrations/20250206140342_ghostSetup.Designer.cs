@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 {
     [DbContext(typeof(GhostDbContext))]
-    [Migration("20250204125442_ghostSettings")]
-    partial class ghostSettings
+    [Migration("20250206140342_ghostSetup")]
+    partial class ghostSetup
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -41,6 +41,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     b.Property<int>("Frequency")
                         .HasColumnType("integer");
 
+                    b.Property<DateTimeOffset?>("LastReminderSent")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("MemberId")
                         .HasColumnType("text");
 
@@ -57,6 +60,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("TierId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TierName")
                         .HasColumnType("text");
 
                     b.Property<string>("UnsubscribeUrl")
@@ -122,6 +128,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .HasColumnType("text");
 
                     b.Property<int>("Frequency")
                         .HasColumnType("integer");

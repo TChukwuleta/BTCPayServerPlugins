@@ -28,8 +28,6 @@ using Newtonsoft.Json;
 using System.Text;
 using System.IO;
 using BTCPayServer.Services.Apps;
-using AngleSharp.Dom;
-using NBitpayClient;
 using BTCPayServer.Plugins.GhostPlugin;
 using NBitcoin.DataEncoders;
 using NBitcoin;
@@ -89,12 +87,10 @@ public class UIGhostPublicController : Controller
 
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
         var ghostSettings = await apiClient.RetrieveGhostSettings();
-        Console.WriteLine(JsonConvert.SerializeObject(ghostSettings));
 
         var donationsCurrency = ghostSettings.FirstOrDefault(s => s.key == "donations_currency")?.value?.ToString();
         var storeBlob = store.GetStoreBlob();
         donationsCurrency ??= storeBlob.DefaultCurrency;
-
         string id = Guid.NewGuid().ToString();
 
         InvoiceEntity invoice = await _invoiceController.CreateInvoiceCoreRaw(new CreateInvoiceRequest()
@@ -103,7 +99,7 @@ public class UIGhostPublicController : Controller
             Currency = donationsCurrency,
             Metadata = new JObject
             {
-                ["GhostDonationUuid"] = id
+                ["GhostDonationId"] = id
             },
             AdditionalSearchTerms = new[]
             {
@@ -111,7 +107,6 @@ public class UIGhostPublicController : Controller
                     $"Ghost_{id}"
             }
         }, store, HttpContext.Request.GetAbsoluteRoot(), new List<string>() { $"Ghost_{id}" });
-
         var url = GreenfieldInvoiceController.ToModel(invoice, _linkGenerator, HttpContext.Request).CheckoutLink;
         return Redirect(url);
     }
@@ -127,9 +122,7 @@ public class UIGhostPublicController : Controller
 
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
         var ghostTiers = await apiClient.RetrieveGhostTiers();
-
         var storeData = await _storeRepo.FindStore(storeId);
-
         return View(new CreateMemberViewModel { 
             GhostTiers = ghostTiers, 
             StoreId = storeId, 
@@ -151,6 +144,9 @@ public class UIGhostPublicController : Controller
         var storeData = await _storeRepo.FindStore(storeId);
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
         var ghostTiers = await apiClient.RetrieveGhostTiers();
+        if (ghostTiers == null)
+            return NotFound();
+
         vm.GhostTiers = ghostTiers;
         vm.StoreName = storeData?.StoreName;
         vm.ShopName = ghostSetting.ApiUrl;
@@ -174,13 +170,14 @@ public class UIGhostPublicController : Controller
             Email = vm.Email,
             Frequency = vm.TierSubscriptionFrequency,
             TierId = vm.TierId,
+            TierName = tier.name,
             StoreId = storeId
         };
         ctx.Add(entity);
         await ctx.SaveChangesAsync();
         var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
         InvoiceEntity invoice = await _ghostPluginService.CreateInvoiceAsync(storeData, tier, entity, txnId, Request.GetAbsoluteRoot());
-        await GetTransaction(ctx, tier, entity, invoice, txnId);
+        await GetTransaction(ctx, tier, entity, invoice, null, txnId);
         await using var dbMain = _context.CreateContext();
         var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == storeId);
 
@@ -195,6 +192,7 @@ public class UIGhostPublicController : Controller
         });
     }
 
+
     [HttpGet("subscription/{memberId}/subscribe")]
     public async Task<IActionResult> Subscribe(string storeId, string memberId)
     {
@@ -206,53 +204,23 @@ public class UIGhostPublicController : Controller
 
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
         var ghostTiers = await apiClient.RetrieveGhostTiers();
+        if (ghostTiers == null)
+            return NotFound();
+
         Tier tier = ghostTiers.FirstOrDefault(c => c.id == member.TierId);
         if(tier == null)
             return NotFound();
 
         var storeData = await _storeRepo.FindStore(storeId);
-
-
         var latestTransaction = ctx.GhostTransactions
             .AsNoTracking().Where(t => t.StoreId == storeId && t.TransactionStatus == GhostPlugin.Data.TransactionStatus.Success && t.MemberId == memberId)
             .OrderByDescending(t => t.CreatedAt)
             .FirstOrDefault();
 
+        var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
         var pr = await _ghostPluginService.CreatePaymentRequest(member, tier, ghostSetting.AppId, latestTransaction.PeriodEnd);
+        await GetTransaction(ctx, tier, member, null, pr, txnId);
         return RedirectToAction("ViewPaymentRequest", "UIPaymentRequest", new { payReqId = pr.Id });
-
-        /*var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
-        InvoiceEntity invoice = await _ghostPluginService.CreateInvoiceAsync(storeData, tier, member, txnId, Request.GetAbsoluteRoot());
-        await GetTransaction(ctx, tier, member, invoice, txnId);
-        await using var dbMain = _context.CreateContext();
-        var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == storeId);
-
-        return View("InitiatePayment", new GhostOrderViewModel
-        {
-            StoreId = storeId,
-            StoreName = store.StoreName,
-            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
-            BTCPayServerUrl = Request.GetAbsoluteRoot(),
-            InvoiceId = invoice.Id
-        });*/
-    }
-
-    [HttpGet("btcpay-ghost.js")]
-    [EnableCors("AllowAllOrigins")]
-    public async Task<IActionResult> GetBtcPayJavascript(string storeId)
-    {
-        await using var ctx = _dbContextFactory.CreateContext();
-        var userStore = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
-        if (userStore == null || !userStore.CredentialsPopulated())
-        {
-            return BadRequest("Invalid BTCPay store specified");
-        }
-        var jsFile = await helper.GetCustomJavascript(userStore.StoreId, Request.GetAbsoluteRoot());
-        if (!jsFile.succeeded)
-        {
-            return BadRequest(jsFile.response);
-        }
-        return Content(jsFile.response, "text/javascript");
     }
 
 
@@ -287,7 +255,6 @@ public class UIGhostPublicController : Controller
                 {
                     ctx.RemoveRange(transactions);
                 }
-
                 ctx.Remove(member);
                 await ctx.SaveChangesAsync();
             }
@@ -306,7 +273,26 @@ public class UIGhostPublicController : Controller
         }
     }
 
-    private async Task GetTransaction(GhostDbContext ctx, Tier tier, GhostMember member, InvoiceEntity invoice, string txnId)
+
+    [HttpGet("btcpay-ghost.js")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> GetBtcPayJavascript(string storeId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var userStore = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        if (userStore == null || !userStore.CredentialsPopulated())
+        {
+            return BadRequest("Invalid BTCPay store specified");
+        }
+        var jsFile = await helper.GetCustomJavascript(userStore.StoreId, Request.GetAbsoluteRoot());
+        if (!jsFile.succeeded)
+        {
+            return BadRequest(jsFile.response);
+        }
+        return Content(jsFile.response, "text/javascript");
+    }
+
+    private async Task GetTransaction(GhostDbContext ctx, Tier tier, GhostMember member, InvoiceEntity invoice, Data.PaymentRequestData paymentRequest, string txnId)
     {
         // Amount is in lower denomination, so divided by 100
         var price = Convert.ToDecimal(member.Frequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price) / 100;
@@ -314,7 +300,8 @@ public class UIGhostPublicController : Controller
         {
             StoreId = member.StoreId,
             TxnId = txnId,
-            InvoiceId = invoice.Id,
+            InvoiceId = invoice?.Id,
+            PaymentRequestId = paymentRequest?.Id,
             MemberId = member.Id,
             TransactionStatus = GhostPlugin.Data.TransactionStatus.Pending,
             TierId = member.TierId,

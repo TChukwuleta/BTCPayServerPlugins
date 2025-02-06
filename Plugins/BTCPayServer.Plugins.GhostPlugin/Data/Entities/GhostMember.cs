@@ -15,6 +15,7 @@ public class GhostMember
     public string Name { get; set; }
     public string Email { get; set; }
     public string TierId { get; set; }
+    public string TierName { get; set; }
     public string UnsubscribeUrl { get; set; }
     public string StoreId { get; set; }
     public TierSubscriptionFrequency Frequency { get; set; }
@@ -22,6 +23,7 @@ public class GhostMember
 
     [JsonConverter(typeof(StringEnumConverter))]
     public GhostSubscriptionStatus Status { get; set; }
+    public DateTimeOffset? LastReminderSent { get; set; }
     internal static void OnModelCreating(ModelBuilder modelBuilder)
     {
     }
