@@ -24,6 +24,8 @@ using Microsoft.AspNetCore.Routing;
 using Newtonsoft.Json;
 using BTCPayServer.Services.Apps;
 using BTCPayServer.Client;
+using BTCPayServer.Abstractions.Extensions;
+using BTCPayServer.Abstractions.Models;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -83,6 +85,16 @@ public class UIGhostController : Controller
         viewModel.MemberCreationUrl = Url.Action("CreateMember", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
         viewModel.DonationUrl = Url.Action("Donate", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
         viewModel.WebhookUrl = Url.Action("ReceiveWebhook", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
+        var emailSender = await _emailSenderFactory.GetEmailSender(storeId);
+        var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+        if (!isEmailSettingsConfigured && !string.IsNullOrEmpty(ghostSetting?.AdminApiKey))
+        {
+            TempData.SetStatusMessageModel(new StatusMessageModel()
+            {
+                Message = $"Kindly configure Email SMTP in the admin settings to be able to send reminder to subscribers",
+                Severity = StatusMessageModel.StatusSeverity.Info
+            });
+        }
         return View(viewModel);
     }
 
@@ -125,12 +137,11 @@ public class UIGhostController : Controller
                         entity.StoreId = CurrentStore.Id;
                         entity.StoreName = CurrentStore.StoreName;
                         entity.ApplicationUserId = GetUserId();
-                        Console.WriteLine("ANother banger");
                         var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStore.Id);
                         var isEmailSetup = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
                         if (isEmailSetup)
                         {
-                            var settingModel = new GhostSettingsPageViewModel { StoreId = storeId, ReminderDays = ReminderDaysEnum.SameDay };
+                            var settingModel = new GhostSettingsPageViewModel { StoreId = storeId, ReminderDays = ReminderDaysEnum.ThreeDays };
                             entity.Setting = JsonConvert.SerializeObject(settingModel);
                         }
                         var storeBlob = store.GetStoreBlob();

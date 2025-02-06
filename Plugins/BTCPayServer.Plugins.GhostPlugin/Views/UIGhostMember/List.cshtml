@@ -1,22 +1,67 @@
+@using BTCPayServer.Abstractions.Contracts
 @using BTCPayServer.Abstractions.Extensions
 @using BTCPayServer.Plugins.GhostPlugin.Data
 @using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models
+@inject IScopeProvider ScopeProvider
 @model GhostMembersViewModel
 @{
     ViewData.SetActivePage(PluginNavPages.Index, "Ghost Members");
+    var storeEmailSettingsConfigured = (bool)ViewData["StoreEmailSettingsConfigured"];
+    var storeId = ScopeProvider.GetCurrentStoreId();
 }
 
 
 <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
-    <a id="page-primary" asp-action="Index" asp-controller="UIGhost" asp-route-storeId="@Model.StoreId" class="btn btn-primary" role="button">
+    <a id="page-primary" asp-action="Index" asp-controller="UIGhost" asp-route-storeId="@storeId" class="btn btn-primary" role="button">
         View Credentials
     </a>
 </div>
 <partial name="_StatusMessage" />
 
 
-@if(Model.Members != null && Model.Members.Any()){
+<nav id="SectionNav" class="mb-3">
+    <div class="nav">
+        <a id="all-view"
+           asp-action="List"
+           asp-route-storeId="@storeId"
+           class="nav-link @(!Model.Active && !Model.Expired && !Model.SoonToExpire ? "active" : "")"
+           role="tab">All</a>
+        @foreach (var state in Enum.GetValues(typeof(MemberSubscriptionState)).Cast<MemberSubscriptionState>())
+        {
+            @if (state == MemberSubscriptionState.Active)
+            {
+                <a id="@state-view"
+                asp-action="List"
+                asp-route-storeId="@storeId"
+                asp-route-filter="active"
+                class="nav-link @(Model.Active ? "active" : "")"
+                role="tab">Active Subscription</a>
+            }
+            @if (state == MemberSubscriptionState.SoonToExpire)
+            {
+                <a id="@state-view"
+                asp-action="List"
+                asp-route-storeId="@storeId"
+                asp-route-filter="aboutToExpire"
+                class="nav-link @(Model.SoonToExpire ? "active" : "")"
+                role="tab">About to Expire</a>
+            }
+            @if (state == MemberSubscriptionState.Expired)
+            {
+                <a id="@state-view"
+                asp-action="List"
+                asp-route-storeId="@storeId"
+                asp-route-filter="expired"
+                class="nav-link @(Model.Expired ? "active" : "")"
+                role="tab">Expired Subscription</a>
+            }
+        }
+    </div>
+</nav>
+
+
+@if(Model.DisplayedMembers != null && Model.DisplayedMembers.Any()){
     <div class="table-responsive">
         <table class="table table-hover">
             <thead>
@@ -41,7 +86,7 @@
                 </tr>
             </thead>
             <tbody id="UsersList">
-                @foreach (var member in Model.Members)
+                @foreach (var member in Model.DisplayedMembers)
                 {
 
                     var detailsId = member.Subscriptions.Any() ? $"user_details_{member.Id}" : null;
@@ -53,12 +98,12 @@
                         <td>@member.CreatedDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td>@member.PeriodEndDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td class="actions-col">
-                            @* <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="SendReminder" asp-route-storeId="@member.StoreId" class="delete-user">Send Reminder</a>
-                            </div> *@
-                            <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="Subscribe" asp-controller="UIGhostPublic" asp-route-storeId="@member.StoreId" asp-route-memberId="@member.Id" class="delete-user">Send Reminder</a>
-                            </div>
+                            @if (storeEmailSettingsConfigured)
+                            {
+                                <div class="d-inline-flex align-items-center gap-3">
+                                    <a asp-action="SendReminder" asp-route-storeId="@member.StoreId" asp-route-memberId="@member.Id">Send Reminder</a>
+                                </div>
+                            }
                         </td>
                         <td class="text-end">
                             @if (detailsId != null)
@@ -101,5 +146,5 @@
     </div>
 }
 else{
-    <p>No Ghost member record found</p>
+    <p class="text-secondary mt-4">No Ghost member record found</p>
 }

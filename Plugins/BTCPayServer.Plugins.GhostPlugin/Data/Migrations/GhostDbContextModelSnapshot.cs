@@ -38,6 +38,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     b.Property<int>("Frequency")
                         .HasColumnType("integer");
 
+                    b.Property<DateTimeOffset?>("LastReminderSent")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("MemberId")
                         .HasColumnType("text");
 
@@ -54,6 +57,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("TierId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TierName")
                         .HasColumnType("text");
 
                     b.Property<string>("UnsubscribeUrl")
@@ -119,6 +125,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .HasColumnType("text");
 
                     b.Property<int>("Frequency")
                         .HasColumnType("integer");

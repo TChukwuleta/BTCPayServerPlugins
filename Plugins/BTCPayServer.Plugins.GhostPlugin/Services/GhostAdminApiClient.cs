@@ -51,15 +51,15 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             };
             var jsonContent = new StringContent(JsonConvert.SerializeObject(postData), Encoding.UTF8, "application/json");
             var sessionResponse = await _httpClient.PostAsync(sessionUrl, jsonContent);
+            Console.WriteLine("Mannie");
+            Console.WriteLine(sessionResponse.StatusCode);
             if (sessionResponse.StatusCode != HttpStatusCode.Created)
                 return false;
             var token = GenerateGhostApiToken();
             var url = $"https://{_credentials.ApiUrl}/ghost/api/admin/site";
-            Console.WriteLine(url);
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Ghost", token);
             var response = await _httpClient.GetAsync(url);
             Console.WriteLine(response.StatusCode);
-            Console.WriteLine($"Admin site url: {response.Content.ReadAsStringAsync()}");
             return response.IsSuccessStatusCode;
         }
 

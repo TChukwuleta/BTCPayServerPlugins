@@ -48,7 +48,6 @@ public class GhostHostedService : EventHostedServiceBase
 
     protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
     {
-        Console.WriteLine($"Event type: {evt}");
         switch (evt)
         {
             case InvoiceEvent invoiceEvent when new[]
@@ -86,6 +85,7 @@ public class GhostHostedService : EventHostedServiceBase
                     {
                         return;
                     }
+                    Console.WriteLine("Aka aka ya");
                     var memberId = memberIdToken.Value<string>();
                     var memberEmail = prBlob.Email;
                     await _ghostPluginService.HandlePaidMembershipSubscription(prBlob, memberId, paymentRequestStatusUpdated.Data.Id, memberEmail);
@@ -146,6 +146,7 @@ public class GhostHostedService : EventHostedServiceBase
                     });
                     transaction.PeriodStart = DateTime.UtcNow;
                     transaction.PeriodEnd = expirationDate;
+                    //transaction.PeriodEnd = DateTime.UtcNow.AddDays(2);
                     ghostMember.MemberId = response.members[0].id;
                     ghostMember.MemberUuid = response.members[0].uuid;
                     ghostMember.UnsubscribeUrl = response.members[0].unsubscribe_url;
