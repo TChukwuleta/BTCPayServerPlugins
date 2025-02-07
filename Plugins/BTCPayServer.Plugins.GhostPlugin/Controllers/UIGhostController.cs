@@ -158,7 +158,7 @@ public class UIGhostController : Controller
                         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
                         if (ghostSetting != null)
                         {
-                            await helper.DeleteGhostApp(CurrentStore.Id);
+                            await helper.DeleteGhostApp(CurrentStore.Id, ghostSetting.AppId);
                             ctx.Remove(ghostSetting);
                             await ctx.SaveChangesAsync();
                         }

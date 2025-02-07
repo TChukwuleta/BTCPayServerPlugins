@@ -13,6 +13,7 @@ public class GhostMemberListViewModel
     public string TierId { get; set; }
     public string TierName { get; set; }
     public string StoreId { get; set; }
+    public int ReminderDay { get; set; }
     public TierSubscriptionFrequency Frequency { get; set; }
     public DateTimeOffset PeriodEndDate { get; set; }
     public DateTimeOffset CreatedDate { get; set; }

@@ -62,11 +62,12 @@ public class GhostHelper
         return appData;
     }
 
-    public async Task DeleteGhostApp(string storeId)
+    public async Task DeleteGhostApp(string storeId, string appId)
     {
         var type = _appService.GetAppType(GhostApp.AppType);
         var appData = new AppData
         {
+            Id = appId,
             StoreDataId = storeId,
             Name = GhostApp.AppName,
             AppType = type != null ? type!.Type : GhostApp.AppType
