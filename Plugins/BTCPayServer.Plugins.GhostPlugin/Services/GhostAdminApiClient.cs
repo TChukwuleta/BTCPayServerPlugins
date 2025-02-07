@@ -10,7 +10,6 @@ using System.IdentityModel.Tokens.Jwt;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using System.Collections.Generic;
-using System.Text.Json;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services
@@ -43,7 +42,6 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
 
         public async Task<bool> ValidateGhostCredentials()
         {
-
             var postData = new
             {
                 username = _credentials.UserName,
@@ -51,15 +49,12 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             };
             var jsonContent = new StringContent(JsonConvert.SerializeObject(postData), Encoding.UTF8, "application/json");
             var sessionResponse = await _httpClient.PostAsync(sessionUrl, jsonContent);
-            Console.WriteLine("Mannie");
-            Console.WriteLine(sessionResponse.StatusCode);
             if (sessionResponse.StatusCode != HttpStatusCode.Created)
                 return false;
             var token = GenerateGhostApiToken();
             var url = $"https://{_credentials.ApiUrl}/ghost/api/admin/site";
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Ghost", token);
             var response = await _httpClient.GetAsync(url);
-            Console.WriteLine(response.StatusCode);
             return response.IsSuccessStatusCode;
         }
 
@@ -87,7 +82,6 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             return member.members;
         }
 
-
         public async Task<CreateMemberResponseModel> CreateGhostMember(CreateGhostMemberRequest requestModel)
         {
             var postJson = JsonConvert.SerializeObject(requestModel);
@@ -103,7 +97,6 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             var req = new HttpRequestMessage(method, url);
             return req;
         }
-
 
         private async Task<string> SendRequest(HttpRequestMessage req)
         {

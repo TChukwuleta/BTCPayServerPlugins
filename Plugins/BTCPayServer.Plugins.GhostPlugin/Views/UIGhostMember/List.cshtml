@@ -13,9 +13,11 @@
 
 <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
-    <a id="page-primary" asp-action="Index" asp-controller="UIGhost" asp-route-storeId="@storeId" class="btn btn-primary" role="button">
-        View Credentials
-    </a>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <a id="page-primary" asp-action="Index" asp-controller="UIGhost" asp-route-storeId="@storeId" class="btn btn-primary" role="button">
+            View Credentials
+        </a>
+    </div>
 </div>
 <partial name="_StatusMessage" />
 
@@ -98,7 +100,9 @@
                         <td>@member.CreatedDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td>@member.PeriodEndDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td class="actions-col">
-                            @if (storeEmailSettingsConfigured)
+
+                            @if (storeEmailSettingsConfigured && (DateTime.UtcNow.Date >= member.PeriodEndDate.UtcDateTime.Date ||
+                            (member.PeriodEndDate.UtcDateTime.Date <= DateTime.UtcNow.AddDays(3).Date && member.PeriodEndDate.UtcDateTime.Date > DateTime.UtcNow.Date)))
                             {
                                 <div class="d-inline-flex align-items-center gap-3">
                                     <a asp-action="SendReminder" asp-route-storeId="@member.StoreId" asp-route-memberId="@member.Id">Send Reminder</a>
@@ -125,9 +129,18 @@
                                     {
                                         <ul class="mb-0 p-0 d-flex gap-4 list-unstyled">
                                             <li>
-                                                <a asp-controller="UIInvoice" asp-action="Invoice" asp-route-invoiceId="@subscription.InvoiceId">
-                                                    @subscription.InvoiceId
-                                                </a>
+                                                @if (!string.IsNullOrEmpty(subscription.InvoiceId))
+                                                {
+                                                    <a asp-controller="UIInvoice" asp-action="Invoice" asp-route-invoiceId="@subscription.InvoiceId">
+                                                        @subscription.InvoiceId
+                                                    </a>
+                                                }
+                                                else if (!string.IsNullOrEmpty(subscription.PaymentRequestId))
+                                                {
+                                                    <a asp-controller="UIPaymentRequest" asp-action="ViewPaymentRequest" asp-route-payReqId="@subscription.PaymentRequestId">
+                                                        @subscription.PaymentRequestId
+                                                    </a>
+                                                }
                                             </li>
                                             <li>@subscription.Amount @subscription.Currency</li>
                                         </ul>

@@ -88,6 +88,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     b.Property<string>("ApplicationUserId")
                         .HasColumnType("text");
 
+                    b.Property<string>("BaseUrl")
+                        .HasColumnType("text");
+
                     b.Property<string>("ContentApiKey")
                         .HasColumnType("text");
 

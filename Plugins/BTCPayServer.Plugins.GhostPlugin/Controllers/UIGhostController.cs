@@ -133,6 +133,7 @@ public class UIGhostController : Controller
                             TempData[WellKnownTempData.ErrorMessage] = $"Invalid Ghost credentials: {err.Message}";
                             return View(vm);
                         }
+                        entity.BaseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}";
                         entity.IntegratedAt = DateTimeOffset.UtcNow;
                         entity.StoreId = CurrentStore.Id;
                         entity.StoreName = CurrentStore.StoreName;
@@ -141,7 +142,7 @@ public class UIGhostController : Controller
                         var isEmailSetup = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
                         if (isEmailSetup)
                         {
-                            var settingModel = new GhostSettingsPageViewModel { StoreId = storeId, ReminderDays = ReminderDaysEnum.ThreeDays };
+                            var settingModel = new GhostSettingsPageViewModel { ReminderStartDaysBeforeExpiration = 4, EnableAutomatedEmailReminders = true };
                             entity.Setting = JsonConvert.SerializeObject(settingModel);
                         }
                         var storeBlob = store.GetStoreBlob();
@@ -184,9 +185,7 @@ public class UIGhostController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var settingJson = ctx.GhostSettings.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id).Select(c => c.Setting).FirstOrDefault();
 
-        var ghostSetting = settingJson != null
-            ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(settingJson) 
-            : new GhostSettingsPageViewModel { StoreId = storeId, ReminderDays = ReminderDaysEnum.SameDay };
+        var ghostSetting = settingJson != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(settingJson) : new GhostSettingsPageViewModel();
 
         var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStore.Id);
         ViewData["StoreEmailSettingsConfigured"] = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
@@ -197,7 +196,6 @@ public class UIGhostController : Controller
     [HttpPost("settings")]
     public async Task<IActionResult> Settings(string storeId, GhostSettingsPageViewModel model)
     {
-        Console.WriteLine(JsonConvert.SerializeObject(model));
         if (CurrentStore is null)
             return NotFound();
 

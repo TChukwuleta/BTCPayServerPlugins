@@ -85,7 +85,6 @@ public class GhostHostedService : EventHostedServiceBase
                     {
                         return;
                     }
-                    Console.WriteLine("Aka aka ya");
                     var memberId = memberIdToken.Value<string>();
                     var memberEmail = prBlob.Email;
                     await _ghostPluginService.HandlePaidMembershipSubscription(prBlob, memberId, paymentRequestStatusUpdated.Data.Id, memberEmail);
@@ -99,7 +98,6 @@ public class GhostHostedService : EventHostedServiceBase
 
     private async Task RegisterTransaction(InvoiceEntity invoice, string orderId, bool success)
     {
-        Console.WriteLine(orderId);
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId);
 
@@ -146,7 +144,7 @@ public class GhostHostedService : EventHostedServiceBase
                     });
                     transaction.PeriodStart = DateTime.UtcNow;
                     transaction.PeriodEnd = expirationDate;
-                    //transaction.PeriodEnd = DateTime.UtcNow.AddDays(2);
+                    //transaction.PeriodEnd = DateTime.UtcNow.AddDays(1);
                     ghostMember.MemberId = response.members[0].id;
                     ghostMember.MemberUuid = response.members[0].uuid;
                     ghostMember.UnsubscribeUrl = response.members[0].unsubscribe_url;

@@ -1,23 +1,12 @@
-﻿using System;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using BTCPayServer.Plugins.GhostPlugin.Data;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace BTCPayServer.Plugins.GhostPlugin.ViewModels;
 
 public class GhostSettingsPageViewModel
 {
+    [Display(Name = "Enable automated email reminders for expiring subscriptions")]
+    public bool EnableAutomatedEmailReminders { get; set; }
 
-    [Display(Name = "Allow subscription emails to be sent to members")]
-    public bool AllowSubscriptionEmail { get; set; }
-    public string SubscriptionEmailSubject { get; set; }
-    public string SubscriptionEmailBody { get; set; }
-
-    [Display(Name = "Send Ghost member automated subscription email reminder")]
-    public bool SendAutomatedSubscriptionRemider { get; set; }
-
-    public ReminderDaysEnum ReminderDays { get; set; } 
-    public int? CustomReminderDays { get; set; }
-
-    public string StoreId { get; set; }
+    [Display(Name = "Number of days before expiration to start sending reminders")]
+    public int? ReminderStartDaysBeforeExpiration { get; set; }
 }

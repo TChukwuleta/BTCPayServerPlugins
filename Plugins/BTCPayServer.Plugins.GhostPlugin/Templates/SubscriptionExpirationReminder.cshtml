@@ -41,21 +41,16 @@
                 margin: 5px 0;
             }
 
-        .cta-button {
+        .button {
             display: inline-block;
-            background-color: #0073e6;
-            color: #ffffff;
-            padding: 12px 20px;
-            border-radius: 5px;
+            padding: 12px 24px;
+            background-color: #3c6b46;
+            color: #ffffff !important;
             text-decoration: none;
-            font-size: 18px;
+            border-radius: 5px;
+            margin: 20px 0;
             font-weight: bold;
-            margin-top: 20px;
         }
-
-            .cta-button:hover {
-                background-color: #005bb5;
-            }
 
         .footer {
             margin-top: 20px;
@@ -66,7 +61,7 @@
 </head>
 <body>
     <div class="container">
-        <h2>Your Ghost Subscription is Expiring Soon! 🚀</h2>
+        <h2>Your Ghost Subscription is Expiring Soon! </h2>
         <p>Hi <strong>@Model.MemberName</strong>,</p>
         <p>Your subscription to <strong>@Model.SubscriptionTier</strong> will expire on <strong>@Model.ExpirationDate</strong>.</p>
 
@@ -79,14 +74,17 @@
 
         <p>Click the button below to renew your subscription now:</p>
 
-        <a href="@Model.SubscriptionUrl" class="cta-button">🔄 Renew Now</a>
+
+        <div style="text-align: center;">
+            <a href="@Model.SubscriptionUrl" class="button">Create Your Account</a>
+        </div>
 
         <p>If you have any questions or need assistance, feel free to contact us. We're here to help!</p>
 
         <p class="footer">
             Best,<br>
             <strong>@Model.StoreName</strong><br>
-            <a href="http://@Model.ApiUrl">@Model.ApiUrl</a>
+            <a href=@Model.ApiUrl>@Model.ApiUrl</a>
         </p>
     </div>
 </body>
