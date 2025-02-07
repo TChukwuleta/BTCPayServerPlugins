@@ -26,6 +26,7 @@ using BTCPayServer.Services.Apps;
 using BTCPayServer.Client;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Models;
+using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -140,11 +141,13 @@ public class UIGhostController : Controller
                         entity.ApplicationUserId = GetUserId();
                         var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStore.Id);
                         var isEmailSetup = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+                        var settingModel = new GhostSettingsPageViewModel { SubscriptionRenewalGracePeriod = 2 };
                         if (isEmailSetup)
                         {
-                            var settingModel = new GhostSettingsPageViewModel { ReminderStartDaysBeforeExpiration = 4, EnableAutomatedEmailReminders = true };
-                            entity.Setting = JsonConvert.SerializeObject(settingModel);
+                            settingModel.ReminderStartDaysBeforeExpiration = 4;
+                            settingModel.EnableAutomatedEmailReminders = true;
                         }
+                        entity.Setting = JsonConvert.SerializeObject(settingModel);
                         var storeBlob = store.GetStoreBlob();
                         var newApp = await helper.CreateGhostApp(CurrentStore.Id, storeBlob.DefaultCurrency);
                         entity.AppId = newApp.Id;
@@ -199,13 +202,26 @@ public class UIGhostController : Controller
         if (CurrentStore is null)
             return NotFound();
 
+        if (model.EnableAutomatedEmailReminders && model.ReminderStartDaysBeforeExpiration == null)
+        {
+            TempData.SetStatusMessageModel(new StatusMessageModel()
+            {
+                Message = $"Kindly specify reminder day",
+                Severity = StatusMessageModel.StatusSeverity.Error
+            });
+            return RedirectToAction(nameof(Settings), new { storeId = CurrentStore.Id });
+        }
         await using var ctx = _dbContextFactory.CreateContext();
         var entity = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         entity.Setting = JsonConvert.SerializeObject(model);
         ctx.Update(entity);
         await ctx.SaveChangesAsync();
-        TempData[WellKnownTempData.SuccessMessage] = "Ghost plugin settings successfully updated";
-        return Ok();
+        TempData.SetStatusMessageModel(new StatusMessageModel()
+        {
+            Message = "Ghost plugin settings successfully updated",
+            Severity = StatusMessageModel.StatusSeverity.Success
+        });
+        return RedirectToAction(nameof(Settings), new { storeId = CurrentStore.Id });
     }
 
     private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(StoreData storeData, bool onlyEnabled = false)

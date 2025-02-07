@@ -217,8 +217,12 @@ public class UIGhostPublicController : Controller
             .OrderByDescending(t => t.PeriodEnd)
             .FirstOrDefault();
 
+        var ghostPluginSetting = ghostSetting?.Setting != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) : new GhostSettingsPageViewModel();
+        var gracePeriod = ghostPluginSetting?.SubscriptionRenewalGracePeriod is 0 ? 1 : ghostPluginSetting.SubscriptionRenewalGracePeriod;
+
+        var endDate = DateTime.UtcNow.Date > latestTransaction.PeriodEnd.Date ? DateTime.UtcNow.Date.AddDays(gracePeriod) : latestTransaction.PeriodEnd;
         var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
-        var pr = await _ghostPluginService.CreatePaymentRequest(member, tier, ghostSetting.AppId, latestTransaction.PeriodEnd);
+        var pr = await _ghostPluginService.CreatePaymentRequest(member, tier, ghostSetting.AppId, endDate);
         await GetTransaction(ctx, tier, member, null, pr, txnId);
         return RedirectToAction("ViewPaymentRequest", "UIPaymentRequest", new { payReqId = pr.Id });
     }

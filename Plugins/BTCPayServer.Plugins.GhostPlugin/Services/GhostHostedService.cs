@@ -80,8 +80,7 @@ public class GhostHostedService : EventHostedServiceBase
                 {
                     var prBlob = paymentRequestStatusUpdated.Data.GetBlob();
                     if (!prBlob.AdditionalData.TryGetValue(GhostApp.PaymentRequestSourceKey, out var src) ||
-                        src?.Value<string>() != GhostApp.AppName ||
-                        !prBlob.AdditionalData.TryGetValue(GhostApp.MemberIdKey, out var memberIdToken))
+                        src?.Value<string>() != GhostApp.AppName || !prBlob.AdditionalData.TryGetValue(GhostApp.MemberIdKey, out var memberIdToken))
                     {
                         return;
                     }
@@ -144,7 +143,7 @@ public class GhostHostedService : EventHostedServiceBase
                     });
                     transaction.PeriodStart = DateTime.UtcNow;
                     transaction.PeriodEnd = expirationDate;
-                    //transaction.PeriodEnd = DateTime.UtcNow.AddDays(1);
+                    //transaction.PeriodEnd = DateTime.UtcNow.AddDays(-1);
                     ghostMember.MemberId = response.members[0].id;
                     ghostMember.MemberUuid = response.members[0].uuid;
                     ghostMember.UnsubscribeUrl = response.members[0].unsubscribe_url;

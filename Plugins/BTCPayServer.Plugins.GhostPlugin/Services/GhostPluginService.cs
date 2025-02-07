@@ -184,7 +184,6 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
                             var noticeFrame = firstTransaction.PeriodEnd - now;
                             if (noticeFrame.TotalDays <= reminderDay)
                             {
-                                Console.WriteLine("Train train");
                                 await SendReminderEmail(ghostSetting, member, firstTransaction.PeriodEnd, emailRequest);
                                 member.LastReminderSent = DateTimeOffset.UtcNow;
                                 ctx.Update(member);
@@ -196,12 +195,10 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
                             var transactions = ctx.GhostTransactions.AsNoTracking().Where(p => p.MemberId == member.Id &&
                                 p.TransactionStatus == TransactionStatus.Success && !string.IsNullOrEmpty(p.PaymentRequestId)).ToList();
 
-                            var currentPeriod = transactions.FirstOrDefault(p => p.PeriodStart <= now && p.PeriodEnd >= now);
-                            var nextPeriod = transactions.FirstOrDefault(p => p.PeriodStart > now);
+                            var currentPeriod = transactions.FirstOrDefault(p => p.PeriodStart.Date <= now.Date && p.PeriodEnd.Date >= now.Date);
+                            var nextPeriod = transactions.FirstOrDefault(p => p.PeriodStart.Date > now.Date);
                             if (currentPeriod is null || nextPeriod is not null)
                                 return;
-
-                            Console.WriteLine("I am a moving train");
 
                             var noticePeriod = currentPeriod.PeriodEnd - now;
                             if (noticePeriod.TotalDays <= reminderDay)
@@ -347,10 +344,10 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
             return;
 
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == member.StoreId);
-        var startDate = pr.ExpiryDate.HasValue ? pr.ExpiryDate.Value.UtcDateTime : (ctx.GhostTransactions
+        var startDate = ctx.GhostTransactions
             .AsNoTracking().Where(t => t.StoreId == member.StoreId && t.TransactionStatus == TransactionStatus.Success && t.MemberId == memberId)
             .OrderByDescending(t => t.CreatedAt)
-            .FirstOrDefault()).PeriodEnd;
+            .FirstOrDefault().PeriodEnd;
 
         var start = DateOnly.FromDateTime(startDate);
         bool change = false;

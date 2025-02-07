@@ -9,4 +9,7 @@ public class GhostSettingsPageViewModel
 
     [Display(Name = "Number of days before expiration to start sending reminders")]
     public int? ReminderStartDaysBeforeExpiration { get; set; }
+
+    [Display(Name = "Grace period (in days) to allow subscription renewal after expiration")]
+    public int SubscriptionRenewalGracePeriod { get; set; }
 }

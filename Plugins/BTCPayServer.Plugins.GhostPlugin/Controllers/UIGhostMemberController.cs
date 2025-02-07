@@ -71,7 +71,7 @@ public class UIGhostMemberController : Controller
         var ghostMemberListViewModels = ghostMembers
             .Select(member =>
             {
-                var transactions = ghostTransactions.Where(t => t.MemberId == member.Id).OrderByDescending(t => t.PeriodEnd).ToList();
+                var transactions = ghostTransactions.Where(t => t.MemberId == member.Id).OrderByDescending(t => t.CreatedAt).ToList();
                 var mostRecentTransaction = transactions.FirstOrDefault();
                 return new GhostMemberListViewModel
                 {
@@ -179,7 +179,7 @@ public class UIGhostMemberController : Controller
             SubscriptionTier = member.TierName,
             ApiUrl = ghostSetting.ApiUrl,
             StoreName = ghostSetting.StoreName,
-            SubscriptionUrl = Url.Action(action: "Subscribe", controller: "UIGhostPublic", values: new { storeId = ghostSetting.StoreId, memberId = member.Id }),
+            SubscriptionUrl = $"{ghostSetting.BaseUrl}/plugins/{ghostSetting.StoreId}/ghost/api/subscription/{member.Id}/subscribe",
             ExpirationDate = latestTransaction.PeriodEnd,
         };
         Console.WriteLine(emailRequest.SubscriptionUrl);
