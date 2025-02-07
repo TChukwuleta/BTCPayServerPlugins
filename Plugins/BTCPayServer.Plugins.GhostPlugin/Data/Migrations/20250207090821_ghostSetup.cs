@@ -53,6 +53,7 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     AppId = table.Column<string>(type: "text", nullable: true),
                     StoreName = table.Column<string>(type: "text", nullable: true),
                     ApplicationUserId = table.Column<string>(type: "text", nullable: true),
+                    BaseUrl = table.Column<string>(type: "text", nullable: true),
                     IntegratedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     Setting = table.Column<string>(type: "text", nullable: true)
                 },

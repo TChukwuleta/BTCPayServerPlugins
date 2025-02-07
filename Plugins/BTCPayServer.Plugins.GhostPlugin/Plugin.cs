@@ -20,7 +20,7 @@ public class Plugin : BaseBTCPayServerPlugin
     {
         services.AddSingleton<IUIExtension>(new UIExtension("GhostPluginHeaderNav", "header-nav"));
         services.AddSingleton<EmailService>();
-        services.AddSingleton<GhostPluginService>();
+        services.AddScoped<GhostPluginService>();
         services.AddSingleton<GhostHostedService>();
         services.AddSingleton<GhostDbContextFactory>();
         services.AddHostedService<GhostHostedService>();

@@ -34,7 +34,7 @@ using NBitcoin;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
-
+// This api route is used in GhostPluginService ... If you change here, go change there too
 [AllowAnonymous]
 [Route("~/plugins/{storeId}/ghost/api/")]
 public class UIGhostPublicController : Controller
@@ -214,7 +214,7 @@ public class UIGhostPublicController : Controller
         var storeData = await _storeRepo.FindStore(storeId);
         var latestTransaction = ctx.GhostTransactions
             .AsNoTracking().Where(t => t.StoreId == storeId && t.TransactionStatus == GhostPlugin.Data.TransactionStatus.Success && t.MemberId == memberId)
-            .OrderByDescending(t => t.CreatedAt)
+            .OrderByDescending(t => t.PeriodEnd)
             .FirstOrDefault();
 
         var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
@@ -307,7 +307,8 @@ public class UIGhostPublicController : Controller
             TierId = member.TierId,
             Frequency = member.Frequency,
             CreatedAt = DateTime.UtcNow,
-            Amount = price
+            Amount = price,
+            Currency = tier.currency
         };
         ctx.Add(transaction);
         await ctx.SaveChangesAsync();

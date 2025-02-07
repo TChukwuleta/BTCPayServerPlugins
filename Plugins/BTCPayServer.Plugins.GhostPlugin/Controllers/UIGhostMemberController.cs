@@ -81,6 +81,7 @@ public class UIGhostMemberController : Controller
                     {
                         StoreId = storeId,
                         InvoiceId = t.InvoiceId, 
+                        PaymentRequestId = t.PaymentRequestId,
                         InvoiceStatus = t.InvoiceStatus,
                         Amount = t.Amount,
                         Currency = t.Currency,
@@ -97,7 +98,6 @@ public class UIGhostMemberController : Controller
         var displayedMembers = ghostMemberListViewModels.Where(member =>
         {
             var periodEnd = member.PeriodEndDate.UtcDateTime;
-
             return filter switch
             {
                 "expired" => now.Date >= periodEnd.Date,
@@ -125,6 +125,14 @@ public class UIGhostMemberController : Controller
             SoonToExpire = filter == "aboutToExpire",
             Expired = filter == "expired"
         });
+    }
+
+
+    [HttpPost]
+    public  IActionResult PreviewInvitationEmail(string storeId)
+    {
+        var templateContent = _emailService.GetEmbeddedResourceContent("Templates.SubscriptionExpirationReminder.cshtml");
+        return Content(templateContent, "text/html");
     }
 
 
@@ -165,6 +173,7 @@ public class UIGhostMemberController : Controller
             SubscriptionUrl = Url.Action(action: "Subscribe", controller: "UIGhostPublic", values: new { storeId = ghostSetting.StoreId, memberId = member.Id }),
             ExpirationDate = latestTransaction.PeriodEnd,
         };
+        Console.WriteLine(emailRequest.SubscriptionUrl);
         try
         {
             await _emailService.SendMembershipSubscriptionReminderEmail(emailRequest);
@@ -180,10 +189,9 @@ public class UIGhostMemberController : Controller
         }
         TempData.SetStatusMessageModel(new StatusMessageModel()
         {
-            Message = $"Vendor pay settings updated successfully",
+            Message = $"Reminder has been sent to {member.Name}",
             Severity = StatusMessageModel.StatusSeverity.Success
         });
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
     }
-
 }

@@ -21,11 +21,10 @@ using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.HostedServices.Webhooks;
 using TransactionStatus = BTCPayServer.Plugins.GhostPlugin.Data.TransactionStatus;
 using Newtonsoft.Json;
-using Microsoft.AspNetCore.Routing;
-using Microsoft.AspNetCore.Http;
 using static BTCPayServer.Plugins.GhostPlugin.Services.EmailService;
 using BTCPayServer.Services.Mails;
 using BTCPayServer.Events;
+using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
@@ -34,19 +33,16 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
     private readonly AppService _appService;
     private readonly EmailService _emailService;
     private readonly WebhookSender _webhookSender;
-    private readonly LinkGenerator _linkGenerator;
     private readonly IHttpClientFactory _clientFactory;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly EmailSenderFactory _emailSenderFactory;
     private readonly UIInvoiceController _invoiceController;
     private readonly GhostDbContextFactory _dbContextFactory;
-    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly PaymentRequestRepository _paymentRequestRepository;
 
     public GhostPluginService(
         AppService appService,
         EmailService emailService,
-        LinkGenerator linkGenerator,
         WebhookSender webhookSender,
         EventAggregator eventAggregator,
         IHttpClientFactory clientFactory,
@@ -55,19 +51,16 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
         EmailSenderFactory emailSenderFactory,
         UIInvoiceController invoiceController,
         GhostDbContextFactory dbContextFactory,
-        IHttpContextAccessor httpContextAccessor,
         PaymentRequestRepository paymentRequestRepository) : base(eventAggregator, logger)
     {
         _appService = appService;
         _emailService = emailService;
-        _linkGenerator = linkGenerator;
         _webhookSender = webhookSender;
         _clientFactory = clientFactory;
         _dbContextFactory = dbContextFactory;
         _invoiceController = invoiceController;
         _invoiceRepository = invoiceRepository;
         _emailSenderFactory = emailSenderFactory;
-        _httpContextAccessor = httpContextAccessor;
         _paymentRequestRepository = paymentRequestRepository;
     }
 
@@ -94,7 +87,6 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
         {
             case SequentialExecute sequentialExecute:
                 {
-                    Console.WriteLine("Hello from this side");
                     var task = await sequentialExecute.Action();
                     sequentialExecute.TaskCompletionSource.SetResult(task);
                     return;
@@ -144,7 +136,6 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
     public async Task CreatePaymentRequestForActiveSubscriptionCloseToEnding()
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        Console.WriteLine("Heyyyyyyyyyy");
         var apps = (await _appService.GetApps(GhostApp.AppType)).Where(data => !data.Archived).ToList();
         List<(string ghostSettingId, string memberId, string email)> deliverRequests = new();
         foreach (var app in apps)
@@ -155,15 +146,19 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
             var ghostMembers = ctx.GhostMembers.AsNoTracking().Where(c => c.StoreId == ghostSetting.StoreId).ToList();
             if (!ghostMembers.Any()) continue;
 
+            var ghostPluginSetting = ghostSetting.Setting != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) : new GhostSettingsPageViewModel();
             var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
             var now = DateTimeOffset.UtcNow;
-            Console.WriteLine("We have some members");
+            var reminderDay = ghostPluginSetting?.ReminderStartDaysBeforeExpiration.GetValueOrDefault(4) switch
+            {
+                0 => 4,
+                var value => value
+            };
+
             foreach (var member in ghostMembers)
             {
-                // Handle the notice period from settings
                 var emailSender = await _emailSenderFactory.GetEmailSender(ghostSetting.StoreId);
                 var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
-
                 if (!isEmailConfigured || (member.LastReminderSent != null && member.LastReminderSent.Value.Date >= now.Date))
                     continue;
 
@@ -177,48 +172,54 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
                     ApiUrl = ghostSetting.ApiUrl,
                     StoreName = ghostSetting.StoreName
                 };
-                Console.WriteLine($"Email request: {JsonConvert.SerializeObject(emailRequest)}");
-
-                switch (member.Status)
+                try
                 {
-                    case GhostSubscriptionStatus.New:
-                        var firstTransaction = ctx.GhostTransactions.AsNoTracking().First(c => c.MemberId == member.Id && c.TransactionStatus == TransactionStatus.Success);
-                        var noticeFrame = firstTransaction.PeriodEnd - now;
-                        Console.WriteLine($"Notice period: {noticeFrame}");
+                    switch (member.Status)
+                    {
+                        case GhostSubscriptionStatus.New:
+                            var firstTransaction = ctx.GhostTransactions.AsNoTracking().First(c => c.MemberId == member.Id && c.TransactionStatus == TransactionStatus.Success);
+                            var noticeFrame = firstTransaction.PeriodEnd - now;
+                            if (noticeFrame.TotalDays <= reminderDay)
+                            {
+                                Console.WriteLine("Train train");
+                                await SendReminderEmail(ghostSetting, member, firstTransaction.PeriodEnd, emailRequest);
+                                member.LastReminderSent = DateTimeOffset.UtcNow;
+                                ctx.Update(member);
+                                await ctx.SaveChangesAsync();
+                            }
+                            break;
 
-                        if (noticeFrame.TotalDays <= 3)
-                        {
-                            await SendReminderEmail(ghostSetting, member, firstTransaction.PeriodEnd, emailRequest);
-                            member.LastReminderSent = DateTimeOffset.UtcNow;
-                            await ctx.SaveChangesAsync();
-                        }
-                        break;
+                        case GhostSubscriptionStatus.Renew:
+                            var transactions = ctx.GhostTransactions.AsNoTracking().Where(p => p.MemberId == member.Id &&
+                                p.TransactionStatus == TransactionStatus.Success && !string.IsNullOrEmpty(p.PaymentRequestId)).ToList();
 
-                    case GhostSubscriptionStatus.Renew:
-                        var transactions = ctx.GhostTransactions.AsNoTracking().Where(p => p.MemberId == member.Id &&
-                            p.TransactionStatus == TransactionStatus.Success && !string.IsNullOrEmpty(p.PaymentRequestId)).ToList();
+                            var currentPeriod = transactions.FirstOrDefault(p => p.PeriodStart <= now && p.PeriodEnd >= now);
+                            var nextPeriod = transactions.FirstOrDefault(p => p.PeriodStart > now);
+                            if (currentPeriod is null || nextPeriod is not null)
+                                return;
 
-                        var currentPeriod = transactions.FirstOrDefault(p => p.PeriodStart <= now && p.PeriodEnd >= now);
-                        var nextPeriod = transactions.FirstOrDefault(p => p.PeriodStart > now);
-                        if (currentPeriod is null || nextPeriod is not null)
-                            return;
+                            Console.WriteLine("I am a moving train");
 
-                        var noticePeriod = currentPeriod.PeriodEnd - now;
-                        if (noticePeriod.TotalDays <= 3)
-                        {
-                            await SendReminderEmail(ghostSetting, member, currentPeriod.PeriodEnd, emailRequest);
-                            member.LastReminderSent = DateTimeOffset.UtcNow;
-                            await ctx.SaveChangesAsync();
-                            deliverRequests.Add((ghostSetting.Id, member.Id, member.Email));
-                        }
-                        break;
+                            var noticePeriod = currentPeriod.PeriodEnd - now;
+                            if (noticePeriod.TotalDays <= reminderDay)
+                            {
+                                await SendReminderEmail(ghostSetting, member, currentPeriod.PeriodEnd, emailRequest);
+                                member.LastReminderSent = DateTimeOffset.UtcNow;
+                                ctx.Update(member);
+                                await ctx.SaveChangesAsync();
+                                deliverRequests.Add((ghostSetting.Id, member.Id, member.Email));
+                            }
+                            break;
 
-                    default:
-                        break;
+                        default:
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error sending an email: {ex.Message}");
                 }
             }
-
-
             foreach (var deliverRequest in deliverRequests)
             {
                 var webhooks = await _webhookSender.GetWebhooks(app.StoreDataId, GhostApp.GhostSubscriptionRenewalRequested);
@@ -227,7 +228,6 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
                     _webhookSender.EnqueueDelivery(CreateSubscriptionRenewalRequestedDeliveryRequest(webhook, app.Id, app.StoreDataId, deliverRequest.memberId,
                          deliverRequest.email));
                 }
-
                 EventAggregator.Publish(CreateSubscriptionRenewalRequestedDeliveryRequest(null, app.Id, app.StoreDataId, deliverRequest.memberId,
                     deliverRequest.email));
             }
@@ -238,6 +238,13 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
     {
         await using var ctx = _dbContextFactory.CreateContext();
         var currentDate = DateTime.UtcNow;
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        var ghostPluginSetting = ghostSetting.Setting != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) : new GhostSettingsPageViewModel();
+        var reminderDay = ghostPluginSetting?.ReminderStartDaysBeforeExpiration.GetValueOrDefault(4) switch
+        {
+            0 => 4,
+            var value => value
+        };
 
         var latestTransactions = await ctx.GhostTransactions
             .AsNoTracking().Where(t => t.StoreId == storeId && t.TransactionStatus == TransactionStatus.Success)
@@ -247,7 +254,7 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
 
         return latestTransactions.Any(t =>
             (currentDate >= t.PeriodStart && currentDate <= t.PeriodEnd &&
-             t.PeriodEnd.AddDays(-2) <= currentDate) || currentDate > t.PeriodEnd);
+             t.PeriodEnd.AddDays(-reminderDay.Value) <= currentDate) || currentDate > t.PeriodEnd);
     }
 
 
@@ -455,13 +462,7 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
 
     private async Task SendReminderEmail(GhostSetting ghostSetting, GhostMember member, DateTime expirationDate, EmailRequest emailRequest)
     {
-        var url = _linkGenerator.GetUriByAction(
-            _httpContextAccessor.HttpContext,
-            action: "Subscribe",
-            controller: "UIGhostPublic",
-            values: new { storeId = ghostSetting.StoreId, memberId = member.Id });
-        Console.WriteLine($"Generated URL: {url}");
-
+        var url = $"{ghostSetting.BaseUrl}/plugins/{ghostSetting.StoreId}/ghost/api/subscription/{member.Id}/subscribe";
         emailRequest.SubscriptionUrl = url;
         emailRequest.ExpirationDate = expirationDate;
         await _emailService.SendMembershipSubscriptionReminderEmail(emailRequest);

@@ -23,6 +23,7 @@ public class GhostTransactionViewModel
 {
     public string StoreId { get; set; }
     public string InvoiceId { get; set; }
+    public string PaymentRequestId { get; set; }
     public string InvoiceStatus { get; set; }
     public decimal Amount { get; set; }
     public string Currency { get; set; }

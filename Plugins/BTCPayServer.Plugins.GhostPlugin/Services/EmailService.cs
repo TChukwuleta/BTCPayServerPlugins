@@ -1,11 +1,8 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using System;
 using BTCPayServer.Logging;
 using BTCPayServer.Services.Mails;
-using BTCPayServer.Services.Stores;
 using MimeKit;
-using Microsoft.Extensions.Logging;
 using System.IO;
 using System.Reflection;
 using System.Linq;
@@ -16,13 +13,9 @@ public class EmailService
 {
     private readonly EmailSenderFactory _emailSender;
     private readonly Logs _logs;
-    private readonly StoreRepository _storeRepo;
-    public EmailService(EmailSenderFactory emailSender,
-        Logs logs,
-        StoreRepository storeRepo)
+    public EmailService(EmailSenderFactory emailSender, Logs logs)
     {
         _logs = logs;
-        _storeRepo = storeRepo;
         _emailSender = emailSender;
     }
 
@@ -39,7 +32,7 @@ public class EmailService
                             .Replace("@Model.ExpirationDate", model.ExpirationDate.ToString("MMMM dd, yyyy"))
                             .Replace("@Model.SubscriptionUrl", model.SubscriptionUrl)
                             .Replace("@Model.StoreName", model.StoreName)
-                            .Replace("@Model.ApiUrl", model.ApiUrl);
+                            .Replace("@Model.ApiUrl", $"https://{model.ApiUrl}");
         var client = await settings.CreateSmtpClient();
         var clientMessage = new MimeMessage
         {
@@ -77,44 +70,6 @@ public class EmailService
         return System.Text.RegularExpressions.Regex.Replace(html, "<.*?>", string.Empty)
             .Replace("&nbsp;", " ")
             .Trim();
-    }
-
-    private async Task SendBulkEmail(string storeId, IEnumerable<EmailRecipient> recipients)
-    {
-        var settings = await (await _emailSender.GetEmailSender(storeId)).GetEmailSettings();
-        if (!settings.IsComplete())
-            return;
-
-        var client = await settings.CreateSmtpClient();
-        try
-        {
-            foreach (var recipient in recipients)
-            {
-                try
-                {
-                    var message = new MimeMessage();
-                    message.From.Add(MailboxAddress.Parse(settings.From));
-                    message.To.Add(recipient.Address);
-                    message.Subject = recipient.Subject;
-                    message.Body = new TextPart("plain") { Text = recipient.MessageText };
-                    await client.SendAsync(message);
-                }
-                catch (Exception ex)
-                {
-                    _logs.PayServer.LogError(ex, $"Error sending email to: {recipient.Address}");
-                }
-            }
-        }
-        finally
-        {
-            await client.DisconnectAsync(true);
-        }
-    }
-    public class EmailRecipient
-    {
-        public InternetAddress Address { get; set; }
-        public string Subject { get; set; }
-        public string MessageText { get; set; }
     }
 
     public class EmailRequest
