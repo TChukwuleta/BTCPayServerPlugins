@@ -25,6 +25,10 @@
       <ExcludeAssets>runtime;native;build;buildTransitive;contentFiles</ExcludeAssets>
     </ProjectReference>
   </ItemDefinitionGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Include="Resources\js\btcpay_shopify.js" />
+	</ItemGroup>
 	
 	
 		<!-- If you need Entity Framework, you can uncomment this. This will make it usable in your project without publishing assemblies

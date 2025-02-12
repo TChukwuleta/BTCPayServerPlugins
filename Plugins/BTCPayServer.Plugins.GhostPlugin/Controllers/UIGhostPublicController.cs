@@ -42,15 +42,16 @@ public class UIGhostPublicController : Controller
     private readonly AppService _appService;
     private readonly UriResolver _uriResolver;
     private readonly StoreRepository _storeRepo;
+    private readonly EmailService _emailService;
     private readonly LinkGenerator _linkGenerator;
     private readonly IHttpClientFactory _clientFactory;
     private readonly ApplicationDbContextFactory _context;
     private readonly GhostPluginService _ghostPluginService;
     private readonly UIInvoiceController _invoiceController;
     private readonly GhostDbContextFactory _dbContextFactory;
-    private GhostHelper helper;
     public UIGhostPublicController
         (AppService appService,
+        EmailService emailService,
         UriResolver uriResolver,
         StoreRepository storeRepo,
         LinkGenerator linkGenerator,
@@ -61,7 +62,7 @@ public class UIGhostPublicController : Controller
         GhostDbContextFactory dbContextFactory)
     {
         _appService = appService;
-        helper = new GhostHelper(_appService);
+        _emailService = emailService;
         _context = context;
         _storeRepo = storeRepo;
         _uriResolver = uriResolver;
@@ -288,12 +289,13 @@ public class UIGhostPublicController : Controller
         {
             return BadRequest("Invalid BTCPay store specified");
         }
-        var jsFile = await helper.GetCustomJavascript(userStore.StoreId, Request.GetAbsoluteRoot());
-        if (!jsFile.succeeded)
-        {
-            return BadRequest(jsFile.response);
-        }
-        return Content(jsFile.response, "text/javascript");
+        StringBuilder combinedJavascript = new StringBuilder();
+        var fileContent = _emailService.GetEmbeddedResourceContent("Resources.js.btcpay_ghost.js");
+        combinedJavascript.AppendLine(fileContent);
+        string jsVariables = $"var BTCPAYSERVER_URL = '{Request.GetAbsoluteRoot()}'; var STORE_ID = '{userStore.StoreId}';";
+        combinedJavascript.Insert(0, jsVariables + Environment.NewLine);
+        var jsFile = combinedJavascript.ToString();
+        return Content(jsFile, "text/javascript");
     }
 
     private async Task GetTransaction(GhostDbContext ctx, Tier tier, GhostMember member, InvoiceEntity invoice, Data.PaymentRequestData paymentRequest, string txnId)
