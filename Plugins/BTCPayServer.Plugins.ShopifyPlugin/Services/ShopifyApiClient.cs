@@ -6,7 +6,6 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using BTCPayServer.Plugins.ShopifyPlugin.ViewModels.Models;
-using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin.Services
@@ -30,8 +29,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
 
             var bearer = $"{_credentials.ApiKey}:{_credentials.ApiPassword}";
             bearer = NBitcoin.DataEncoders.Encoders.Base64.EncodeData(Encoding.UTF8.GetBytes(bearer));
-
-            _httpClient.DefaultRequestHeaders.Add("Authorization", "Basic " + bearer);
+            _httpClient.DefaultRequestHeaders.Add("X-Shopify-Access-Token", _credentials.ApiPassword);
         }
 
         private HttpRequestMessage CreateRequest(string shopName, HttpMethod method, string action,
@@ -154,7 +152,6 @@ namespace BTCPayServer.Plugins.ShopifyPlugin.Services
             var strResp = await SendRequest(req);
 
             var parsed = JsonConvert.DeserializeObject<CountResponse>(strResp);
-
             return parsed.Count;
         }
 

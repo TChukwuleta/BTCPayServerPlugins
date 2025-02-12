@@ -132,12 +132,6 @@ public class UIShopifyController : Controller
                             TempData[WellKnownTempData.ErrorMessage] = $"Invalid Shopify credentials: {err.Message}";
                             return View(vm);
                         }
-                        var scopesGranted = await apiClient.CheckScopes();
-                        if (!scopesGranted.Contains("read_orders") || !scopesGranted.Contains("write_orders"))
-                        {
-                            TempData[WellKnownTempData.ErrorMessage] = "Please grant the private app permissions for read_orders, write_orders.";
-                            return View(vm);
-                        }
                         vm.IntegratedAt = DateTimeOffset.UtcNow;
                         vm.StoreId = CurrentStore.Id;
                         var webhookResponse = await apiClient.CreateWebhook("orders/create", Url.Action("OrderCreatedWebhook", "UIShopify", new { storeId = vm.StoreId, shopName = vm.ShopName }, Request.Scheme));
@@ -204,11 +198,6 @@ public class UIShopifyController : Controller
             if (shopifySetting == null || !shopifySetting.IntegratedAt.HasValue)
             {
                 return BadRequest("Invalid Shopify BTCPay store specified");
-            }
-            bool isValid = VerifyWebhookSignature(requestBody, shopifyHmacHeader, shopifySetting.ApiSecret);
-            if (!isValid)
-            {
-                return Unauthorized("Invalid HMAC signature");
             }
             var orderData = JsonConvert.DeserializeObject<dynamic>(requestBody);
             var paymentGatewayNames = ((IEnumerable<dynamic>)orderData.payment_gateway_names).Select(pg => (string)pg).ToList();
