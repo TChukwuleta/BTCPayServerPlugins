@@ -19,6 +19,8 @@ using BTCPayServer.Abstractions.Models;
 using Microsoft.AspNetCore.Routing;
 using static BTCPayServer.Plugins.GhostPlugin.Services.EmailService;
 using BTCPayServer.Services.Mails;
+using BTCPayServer.Plugins.GhostPlugin.ViewModels;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -50,7 +52,6 @@ public class UIGhostMemberController : Controller
     [HttpGet("list")]
     public async Task<IActionResult> List(string storeId, string filter)
     {
-        // Also Measure about to expire from settings.. see plugin service for other comment
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
 
@@ -60,10 +61,17 @@ public class UIGhostMemberController : Controller
         var ghostMembers = ctx.GhostMembers.AsNoTracking().Where(c => c.StoreId == storeId && !string.IsNullOrEmpty(c.MemberId)).ToList();
         var ghostTransactions = ctx.GhostTransactions.AsNoTracking().Where(t => t.StoreId == storeId && t.TransactionStatus == TransactionStatus.Success).ToList();
 
+        var ghostPluginSetting = ghostSetting.Setting != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) : new GhostSettingsPageViewModel();
+        var reminderDay = ghostPluginSetting?.ReminderStartDaysBeforeExpiration.GetValueOrDefault(4) switch
+        {
+            0 => 4,
+            var value => value
+        };
+
         var ghostMemberListViewModels = ghostMembers
             .Select(member =>
             {
-                var transactions = ghostTransactions.Where(t => t.MemberId == member.Id).OrderByDescending(t => t.PeriodEnd).ToList();
+                var transactions = ghostTransactions.Where(t => t.MemberId == member.Id).OrderByDescending(t => t.CreatedAt).ToList();
                 var mostRecentTransaction = transactions.FirstOrDefault();
                 return new GhostMemberListViewModel
                 {
@@ -73,6 +81,7 @@ public class UIGhostMemberController : Controller
                     Email = member.Email,
                     TierId = member.TierId,
                     StoreId = storeId,
+                    ReminderDay = reminderDay.Value,
                     Frequency = member.Frequency,
                     CreatedDate = member.CreatedAt,
                     PeriodEndDate = (DateTimeOffset)(mostRecentTransaction?.PeriodEnd),
@@ -170,7 +179,7 @@ public class UIGhostMemberController : Controller
             SubscriptionTier = member.TierName,
             ApiUrl = ghostSetting.ApiUrl,
             StoreName = ghostSetting.StoreName,
-            SubscriptionUrl = Url.Action(action: "Subscribe", controller: "UIGhostPublic", values: new { storeId = ghostSetting.StoreId, memberId = member.Id }),
+            SubscriptionUrl = $"{ghostSetting.BaseUrl}/plugins/{ghostSetting.StoreId}/ghost/api/subscription/{member.Id}/subscribe",
             ExpirationDate = latestTransaction.PeriodEnd,
         };
         Console.WriteLine(emailRequest.SubscriptionUrl);

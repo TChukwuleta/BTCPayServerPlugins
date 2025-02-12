@@ -102,7 +102,7 @@
                         <td class="actions-col">
 
                             @if (storeEmailSettingsConfigured && (DateTime.UtcNow.Date >= member.PeriodEndDate.UtcDateTime.Date ||
-                            (member.PeriodEndDate.UtcDateTime.Date <= DateTime.UtcNow.AddDays(3).Date && member.PeriodEndDate.UtcDateTime.Date > DateTime.UtcNow.Date)))
+                            (member.PeriodEndDate.UtcDateTime.Date <= DateTime.UtcNow.AddDays(member.ReminderDay).Date && member.PeriodEndDate.UtcDateTime.Date > DateTime.UtcNow.Date)))
                             {
                                 <div class="d-inline-flex align-items-center gap-3">
                                     <a asp-action="SendReminder" asp-route-storeId="@member.StoreId" asp-route-memberId="@member.Id">Send Reminder</a>

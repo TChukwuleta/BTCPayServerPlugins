@@ -387,12 +387,14 @@ public class UIShopifyController : Controller
         {
             return BadRequest("Invalid BTCPay store specified");
         }
-        var jsFile = await helper.GetCustomJavascript(userStore.StoreId, Request.GetAbsoluteRoot());
-        if (!jsFile.succeeded)
-        {
-            return BadRequest(jsFile.response);
-        }
-        return Content(jsFile.response, "text/javascript");
+
+        StringBuilder combinedJavascript = new StringBuilder();
+        var fileContent = helper.GetEmbeddedResourceContent("Resources.js.btcpay_shopify.js");
+        combinedJavascript.AppendLine(fileContent);
+        string jsVariables = $"var BTCPAYSERVER_URL = '{Request.GetAbsoluteRoot()}'; var STORE_ID = '{userStore.StoreId}';";
+        combinedJavascript.Insert(0, jsVariables + Environment.NewLine);
+        var jsFile = combinedJavascript.ToString();
+        return Content(jsFile, "text/javascript");
     }
 
     private static bool VerifyWebhookSignature(string requestBody, string shopifyHmacHeader, string clientSecret)

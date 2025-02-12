@@ -10,6 +10,7 @@
 @model GhostSettingsPageViewModel
 @{
     ViewData.SetActivePage(PluginNavPages.Index, "Ghost Settings");
+    var storeEmailSettingsConfigured = (bool)ViewData["StoreEmailSettingsConfigured"];
     var storeId = ScopeProvider.GetCurrentStoreId();
 }
 
@@ -28,10 +29,12 @@
 <form method="post" asp-action="Settings" id="settingsForm">
     <div class="row">
         <div class="col-md-6"> 
+            <div class="form-group">
+                <label asp-for="SubscriptionRenewalGracePeriod" class="form-label"></label>
+                <input asp-for="SubscriptionRenewalGracePeriod" min="1" class="form-control" required />
+                <span asp-validation-for="SubscriptionRenewalGracePeriod" class="text-danger"></span>
+            </div>
             <div class="form-group d-flex align-items-center">
-                @{
-                    var storeEmailSettingsConfigured = (bool)ViewData["StoreEmailSettingsConfigured"];
-                }
                 <input asp-for="EnableAutomatedEmailReminders" type="checkbox" class="btcpay-toggle me-3" id="emailToggle" disabled="@(storeEmailSettingsConfigured ? null : "disabled")" />
                 <div>
                     <label asp-for="EnableAutomatedEmailReminders" class="form-check-label"></label>
@@ -47,12 +50,11 @@
             </div>
             <div id="emailTemplateGroup" style="display: none;">
                 <div class="form-group">
-                    <label asp-for="ReminderStartDaysBeforeExpiration" class="form-label">Customize Subject</label>
+                    <label asp-for="ReminderStartDaysBeforeExpiration" class="form-label"></label>
                     <input asp-for="ReminderStartDaysBeforeExpiration" type="number" class="form-control" min="1" placeholder="Enter custom days" />
                     <span asp-validation-for="ReminderStartDaysBeforeExpiration" class="text-danger"></span>
                 </div>
             </div>
-            @* <input type="number" class="form-control mt-2 d-none" id="customDaysInput" asp-for="CustomReminderDays" min="1" placeholder="Enter custom days"> *@
         </div>
     </div>
 </form>
