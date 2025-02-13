@@ -16,6 +16,7 @@ using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using System.Collections.Generic;
 using BTCPayServer.Services.PaymentRequests;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
@@ -60,7 +61,7 @@ public class GhostHostedService : EventHostedServiceBase
         }.Contains(invoiceEvent.Name):
                 {
                     var invoice = invoiceEvent.Invoice;
-                    var ghostOrderId = invoice.GetInternalTags(GhostApp.GHOST_MEMBER_ID_PREFIX).FirstOrDefault();
+                    var ghostOrderId = invoice.GetInternalTags(GhostApp.GHOST_PREFIX).FirstOrDefault();
                     if (ghostOrderId != null)
                     {
                         string invoiceStatus = invoice.Status.ToString().ToLower();
@@ -71,7 +72,16 @@ public class GhostHostedService : EventHostedServiceBase
                             _ => (bool?)null
                         };
                         if (success.HasValue)
-                            await RegisterTransaction(invoice, ghostOrderId, success.Value);
+                        {
+                            if (ghostOrderId.StartsWith(GhostApp.GHOST_MEMBER_ID_PREFIX))
+                            {
+                                await RegisterMembershipCreationTransaction(invoice, ghostOrderId, success.Value);
+                            }
+                            else if (ghostOrderId.StartsWith(GhostApp.GHOST_TICKET_ID_PREFIX))
+                            {
+                                await RegisterTicketTransaction(invoice, ghostOrderId, success.Value);
+                            }
+                        }
                     }
                     break;
                 }
@@ -95,7 +105,7 @@ public class GhostHostedService : EventHostedServiceBase
     }
 
 
-    private async Task RegisterTransaction(InvoiceEntity invoice, string orderId, bool success)
+    private async Task RegisterMembershipCreationTransaction(InvoiceEntity invoice, string orderId, bool success)
     {
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId);
@@ -105,13 +115,20 @@ public class GhostHostedService : EventHostedServiceBase
             var result = new InvoiceLogs();
 
             result.Write($"Invoice status: {invoice.Status.ToString().ToLower()}", InvoiceEventData.EventSeverity.Info);
-            var transaction = ctx.GhostTransactions.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id && c.TransactionStatus == TransactionStatus.Pending);
+            var transaction = ctx.GhostTransactions.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id);
             if (transaction == null)
             {
                 result.Write("Couldn't find a corresponding Ghost transaction table record", InvoiceEventData.EventSeverity.Error);
                 await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
                 return;
             }
+            if (transaction != null && transaction.TransactionStatus != TransactionStatus.Pending)
+            {
+                result.Write("Transaction has previously been completed", InvoiceEventData.EventSeverity.Info);
+                await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
+                return;
+            }
+
             transaction.InvoiceStatus = invoice.Status.ToString().ToLower();
             transaction.TransactionStatus = success ? TransactionStatus.Success : TransactionStatus.Failed;
             if (success)
@@ -160,7 +177,42 @@ public class GhostHostedService : EventHostedServiceBase
 
             }
             ctx.UpdateRange(transaction);
-            ctx.SaveChanges();
+            await ctx.SaveChangesAsync();
+            await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
+        }
+    }
+
+    private async Task RegisterTicketTransaction(InvoiceEntity invoice, string orderId, bool success)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId);
+        if (ghostSetting.CredentialsPopulated())
+        {
+            var result = new InvoiceLogs();
+            result.Write($"Invoice status: {invoice.Status.ToString().ToLower()}", InvoiceEventData.EventSeverity.Info);
+            var ticket = ctx.GhostEventTickets.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id);
+            if (ticket == null)
+            {
+                result.Write("Couldn't find a corresponding Event ticket table record", InvoiceEventData.EventSeverity.Error);
+                await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
+                return;
+            }
+            if (ticket != null && ticket.PaymentStatus != TransactionStatus.Pending.ToString())
+            {
+                result.Write("Transaction has previously been completed", InvoiceEventData.EventSeverity.Info);
+                await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
+                return;
+            }
+            var ghostEvent = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == ticket.EventId && c.StoreId == ticket.StoreId);
+            ticket.PurchaseDate = DateTime.UtcNow;
+            ticket.InvoiceStatus = invoice.Status.ToString().ToLower();
+            ticket.PaymentStatus = success ? TransactionStatus.Success.ToString() : TransactionStatus.Failed.ToString();
+            ctx.UpdateRange(ticket);
+            result.Write($"New ticket payment completed for Event: {ghostEvent?.Title} Buyer name: {ticket.Name}", InvoiceEventData.EventSeverity.Success);
+            await ctx.SaveChangesAsync();
+
+            // Sending email?
+
             await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
         }
     }

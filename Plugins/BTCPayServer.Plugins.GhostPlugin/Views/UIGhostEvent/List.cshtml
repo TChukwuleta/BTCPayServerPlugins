@@ -1,0 +1,71 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Plugins.GhostPlugin.Data
+@using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models
+@inject IScopeProvider ScopeProvider
+@model GhostEventsViewModel
+@{
+    ViewData.SetActivePage(PluginNavPages.Index, "Ghost Events");
+    var storeEmailSettingsConfigured = (bool)ViewData["StoreEmailSettingsConfigured"];
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+
+
+<div class="sticky-header">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        @* <a id="create-event" asp-action="CreateEvent" asp-controller="UIGhostEvent" asp-route-storeId="@storeId"
+           class="btn btn-success @(storeEmailSettingsConfigured ? "" : "disabled")" role="button">
+            Create Event
+        </a> *@
+
+        <a id="create-event" asp-action="CreateEvent" asp-controller="UIGhostEvent" asp-route-storeId="@storeId"
+           class="btn btn-success" role="button">
+            Create Event
+        </a>
+
+        <a id="page-primary" asp-action="Index" asp-controller="UIGhost" asp-route-storeId="@storeId" class="btn btn-primary" role="button">
+            View Credentials
+        </a>
+    </div>
+</div>
+<partial name="_StatusMessage" />
+
+
+@if (Model.DisplayedEvents != null && Model.DisplayedEvents.Any())
+{
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Desc </th>
+                    <th>Event Date</th>
+                    <th>Tickets Sold</th>
+                    <th class="actions-col"></th>
+                    <th class="w-75px"></th>
+                </tr>
+            </thead>
+            <tbody id="UsersList">
+                @foreach (var member in Model.DisplayedEvents)
+                {
+                    <tr id="user_@member.Id" class="user-overview-row mass-action-row">
+                        <td>@member.Title</td>
+                        <td>@member.Description</td>
+                        <td>@member.EventDate.ToString("M/d/yy, hh:mm tt")</td>
+                        <td>100</td>
+                        <td class="actions-col">
+                            <div class="d-inline-flex align-items-center gap-3">
+                                <a asp-action="SendReminder" asp-route-storeId="@member.StoreId" asp-route-memberId="@member.Id">Send Reminder</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <p class="text-secondary mt-4">No Ghost events record found</p>
+}

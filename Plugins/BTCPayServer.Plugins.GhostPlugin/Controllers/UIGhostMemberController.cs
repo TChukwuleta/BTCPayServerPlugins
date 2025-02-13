@@ -11,7 +11,6 @@ using BTCPayServer.Plugins.GhostPlugin.Data;
 using BTCPayServer.Plugins.GhostPlugin.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Net.Http;
-using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using System;
 using BTCPayServer.Abstractions.Extensions;
@@ -53,13 +52,10 @@ public class UIGhostMemberController : Controller
     public async Task<IActionResult> List(string storeId, string filter)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
 
-        var storeData = await _storeRepo.FindStore(storeId);
-        var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
-
-        var ghostMembers = ctx.GhostMembers.AsNoTracking().Where(c => c.StoreId == storeId && !string.IsNullOrEmpty(c.MemberId)).ToList();
-        var ghostTransactions = ctx.GhostTransactions.AsNoTracking().Where(t => t.StoreId == storeId && t.TransactionStatus == TransactionStatus.Success).ToList();
+        var ghostMembers = ctx.GhostMembers.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id && !string.IsNullOrEmpty(c.MemberId)).ToList();
+        var ghostTransactions = ctx.GhostTransactions.AsNoTracking().Where(t => t.StoreId == CurrentStore.Id && t.TransactionStatus == TransactionStatus.Success).ToList();
 
         var ghostPluginSetting = ghostSetting.Setting != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) : new GhostSettingsPageViewModel();
         var reminderDay = ghostPluginSetting?.ReminderStartDaysBeforeExpiration.GetValueOrDefault(4) switch
@@ -80,7 +76,7 @@ public class UIGhostMemberController : Controller
                     Name = member.Name,
                     Email = member.Email,
                     TierId = member.TierId,
-                    StoreId = storeId,
+                    StoreId = CurrentStore.Id,
                     ReminderDay = reminderDay.Value,
                     Frequency = member.Frequency,
                     CreatedDate = member.CreatedAt,
@@ -88,7 +84,7 @@ public class UIGhostMemberController : Controller
                     TierName = member.TierName,
                     Subscriptions = transactions.Select(t => new GhostTransactionViewModel
                     {
-                        StoreId = storeId,
+                        StoreId = CurrentStore.Id,
                         InvoiceId = t.InvoiceId, 
                         PaymentRequestId = t.PaymentRequestId,
                         InvoiceStatus = t.InvoiceStatus,

@@ -292,9 +292,9 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
     }
 
 
-    public async Task<InvoiceEntity> CreateInvoiceAsync(BTCPayServer.Data.StoreData store, Tier tier, GhostMember member, string txnId, string url)
+    public async Task<InvoiceEntity> CreateMemberInvoiceAsync(BTCPayServer.Data.StoreData store, Tier tier, GhostMember member, string txnId, string url)
     {
-        var ghostSearchTerm = $"{GhostApp.GHOST_MEMBER_ID_PREFIX}{member.Id}_{txnId}";
+        var ghostSearchTerm = $"{GhostApp.GHOST_PREFIX}{GhostApp.GHOST_MEMBER_ID_PREFIX}{member.Id}_{txnId}";
         var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
         {
             TextSearch = ghostSearchTerm,
@@ -328,6 +328,46 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
                 AdditionalSearchTerms = new[]
                 {
                     member.Id.ToString(CultureInfo.InvariantCulture),
+                    ghostSearchTerm
+                }
+            }, store, url, new List<string>() { ghostSearchTerm });
+
+        return invoice;
+    }
+
+    public async Task<InvoiceEntity> CreateInvoiceAsync(BTCPayServer.Data.StoreData store, string prefix, string txnId, decimal amount, string currency, string url)
+    {
+        var ghostSearchTerm = $"{prefix}{txnId}";
+        var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
+        {
+            TextSearch = ghostSearchTerm,
+            StoreId = new[] { store.Id }
+        });
+
+        matchedExistingInvoices = matchedExistingInvoices.Where(entity =>
+                entity.GetInternalTags(ghostSearchTerm).Any(s => s == txnId.ToString())).ToArray();
+
+        var firstInvoiceSettled =
+            matchedExistingInvoices.LastOrDefault(entity =>
+                new[] { "settled", "processing", "confirmed", "paid", "complete" }
+                    .Contains(
+                        entity.GetInvoiceState().Status.ToString().ToLower()));
+
+        if (firstInvoiceSettled != null)
+            return firstInvoiceSettled;
+
+        var invoice = await _invoiceController.CreateInvoiceCoreRaw(
+            new CreateInvoiceRequest()
+            {
+                Amount = amount,
+                Currency = currency,
+                Metadata = new JObject
+                {
+                    ["TxnId"] = txnId
+                },
+                AdditionalSearchTerms = new[]
+                {
+                    txnId.ToString(CultureInfo.InvariantCulture),
                     ghostSearchTerm
                 }
             }, store, url, new List<string>() { ghostSearchTerm });

@@ -1,0 +1,139 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Plugins.GhostPlugin.Data
+@using BTCPayServer.Plugins.GhostPlugin.ViewModels
+@using System.Globalization
+@inject IFileService FileService
+@inject IScopeProvider ScopeProvider
+@model UpdateGhostEventViewModel
+@{
+    ViewData.SetActivePage(PluginNavPages.Index, "Ghost Events");
+    var canUpload = await FileService.IsAvailable();
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+
+<div class="sticky-header">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <button type="submit" form="event-form" class="btn btn-success">Create Event</button>
+    </div>
+</div>
+<partial name="_StatusMessage" />
+
+
+<form id="event-form" asp-action="CreateEvent" asp-controller="UIGhostEvent" method="post" enctype="multipart/form-data">
+    <div class="row">
+        <div class="col-sm-10 col-md-9 col-xl-7 col-xxl-6">
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label asp-for="Title" class="form-label" data-required></label>
+                        <input asp-for="Title" class="form-control" required />
+                        <span asp-validation-for="Title" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <label asp-for="EventLink" class="form-label" data-required></label>
+                        <input asp-for="EventLink" class="form-control" required />
+                        <span asp-validation-for="EventLink" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="d-flex align-items-center justify-content-between gap-2">
+                    <label asp-for="EventImageFile" class="form-label"></label>
+                    @if (!string.IsNullOrEmpty(Model.EventImageUrl)) {
+                        <button type="submit" class="btn btn-link p-0 text-danger" name="RemoveEventLogoFile" value="true">
+                            <vc:icon symbol="cross" /> Remove
+                        </button>
+                    }
+                </div>
+                @if (canUpload) {
+                    <div class="d-flex align-items-center gap-3">
+                        <input asp-for="EventImageFile" type="file" class="form-control flex-grow" />
+                        @if (!string.IsNullOrEmpty(Model.EventImageUrl)) {
+                            <img src="@Model.EventImageUrl" alt="Logo" style="height:2.1rem;max-width:10.5rem;" />
+                        }
+                    </div>
+                    <span asp-validation-for="EventImageFile" class="text-danger"></span>
+                } else {
+                    <input asp-for="EventImageFile" type="file" class="form-control" disabled />
+                    <div class="form-text">In order to upload an image, a <a asp-controller="UIServer" asp-action="Files">file storage</a> must be configured.</div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-xl-10 col-xxl-constrain">
+            <div class="d-flex flex-wrap gap-3 mb-3">
+                <div class="form-group w-250px mb-0">
+                    <label asp-for="Amount" class="form-label" data-required></label>
+                    <input inputmode="decimal" asp-for="Amount" class="form-control" required />
+                    <span asp-validation-for="Amount" class="text-danger"></span>
+                </div>
+                <div class="form-group">
+                    <label asp-for="Currency" class="form-label"></label>
+                    <input asp-for="Currency" class="form-control w-auto" currency-selection />
+                    <div class="form-text">Uses the store's default currency (@Model.StoreDefaultCurrency) if empty.</div>
+                    <span asp-validation-for="Currency" class="text-danger"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row align-items-center mb-3">
+        <div class="col-md-12">
+            <div class="form-group mb-0">
+                <label asp-for="EventDate" class="form-label" data-required></label>
+                <div class="input-group flex-nowrap">
+                    <input type="datetime-local" asp-for="EventDate" value="@(Model.EventDate.ToString("u", CultureInfo.InvariantCulture))" class="form-control flatdtpicker" placeholder="No Event date has been set" required />
+                    <button class="btn btn-secondary input-group-clear px-3" type="button" title="Clear">
+                        <vc:icon symbol="close" />
+                    </button>
+                </div>
+                <span asp-validation-for="EventDate" class="text-danger"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row align-items-center mb-4">
+        <div class="col-md-12 d-flex flex-column">
+            <div class="form-group d-flex align-items-center">
+                <input asp-for="HasMaximumCapacity" type="checkbox" class="btcpay-toggle me-2" id="maxCapacityToggle" />
+                <label asp-for="HasMaximumCapacity" class="form-check-label"></label>
+            </div>
+            <div id="maxCapacityInput" class="mt-2" style="display: none;">
+                <label asp-for="MaximumEventCapacity" class="form-label"></label>
+                <input asp-for="MaximumEventCapacity" type="number" class="form-control w-25" placeholder="Enter maximum capacity" />
+                <span asp-validation-for="MaximumEventCapacity" class="text-danger"></span>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="row mt-3">
+        <div class="col-xl-10 col-xxl-constrain">
+            <div class="form-group">
+                <label asp-for="Description" class="form-label"></label>
+                <textarea asp-for="Description" rows="15" cols="30" class="form-control richtext"></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section PageFootContent {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const toggle = document.getElementById("maxCapacityToggle");
+            const inputDiv = document.getElementById("maxCapacityInput");
+            toggle.addEventListener("change", function () {
+                inputDiv.style.display = toggle.checked ? "block" : "none";
+            });
+        });
+    </script>
+}
+
