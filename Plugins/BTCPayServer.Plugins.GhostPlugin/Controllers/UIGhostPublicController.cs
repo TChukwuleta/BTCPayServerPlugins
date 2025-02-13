@@ -159,7 +159,7 @@ public class UIGhostPublicController : Controller
 
 
         var uid = existingTicket?.Id ?? Guid.NewGuid().ToString();
-        var invoice = await _ghostPluginService.CreateInvoiceAsync(store, GhostApp.GHOST_TICKET_ID_PREFIX, uid, ghostEvent.Amount, ghostEvent.Currency, Request.GetAbsoluteRoot());
+        var invoice = await _ghostPluginService.CreateInvoiceAsync(store, $"{GhostApp.GHOST_PREFIX}{GhostApp.GHOST_TICKET_ID_PREFIX}", uid, ghostEvent.Amount, ghostEvent.Currency, Request.GetAbsoluteRoot());
         if (existingTicket != null)
         {
             existingTicket.InvoiceId = invoice.Id;

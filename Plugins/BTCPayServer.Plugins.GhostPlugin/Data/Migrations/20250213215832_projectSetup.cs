@@ -46,11 +46,14 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                 {
                     Id = table.Column<string>(type: "text", nullable: false),
                     StoreId = table.Column<string>(type: "text", nullable: true),
-                    EventId = table.Column<int>(type: "integer", nullable: false),
+                    EventId = table.Column<string>(type: "text", nullable: true),
+                    Amount = table.Column<decimal>(type: "numeric", nullable: false),
+                    Currency = table.Column<string>(type: "text", nullable: true),
                     Name = table.Column<string>(type: "text", nullable: true),
                     Email = table.Column<string>(type: "text", nullable: true),
                     InvoiceId = table.Column<string>(type: "text", nullable: true),
                     PaymentStatus = table.Column<string>(type: "text", nullable: true),
+                    InvoiceStatus = table.Column<string>(type: "text", nullable: true),
                     PurchaseDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },

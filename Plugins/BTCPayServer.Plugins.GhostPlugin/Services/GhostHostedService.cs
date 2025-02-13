@@ -73,22 +73,14 @@ public class GhostHostedService : EventHostedServiceBase
                         };
                         if (success.HasValue)
                         {
-                            // Try and get which prefix belong to which
-                            Console.WriteLine(ghostOrderId.ToString());
-                            Console.WriteLine(JsonConvert.SerializeObject(invoice));
-                            string value = "";
-                            switch (value)
+                            if (ghostOrderId.StartsWith(GhostApp.GHOST_MEMBER_ID_PREFIX))
                             {
-                                case GhostApp.GHOST_MEMBER_ID_PREFIX:
-                                    await RegisterMembershipCreationTransaction(invoice, ghostOrderId, success.Value);
-                                    break;
-                                case GhostApp.GHOST_TICKET_ID_PREFIX:
-                                    await RegisterTicketTransaction(invoice, ghostOrderId, success.Value);
-                                    break;
-                                default:
-                                    break;
+                                await RegisterMembershipCreationTransaction(invoice, ghostOrderId, success.Value);
                             }
-                            await RegisterMembershipCreationTransaction(invoice, ghostOrderId, success.Value);
+                            else if (ghostOrderId.StartsWith(GhostApp.GHOST_TICKET_ID_PREFIX))
+                            {
+                                await RegisterTicketTransaction(invoice, ghostOrderId, success.Value);
+                            }
                         }
                     }
                     break;

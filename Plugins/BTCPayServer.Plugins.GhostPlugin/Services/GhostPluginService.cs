@@ -294,7 +294,7 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
 
     public async Task<InvoiceEntity> CreateMemberInvoiceAsync(BTCPayServer.Data.StoreData store, Tier tier, GhostMember member, string txnId, string url)
     {
-        var ghostSearchTerm = $"{GhostApp.GHOST_MEMBER_ID_PREFIX}{member.Id}_{txnId}";
+        var ghostSearchTerm = $"{GhostApp.GHOST_PREFIX}{GhostApp.GHOST_MEMBER_ID_PREFIX}{member.Id}_{txnId}";
         var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
         {
             TextSearch = ghostSearchTerm,

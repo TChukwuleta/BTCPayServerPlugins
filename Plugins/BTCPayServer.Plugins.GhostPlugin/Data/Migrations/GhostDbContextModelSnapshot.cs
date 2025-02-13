@@ -79,16 +79,25 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text");
 
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .HasColumnType("text");
 
                     b.Property<string>("Email")
                         .HasColumnType("text");
 
-                    b.Property<int>("EventId")
-                        .HasColumnType("integer");
+                    b.Property<string>("EventId")
+                        .HasColumnType("text");
 
                     b.Property<string>("InvoiceId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("InvoiceStatus")
                         .HasColumnType("text");
 
                     b.Property<string>("Name")
