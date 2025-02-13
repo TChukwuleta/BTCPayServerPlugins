@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using BTCPayServer.Data;
 using BTCPayServer.Plugins.GhostPlugin.Data;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
@@ -68,6 +69,44 @@ public class GhostHelper
             Password = vm.Password,
             StoreId = vm.StoreId,
             StoreName = vm.StoreName
+        };
+    }
+
+    public UpdateGhostEventViewModel GhostEventToViewModel(GhostEvent vm)
+    {
+        return new UpdateGhostEventViewModel
+        {
+            Title = vm.Title,
+            Description = vm.Description,
+            EventLink = vm.EventLink,
+            EventDate = vm.EventDate,
+            Amount = vm.Amount,
+            Currency = vm.Currency,
+            EmailBody = vm.EmailBody,
+            EmailSubject = vm.EmailSubject,
+            HasMaximumCapacity = vm.HasMaximumCapacity,
+            MaximumEventCapacity = vm.MaximumEventCapacity,
+            StoreId = vm.StoreId,
+            EventId = vm.Id
+        };
+    }
+
+    public GhostEvent GhostEventViewModelToEntity(UpdateGhostEventViewModel vm)
+    {
+        return new GhostEvent
+        {
+            Title = vm.Title,
+            Description = vm.Description,
+            EventLink = vm.EventLink,
+            EventDate = vm.EventDate,
+            Amount = vm.Amount,
+            Currency = vm.Currency,
+            EmailBody = vm.EmailBody,
+            EmailSubject = vm.EmailSubject,
+            HasMaximumCapacity = vm.HasMaximumCapacity,
+            MaximumEventCapacity = vm.MaximumEventCapacity,
+            StoreId = vm.StoreId,
+            CreatedAt = DateTime.UtcNow
         };
     }
 }

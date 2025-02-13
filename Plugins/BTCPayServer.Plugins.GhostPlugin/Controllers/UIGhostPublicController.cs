@@ -27,10 +27,11 @@ using Microsoft.AspNetCore.Routing;
 using Newtonsoft.Json;
 using System.Text;
 using System.IO;
-using BTCPayServer.Services.Apps;
 using BTCPayServer.Plugins.GhostPlugin;
 using NBitcoin.DataEncoders;
 using NBitcoin;
+using NBitpayClient;
+using AngleSharp.Dom;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -39,7 +40,6 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 [Route("~/plugins/{storeId}/ghost/api/")]
 public class UIGhostPublicController : Controller
 {
-    private readonly AppService _appService;
     private readonly UriResolver _uriResolver;
     private readonly StoreRepository _storeRepo;
     private readonly EmailService _emailService;
@@ -50,8 +50,7 @@ public class UIGhostPublicController : Controller
     private readonly UIInvoiceController _invoiceController;
     private readonly GhostDbContextFactory _dbContextFactory;
     public UIGhostPublicController
-        (AppService appService,
-        EmailService emailService,
+        (EmailService emailService,
         UriResolver uriResolver,
         StoreRepository storeRepo,
         LinkGenerator linkGenerator,
@@ -61,7 +60,6 @@ public class UIGhostPublicController : Controller
         UIInvoiceController invoiceController,
         GhostDbContextFactory dbContextFactory)
     {
-        _appService = appService;
         _emailService = emailService;
         _context = context;
         _storeRepo = storeRepo;
@@ -110,6 +108,77 @@ public class UIGhostPublicController : Controller
         }, store, HttpContext.Request.GetAbsoluteRoot(), new List<string>() { $"Ghost_{id}" });
         var url = GreenfieldInvoiceController.ToModel(invoice, _linkGenerator, HttpContext.Request).CheckoutLink;
         return Redirect(url);
+    }
+
+
+    [HttpGet("event/{eventId}/register")]
+    public async Task<IActionResult> EventRegistration(string storeId, string eventId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
+            return NotFound();
+
+        var ghostEvent = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.StoreId == ghostSetting.StoreId && c.Id == eventId);
+        if (ghostEvent == null)
+            return NotFound();
+
+        return View(new CreateEventTicketViewModel { EventId = ghostEvent.Id, StoreId = ghostSetting.StoreId });
+    }
+
+    [HttpPost("event/{eventId}/register")]
+    public async Task<IActionResult> EventRegistration(string storeId, string eventId, CreateEventTicketViewModel vm)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ghostSetting = await ctx.GhostSettings.AsNoTracking().SingleOrDefaultAsync(c => c.StoreId == storeId);
+        var ghostEvent = await ctx.GhostEvents.AsNoTracking().SingleOrDefaultAsync(c => c.StoreId == storeId && c.Id == eventId);
+        if (ghostSetting == null || !ghostSetting.CredentialsPopulated() || ghostEvent == null)
+            return NotFound();
+
+        var existingTicket = await ctx.GhostEventTickets.SingleOrDefaultAsync(c => c.Email == vm.Email.Trim() && c.EventId == eventId && c.StoreId == storeId);
+        if (existingTicket?.PaymentStatus == GhostPlugin.Data.TransactionStatus.Success.ToString())
+        {
+            ModelState.AddModelError(nameof(vm.Email),
+                $"A user with this email has already purchased a ticket. Contact admin at https://{ghostSetting.ApiUrl} for assistance.");
+            return View(vm);
+        }
+
+        await using var dbMain = _context.CreateContext();
+        var store = await dbMain.Stores.AsNoTracking().FirstOrDefaultAsync(a => a.Id == storeId);
+        if (store == null) return NotFound();
+
+
+        var uid = existingTicket?.Id ?? Guid.NewGuid().ToString();
+        var invoice = await _ghostPluginService.CreateInvoiceAsync(store, GhostApp.GHOST_TICKET_ID_PREFIX, uid, ghostEvent.Amount, ghostEvent.Currency, Request.GetAbsoluteRoot());
+        if (existingTicket != null)
+        {
+            existingTicket.InvoiceId = invoice.Id;
+        }
+        else
+        {
+            ctx.GhostEventTickets.Add(new GhostEventTicket
+            {
+                Id = uid,
+                StoreId = storeId,
+                EventId = eventId,
+                Name = vm.Name.Trim(),
+                Amount = ghostEvent.Amount,
+                Currency = ghostEvent.Currency,
+                Email = vm.Email.Trim(),
+                PaymentStatus = GhostPlugin.Data.TransactionStatus.Pending.ToString(),
+                CreatedAt = DateTime.UtcNow,
+                InvoiceId = invoice.Id
+            });
+        }
+        await ctx.SaveChangesAsync();
+        return View("InitiatePayment", new GhostOrderViewModel
+        {
+            StoreId = storeId,
+            StoreName = store.StoreName,
+            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
+            BTCPayServerUrl = Request.GetAbsoluteRoot(),
+            InvoiceId = invoice.Id
+        });
     }
 
 
@@ -174,10 +243,10 @@ public class UIGhostPublicController : Controller
             TierName = tier.name,
             StoreId = storeId
         };
-        ctx.Add(entity);
+        ctx.GhostMembers.Add(entity);
         await ctx.SaveChangesAsync();
         var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
-        InvoiceEntity invoice = await _ghostPluginService.CreateInvoiceAsync(storeData, tier, entity, txnId, Request.GetAbsoluteRoot());
+        InvoiceEntity invoice = await _ghostPluginService.CreateMemberInvoiceAsync(storeData, tier, entity, txnId, Request.GetAbsoluteRoot());
         await GetTransaction(ctx, tier, entity, invoice, null, txnId);
         await using var dbMain = _context.CreateContext();
         var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == storeId);
@@ -316,7 +385,7 @@ public class UIGhostPublicController : Controller
             Amount = price,
             Currency = tier.currency
         };
-        ctx.Add(transaction);
+        ctx.GhostTransactions.Add(transaction);
         await ctx.SaveChangesAsync();
     }
 }

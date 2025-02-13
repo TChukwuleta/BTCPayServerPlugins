@@ -26,7 +26,6 @@ using BTCPayServer.Services.Apps;
 using BTCPayServer.Client;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Models;
-using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
