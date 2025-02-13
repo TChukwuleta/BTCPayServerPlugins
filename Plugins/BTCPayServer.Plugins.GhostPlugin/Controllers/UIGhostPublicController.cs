@@ -30,8 +30,6 @@ using System.IO;
 using BTCPayServer.Plugins.GhostPlugin;
 using NBitcoin.DataEncoders;
 using NBitcoin;
-using NBitpayClient;
-using AngleSharp.Dom;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -116,13 +114,17 @@ public class UIGhostPublicController : Controller
     {
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
-        if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
+        var ghostEvent = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
+        if (ghostSetting == null || !ghostSetting.CredentialsPopulated() || ghostEvent == null)
             return NotFound();
 
-        var ghostEvent = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.StoreId == ghostSetting.StoreId && c.Id == eventId);
-        if (ghostEvent == null)
-            return NotFound();
-
+        if (ghostEvent.HasMaximumCapacity)
+        {
+            var eventTickets = await ctx.GhostEventTickets.AsNoTracking().CountAsync(c => c.StoreId == storeId && c.EventId == eventId
+                    && c.PaymentStatus == GhostPlugin.Data.TransactionStatus.Success.ToString());
+            if (eventTickets >= ghostEvent.MaximumEventCapacity)
+                return NotFound();
+        }
         return View(new CreateEventTicketViewModel { EventId = ghostEvent.Id, StoreId = ghostSetting.StoreId });
     }
 
@@ -134,6 +136,14 @@ public class UIGhostPublicController : Controller
         var ghostEvent = await ctx.GhostEvents.AsNoTracking().SingleOrDefaultAsync(c => c.StoreId == storeId && c.Id == eventId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated() || ghostEvent == null)
             return NotFound();
+        
+        if (ghostEvent.HasMaximumCapacity)
+        {
+            var eventTickets = await ctx.GhostEventTickets.AsNoTracking().CountAsync(c => c.StoreId == storeId && c.EventId == eventId
+                    && c.PaymentStatus == GhostPlugin.Data.TransactionStatus.Success.ToString());
+            if (eventTickets >= ghostEvent.MaximumEventCapacity)
+                return NotFound();
+        }
 
         var existingTicket = await ctx.GhostEventTickets.SingleOrDefaultAsync(c => c.Email == vm.Email.Trim() && c.EventId == eventId && c.StoreId == storeId);
         if (existingTicket?.PaymentStatus == GhostPlugin.Data.TransactionStatus.Success.ToString())
