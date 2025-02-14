@@ -398,6 +398,8 @@ namespace BTCPayServer.Plugins.Crowdfund.Controllers
 
             var settings = app.GetSettings<CrowdfundSettings>();
             var resetEvery = Enum.GetName(typeof(CrowdfundResetEvery), settings.ResetEvery);
+            var urll = await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), settings.MainImageUrl);
+            Console.WriteLine(urll);
 
             var vm = new UpdateCrowdfundViewModel
             {

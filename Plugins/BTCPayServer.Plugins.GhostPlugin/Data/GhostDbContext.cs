@@ -27,12 +27,5 @@ public class GhostDbContext : DbContext
         GhostSetting.OnModelCreating(modelBuilder);
         GhostMember.OnModelCreating(modelBuilder);
         GhostTransaction.OnModelCreating(modelBuilder);
-
-        modelBuilder.Entity<GhostEvent>()
-        .Property(e => e.EventImageUrl)
-        .HasConversion(
-            v => v.ToString(),
-            v => v == null ? null : new UnresolvedUri.FileIdUri(v)
-        );
     }
 }

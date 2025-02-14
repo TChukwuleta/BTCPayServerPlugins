@@ -12,8 +12,7 @@ public class GhostEvent
     public string StoreId { get; set; }
     public string Title { get; set; }
     public string Description { get; set; }
-    [JsonConverter(typeof(UnresolvedUriJsonConverter))]
-    public UnresolvedUri EventImageUrl { get; set; }
+    public string EventImageUrl { get; set; }
     public string EventLink { get; set; }
     public DateTime EventDate { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

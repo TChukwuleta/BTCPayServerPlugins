@@ -9,6 +9,7 @@ public class GhostEventsListViewModel
     public string Id { get; set; }
     public string Title { get; set; }
     public string Description { get; set; }
+    public string EventPurchaseLink { get; set; }
     public DateTime EventDate { get; set; }
     public string StoreId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
@@ -20,8 +21,15 @@ public class GhostEventsListViewModel
 public class GhostEventTicketsViewModel
 {
     public string Id { get; set; }
-    public string MemberId { get; set; }
     public string Name { get; set; }
+    public string StoreId { get; set; }
+    public string EventId { get; set; }
+    public decimal Amount { get; set; }
+    public string Currency { get; set; }
+    public string Email { get; set; }
+    public string InvoiceId { get; set; }
+    public string PaymentStatus { get; set; }
+    public DateTime PurchaseDate { get; set; }
 }
 
 public class GhostEventsViewModel
@@ -29,6 +37,5 @@ public class GhostEventsViewModel
     public List<GhostEventsListViewModel> Events { get; set; }
     public List<GhostEventsListViewModel> DisplayedEvents { get; set; }
     public bool Active { get; set; }
-    public bool SoonToExpire { get; set; }
     public bool Expired { get; set; }
 }

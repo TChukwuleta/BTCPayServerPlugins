@@ -2,7 +2,9 @@
 
 public enum TransactionStatus
 {
-    Pending = 1,
-    Failed = 2,
-    Success = 3
+    New,
+    Processing,
+    Expired,
+    Invalid,
+    Settled
 }

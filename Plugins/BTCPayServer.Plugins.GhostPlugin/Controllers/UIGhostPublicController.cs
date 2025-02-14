@@ -30,6 +30,8 @@ using System.IO;
 using BTCPayServer.Plugins.GhostPlugin;
 using NBitcoin.DataEncoders;
 using NBitcoin;
+using AngleSharp.Dom;
+using BTCPayServer.Abstractions.Contracts;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -39,6 +41,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 public class UIGhostPublicController : Controller
 {
     private readonly UriResolver _uriResolver;
+    private readonly IFileService _fileService;
     private readonly StoreRepository _storeRepo;
     private readonly EmailService _emailService;
     private readonly LinkGenerator _linkGenerator;
@@ -50,6 +53,7 @@ public class UIGhostPublicController : Controller
     public UIGhostPublicController
         (EmailService emailService,
         UriResolver uriResolver,
+        IFileService fileService,
         StoreRepository storeRepo,
         LinkGenerator linkGenerator,
         IHttpClientFactory clientFactory,
@@ -62,6 +66,7 @@ public class UIGhostPublicController : Controller
         _context = context;
         _storeRepo = storeRepo;
         _uriResolver = uriResolver;
+        _fileService = fileService;
         _linkGenerator = linkGenerator;
         _clientFactory = clientFactory;
         _dbContextFactory = dbContextFactory;
@@ -118,14 +123,29 @@ public class UIGhostPublicController : Controller
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated() || ghostEvent == null)
             return NotFound();
 
+        if (ghostEvent.EventDate <= DateTime.UtcNow)
+            return NotFound();
+
         if (ghostEvent.HasMaximumCapacity)
         {
             var eventTickets = await ctx.GhostEventTickets.AsNoTracking().CountAsync(c => c.StoreId == storeId && c.EventId == eventId
-                    && c.PaymentStatus == GhostPlugin.Data.TransactionStatus.Success.ToString());
+                    && c.PaymentStatus == GhostPlugin.Data.TransactionStatus.Settled.ToString());
             if (eventTickets >= ghostEvent.MaximumEventCapacity)
                 return NotFound();
         }
-        return View(new CreateEventTicketViewModel { EventId = ghostEvent.Id, StoreId = ghostSetting.StoreId });
+        var storeData = await _storeRepo.FindStore(storeId);
+        var getFile = ghostEvent.EventImageUrl == null ? null : await _fileService.GetFileUrl(Request.GetAbsoluteRootUri(), ghostEvent.EventImageUrl);
+
+        return View(new CreateEventTicketViewModel { 
+            EventId = ghostEvent.Id, 
+            StoreId = ghostSetting.StoreId,
+            EventImageUrl = getFile == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile)),
+            EventDate = ghostEvent.EventDate,
+            Description = ghostEvent.Description,
+            EventTitle = ghostEvent.Title,
+            StoreName = storeData?.StoreName,
+            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, storeData?.GetStoreBlob()),
+        });
     }
 
     [HttpPost("event/{eventId}/register")]
@@ -140,23 +160,22 @@ public class UIGhostPublicController : Controller
         if (ghostEvent.HasMaximumCapacity)
         {
             var eventTickets = await ctx.GhostEventTickets.AsNoTracking().CountAsync(c => c.StoreId == storeId && c.EventId == eventId
-                    && c.PaymentStatus == GhostPlugin.Data.TransactionStatus.Success.ToString());
+                    && c.PaymentStatus == GhostPlugin.Data.TransactionStatus.Settled.ToString());
             if (eventTickets >= ghostEvent.MaximumEventCapacity)
                 return NotFound();
         }
 
         var existingTicket = await ctx.GhostEventTickets.SingleOrDefaultAsync(c => c.Email == vm.Email.Trim() && c.EventId == eventId && c.StoreId == storeId);
-        if (existingTicket?.PaymentStatus == GhostPlugin.Data.TransactionStatus.Success.ToString())
+        if (existingTicket?.PaymentStatus == GhostPlugin.Data.TransactionStatus.Settled.ToString())
         {
             ModelState.AddModelError(nameof(vm.Email),
-                $"A user with this email has already purchased a ticket. Contact admin at https://{ghostSetting.ApiUrl} for assistance.");
+                $"A user with this email has already purchased a ticket. Contact admin at https://{ghostSetting.ApiUrl} for assistance");
             return View(vm);
         }
 
         await using var dbMain = _context.CreateContext();
         var store = await dbMain.Stores.AsNoTracking().FirstOrDefaultAsync(a => a.Id == storeId);
         if (store == null) return NotFound();
-
 
         var uid = existingTicket?.Id ?? Guid.NewGuid().ToString();
         var invoice = await _ghostPluginService.CreateInvoiceAsync(store, $"{GhostApp.GHOST_PREFIX}{GhostApp.GHOST_TICKET_ID_PREFIX}", uid, ghostEvent.Amount, ghostEvent.Currency, Request.GetAbsoluteRoot());
@@ -168,14 +187,13 @@ public class UIGhostPublicController : Controller
         {
             ctx.GhostEventTickets.Add(new GhostEventTicket
             {
-                Id = uid,
                 StoreId = storeId,
                 EventId = eventId,
                 Name = vm.Name.Trim(),
                 Amount = ghostEvent.Amount,
                 Currency = ghostEvent.Currency,
                 Email = vm.Email.Trim(),
-                PaymentStatus = GhostPlugin.Data.TransactionStatus.Pending.ToString(),
+                PaymentStatus = GhostPlugin.Data.TransactionStatus.New.ToString(),
                 CreatedAt = DateTime.UtcNow,
                 InvoiceId = invoice.Id
             });
@@ -237,7 +255,6 @@ public class UIGhostPublicController : Controller
         var member = await apiClient.RetrieveMember(vm.Email);
         if (member.Any())
         {
-            ModelState.Clear();
             ModelState.AddModelError(nameof(vm.Email), "A member with this email already exist");
             return View(vm);
         }
@@ -293,7 +310,7 @@ public class UIGhostPublicController : Controller
 
         var storeData = await _storeRepo.FindStore(storeId);
         var latestTransaction = ctx.GhostTransactions
-            .AsNoTracking().Where(t => t.StoreId == storeId && t.TransactionStatus == GhostPlugin.Data.TransactionStatus.Success && t.MemberId == memberId)
+            .AsNoTracking().Where(t => t.StoreId == storeId && t.TransactionStatus == GhostPlugin.Data.TransactionStatus.Settled && t.MemberId == memberId)
             .OrderByDescending(t => t.PeriodEnd)
             .FirstOrDefault();
 
@@ -388,7 +405,7 @@ public class UIGhostPublicController : Controller
             InvoiceId = invoice?.Id,
             PaymentRequestId = paymentRequest?.Id,
             MemberId = member.Id,
-            TransactionStatus = GhostPlugin.Data.TransactionStatus.Pending,
+            TransactionStatus = GhostPlugin.Data.TransactionStatus.New,
             TierId = member.TierId,
             Frequency = member.Frequency,
             CreatedAt = DateTime.UtcNow,

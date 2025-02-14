@@ -24,8 +24,6 @@ using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Services;
 using System;
 using Newtonsoft.Json;
-using NBitcoin.DataEncoders;
-using NBitcoin;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -76,19 +74,39 @@ public class UIGhostEventController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+        Console.WriteLine(JsonConvert.SerializeObject(ghostSetting));
+        if (ghostSetting == null)
+            return NoGhostSetupResult(storeId);
+
         var events = ctx.GhostEvents.AsNoTracking().Where(c => c.StoreId == ghostSetting.StoreId).ToList();
+        var eventTickets = ctx.GhostEventTickets.AsNoTracking().Where(t => t.StoreId == ghostSetting.StoreId).ToList();
 
         var ghostEventsViewModel = events
            .Select(ghostEvent =>
            {
+               var tickets = eventTickets.Where(t => t.EventId == ghostEvent.Id).ToList();
                return new GhostEventsListViewModel
                {
                    Id = ghostEvent.Id,
                    Title = ghostEvent.Title,
+                   EventPurchaseLink = Url.Action("EventRegistration", "UIGhostPublic", new { storeId = CurrentStore.Id, eventId = ghostEvent.Id }, Request.Scheme),
                    Description = ghostEvent.Description,
                    EventDate = ghostEvent.EventDate,
                    CreatedAt = ghostEvent.CreatedAt,
-                   StoreId = CurrentStore.Id
+                   StoreId = CurrentStore.Id,
+                   Tickets = tickets.Select(t => new GhostEventTicketsViewModel
+                   {
+                       Id = t.Id,
+                       Name = t.Name,
+                       StoreId = CurrentStore.Id,
+                       EventId = ghostEvent.Id,
+                       Amount = t.Amount,
+                       Currency = t.Currency,
+                       Email = t.Email,
+                       InvoiceId = t.InvoiceId,
+                       PaymentStatus = t.PaymentStatus,
+                       PurchaseDate = t.PurchaseDate
+                   }).ToList()
                };
            }).ToList();
 
@@ -103,48 +121,86 @@ public class UIGhostEventController : Controller
                 Severity = StatusMessageModel.StatusSeverity.Info
             });
         }
-        Console.WriteLine(JsonConvert.SerializeObject(ghostEventsViewModel));
         return View(new GhostEventsViewModel { DisplayedEvents = ghostEventsViewModel });
     }
 
-
-    [HttpGet("{eventId}")]
-    public async Task<IActionResult> GetEvent(string storeId, string eventId)
+    [HttpGet("{eventId}/tickets")]
+    public async Task<IActionResult> ViewEventTicket(string storeId, string eventId, string searchText)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
-            return NotFound();
+        if (ghostSetting == null)
+            return NoGhostSetupResult(storeId);
 
-        var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == eventId);
+        var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == ghostSetting.StoreId);
         if (entity == null)
         {
-            TempData[WellKnownTempData.ErrorMessage] = "No Ghost event record found for this Store";
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid Event specified";
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
         }
-        var vm = helper.GhostEventToViewModel(entity);
-        vm.EventImageUrl = entity.EventImageUrl == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), entity.EventImageUrl);
-        vm.StoreDefaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, entity.Currency);
+
+        var query = ctx.GhostEventTickets.AsNoTracking().Where(c => c.EventId == eventId && c.StoreId == ghostSetting.StoreId);
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            searchText = searchText.Trim().ToLowerInvariant();
+            query = query.Where(t =>
+                t.Email.ToLower().Contains(searchText) ||
+                t.Name.ToLower().Contains(searchText) ||
+                t.InvoiceId.ToLower().Contains(searchText));
+        }
+        var tickets = query.ToList();
+
+        var vm = new EventTicketViewModel
+        {
+            StoreId = CurrentStore.Id,
+            EventId = eventId,
+            SearchText = searchText,
+            EventTitle = entity.Title,
+            Tickets = tickets.Select(t => new EventTicketVm
+            {
+                CreatedDate = t.CreatedAt,
+                Name = t.Name,
+                Amount = t.Amount,
+                Currency = t.Currency,
+                Email = t.Email,
+                TicketStatus = t.PaymentStatus,
+                InvoiceId = t.InvoiceId
+            }).ToList()
+        };
         return View(vm);
     }
 
 
-    [HttpGet("create-event")]
-    public async Task<IActionResult> CreateEvent(string storeId)
+    [HttpGet("view-event")]
+    public async Task<IActionResult> ViewEvent(string storeId, string eventId)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
-            return NotFound();
+        if (ghostSetting == null)
+            return NoGhostSetupResult(storeId);
 
         var defaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, string.Empty);
-        return View(new UpdateGhostEventViewModel { StoreId = CurrentStore.Id, StoreDefaultCurrency = defaultCurrency });
+        var vm = new UpdateGhostEventViewModel { StoreId = CurrentStore.Id, StoreDefaultCurrency = defaultCurrency };
+        if (!string.IsNullOrEmpty(eventId))
+        {
+            var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == ghostSetting.StoreId);
+            if (entity == null)
+            {
+                TempData[WellKnownTempData.ErrorMessage] = "Invalid Ghost event record specified for this store";
+                return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+            }
+            vm = helper.GhostEventToViewModel(entity);
+            var getFile = entity.EventImageUrl == null ? null : await _fileService.GetFileUrl(Request.GetAbsoluteRootUri(), entity.EventImageUrl);
+            vm.EventImageUrl = getFile == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile));
+            vm.StoreDefaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, entity.Currency);
+        }
+        return View(vm);
     }
 
 
@@ -156,9 +212,19 @@ public class UIGhostEventController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
-            return NotFound();
+        if (ghostSetting == null)
+            return NoGhostSetupResult(storeId);
 
+        if (vm.HasMaximumCapacity && (!vm.MaximumEventCapacity.HasValue || vm.MaximumEventCapacity.Value <= 0))
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Kindly input the event capacity";
+            return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
+        }
+        if (vm.EventDate <= DateTime.UtcNow)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Event date cannot be in the past";
+            return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
+        }
         var entity = helper.GhostEventViewModelToEntity(vm);
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
@@ -166,18 +232,15 @@ public class UIGhostEventController : Controller
             imageUpload = await _fileService.UploadImage(vm.EventImageFile, ghostSetting.ApplicationUserId);
             if (!imageUpload.Success)
             {
-                ModelState.AddModelError(nameof(vm.EventImageFile), imageUpload.Response);
+                TempData[WellKnownTempData.ErrorMessage] = imageUpload.Response;
+                return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
             }
             else
             {
-                entity.EventImageUrl = new UnresolvedUri.FileIdUri(imageUpload.StoredFile.Id);
+                entity.EventImageUrl = imageUpload.StoredFile.Id;
             }
         }
-        if (!ModelState.IsValid)
-        {
-            return View(vm);
-        }
-        entity.Id = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
+        vm.EventImageFile = null;
         entity.Currency = await GetStoreDefaultCurrentIfEmpty(storeId, vm.Currency);
         entity.StoreId = CurrentStore.Id;
         ctx.GhostEvents.Update(entity);
@@ -195,8 +258,8 @@ public class UIGhostEventController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
-            return NotFound();
+        if (ghostSetting == null)
+            return NoGhostSetupResult(storeId);
 
         var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == ghostSetting.StoreId);
         if (entity == null)
@@ -205,22 +268,20 @@ public class UIGhostEventController : Controller
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
         }
         entity = helper.GhostEventViewModelToEntity(vm);
+        entity.Id = eventId;
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
         {
             imageUpload = await _fileService.UploadImage(vm.EventImageFile, ghostSetting.ApplicationUserId);
             if (!imageUpload.Success)
             {
-                ModelState.AddModelError(nameof(vm.EventImageFile), imageUpload.Response);
+                TempData[WellKnownTempData.ErrorMessage] = imageUpload.Response;
+                return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id, eventId });
             }
-        }
-        if (!ModelState.IsValid)
-        {
-            return View(vm);
         }
         if (imageUpload?.Success is true)
         {
-            entity.EventImageUrl = new UnresolvedUri.FileIdUri(imageUpload.StoredFile.Id);
+            entity.EventImageUrl = imageUpload.StoredFile.Id;
         }
         else if (RemoveEventLogoFile)
         {
@@ -234,18 +295,84 @@ public class UIGhostEventController : Controller
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
     }
 
+
+    [HttpGet("delete-event/{eventId}")]
+    public async Task<IActionResult> DeleteEvent(string storeId, string eventId)
+    {
+        if (CurrentStore is null)
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ghostSettingExists = await ctx.GhostSettings.AnyAsync(c => c.StoreId == CurrentStore.Id);
+        if (!ghostSettingExists)
+            return NoGhostSetupResult(storeId);
+
+        var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        if (entity == null)
+            return NotFound();
+
+        var tickets = ctx.GhostEventTickets.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id && c.EventId == eventId).ToList();
+        if (tickets.Any() && entity.EventDate > DateTime.UtcNow)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Cannot delete event as there are active tickets purchase and the event is in the future";
+            return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+        }
+        return View("Confirm", new ConfirmModel($"Delete Event", $"All tickets associated with this Event: {entity.Title} would also be deleted. Are you sure?", "Delete Event"));
+    }
+
+
+    [HttpPost("delete-event/{eventId}")]
+    public async Task<IActionResult> DeleteEventPost(string storeId, string eventId)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ghostSettingExists = await ctx.GhostSettings.AnyAsync(c => c.StoreId == CurrentStore.Id);
+        if (!ghostSettingExists)
+            return NoGhostSetupResult(storeId);
+
+        var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        if (entity == null)
+            return NotFound();
+
+        var tickets = ctx.GhostEventTickets.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id && c.EventId == eventId).ToList();
+        if (tickets.Any())
+        {
+            if (entity.EventDate > DateTime.UtcNow)
+            {
+                TempData[WellKnownTempData.ErrorMessage] = "Cannot delete event as there are active tickets purchase and the event is in the future";
+                return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+            }
+            else
+            {
+                ctx.GhostEventTickets.RemoveRange(tickets);
+            }
+        }
+        ctx.GhostEvents.Remove(entity);
+        await ctx.SaveChangesAsync();
+        TempData[WellKnownTempData.SuccessMessage] = "Event deleted successfully";
+        return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+    }
+
     private async Task<string> GetStoreDefaultCurrentIfEmpty(string storeId, string currency)
     {
         if (string.IsNullOrWhiteSpace(currency))
         {
             var store = await _storeRepo.FindStore(storeId);
-            if (store == null)
-            {
-                throw new Exception($"Could not find store with id {storeId}");
-            }
             currency = store.GetStoreBlob().DefaultCurrency;
         }
         return currency.Trim().ToUpperInvariant();
     }
 
+    public IActionResult NoGhostSetupResult(string storeId)
+    {
+        TempData.SetStatusMessageModel(new StatusMessageModel
+        {
+            Severity = StatusMessageModel.StatusSeverity.Error,
+            Html = $"To manage ghost events, you need to set up Ghost credentials first",
+            AllowDismiss = false
+        });
+        return RedirectToAction(nameof(UIGhostController.Index), "UIGhost", new { storeId });
+    }
 }
