@@ -18,14 +18,9 @@
            class="btn btn-success @(storeEmailSettingsConfigured ? "" : "disabled")" role="button">
             Create Event
         </a> *@
-
         <a id="create-event" asp-action="CreateEvent" asp-controller="UIGhostEvent" asp-route-storeId="@storeId"
            class="btn btn-success" role="button">
             Create Event
-        </a>
-
-        <a id="page-primary" asp-action="Index" asp-controller="UIGhost" asp-route-storeId="@storeId" class="btn btn-primary" role="button">
-            View Credentials
         </a>
     </div>
 </div>
@@ -47,16 +42,17 @@
                 </tr>
             </thead>
             <tbody id="UsersList">
-                @foreach (var member in Model.DisplayedEvents)
+                @foreach (var ghostEvent in Model.DisplayedEvents)
                 {
-                    <tr id="user_@member.Id" class="user-overview-row mass-action-row">
-                        <td>@member.Title</td>
-                        <td>@member.Description</td>
-                        <td>@member.EventDate.ToString("M/d/yy, hh:mm tt")</td>
+                    <tr id="user_@ghostEvent.Id" class="user-overview-row mass-action-row">
+                        <td>@ghostEvent.Title</td>
+                        <td>@ghostEvent.Description</td>
+                        <td>@ghostEvent.EventDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td>100</td>
                         <td class="actions-col">
                             <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="SendReminder" asp-route-storeId="@member.StoreId" asp-route-memberId="@member.Id">Send Reminder</a>
+                                <a asp-action="SendReminder" asp-route-storeId="@storeId" asp-route-memberId="@ghostEvent.Id">View Tickets</a>
+                                <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ghostEvent.Id">Edit</a>
                             </div>
                         </td>
                     </tr>

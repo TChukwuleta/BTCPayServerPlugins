@@ -2,6 +2,8 @@
 {
     public enum PluginNavPages
     {
-        Index
+        Index,
+        GhostMember,
+        GhostEvent
     }
 }

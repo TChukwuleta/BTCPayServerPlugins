@@ -237,7 +237,6 @@ public class UIGhostPublicController : Controller
         var member = await apiClient.RetrieveMember(vm.Email);
         if (member.Any())
         {
-            ModelState.Clear();
             ModelState.AddModelError(nameof(vm.Email), "A member with this email already exist");
             return View(vm);
         }

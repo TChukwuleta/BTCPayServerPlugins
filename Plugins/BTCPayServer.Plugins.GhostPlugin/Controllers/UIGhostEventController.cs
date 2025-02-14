@@ -24,8 +24,6 @@ using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Services;
 using System;
 using Newtonsoft.Json;
-using NBitcoin.DataEncoders;
-using NBitcoin;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -76,6 +74,9 @@ public class UIGhostEventController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+        if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
+            NoGhostSetupResult(storeId);
+
         var events = ctx.GhostEvents.AsNoTracking().Where(c => c.StoreId == ghostSetting.StoreId).ToList();
 
         var ghostEventsViewModel = events
@@ -103,37 +104,12 @@ public class UIGhostEventController : Controller
                 Severity = StatusMessageModel.StatusSeverity.Info
             });
         }
-        Console.WriteLine(JsonConvert.SerializeObject(ghostEventsViewModel));
         return View(new GhostEventsViewModel { DisplayedEvents = ghostEventsViewModel });
     }
 
 
-    [HttpGet("{eventId}")]
-    public async Task<IActionResult> GetEvent(string storeId, string eventId)
-    {
-        if (string.IsNullOrEmpty(CurrentStore.Id))
-            return NotFound();
-
-        await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
-            return NotFound();
-
-        var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == eventId);
-        if (entity == null)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "No Ghost event record found for this Store";
-            return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
-        }
-        var vm = helper.GhostEventToViewModel(entity);
-        vm.EventImageUrl = entity.EventImageUrl == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), entity.EventImageUrl);
-        vm.StoreDefaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, entity.Currency);
-        return View(vm);
-    }
-
-
-    [HttpGet("create-event")]
-    public async Task<IActionResult> CreateEvent(string storeId)
+    [HttpGet("view-event")]
+    public async Task<IActionResult> ViewEvent(string storeId, string eventId)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
@@ -144,7 +120,20 @@ public class UIGhostEventController : Controller
             return NotFound();
 
         var defaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, string.Empty);
-        return View(new UpdateGhostEventViewModel { StoreId = CurrentStore.Id, StoreDefaultCurrency = defaultCurrency });
+        var vm = new UpdateGhostEventViewModel { StoreId = CurrentStore.Id, StoreDefaultCurrency = defaultCurrency };
+        if (!string.IsNullOrEmpty(eventId))
+        {
+            var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == ghostSetting.StoreId);
+            if (entity == null)
+            {
+                TempData[WellKnownTempData.ErrorMessage] = "Invalid Ghost event record specified for this store";
+                return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+            }
+            vm = helper.GhostEventToViewModel(entity);
+            vm.EventImageUrl = entity.EventImageUrl == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), entity.EventImageUrl);
+            vm.StoreDefaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, entity.Currency);
+        }
+        return View(vm);
     }
 
 
@@ -159,6 +148,14 @@ public class UIGhostEventController : Controller
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
+        if (vm.HasMaximumCapacity && (!vm.MaximumEventCapacity.HasValue || vm.MaximumEventCapacity.Value <= 0))
+        {
+            ModelState.AddModelError(nameof(vm.MaximumEventCapacity), "Kindly input the event capacity");
+        }
+        if (vm.EventDate <= DateTime.UtcNow)
+        {
+            ModelState.AddModelError(nameof(vm.EventDate), "Event date cannot be in the past");
+        }
         var entity = helper.GhostEventViewModelToEntity(vm);
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
@@ -173,13 +170,14 @@ public class UIGhostEventController : Controller
                 entity.EventImageUrl = new UnresolvedUri.FileIdUri(imageUpload.StoredFile.Id);
             }
         }
+        vm.EventImageFile = null;
         if (!ModelState.IsValid)
         {
             return View(vm);
         }
-        entity.Id = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
         entity.Currency = await GetStoreDefaultCurrentIfEmpty(storeId, vm.Currency);
         entity.StoreId = CurrentStore.Id;
+        Console.WriteLine(JsonConvert.SerializeObject(entity));
         ctx.GhostEvents.Update(entity);
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Event created successfully";
@@ -248,4 +246,14 @@ public class UIGhostEventController : Controller
         return currency.Trim().ToUpperInvariant();
     }
 
+    public IActionResult NoGhostSetupResult(string storeId)
+    {
+        TempData.SetStatusMessageModel(new StatusMessageModel
+        {
+            Severity = StatusMessageModel.StatusSeverity.Error,
+            Html = $"To manage ghost events, you need to set up Ghost credentials first",
+            AllowDismiss = false
+        });
+        return RedirectToAction(nameof(UIGhostController.Index), "UIGhost", new { storeId });
+    }
 }
