@@ -6,7 +6,6 @@ fees and thrid party?
 Introducing BTCPay Server for Ghost – a plugin that allows you accept bitcoin payments directly on your blog from customers with no fee.
 
 Monetizing your content should be simple, and free from third-party fees. Our integration with Ghost allows you connect your self-hosted BTCPay Server with your 
-
 [Ghost blog](https://ghost.org/), enabling you accept Bitcoin payments swiftly and securely.
 
 With this plugin, you're not just adding a payment gateway;  you're embracing a transparent, and secure way to monetize your content which also keeps you in full control of your funds.
