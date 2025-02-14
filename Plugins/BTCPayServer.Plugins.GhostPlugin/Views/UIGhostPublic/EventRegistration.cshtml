@@ -1,0 +1,40 @@
+@using BTCPayServer.Plugins.GhostPlugin.ViewModels
+@model CreateEventTicketViewModel
+@{
+    Layout = "_GhostPublicLayout";
+    ViewBag.Title = "Register for Event";
+}
+
+<div class="container mt-5">
+    <div class="text-center mb-5">
+        <h1 class="mb-4">@Model.EventTitle</h1>
+
+        <div class="d-inline-block">
+            <span class="badge bg-info px-4 py-2 fs-6">@Model.EventDate.ToString("M/d/yy, hh:mm tt")</span>
+        </div>
+        <div class="text-muted mt-2">@Model.Description</div>
+    </div>
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <form method="POST">
+                <div class="mb-3">
+                    <label asp-for="Name" class="form-label">Full Name</label>
+                    <input asp-for="Name" type="text" class="form-control" required>
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Email" class="form-label">Email address</label>
+                    <input asp-for="Email" type="email" class="form-control" required>
+                    <span asp-validation-for="Email" class="text-danger"></span>
+                </div>
+
+                <div class="text-center mt-4">
+                    <button type="submit" class="btn btn-success btn-md px-5">
+                        Contribute
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -7,7 +7,7 @@
 @inject IScopeProvider ScopeProvider
 @model UpdateGhostEventViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Ghost Events");
+    ViewData.SetActivePage(PluginNavPages.GhostEvent, "Ghost Events");
     var canUpload = await FileService.IsAvailable();
     var storeId = ScopeProvider.GetCurrentStoreId();
     bool isEditMode = !string.IsNullOrEmpty(Model.EventId);
@@ -121,8 +121,8 @@
     <div class="row mt-3">
         <div class="col-xl-10 col-xxl-constrain">
             <div class="form-group">
-                <label asp-for="Description" class="form-label"></label>
-                <textarea asp-for="Description" rows="15" cols="30" class="form-control richtext"></textarea>
+                <label asp-for="Description" class="form-label" data-required></label>
+                <textarea asp-for="Description" rows="15" cols="30" class="form-control richtext" required></textarea>
                 <span asp-validation-for="Description" class="text-danger"></span>
             </div>
         </div>

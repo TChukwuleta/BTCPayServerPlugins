@@ -5,7 +5,7 @@
 @inject IScopeProvider ScopeProvider
 @model GhostMembersViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Ghost Members");
+    ViewData.SetActivePage(PluginNavPages.GhostMember, "Ghost Members");
     var storeEmailSettingsConfigured = (bool)ViewData["StoreEmailSettingsConfigured"];
     var storeId = ScopeProvider.GetCurrentStoreId();
 }

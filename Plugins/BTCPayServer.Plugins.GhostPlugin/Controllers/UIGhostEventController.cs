@@ -78,10 +78,12 @@ public class UIGhostEventController : Controller
             NoGhostSetupResult(storeId);
 
         var events = ctx.GhostEvents.AsNoTracking().Where(c => c.StoreId == ghostSetting.StoreId).ToList();
+        var eventTickets = ctx.GhostEventTickets.AsNoTracking().Where(t => t.StoreId == ghostSetting.StoreId).ToList();
 
         var ghostEventsViewModel = events
            .Select(ghostEvent =>
            {
+               var tickets = eventTickets.Where(t => t.EventId == ghostEvent.Id).ToList();
                return new GhostEventsListViewModel
                {
                    Id = ghostEvent.Id,
@@ -89,7 +91,20 @@ public class UIGhostEventController : Controller
                    Description = ghostEvent.Description,
                    EventDate = ghostEvent.EventDate,
                    CreatedAt = ghostEvent.CreatedAt,
-                   StoreId = CurrentStore.Id
+                   StoreId = CurrentStore.Id,
+                   Tickets = tickets.Select(t => new GhostEventTicketsViewModel
+                   {
+                       Id = t.Id,
+                       Name = t.Name,
+                       StoreId = CurrentStore.Id,
+                       EventId = ghostEvent.Id,
+                       Amount = t.Amount,
+                       Currency = t.Currency,
+                       Email = t.Email,
+                       InvoiceId = t.InvoiceId,
+                       PaymentStatus = t.PaymentStatus,
+                       PurchaseDate = t.PurchaseDate
+                   }).ToList()
                };
            }).ToList();
 
@@ -107,6 +122,42 @@ public class UIGhostEventController : Controller
         return View(new GhostEventsViewModel { DisplayedEvents = ghostEventsViewModel });
     }
 
+    [HttpGet("{eventId}/tickets")]
+    public async Task<IActionResult> ViewEventTicket(string storeId, string eventId)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+        if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
+            NoGhostSetupResult(storeId);
+
+        var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == ghostSetting.StoreId);
+        if (entity == null)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid Event specified";
+            return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+        }
+        var tickets = ctx.GhostEventTickets.AsNoTracking().Where(c => c.EventId == eventId && c.StoreId == ghostSetting.StoreId).ToList();
+        var vm = new EventTicketViewModel
+        {
+            StoreId = CurrentStore.Id,
+            EventId = eventId,
+            EventTitle = entity.Title,
+            Tickets = tickets.Select(t => new EventTicketVm
+            {
+                CreatedDate = t.CreatedAt,
+                Name = t.Name,
+                Amount = t.Amount,
+                Currency = t.Currency,
+                Email = t.Email,
+                InvoiceId = t.InvoiceId
+            }).ToList()
+        };
+        return View(vm);
+    }
+
 
     [HttpGet("view-event")]
     public async Task<IActionResult> ViewEvent(string storeId, string eventId)
@@ -117,7 +168,7 @@ public class UIGhostEventController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
-            return NotFound();
+            NoGhostSetupResult(storeId);
 
         var defaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, string.Empty);
         var vm = new UpdateGhostEventViewModel { StoreId = CurrentStore.Id, StoreDefaultCurrency = defaultCurrency };
@@ -146,7 +197,7 @@ public class UIGhostEventController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
-            return NotFound();
+            NoGhostSetupResult(storeId);
 
         if (vm.HasMaximumCapacity && (!vm.MaximumEventCapacity.HasValue || vm.MaximumEventCapacity.Value <= 0))
         {
@@ -194,7 +245,7 @@ public class UIGhostEventController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
-            return NotFound();
+            NoGhostSetupResult(storeId);
 
         var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == ghostSetting.StoreId);
         if (entity == null)
@@ -237,10 +288,6 @@ public class UIGhostEventController : Controller
         if (string.IsNullOrWhiteSpace(currency))
         {
             var store = await _storeRepo.FindStore(storeId);
-            if (store == null)
-            {
-                throw new Exception($"Could not find store with id {storeId}");
-            }
             currency = store.GetStoreBlob().DefaultCurrency;
         }
         return currency.Trim().ToUpperInvariant();

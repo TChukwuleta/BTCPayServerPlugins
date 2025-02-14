@@ -118,6 +118,9 @@ public class UIGhostPublicController : Controller
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated() || ghostEvent == null)
             return NotFound();
 
+        if (ghostEvent.EventDate <= DateTime.UtcNow)
+            return NotFound();
+
         if (ghostEvent.HasMaximumCapacity)
         {
             var eventTickets = await ctx.GhostEventTickets.AsNoTracking().CountAsync(c => c.StoreId == storeId && c.EventId == eventId
@@ -125,7 +128,16 @@ public class UIGhostPublicController : Controller
             if (eventTickets >= ghostEvent.MaximumEventCapacity)
                 return NotFound();
         }
-        return View(new CreateEventTicketViewModel { EventId = ghostEvent.Id, StoreId = ghostSetting.StoreId });
+        var storeData = await _storeRepo.FindStore(storeId);
+        return View(new CreateEventTicketViewModel { 
+            EventId = ghostEvent.Id, 
+            StoreId = ghostSetting.StoreId,
+            EventDate = ghostEvent.EventDate,
+            Description = ghostEvent.Description,
+            EventTitle = ghostEvent.Title,
+            StoreName = storeData?.StoreName,
+            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, storeData?.GetStoreBlob()),
+        });
     }
 
     [HttpPost("event/{eventId}/register")]
@@ -149,14 +161,13 @@ public class UIGhostPublicController : Controller
         if (existingTicket?.PaymentStatus == GhostPlugin.Data.TransactionStatus.Success.ToString())
         {
             ModelState.AddModelError(nameof(vm.Email),
-                $"A user with this email has already purchased a ticket. Contact admin at https://{ghostSetting.ApiUrl} for assistance.");
+                $"A user with this email has already purchased a ticket. Contact admin at https://{ghostSetting.ApiUrl} for assistance");
             return View(vm);
         }
 
         await using var dbMain = _context.CreateContext();
         var store = await dbMain.Stores.AsNoTracking().FirstOrDefaultAsync(a => a.Id == storeId);
         if (store == null) return NotFound();
-
 
         var uid = existingTicket?.Id ?? Guid.NewGuid().ToString();
         var invoice = await _ghostPluginService.CreateInvoiceAsync(store, $"{GhostApp.GHOST_PREFIX}{GhostApp.GHOST_TICKET_ID_PREFIX}", uid, ghostEvent.Amount, ghostEvent.Currency, Request.GetAbsoluteRoot());
@@ -168,7 +179,6 @@ public class UIGhostPublicController : Controller
         {
             ctx.GhostEventTickets.Add(new GhostEventTicket
             {
-                Id = uid,
                 StoreId = storeId,
                 EventId = eventId,
                 Name = vm.Name.Trim(),

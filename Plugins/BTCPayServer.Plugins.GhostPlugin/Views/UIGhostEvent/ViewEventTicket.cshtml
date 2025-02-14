@@ -1,0 +1,70 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Plugins.GhostPlugin.Data
+@using BTCPayServer.Plugins.GhostPlugin.ViewModels
+@using System.Globalization
+@using BTCPayServer.Services
+@inject DisplayFormatter DisplayFormatter
+@inject IFileService FileService
+@inject IScopeProvider ScopeProvider
+@model EventTicketViewModel
+@{
+    ViewData.SetActivePage(PluginNavPages.GhostEvent, $"Ghost Event Tickets: {Model.EventTitle}");
+    var canUpload = await FileService.IsAvailable();
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+
+<div class="sticky-header">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <a asp-action="List" asp-route-storeId="@storeId" class="btn btn-success">Go Back</a>
+    </div>
+</div>
+
+<partial name="_StatusMessage" />
+
+@if (Model.Tickets.Any())
+{
+    <div class="table-responsive">
+        <table id="invoices" class="table table-hover mass-action">
+            <thead class="mass-action-head">
+                <tr>
+                    <th class="date-col">
+                        <div class="d-flex align-items-center gap-1">
+                            Date
+                        </div>
+                    </th>
+                    <th class="text-nowrap">Invoice Id</th>
+                    <th class="text-nowrap">Name</th>
+                    <th class="text-nowrap">Email</th>
+                    <th>Status</th>
+                    <th class="amount-col">Amount</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var ticket in Model.Tickets)
+                {
+                    <tr id="invoice_@ticket.InvoiceId">
+                        <td class="align-middle date-col">@ticket.CreatedDate.ToBrowserDate()</td>
+                        <td class="text-break align-middle invoiceId-col">
+                            <a asp-action="Invoice" asp-controller="UIInvoice" class="invoice-details-link" asp-route-invoiceId="@ticket.InvoiceId">@ticket.InvoiceId</a>
+                        </td>
+                        <td class="align-middle">@ticket.Name</td>
+                        <td class="align-middle">@ticket.Email</td>
+                        <td class="align-middle">@ticket.TicketStatus</td>
+                        <td class="text-end amount-col">
+                            <span data-sensitive>@DisplayFormatter.Currency(ticket.Amount, ticket.Currency)</span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <p class="text-secondary mt-3">
+        No tickets found for this event.
+    </p>
+}

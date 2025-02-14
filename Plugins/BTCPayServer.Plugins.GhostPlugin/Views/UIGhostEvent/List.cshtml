@@ -5,7 +5,7 @@
 @inject IScopeProvider ScopeProvider
 @model GhostEventsViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Ghost Events");
+    ViewData.SetActivePage(PluginNavPages.GhostEvent, "Ghost Events");
     var storeEmailSettingsConfigured = (bool)ViewData["StoreEmailSettingsConfigured"];
     var storeId = ScopeProvider.GetCurrentStoreId();
 }
@@ -14,11 +14,11 @@
 <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
-        @* <a id="create-event" asp-action="CreateEvent" asp-controller="UIGhostEvent" asp-route-storeId="@storeId"
+        @* <a id="create-event" asp-action="ViewEvent" asp-route-storeId="@storeId"
            class="btn btn-success @(storeEmailSettingsConfigured ? "" : "disabled")" role="button">
             Create Event
         </a> *@
-        <a id="create-event" asp-action="CreateEvent" asp-controller="UIGhostEvent" asp-route-storeId="@storeId"
+        <a id="create-event" asp-action="ViewEvent" asp-route-storeId="@storeId"
            class="btn btn-success" role="button">
             Create Event
         </a>
@@ -34,7 +34,7 @@
             <thead>
                 <tr>
                     <th>Title</th>
-                    <th>Desc </th>
+                    <th>Description</th>
                     <th>Event Date</th>
                     <th>Tickets Sold</th>
                     <th class="actions-col"></th>
@@ -46,12 +46,19 @@
                 {
                     <tr id="user_@ghostEvent.Id" class="user-overview-row mass-action-row">
                         <td>@ghostEvent.Title</td>
-                        <td>@ghostEvent.Description</td>
+                        <td>@(!string.IsNullOrEmpty(ghostEvent.Description) && ghostEvent.Description.Length > 15 ? ghostEvent.Description.Substring(0, 15) + "..." : ghostEvent.Description)</td>
                         <td>@ghostEvent.EventDate.ToString("M/d/yy, hh:mm tt")</td>
-                        <td>100</td>
+                        <td>@ghostEvent.Tickets.Count</td>
                         <td class="actions-col">
+                            @if (ghostEvent.Tickets != null && ghostEvent.Tickets.Any())
+                            {
+                                <div class="d-inline-flex align-items-center gap-3">
+                                    <a asp-action="ViewEventTicket" asp-route-storeId="@storeId" asp-route-eventId="@ghostEvent.Id">View Tickets</a>
+                                </div>
+                            }
+                        </td>
+                        <td class="text-end">
                             <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="SendReminder" asp-route-storeId="@storeId" asp-route-memberId="@ghostEvent.Id">View Tickets</a>
                                 <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ghostEvent.Id">Edit</a>
                             </div>
                         </td>
