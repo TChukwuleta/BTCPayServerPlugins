@@ -9,12 +9,15 @@ Our integration with Ghost allows you connect your self-hosted BTCPay Server wit
 
 With this plugin, you're not just adding a payment gateway;  you're embracing a transparent, and secure way to monetize your content which keeps you in full control of your funds.
 
-Whether you’re receiving donations, selling tiered memberships, or offering event tickets, this integration ensures seamless Bitcoin transactions without third-party fees.  Here's how it works:
+Whether you’re receiving donations, selling tiered memberships, or offering event tickets, this integration ensures seamless Bitcoin transactions without third-party fees.
 
 
 🔹 Seamless Integration – Connect your Ghost blog to BTCPay Server in just a few clicks.
+
 🔹 Zero Fees, Full Control – No third-party processing, just direct Bitcoin payments to your wallet.
+
 🔹 Perfect for Creators – Monetize your blog with Bitcoin-based memberships and content access.
+
 🔹 Event Ticketing Made Easy – Sell tickets for your events, with instant Bitcoin payments.
 
 💡 Ready to power your blog with Bitcoin? Set up your BTCPay Server and start accepting payments
