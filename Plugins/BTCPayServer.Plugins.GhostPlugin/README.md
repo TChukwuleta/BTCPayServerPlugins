@@ -7,7 +7,7 @@ Introducing BTCPay Server for Ghost – a plugin that allows you accept bitcoin 
 
 Our integration with Ghost allows you connect your self-hosted BTCPay Server with your [Ghost blog](https://ghost.org/), enabling you accept Bitcoin payments swiftly and securely.
 
-With this plugin, you're not just adding a payment gateway;  you're embracing a transparent, and secure way to monetize your content which keeps you in full control of your funds.
+With this plugin, you're not just adding a payment gateway;  you're embracing a transparent, and secure way to monetize your content which also keeps you in full control of your funds.
 
 Whether you’re receiving donations, selling tiered memberships, or offering event tickets, this integration ensures seamless Bitcoin transactions without third-party fees.
 
@@ -44,8 +44,11 @@ Before diving into the setup process, ensure you have the following:
 5. Navigate to Settings > Integrations. Click "Add custom integration" and name it e.g "BTCPay Server"
 6. Save the integration, another screen would pop out showing the required Ghost credentials needed by the plugin.
 1. You can go ahead and give your integration a description, but if you are fine with it, you can save and close the pop up.
+
 ![BTCPay Server Ghost img 1](./img/Ghost/Add_Custom_Integration_View.png)
+
 ![BTCPay Server Ghost img 2](./img/Ghost/Custom_Integration_Name.png)   
+
 ![BTCPay Server Ghost img 3](./img/Ghost/Custom_Integration_Credentials.png)
 
 
