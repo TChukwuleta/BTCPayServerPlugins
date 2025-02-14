@@ -5,7 +5,9 @@ fees and thrid party?
 
 Introducing BTCPay Server for Ghost – a plugin that allows you accept bitcoin payments directly on your blog from customers with no fee.
 
-Our integration with Ghost allows you connect your self-hosted BTCPay Server with your [Ghost blog](https://ghost.org/), enabling you accept Bitcoin payments swiftly and securely.
+Monetizing your content should be simple, and free from third-party fees. Our integration with Ghost allows you connect your self-hosted BTCPay Server with your 
+
+[Ghost blog](https://ghost.org/), enabling you accept Bitcoin payments swiftly and securely.
 
 With this plugin, you're not just adding a payment gateway;  you're embracing a transparent, and secure way to monetize your content which also keeps you in full control of your funds.
 
@@ -61,15 +63,21 @@ Before diving into the setup process, ensure you have the following:
 
 ![BTCPay Server Ghost img 1](./img/Ghost/Add_Custom_Integration_View.png)
 
+
 ![BTCPay Server Ghost img 2](./img/Ghost/Custom_Integration_Name.png)   
+
 
 ![BTCPay Server Ghost img 3](./img/Ghost/Custom_Integration_Credentials.png)
 
+
 ![BTCPay Server Ghost img 4](./img/Ghost/Ghost_BTCPay_Credential_View.png)
+
 
 ![BTCPay Server Ghost img 5](./img/Ghost/Ghost_BTCPay_Credential_Saved_1.png)   
 
+
 ![BTCPay Server Ghost img 6](./img/Ghost/Ghost_BTCPay_Credential_Saved_2.png)
+
 
 
 If you got here without any hassle, congratulations on successfully installing the plugin. 
@@ -96,40 +104,41 @@ Each use case comes with an easy setup guide to help you get started quickly. Le
 
 ### Receiving Donations on Ghost through BTCPay Server
 
-Together with the ability to  fiat donations on your Ghost website, with BTCPay Server, you can now also receive donations in Bitcoin.
-Follow the guide to get started.
+With BTCPay Server, you can accept Bitcoin donations directly on your Ghost blog — no intermediaries, no processing fees, just a seamless way for your audience to support your work.
 
-### Steps on how to receive donations on Ghost via BTCPay Server.
-1. Go to the editor of your donation page. (You can create a new page for Donation on your admin panel if you do not have one.), Add a button, with a Title of your choice e.g Donate Bitcoin. 
-1. In Shopify, click on `Apps >` in the left sidebar   
-![BTCPay Server shopify step 1](./img/Shopify/step_1.png)
-2. On the modal popped up, click on `App and sales channel settings`   
-![BTCPay Server shopify step 2](./img/Shopify/step_2.png)
-3. From the page displayed, click on `Develop apps` button   
-![BTCPay Server shopify step 3](./img/Shopify/step_3.png)
-4. If prompted, click on `Allow custom app development`   
-![BTCPay Server shopify step 4](./img/Shopify/step_4.png) 
-5. `Create an app` and name it, e.g. BTCPay Server, click on `Create App`      
-![BTCPay Server shopify step 5](./img/Shopify/step_5.png)
-![BTCPay Server shopify step 6](./img/Shopify/step_6.png)
-6. On the app page, in `Overview` tab, click on the `Configure Admin API scopes`   
-![BTCPay Server shopify step 7](./img/Shopify/step_7.png)
-7. In the filter admin access scopes type in `Orders`
-8. In `Orders` enable `read_orders` and `write_orders` and then click `Save`     
-![BTCPay Server shopify step 8](./img/Shopify/step_8.png)   
-9. Click on the "API credentials" tab, and then click on the `Install App` in the top right corner and when pop-up window appears click `Install`   
-![BTCPay Server shopify step 9-1](./img/Shopify/step_9-1.png)   
-![BTCPay Server shopify step 9-2](./img/Shopify/step_9-2.png)   
-10. Reveal `Admin API access token` and `copy` it (and note it down somewhere safe)   
-11. Also copy the `API key` and `API Secret` and note it down somewhere safe     
-![BTCPay Server shopify step 10 and 11](./img/Shopify/step_10_and_11.png)   
-12. Shopify app setup is now complete
-	1. 
-	1.
+Whether you're a blogger, journalist, or content creator, adding a Bitcoin donation option gives your supporters an easy way to contribute, while ensuring you maintain full control over your funds.
 
 
+#### Steps on how to receive donations on Ghost via BTCPay Server.
 
-	1. 
+1. Go to your BTCPay Server Ghost plugin, scroll down the page, you'd see donation URL, copy the URL.
+
+2. Open your ghost admin page where you want to receive donations. You may be open to receiving donations on every content page of your Ghost blog, or on a single page dedicated to donations. Which ever you choose, 
+   accepting donations is pretty straightforward. Go to the editor of your donation page (Or any page). Add a new button with a title of your choice e.g Buy me a coffee in Bitcoin, for the Bitcoin URL, paste the
+   Donation URL you copied, and paste it there. Save and publish your page
+
+3. When you go to the URL of the page, you should see the button now, click on the button, and a QR code would be displayed on the screen. Users can then scan this QR and support 
+   you with any amount they want to. 
+   
+4. If you check your BTCPay Server invoice, you should see your new donation, received in your wallet. Voila!!!
+
+
+![BTCPay Server Ghost img 7](./img/Ghost/Donation_Url.png)
+
+
+![BTCPay Server Ghost img 8](./img/Ghost/Ghost_Donation_Page.png)
+
+
+![BTCPay Server Ghost img 9](./img/Ghost/Donation_Page.png)
+
+
+![BTCPay Server Ghost img 10](./img/Ghost/Donation_Invoice.png)
+
+
+![BTCPay Server Ghost img 11](./img/Ghost/Paid_Donation.png)
+
+
+
 
 
 
