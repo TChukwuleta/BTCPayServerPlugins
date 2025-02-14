@@ -40,10 +40,14 @@ Before diving into the setup process, ensure you have the following:
 1. Login to your BTCPay Server instance, Plugins > Manage Plugins
 2. Search for and install BTCPay Server plugin for Ghost
 3. Once installed you should see Ghost, included in the side nav, under plugins
-4. Log in to your Ghost Admin Panel
+4. Log in to your Ghost Admin Panel on a new tab
 5. Navigate to Settings > Integrations. Click "Add custom integration" and name it e.g "BTCPay Server"
 6. Save the integration, another screen would pop out showing the required Ghost credentials needed by the plugin.
-1. You can go ahead and give your integration a description, but if you are fine with it, you can save and close the pop up.
+7. Open up your BTCPay Server instance, and the Ghost plugin page.
+8. Copy your API Url (without the https://), Content API key, and Admin API Key from Ghost credential page into their respective input fields in your plugin page.
+9. For the username/email and password fields, enter your Ghost admin email address, and password.
+10. First save your Ghost credetials on Ghost admin portal (You can input a description before saving it if you want to) and close the pop up.
+11. Now save the credetial details on BTCPay Plugin. If all data is correct, it should save successfully.
 
 ![BTCPay Server Ghost img 1](./img/Ghost/Add_Custom_Integration_View.png)
 
@@ -51,39 +55,14 @@ Before diving into the setup process, ensure you have the following:
 
 ![BTCPay Server Ghost img 3](./img/Ghost/Custom_Integration_Credentials.png)
 
+![BTCPay Server Ghost img 4](./img/Ghost/Ghost_BTCPay_Credential_View.png)
+
+![BTCPay Server Ghost img 5](./img/Ghost/Ghost_BTCPay_Credential_Saved_1.png)   
+
+![BTCPay Server Ghost img 6](./img/Ghost/Ghost_BTCPay_Credential_Saved_2.png)
 
 
 
-
-
-![BTCPay Server shopify step 4](./img/Shopify/step_4.png) 
-5. `Create an app` and name it, e.g. BTCPay Server, click on `Create App`      
-![BTCPay Server shopify step 5](./img/Shopify/step_5.png)
-![BTCPay Server shopify step 6](./img/Shopify/step_6.png)
-6. On the app page, in `Overview` tab, click on the `Configure Admin API scopes`   
-![BTCPay Server shopify step 7](./img/Shopify/step_7.png)
-7. In the filter admin access scopes type in `Orders`
-8. In `Orders` enable `read_orders` and `write_orders` and then click `Save`     
-![BTCPay Server shopify step 8](./img/Shopify/step_8.png)   
-9. Click on the "API credentials" tab, and then click on the `Install App` in the top right corner and when pop-up window appears click `Install`   
-![BTCPay Server shopify step 9-1](./img/Shopify/step_9-1.png)   
-![BTCPay Server shopify step 9-2](./img/Shopify/step_9-2.png)   
-10. Reveal `Admin API access token` and `copy` it (and note it down somewhere safe)   
-11. Also copy the `API key` and `API Secret` and note it down somewhere safe     
-![BTCPay Server shopify step 10 and 11](./img/Shopify/step_10_and_11.png)   
-12. Shopify app setup is now complete
-
-
-
-	1. 
-
-Log in to your Ghost Admin Panel.
-
-Navigate to Settings > Integrations.
-
-Click "Add custom integration" and name it "BTCPay Server".
-
-Save the integration and take note of the Admin API Key.
 
 
 
