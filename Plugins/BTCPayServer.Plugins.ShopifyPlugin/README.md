@@ -71,10 +71,6 @@ Before diving into the setup process, ensure you have the following:
 
 ## Install BTCPay Server Shopify plugin
 
-:::warning
-This plugin is currently in pre-release mode. To view, you can enable "Show plugins in pre-release" in your server settings.
-:::
-
 1. In your BTCPay Server, go to your plugins, find and install Shopify plugin. Once done, on the left sidebar click on `Shopify`
 2. In the first field, `Shopify Store URL` enter the subdomain of your Shopify store e.g. SOME_ID.myshopify.com then enter SOME_ID
 3. In the second field, `API key` paste the `API key` from Shopify - see steps above.
@@ -90,43 +86,14 @@ This plugin is currently in pre-release mode. To view, you can enable "Show plug
 
 ## Install BTCPay-Shopify application on Shopify
 
-The second piece of this installation guide is setting up the BTCPay-Shopify app. You can choose to self-host your own BTCPay-Shopify app 
-or use the app we submitted to the Shopify App Store.
-
-### Using BTCPay-Shopify from Shopify App Store
-
-:::warning
-As of now, the BTCPay-Shopify app is not yet available on the Shopify App Store. We are working on getting it published.
-:::
-
-1. Now we need to install the BTCPay-Shopify app. Visit the [Shopify app store](https://apps.shopify.com/) search for "BTCPay" and install the BTCPay-Shopify app.   
-[App Setup: Step 1](./img/Shopify/app-setup_step-1.png)   
-2. Once installed, you can go to your dashboard, click on `Apps >` in the left sidebar, then you would see the list of installed apps, including the just installed BTCPay-Shopify app.    
-3. Select the BTCPay-Shopify app, and in settings, input your `BTCPay Server URL` (e.g https://btcpay.example.com) and the `storeId` to which your Shopify plugin is connected on your BTCPay Server instance.   
-![App Setup: Step 2 + 3](./img/Shopify/app-setup_step-2-settings.png)   
-4. In your shopify dashboard, click on `Settings`, which is located on the bottom of the left nav panel, select `Checkout` and then `Customize`.   
-![App Setup: Step 4.1](./img/Shopify/app-setup_step-4-1.png)   
-![App Setup: Step 4.2](./img/Shopify/app-setup_step-4-2.png)   
-5. In the editor change the selected page to the "Thank you" page.   
-![App Setup: Step 5.1](./img/Shopify/app-setup_step-5-1.png)   
-![App Setup: Step 5.2](./img/Shopify/app-setup_step-5-2.png)   
-6. Click on the `Apps` icon on the left panel
-![App Setup: Step 6](./img/Shopify/app-setup_step-6.png)   
-7. Click on the (+) sign on the listed "BTCPay Checkout" app and then on the "Thank you" page listed.   
-![App Setup: Step 7](./img/Shopify/app-setup_step-7.png)   
-8. You will now see the extension got added to your "Thank you" page. Click `save` in the top right corner.   
-![App Setup: Step 8](./img/Shopify/app-setup_step-8.png)   
-9. To double check all is working, click on the left arrow `<` next to "BTCPay Checkout" and verify it is listed in the "Order details section".   
-![App Setup: Step 9.1](./img/Shopify/app-setup_step-9-1.png)   
-![App Setup: Step 9.2](./img/Shopify/app-setup_step-9-2.png)   
-
-Congrats! You have successfully installed the BTCPay-Shopify app and set up the payment method on your Shopify store. You are ready to go. See also the [demo checkout flow below](#demo-checkout-flow-after-everything-is-set-up) to make sure everything works.
+The second piece of this installation guide is setting up the BTCPay-Shopify app. At the time of writing you can self-host the app as lined out in the steps below.
 
 ### Self-hosting the BTCPay-shopify app
 
-If you are a developer or would love to have total control, you would need to create and deploy your own application.
+This is the only option right now. We will update this guide once the app is available on the Shopify App Store. 
+
 #### Requirements:
-1. A Linux VPS instance to deploy your shopify app to
+1. A Linux VPS instance to deploy your shopify app to (can be a very cheap one)
 2. The VPS should have [Docker Engine installed](https://docs.docker.com/engine/install/)
 3. A domain/subdomain with an DNS A-record to the IP of your VPS instance, in our example below we use the placeholder "YOUR_HOSTED_APP_URL.COM", e.g. btcpaypp.example.com
 4. Shopify plugin installed in your BTCPay Server instance
@@ -230,7 +197,25 @@ Please note that selecting custom distribution would mean that you can only use 
 17. Once installed, you will see the app settings page. 
 ![app-deploy_distribution-install-complete-config-app.png](./img/Shopify/app-deploy_distribution-install-complete-config-app.png)
 
-Go back to [Using BTCPay-Shopify from Shopify App Store](#using-btcpay-shopify-from-shopify-app-store) section above and continue from step 3.
+18. Put your `BTCPay Server URL` (e.g https://btcpay.example.com) and the `storeId` to which your Shopify plugin is connected on your BTCPay Server instance.   
+![App Setup: Step 2 + 3](./img/Shopify/app-setup_step-2-settings.png)
+19. On your shopify dashboard, click on `Settings`, which is located on the bottom of the left nav panel, select `Checkout` and then `Customize`.   
+![App Setup: Step 4.1](./img/Shopify/app-setup_step-4-1.png)   
+![App Setup: Step 4.2](./img/Shopify/app-setup_step-4-2.png)
+20. In the editor change the selected page to the "Thank you" page.   
+![App Setup: Step 5.1](./img/Shopify/app-setup_step-5-1.png)   
+![App Setup: Step 5.2](./img/Shopify/app-setup_step-5-2.png)
+21. Click on the `Apps` icon on the left panel
+![App Setup: Step 6](./img/Shopify/app-setup_step-6.png)
+22. Click on the (+) sign on the listed "BTCPay Checkout" app and then on the "Thank you" page listed.   
+![App Setup: Step 7](./img/Shopify/app-setup_step-7.png)
+23. You will now see the extension got added to your "Thank you" page. Click `save` in the top right corner.   
+![App Setup: Step 8](./img/Shopify/app-setup_step-8.png)
+24. To double check all is working, click on the left arrow `<` next to "BTCPay Checkout" and verify it is listed in the "Order details section".   
+![App Setup: Step 9.1](./img/Shopify/app-setup_step-9-1.png)   
+![App Setup: Step 9.2](./img/Shopify/app-setup_step-9-2.png)
+
+Congrats! You have successfully installed the BTCPay-Shopify app and set up the payment method on your Shopify store. You are ready to go. See also the [demo checkout flow below](#demo-checkout-flow-after-everything-is-set-up) to make sure everything works.
 
 
 ## Demo Checkout flow after everything is set up
