@@ -5,14 +5,35 @@
     ViewBag.Title = "Register for Event";
 }
 
+<style>
+    #crowdfund-main-image {
+        border-radius: var(--btcpay-border-radius);
+        object-fit: cover;
+        max-width: 100%;
+        max-height: 40vh;
+    }
+    #crowdfund-body-description {
+        font-size: 16px;
+    }
+
+    .perk.card .card-img-top {
+        max-height: 210px;
+        object-fit: scale-down;
+    }
+</style>
+
 <div class="container mt-5">
+    @if (!string.IsNullOrEmpty(Model.EventImageUrl))
+    {
+        <img src="@Model.EventImageUrl" alt="@Model.EventTitle" id="crowdfund-main-image" class="img-fluid" asp-append-version="true" />
+    }
     <div class="text-center mb-5">
         <h1 class="mb-4">@Model.EventTitle</h1>
 
         <div class="d-inline-block">
             <span class="badge bg-info px-4 py-2 fs-6">@Model.EventDate.ToString("M/d/yy, hh:mm tt")</span>
         </div>
-        <div class="text-muted mt-2">@Model.Description</div>
+        <div class="text-muted mt-2" id="crowdfund-body-description">@Model.Description</div>
     </div>
     <div class="row justify-content-center">
         <div class="col-md-6">
@@ -31,7 +52,7 @@
 
                 <div class="text-center mt-4">
                     <button type="submit" class="btn btn-success btn-md px-5">
-                        Contribute
+                        Buy Ticket
                     </button>
                 </div>
             </form>

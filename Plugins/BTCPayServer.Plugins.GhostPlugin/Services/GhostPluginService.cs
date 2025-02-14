@@ -180,7 +180,7 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
                     switch (member.Status)
                     {
                         case GhostSubscriptionStatus.New:
-                            var firstTransaction = ctx.GhostTransactions.AsNoTracking().First(c => c.MemberId == member.Id && c.TransactionStatus == TransactionStatus.Success);
+                            var firstTransaction = ctx.GhostTransactions.AsNoTracking().First(c => c.MemberId == member.Id && c.TransactionStatus == TransactionStatus.Settled);
                             var noticeFrame = firstTransaction.PeriodEnd - now;
                             if (noticeFrame.TotalDays <= reminderDay)
                             {
@@ -193,7 +193,7 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
 
                         case GhostSubscriptionStatus.Renew:
                             var transactions = ctx.GhostTransactions.AsNoTracking().Where(p => p.MemberId == member.Id &&
-                                p.TransactionStatus == TransactionStatus.Success && !string.IsNullOrEmpty(p.PaymentRequestId)).ToList();
+                                p.TransactionStatus == TransactionStatus.Settled && !string.IsNullOrEmpty(p.PaymentRequestId)).ToList();
 
                             var currentPeriod = transactions.FirstOrDefault(p => p.PeriodStart.Date <= now.Date && p.PeriodEnd.Date >= now.Date);
                             var nextPeriod = transactions.FirstOrDefault(p => p.PeriodStart.Date > now.Date);
@@ -247,7 +247,7 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
         };
 
         var latestTransactions = await ctx.GhostTransactions
-            .AsNoTracking().Where(t => t.StoreId == storeId && t.TransactionStatus == TransactionStatus.Success)
+            .AsNoTracking().Where(t => t.StoreId == storeId && t.TransactionStatus == TransactionStatus.Settled)
             .GroupBy(t => t.MemberId)
             .Select(g => g.OrderByDescending(t => t.CreatedAt).First())
             .ToListAsync();
@@ -385,7 +385,7 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
 
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == member.StoreId);
         var startDate = ctx.GhostTransactions
-            .AsNoTracking().Where(t => t.StoreId == member.StoreId && t.TransactionStatus == TransactionStatus.Success && t.MemberId == memberId)
+            .AsNoTracking().Where(t => t.StoreId == member.StoreId && t.TransactionStatus == TransactionStatus.Settled && t.MemberId == memberId)
             .OrderByDescending(t => t.CreatedAt)
             .FirstOrDefault().PeriodEnd;
 
@@ -399,7 +399,7 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
             {
                 existingPayment.PeriodStart = startDate;
                 existingPayment.PeriodEnd = end;
-                existingPayment.TransactionStatus = TransactionStatus.Success;
+                existingPayment.TransactionStatus = TransactionStatus.Settled;
                 ctx.Update(existingPayment);
                 change = true;
             }

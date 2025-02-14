@@ -8,6 +8,7 @@ public class EventTicketViewModel
     public string EventId { get; set; }
     public string EventTitle { get; set; }
     public string StoreId { get; set; }
+    public string SearchText { get; set; }
     public List<EventTicketVm> Tickets { get; set; }
 }
 

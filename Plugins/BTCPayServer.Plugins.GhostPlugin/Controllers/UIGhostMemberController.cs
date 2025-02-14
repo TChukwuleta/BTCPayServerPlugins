@@ -53,11 +53,11 @@ public class UIGhostMemberController : Controller
     {
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
-            NoGhostSetupResult(storeId);
+        if (ghostSetting == null)
+            return NoGhostSetupResult(storeId);
 
         var ghostMembers = ctx.GhostMembers.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id && !string.IsNullOrEmpty(c.MemberId)).ToList();
-        var ghostTransactions = ctx.GhostTransactions.AsNoTracking().Where(t => t.StoreId == CurrentStore.Id && t.TransactionStatus == TransactionStatus.Success).ToList();
+        var ghostTransactions = ctx.GhostTransactions.AsNoTracking().Where(t => t.StoreId == CurrentStore.Id && t.TransactionStatus == TransactionStatus.Settled).ToList();
 
         var ghostPluginSetting = ghostSetting.Setting != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) : new GhostSettingsPageViewModel();
         var reminderDay = ghostPluginSetting?.ReminderStartDaysBeforeExpiration.GetValueOrDefault(4) switch
@@ -149,7 +149,7 @@ public class UIGhostMemberController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         var member = ctx.GhostMembers.AsNoTracking().FirstOrDefault(c => c.Id == memberId && c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null || member == null || !ghostSetting.CredentialsPopulated())
+        if (ghostSetting == null || member == null)
             return NotFound();
 
         var emailSender = await _emailSenderFactory.GetEmailSender(ghostSetting.StoreId);
@@ -165,7 +165,7 @@ public class UIGhostMemberController : Controller
         }
 
         var latestTransaction = ctx.GhostTransactions
-            .AsNoTracking().Where(t => t.MemberId == member.Id && t.TransactionStatus == TransactionStatus.Success && DateTime.UtcNow >= t.PeriodStart)
+            .AsNoTracking().Where(t => t.MemberId == member.Id && t.TransactionStatus == TransactionStatus.Settled && DateTime.UtcNow >= t.PeriodStart)
             .OrderByDescending(t => t.CreatedAt).First();
 
         var emailRequest = new EmailRequest

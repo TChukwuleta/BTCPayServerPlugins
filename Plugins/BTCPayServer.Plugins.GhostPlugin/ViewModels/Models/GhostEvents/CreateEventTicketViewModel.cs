@@ -12,6 +12,7 @@ public class CreateEventTicketViewModel : BaseGhostPublicViewModel
     public string Name { get; set; }
     public string EventTitle { get; set; }
     public DateTime EventDate { get; set; }
+    public string EventImageUrl { get; set; }
     public string Description { get; set; }
     public string EventId { get; set; }
 }

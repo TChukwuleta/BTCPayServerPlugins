@@ -122,7 +122,7 @@ public class GhostHostedService : EventHostedServiceBase
                 await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
                 return;
             }
-            if (transaction != null && transaction.TransactionStatus != TransactionStatus.Pending)
+            if (transaction != null && transaction.TransactionStatus != TransactionStatus.New)
             {
                 result.Write("Transaction has previously been completed", InvoiceEventData.EventSeverity.Info);
                 await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
@@ -130,7 +130,7 @@ public class GhostHostedService : EventHostedServiceBase
             }
 
             transaction.InvoiceStatus = invoice.Status.ToString().ToLower();
-            transaction.TransactionStatus = success ? TransactionStatus.Success : TransactionStatus.Failed;
+            transaction.TransactionStatus = success ? TransactionStatus.Settled : TransactionStatus.Expired;
             if (success)
             {
                 try
@@ -197,7 +197,7 @@ public class GhostHostedService : EventHostedServiceBase
                 await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
                 return;
             }
-            if (ticket != null && ticket.PaymentStatus != TransactionStatus.Pending.ToString())
+            if (ticket != null && ticket.PaymentStatus != TransactionStatus.New.ToString())
             {
                 result.Write("Transaction has previously been completed", InvoiceEventData.EventSeverity.Info);
                 await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
@@ -206,7 +206,7 @@ public class GhostHostedService : EventHostedServiceBase
             var ghostEvent = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == ticket.EventId && c.StoreId == ticket.StoreId);
             ticket.PurchaseDate = DateTime.UtcNow;
             ticket.InvoiceStatus = invoice.Status.ToString().ToLower();
-            ticket.PaymentStatus = success ? TransactionStatus.Success.ToString() : TransactionStatus.Failed.ToString();
+            ticket.PaymentStatus = success ? TransactionStatus.Settled.ToString() : TransactionStatus.Expired.ToString();
             ctx.UpdateRange(ticket);
             result.Write($"New ticket payment completed for Event: {ghostEvent?.Title} Buyer name: {ticket.Name}", InvoiceEventData.EventSeverity.Success);
             await ctx.SaveChangesAsync();

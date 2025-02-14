@@ -12,8 +12,8 @@
     var storeId = ScopeProvider.GetCurrentStoreId();
     bool isEditMode = !string.IsNullOrEmpty(Model.EventId);
     string formAction = isEditMode
-        ? Url.Action("UpdateEvent", "UIGhostEvent", new { eventId = Model.EventId })
-        : Url.Action("CreateEvent", "UIGhostEvent");
+        ? Url.Action("UpdateEvent", "UIGhostEvent", new { eventId = Model.EventId, storeId })
+        : Url.Action("CreateEvent", "UIGhostEvent", new { storeId });
 }
 
 <div class="sticky-header">
@@ -75,7 +75,7 @@
             <div class="d-flex flex-wrap gap-3 mb-3">
                 <div class="form-group w-250px mb-0">
                     <label asp-for="Amount" class="form-label" data-required></label>
-                    <input inputmode="decimal" asp-for="Amount" class="form-control" required />
+                    <input inputmode="decimal" asp-for="Amount" class="form-control" required min="1" step="1" />
                     <span asp-validation-for="Amount" class="text-danger"></span>
                 </div>
                 <div class="form-group">

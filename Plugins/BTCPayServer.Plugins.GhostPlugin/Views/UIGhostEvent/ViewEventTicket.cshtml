@@ -23,6 +23,12 @@
 
 <partial name="_StatusMessage" />
 
+
+<form class="d-flex flex-wrap flex-sm-nowrap align-items-center gap-3 mb-4 col-xxl-8" asp-action="ViewEventTicket"
+      asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" method="get">
+    <input asp-for="SearchText" class="form-control" name="searchText" placeholder="Search…" />
+</form>
+
 @if (Model.Tickets.Any())
 {
     <div class="table-responsive">
@@ -52,7 +58,11 @@
                         </td>
                         <td class="align-middle">@ticket.Name</td>
                         <td class="align-middle">@ticket.Email</td>
-                        <td class="align-middle">@ticket.TicketStatus</td>
+                        <td class="align-middle">
+                            <div class="d-inline-flex align-items-center gap-2">
+                                @ticket.TicketStatus
+                            </div>
+                        </td>
                         <td class="text-end amount-col">
                             <span data-sensitive>@DisplayFormatter.Currency(ticket.Amount, ticket.Currency)</span>
                         </td>
@@ -68,3 +78,17 @@ else
         No tickets found for this event.
     </p>
 }
+
+@section PageFootContent {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const searchInput = document.querySelector('input[name="searchText"]');
+            searchInput.addEventListener("input", function () {
+                if (this.value.trim() === "") {
+                    window.location.href = window.location.pathname;
+                }
+            });
+        });
+    </script>
+}
+
