@@ -1,9 +1,102 @@
+﻿# Accept Bitcoin on Your Ghost Blog Today 
+
+Tired of relying on Stripe for your Ghost platform and want to try something new? Do you want to receive payment from your Ghost blog in Bitcoin, of course without an 
+fees and thrid party?
+
+Introducing BTCPay Server for Ghost – a plugin that allows you accept bitcoin payments directly on your blog from customers with no fee.
+
+Our integration with Ghost allows you connect your self-hosted BTCPay Server with your [Ghost blog](https://ghost.org/), enabling you accept Bitcoin payments swiftly and securely.
+
+With this plugin, you're not just adding a payment gateway;  you're embracing a transparent, and secure way to monetize your content which keeps you in full control of your funds.
+
+Whether you’re receiving donations, selling tiered memberships, or offering event tickets, this integration ensures seamless Bitcoin transactions without third-party fees.  Here's how it works:
+
+
+🔹 Seamless Integration – Connect your Ghost blog to BTCPay Server in just a few clicks.
+🔹 Zero Fees, Full Control – No third-party processing, just direct Bitcoin payments to your wallet.
+🔹 Perfect for Creators – Monetize your blog with Bitcoin-based memberships and content access.
+🔹 Event Ticketing Made Easy – Sell tickets for your events, with instant Bitcoin payments.
+
+💡 Ready to power your blog with Bitcoin? Set up your BTCPay Server and start accepting payments
+
+
+
+## Prerequisites:
+
+Before diving into the setup process, ensure you have the following:
+
+- [A Ghost account](https://ghost.org/)
+- BTCPay Server - [self-hosted](Deployment.md) or run by a [third-party host](/Deployment/ThirdPartyHosting.md) v2.0.0 or later.
+- [Created BTCPay Server store](CreateStore.md) with [wallet set up](WalletSetup.md)
+
+
+
+## Setting up BTCPay Server with Ghost
+
+### Installation guide for your BTCPay Server - Ghost plugin
+1. Login to your BTCPay Server instance, Plugins > Manage Plugins
+2. Search for and install BTCPay Server plugin for Ghost
+3. Once installed you should see Ghost, included in the side nav, under plugins
+4. Log in to your Ghost Admin Panel
+5. Navigate to Settings > Integrations. Click "Add custom integration" and name it e.g "BTCPay Server"
+6. Save the integration, another screen would pop out showing the required Ghost credentials needed by the plugin.
+1. You can go ahead and give your integration a description, but if you are fine with it, you can save and close the pop up.
+![BTCPay Server Ghost img 1](./img/Ghost/Add_Custom_Integration_View.png)
+![BTCPay Server Ghost img 2](./img/Ghost/Custom_Integration_Name.png)   
+![BTCPay Server Ghost img 3](./img/Ghost/Custom_Integration_Credentials.png)
+
+
+
+
+
+
+![BTCPay Server shopify step 4](./img/Shopify/step_4.png) 
+5. `Create an app` and name it, e.g. BTCPay Server, click on `Create App`      
+![BTCPay Server shopify step 5](./img/Shopify/step_5.png)
+![BTCPay Server shopify step 6](./img/Shopify/step_6.png)
+6. On the app page, in `Overview` tab, click on the `Configure Admin API scopes`   
+![BTCPay Server shopify step 7](./img/Shopify/step_7.png)
+7. In the filter admin access scopes type in `Orders`
+8. In `Orders` enable `read_orders` and `write_orders` and then click `Save`     
+![BTCPay Server shopify step 8](./img/Shopify/step_8.png)   
+9. Click on the "API credentials" tab, and then click on the `Install App` in the top right corner and when pop-up window appears click `Install`   
+![BTCPay Server shopify step 9-1](./img/Shopify/step_9-1.png)   
+![BTCPay Server shopify step 9-2](./img/Shopify/step_9-2.png)   
+10. Reveal `Admin API access token` and `copy` it (and note it down somewhere safe)   
+11. Also copy the `API key` and `API Secret` and note it down somewhere safe     
+![BTCPay Server shopify step 10 and 11](./img/Shopify/step_10_and_11.png)   
+12. Shopify app setup is now complete
+
+
+
+	1. 
+
+Log in to your Ghost Admin Panel.
+
+Navigate to Settings > Integrations.
+
+Click "Add custom integration" and name it "BTCPay Server".
+
+Save the integration and take note of the Admin API Key.
+
+
+
+
+
+
+
+
+
+
+
+
+
 Use Cases:
 Membership Payments:
 Allow Ghost users to pay for memberships via Bitcoin using BTCPay Server.
 Automatically update the membership status in Ghost once payment is confirmed.
 Subscription Renewals:
-Automate Bitcoin payments for recurring memberships (handled manually since BTCPay doesn�t natively support subscriptions... until subscription plugin is complete).
+Automate Bitcoin payments for recurring memberships (handled manually since BTCPay doesn’t natively support subscriptions... until subscription plugin is complete).
 
 
 
