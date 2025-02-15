@@ -19,17 +19,23 @@ public class UpdateGhostEventViewModel
     [JsonIgnore]
     public IFormFile EventImageFile { get; set; }
 
-    [Display(Name = "Event Registration Link")]
+    [Display(Name = "Event Link")]
     public string EventLink { get; set; }
     public DateTime EventDate { get; set; }
     public string StoreDefaultCurrency { get; set; }
     public decimal Amount { get; set; }
     public string Currency { get; set; }
+
+    [Display(Name = "Email Subject")]
     public string EmailSubject { get; set; }
+
+    [Display(Name = "Email Body")]
     public string EmailBody { get; set; }
 
-    [Display(Name = "Limit Event Attendance")]
+    [Display(Name = "Limit Ticket Sales")]
     public bool HasMaximumCapacity { get; set; }
+
+    [Display(Name = "Maximum number of ticket for sale")]
     public int? MaximumEventCapacity { get; set; }
     public string EventPaymentUrl { get; set; }
 }
