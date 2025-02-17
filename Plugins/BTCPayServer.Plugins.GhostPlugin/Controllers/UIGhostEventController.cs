@@ -37,6 +37,7 @@ public class UIGhostEventController : Controller
     private readonly UriResolver _uriResolver;
     private readonly IFileService _fileService;
     private readonly StoreRepository _storeRepo;
+    private readonly EmailService _emailService;
     private readonly IHttpClientFactory _clientFactory;
     private readonly EmailSenderFactory _emailSenderFactory;
     private readonly BTCPayNetworkProvider _networkProvider;
@@ -46,6 +47,7 @@ public class UIGhostEventController : Controller
         (AppService appService,
         UriResolver uriResolver,
         IFileService fileService,
+        EmailService emailService,
         StoreRepository storeRepo,
         IHttpClientFactory clientFactory,
         EmailSenderFactory emailSenderFactory,
@@ -74,7 +76,6 @@ public class UIGhostEventController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        Console.WriteLine(JsonConvert.SerializeObject(ghostSetting));
         if (ghostSetting == null)
             return NoGhostSetupResult(storeId);
 
@@ -161,6 +162,8 @@ public class UIGhostEventController : Controller
             EventTitle = entity.Title,
             Tickets = tickets.Select(t => new EventTicketVm
             {
+                Id = t.Id,
+                HasEmailNotificationBeenSent = t.EmailSent,
                 CreatedDate = t.CreatedAt,
                 Name = t.Name,
                 Amount = t.Amount,
@@ -353,6 +356,47 @@ public class UIGhostEventController : Controller
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Event deleted successfully";
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+    }
+
+
+    [HttpGet("{eventId}/send-reminder/{ticketId}")]
+    public async Task<IActionResult> SendReminder(string storeId, string eventId, string ticketId)
+    {
+
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+        if (ghostSetting == null)
+            return NoGhostSetupResult(storeId);
+
+        var ghostEvent = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        var eventTicket = ctx.GhostEventTickets.AsNoTracking().FirstOrDefault(c => c.Id == ticketId && c.EventId == eventId);
+        if (ghostEvent == null || eventTicket == null)
+            return NotFound();
+
+        var emailSender = await _emailSenderFactory.GetEmailSender(ghostSetting.StoreId);
+        var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+        if (!isEmailConfigured)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = $"Email settings not setup. Kindly configure Email SMTP in the admin settings";
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
+        }
+        try
+        {
+            await _emailService.SendTicketRegistrationEmail(ghostSetting.StoreId, eventTicket, ghostEvent);
+            eventTicket.EmailSent = true;
+            ctx.GhostEventTickets.Update(eventTicket);
+            await ctx.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = $"An error occured when sending subscription reminder. {ex.Message}";
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
+        }
+        TempData[WellKnownTempData.ErrorMessage] = $"Ticket details has been sent to {eventTicket.Name}";
+        return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
     }
 
     private async Task<string> GetStoreDefaultCurrentIfEmpty(string storeId, string currency)

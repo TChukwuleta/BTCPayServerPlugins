@@ -16,6 +16,7 @@ public class GhostEventTicket
     public string InvoiceId { get; set; }
     public string PaymentStatus { get; set; }
     public string InvoiceStatus { get; set; }
+    public bool EmailSent { get; set; }
     public DateTime PurchaseDate { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }

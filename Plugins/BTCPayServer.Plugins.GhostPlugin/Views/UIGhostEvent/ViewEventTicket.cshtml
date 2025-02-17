@@ -44,8 +44,8 @@
                     <th class="text-nowrap">Name</th>
                     <th class="text-nowrap">Email</th>
                     <th>Status</th>
-                    <th class="amount-col">Amount</th>
-                    <th></th>
+                    <th class="text-nowrap">Amount</th>
+                    <th class="w-75px"></th>
                 </tr>
             </thead>
             <tbody>
@@ -63,9 +63,19 @@
                                 @ticket.TicketStatus
                             </div>
                         </td>
-                        <td class="text-end amount-col">
+                        <td class="align-middle">
                             <span data-sensitive>@DisplayFormatter.Currency(ticket.Amount, ticket.Currency)</span>
                         </td>
+
+                        @if (!ticket.HasEmailNotificationBeenSent)
+                        {
+                            <td class="text-end amount-col">
+                                <a asp-action="SendReminder" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticket.Id">Send Reminder</a>
+                            </td>
+                            @* <div class="d-inline-flex align-items-center gap-3">
+                                <a asp-action="SendReminder" asp-route-storeId="@member.StoreId" asp-route-memberId="@member.Id">Send Reminder</a>
+                            </div> *@
+                        }
                     </tr>
                 }
             </tbody>

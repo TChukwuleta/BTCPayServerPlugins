@@ -156,11 +156,7 @@ public class UIGhostMemberController : Controller
         var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
         if (!isEmailConfigured)
         {
-            TempData.SetStatusMessageModel(new StatusMessageModel()
-            {
-                Message = $"Email settings not setup. Kindly configure Email SMTP in the admin settings",
-                Severity = StatusMessageModel.StatusSeverity.Error
-            });
+            TempData[WellKnownTempData.ErrorMessage] = $"Email settings not setup. Kindly configure Email SMTP in the admin settings";
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
         }
 
@@ -180,25 +176,16 @@ public class UIGhostMemberController : Controller
             SubscriptionUrl = $"{ghostSetting.BaseUrl}/plugins/{ghostSetting.StoreId}/ghost/api/subscription/{member.Id}/subscribe",
             ExpirationDate = latestTransaction.PeriodEnd,
         };
-        Console.WriteLine(emailRequest.SubscriptionUrl);
         try
         {
             await _emailService.SendMembershipSubscriptionReminderEmail(emailRequest);
         }
         catch (Exception ex)
         {
-            TempData.SetStatusMessageModel(new StatusMessageModel()
-            {
-                Message = $"An error occured when sending subscription reminder. {ex.Message}",
-                Severity = StatusMessageModel.StatusSeverity.Error
-            });
+            TempData[WellKnownTempData.ErrorMessage] = $"An error occured when sending subscription reminder. {ex.Message}";
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
         }
-        TempData.SetStatusMessageModel(new StatusMessageModel()
-        {
-            Message = $"Reminder has been sent to {member.Name}",
-            Severity = StatusMessageModel.StatusSeverity.Success
-        });
+        TempData[WellKnownTempData.SuccessMessage] = $"Reminder has been sent to {member.Name}";
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
     }
 

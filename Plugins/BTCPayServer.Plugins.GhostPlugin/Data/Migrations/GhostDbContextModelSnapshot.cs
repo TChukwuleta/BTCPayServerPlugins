@@ -91,6 +91,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     b.Property<string>("Email")
                         .HasColumnType("text");
 
+                    b.Property<bool>("EmailSent")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("EventId")
                         .HasColumnType("text");
 

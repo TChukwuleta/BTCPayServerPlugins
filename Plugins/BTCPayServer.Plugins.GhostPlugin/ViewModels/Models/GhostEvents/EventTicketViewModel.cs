@@ -14,6 +14,8 @@ public class EventTicketViewModel
 
 public class EventTicketVm
 {
+    public bool HasEmailNotificationBeenSent { get; set; }
+    public string Id { get; set; }
     public decimal Amount { get; set; }
     public string Currency { get; set; }
     public string Name { get; set; }

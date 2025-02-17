@@ -23,6 +23,38 @@
     </div>
 </div>
 
+@section PageHeadContent
+{
+    <style>
+        .autocomplete-popup {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+        }
+
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+            .autocomplete-item:hover {
+                background-color: #f0f0f0;
+            }
+
+        .variable-highlight {
+            background-color: #e8f0fe;
+            border-radius: 3px;
+            padding: 2px 0;
+        }
+    </style>
+}
+
 <partial name="_StatusMessage" />
 
 <form id="event-form" action="@formAction" method="post" enctype="multipart/form-data">
@@ -66,6 +98,16 @@
                     <input asp-for="EventImageFile" type="file" class="form-control" disabled />
                     <div class="form-text">In order to upload an image, a <a asp-controller="UIServer" asp-action="Files">file storage</a> must be configured.</div>
                 }
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-sm-6">
+            <div class="form-group">
+                <label asp-for="Description" class="form-label" data-required></label>
+                <textarea asp-for="Description" rows="5" class="form-control richtext" required></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
             </div>
         </div>
     </div>
@@ -117,13 +159,23 @@
         </div>
     </div>
 
+    <div class="row mt-3">
+        <div class="col-sm-6">
+            <div class="form-group">
+                <label asp-for="EmailSubject" class="form-label" data-required></label>
+                <input asp-for="EmailSubject" type="text" class="form-control" required />
+                <span asp-validation-for="EmailSubject" class="text-danger"></span>
+            </div>
+        </div>
+    </div>
 
     <div class="row mt-3">
-        <div class="col-xl-10 col-xxl-constrain">
+        <div class="col-sm-6">
             <div class="form-group">
-                <label asp-for="Description" class="form-label" data-required></label>
-                <textarea asp-for="Description" rows="15" cols="30" class="form-control richtext" required></textarea>
-                <span asp-validation-for="Description" class="text-danger"></span>
+                <label asp-for="EmailBody" class="form-label" data-required></label>
+                <textarea asp-for="EmailBody" rows="10" class="form-control" id="EmailBody" required></textarea>
+                <div id="autocompletePopup" class="dropdown-menu" style="display: none; position: absolute; width: auto; max-height: 200px; overflow-y: auto;"></div>
+                <span asp-validation-for="EmailBody" class="text-danger"></span>
             </div>
         </div>
     </div>
@@ -139,6 +191,93 @@
             }
             updateVisibility();
             toggle.addEventListener("change", updateVisibility);
+
+
+            const variables = [
+                'Name',
+                'Email',
+                'Title',
+                'EventLink',
+                'Description',
+                'EventDate',
+                'Amount',
+                'Currency'
+            ];
+            const textarea = document.getElementById('EmailBody');
+            const popup = document.getElementById('autocompletePopup');
+            textarea.parentElement.style.position = 'relative';
+            let cursorPosition = 0;
+
+            textarea.addEventListener('input', function(e) {
+                const text = textarea.value;
+                cursorPosition = textarea.selectionStart;
+
+                if (text.slice(cursorPosition - 2, cursorPosition) === '{{') {
+                    showAutocomplete(cursorPosition);
+                } else {
+                    popup.style.display = 'none';
+                }
+            });
+
+            function showAutocomplete(position) {
+                const text = textarea.value.substring(0, position);
+                const lines = text.split('\n');
+                const currentLineNumber = lines.length - 1;
+
+                const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight) || 20;
+
+                popup.innerHTML = '';
+
+                variables.forEach(variable => {
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'dropdown-item';
+                    item.textContent = variable;
+                    item.style.display = 'block';
+                    item.style.width = '100%';
+                    item.style.textAlign = 'left';
+                    item.style.padding = '0.25rem 1rem';
+
+                    item.addEventListener('click', function() {
+                        insertVariable(variable);
+                    });
+
+                    popup.appendChild(item);
+                });
+
+                popup.style.position = 'absolute';
+                popup.style.left = '50px'; 
+                popup.style.top = `${(currentLineNumber * lineHeight) + 30}px`;
+                popup.style.minWidth = '150px';
+                popup.style.maxWidth = '200px';
+                popup.style.zIndex = '1050';
+                popup.style.display = 'block';
+                popup.style.backgroundColor = '#fff';
+                popup.style.border = '1px solid rgba(0,0,0,.15)';
+                popup.style.borderRadius = '0.25rem';
+                popup.style.padding = '0.5rem 0';
+            }
+
+
+            function insertVariable(variable) {
+                const text = textarea.value;
+                const beforeText = text.slice(0, cursorPosition);
+                const afterText = text.slice(cursorPosition);
+
+                textarea.value = beforeText + variable + '}}' + afterText;
+
+                const newPosition = cursorPosition + variable.length + 2;
+                textarea.setSelectionRange(newPosition, newPosition);
+                textarea.focus();
+
+                popup.style.display = 'none';
+            }
+
+            document.addEventListener('click', function(e) {
+                if (!popup.contains(e.target) && e.target !== textarea) {
+                    popup.style.display = 'none';
+                }
+            });
         });
     </script>
 }
