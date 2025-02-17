@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using BTCPayServer.Plugins.GhostPlugin.Data;
 
 namespace BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 

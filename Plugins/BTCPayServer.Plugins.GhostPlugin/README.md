@@ -139,6 +139,53 @@ Whether you're a blogger, journalist, or content creator, adding a Bitcoin donat
 
 
 
+### Event management using BTCPay Server
+
+If you are an event organizers, conference hosts, or community managers, you can now create and manage events on your Ghost platform that accept payments on 
+
+Bitcoin using BTCPay Server. With this you can create an event, set ticket pricing and available quantities, allow attendees purchase their tickets using Bitcoin.
+
+Manage ticket payments e.t.c.
+
+
+#### Steps on how to setup Events on Ghost via BTCPay Server.
+
+
+1. Click on your BTCPay Server Ghost plugin, you'd see a dropdown of available use cases, select 'Ghost Event'.
+
+2. Click on Create event on the top right.
+
+3. Fill out all required event information such as title, Link (online event) or Address (Physical event), Event logo, Description, Ticket fee and currency
+
+	Event date, number of ticket for sale (if not an unlimited ticket event), the email subject and body that would be sent to customers on purchase of every
+
+	ticket.
+
+	N.B: It is important that you have configured your email service in server settings, this is needed so that customers get all required information needed in their email.
+
+4. Once done, click on create. This should create the event successfully, and you should see it populated in the list of events available.
+
+
+
+![BTCPay Server Ghost img 12](./img/Ghost/Ghost_Event_View.png)
+
+
+![BTCPay Server Ghost img 13](./img/Ghost/Create_Ghost_Event_1.png)
+
+
+![BTCPay Server Ghost img 14](./img/Ghost/Create_Ghost_Event_2.png)
+
+
+![BTCPay Server Ghost img 15](./img/Ghost/Create_Ghost_Event_3.png)
+
+
+![BTCPay Server Ghost img 16](./img/Ghost/Created_Ghost_Event_List_View.png)
+
+
+
+
+
+
 
 
 Integrating BTCPay Server with Ghost Commerce to accept Bitcoin payments provides a variety of use cases, depending on your goals and the type of e-commerce or content-based transactions you're running. 

@@ -16,7 +16,6 @@ using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using System.Collections.Generic;
 using BTCPayServer.Services.PaymentRequests;
 using Newtonsoft.Json.Linq;
-using Newtonsoft.Json;
 using BTCPayServer.Services.Mails;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;

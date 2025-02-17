@@ -175,6 +175,7 @@
                 <label asp-for="EmailBody" class="form-label" data-required></label>
                 <textarea asp-for="EmailBody" rows="10" class="form-control" id="EmailBody" required></textarea>
                 <div id="autocompletePopup" class="dropdown-menu" style="display: none; position: absolute; width: auto; max-height: 200px; overflow-y: auto;"></div>
+                <div class="form-text">Note: To view available variables for dynamic values in the email template, type "{{".</div>
                 <span asp-validation-for="EmailBody" class="text-danger"></span>
             </div>
         </div>

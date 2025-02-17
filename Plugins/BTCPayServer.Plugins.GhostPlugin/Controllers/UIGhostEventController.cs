@@ -125,57 +125,6 @@ public class UIGhostEventController : Controller
         return View(new GhostEventsViewModel { DisplayedEvents = ghostEventsViewModel });
     }
 
-    [HttpGet("{eventId}/tickets")]
-    public async Task<IActionResult> ViewEventTicket(string storeId, string eventId, string searchText)
-    {
-        if (string.IsNullOrEmpty(CurrentStore.Id))
-            return NotFound();
-
-        await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null)
-            return NoGhostSetupResult(storeId);
-
-        var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == ghostSetting.StoreId);
-        if (entity == null)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid Event specified";
-            return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
-        }
-
-        var query = ctx.GhostEventTickets.AsNoTracking().Where(c => c.EventId == eventId && c.StoreId == ghostSetting.StoreId);
-        if (!string.IsNullOrWhiteSpace(searchText))
-        {
-            searchText = searchText.Trim().ToLowerInvariant();
-            query = query.Where(t =>
-                t.Email.ToLower().Contains(searchText) ||
-                t.Name.ToLower().Contains(searchText) ||
-                t.InvoiceId.ToLower().Contains(searchText));
-        }
-        var tickets = query.ToList();
-
-        var vm = new EventTicketViewModel
-        {
-            StoreId = CurrentStore.Id,
-            EventId = eventId,
-            SearchText = searchText,
-            EventTitle = entity.Title,
-            Tickets = tickets.Select(t => new EventTicketVm
-            {
-                Id = t.Id,
-                HasEmailNotificationBeenSent = t.EmailSent,
-                CreatedDate = t.CreatedAt,
-                Name = t.Name,
-                Amount = t.Amount,
-                Currency = t.Currency,
-                Email = t.Email,
-                TicketStatus = t.PaymentStatus,
-                InvoiceId = t.InvoiceId
-            }).ToList()
-        };
-        return View(vm);
-    }
-
 
     [HttpGet("view-event")]
     public async Task<IActionResult> ViewEvent(string storeId, string eventId)
@@ -356,6 +305,58 @@ public class UIGhostEventController : Controller
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Event deleted successfully";
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+    }
+
+
+    [HttpGet("{eventId}/tickets")]
+    public async Task<IActionResult> ViewEventTicket(string storeId, string eventId, string searchText)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+        if (ghostSetting == null)
+            return NoGhostSetupResult(storeId);
+
+        var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == ghostSetting.StoreId);
+        if (entity == null)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid Event specified";
+            return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+        }
+
+        var query = ctx.GhostEventTickets.AsNoTracking().Where(c => c.EventId == eventId && c.StoreId == ghostSetting.StoreId);
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            searchText = searchText.Trim().ToLowerInvariant();
+            query = query.Where(t =>
+                t.Email.ToLower().Contains(searchText) ||
+                t.Name.ToLower().Contains(searchText) ||
+                t.InvoiceId.ToLower().Contains(searchText));
+        }
+        var tickets = query.ToList();
+
+        var vm = new EventTicketViewModel
+        {
+            StoreId = CurrentStore.Id,
+            EventId = eventId,
+            SearchText = searchText,
+            EventTitle = entity.Title,
+            Tickets = tickets.Select(t => new EventTicketVm
+            {
+                Id = t.Id,
+                HasEmailNotificationBeenSent = t.EmailSent,
+                CreatedDate = t.CreatedAt,
+                Name = t.Name,
+                Amount = t.Amount,
+                Currency = t.Currency,
+                Email = t.Email,
+                TicketStatus = t.PaymentStatus,
+                InvoiceId = t.InvoiceId
+            }).ToList()
+        };
+        return View(vm);
     }
 
 
