@@ -14,12 +14,8 @@
 <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
-        @* <a id="create-event" asp-action="ViewEvent" asp-route-storeId="@storeId"
-           class="btn btn-success @(storeEmailSettingsConfigured ? "" : "disabled")" role="button">
-            Create Event
-        </a> *@
         <a id="create-event" asp-action="ViewEvent" asp-route-storeId="@storeId"
-           class="btn btn-success" role="button">
+           class="btn btn-success @(storeEmailSettingsConfigured ? "" : "disabled")" role="button">
             Create Event
         </a>
     </div>
@@ -55,7 +51,7 @@
                         <td>@ghostEvent.EventDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td>
                             <a href="@ghostEvent.EventPurchaseLink" target="_blank">
-                                @(ghostEvent.EventPurchaseLink.Length > 15? ghostEvent.EventPurchaseLink.Substring(0, 15) + "..." : ghostEvent.EventPurchaseLink)
+                                @(ghostEvent.EventPurchaseLink.Length > 15? ghostEvent.EventPurchaseLink.Substring(0, 20) + "..." : ghostEvent.EventPurchaseLink)
                             </a>
                         </td>
                         <td>@ghostEvent.Tickets.Count</td>

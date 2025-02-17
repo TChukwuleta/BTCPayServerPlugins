@@ -59,6 +59,8 @@ public class EmailService
         string emailBody = ghostEvent.EmailBody
                             .Replace("{{Title}}", ghostEvent.Title)
                             .Replace("{{EventLink}}", ghostEvent.EventLink)
+                            .Replace("{{Name}}", ticket.Name)
+                            .Replace("{{Email}}", ticket.Email)
                             .Replace("{{Description}}", ghostEvent.Description)
                             .Replace("{{EventDate}}", ghostEvent.EventDate.ToString("MMMM dd, yyyy"))
                             .Replace("{{Amount}}", ghostEvent.Amount.ToString())
