@@ -30,7 +30,6 @@ using System.IO;
 using BTCPayServer.Plugins.GhostPlugin;
 using NBitcoin.DataEncoders;
 using NBitcoin;
-using AngleSharp.Dom;
 using BTCPayServer.Abstractions.Contracts;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;

@@ -1,9 +1,8 @@
-﻿namespace BTCPayServer.Plugins.GhostPlugin.Data
+﻿namespace BTCPayServer.Plugins.GhostPlugin.Data;
+
+public enum PluginNavPages
 {
-    public enum PluginNavPages
-    {
-        Index,
-        GhostMember,
-        GhostEvent
-    }
+    Index,
+    GhostMember,
+    GhostEvent
 }

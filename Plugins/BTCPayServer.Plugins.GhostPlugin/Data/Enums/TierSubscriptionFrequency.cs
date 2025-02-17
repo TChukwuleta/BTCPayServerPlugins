@@ -1,8 +1,7 @@
-﻿namespace BTCPayServer.Plugins.GhostPlugin.Data
+﻿namespace BTCPayServer.Plugins.GhostPlugin.Data;
+
+public enum TierSubscriptionFrequency
 {
-    public enum TierSubscriptionFrequency
-    {
-        Monthly = 1,
-        Yearly = 2
-    }
+    Monthly = 1,
+    Yearly = 2
 }
