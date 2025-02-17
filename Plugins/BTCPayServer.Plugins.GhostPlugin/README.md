@@ -216,7 +216,6 @@ Manage ticket payments e.t.c.
 
 
 
-
 ### Membership and subscription BTCPay Server
 
 
@@ -256,6 +255,35 @@ This means subscription management remains the admin’s responsibility. However
 ![BTCPay Server Ghost img 24](./img/Ghost/Membership_Portal_Setup.png)
 
 
+5. Before we proceed to testing it out, we need to configure webhooks for our integrations, these webhook would alert the plugin for when member's data are updated or deleted. 
+
+6. Go to your plugin view in BTCPay Server, and copy the 'Webhook Url'
+
+7. In your Ghost admin portal, navigate to Settings >>> Integrations. Select the custom integration you earlier created.
+
+8. Click on 'Add webhook'. Enter a name for the webhook, for the event, select 'Member Updated', paste the URL copied into the 'Target Url' field and click on Add.
+
+9. Create another webhook, this time the event would be 'Member Deleted'. Use the same Url for the target Url and click on Add also.
+
+10. Once you can confirm that both your webhooks has been populated, click on 'Save' and close the modal.
+
+
+![BTCPay Server Ghost img 25](./img/Ghost/Member_Update_Webhook.png)
+
+
+![BTCPay Server Ghost img 26](./img/Ghost/Member_Delete_Webhook.png)
+
+
+![BTCPay Server Ghost img 27](./img/Ghost/Member_Credentials_Webhook_View.png)
+
+
+11. Users can then proceed to create membership and pay vis BTCPay Server. 
+
+12. The user is promted to enter their name and email, and also prompted to select their tier to which they need to subscribe to.
+
+13. Once he is done filling his details, he then clicks on subscribe which would show an invoice containing his first payment to subscribe to being a member.
+
+14. Once the invoice has been paid, a member account is created by the user on the Ghost platform, the user can then proceed to login
 
 
 
