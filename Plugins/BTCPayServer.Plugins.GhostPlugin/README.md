@@ -156,17 +156,11 @@ Manage ticket payments e.t.c.
 
 3. Fill out all required event information such as title, Link (online event) or Address (Physical event), Event logo, Description, Ticket fee and currency
 
-	Event date, number of ticket for sale (if not an unlimited ticket event), the email subject and body that would be sent to customers on purchase of every
-
-	ticket.
+	Event date, number of ticket for sale (if not an unlimited ticket event), the email subject and body that would be sent to customers on purchase of every ticket.
 
 	N.B: It is important that you have configured your email service in server settings, this is needed so that customers get all required information needed in their email.
 
-
-4. Once done, click on create. This should create the event successfully, and you should see it populated in the list of events available. The admin can 
-
-	delete the event, or edit details regarding the event.
-
+4. Once done, click on create. This should create the event successfully, and you should see it populated in the list of events available. The admin can delete the event, or edit details regarding the event.
 
 5. From the table, you'd see the column: Ticket purchase link, which represent the link you'd put in your event page on Ghost. Copy the link, go to your event page
 
@@ -191,9 +185,7 @@ Manage ticket payments e.t.c.
 
 6. When customers/potential attendees clicks on the link, they are redirected to a page to input their Name and Email and purchase ticket.
 
-
 7. A BTCPay invoice is presented to the customer, to pay, and once paid, customer can then go ahead and download/print the invoice. 
-
 
 8. If email is properly configured, the customer should get an email with details about the event as defined when creating an event. 
 
@@ -211,11 +203,7 @@ Manage ticket payments e.t.c.
 
 9. Once customers starts purchasing tickets, the admin can view all the tickets being purchased. To view, Navigate to Ghost plugin >> Ghost event list  
 
-
-10. Click on 'View Tickets', it would load all the tickets that have been purchased so far. The list includes the purchaser name, email, amount, invoiceId: which is 
-
-	a link to details regarding the particular purchase.
-
+10. Click on 'View Tickets', it would load all the tickets that have been purchased so far. The list includes the purchaser name, email, amount, invoiceId: which is a link to details regarding the particular purchase.
 
 11. The admin can resend ticket information for any customer that didn't get an email after purchasing ticket. The "Resend Ticket Confirmation" button would trigger this
 
@@ -225,6 +213,47 @@ Manage ticket payments e.t.c.
 
 
 ![BTCPay Server Ghost img 21](./img/Ghost/Paid_Event_Tickets.png)
+
+
+
+
+### Membership and subscription BTCPay Server
+
+
+Beyond accepting donations and managing events, if you are looking to monetize your content, community, or services with Bitcoin, this plugin also offers you
+
+the opportunity to do so. Following the steps below, you should be able to now accept Bitcoin for membership creation and subscriptions.
+
+Ghost doesn’t provide a direct way to integrate custom payment providers. Instead, it relies on a private API for payment processing, which is currently built around Stripe as the default processor.
+
+Why does this matter? While BTCPay Server can handle subscriptions and send notifications to both users and admins, it cannot automatically deactivate or delete members in Ghost once a subscription ends. 
+
+This means subscription management remains the admin’s responsibility. However, you can configure the Ghost plugin to send automated notifications to both the admin and the customer when a subscription is nearing expiration, allowing for timely action.
+
+
+#### Setting up membership subscription via BTCPay Server
+
+
+1. Head to your BTCPay Server Ghost plugin, scroll down on the page, Copy the 'Membership subscription Url'.
+
+2. Head over to your Ghost admin portal, click on Settings >> Portal Settings, click on the 'Customize' button.
+
+3. Edit the content at 'Display notice at signup' and to include instructions on how to signup if the want Bitcoin, directing users to use the link. For instance: "Sign up with Bitcoin using this link: {membership url}"
+
+4. Save the changes and the close to the portal. You can navigate to the signup page to view your changes.
+
+
+
+![BTCPay Server Ghost img 21](./img/Ghost/Membership_Url_Ghost_View.png)
+
+
+![BTCPay Server Ghost img 22](./img/Ghost/Setup_Membership_Portal.png)
+
+
+![BTCPay Server Ghost img 23](./img/Ghost/Setup_Membership_Portal.png)
+
+
+![BTCPay Server Ghost img 24](./img/Ghost/Membership_Portal_Setup.png)
 
 
 

@@ -61,11 +61,11 @@ public class UIGhostPublicController : Controller
         UIInvoiceController invoiceController,
         GhostDbContextFactory dbContextFactory)
     {
-        _emailService = emailService;
         _context = context;
         _storeRepo = storeRepo;
         _uriResolver = uriResolver;
         _fileService = fileService;
+        _emailService = emailService;
         _linkGenerator = linkGenerator;
         _clientFactory = clientFactory;
         _dbContextFactory = dbContextFactory;
@@ -213,7 +213,7 @@ public class UIGhostPublicController : Controller
     public async Task<IActionResult> CreateMember(string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.AppId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
@@ -234,7 +234,7 @@ public class UIGhostPublicController : Controller
     public async Task<IActionResult> CreateMember(CreateMemberViewModel vm, string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.AppId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
