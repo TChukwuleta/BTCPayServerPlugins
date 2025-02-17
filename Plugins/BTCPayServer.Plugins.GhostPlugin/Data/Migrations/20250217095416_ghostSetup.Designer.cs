@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 {
     [DbContext(typeof(GhostDbContext))]
-    [Migration("20250213215832_projectSetup")]
-    partial class projectSetup
+    [Migration("20250217095416_ghostSetup")]
+    partial class ghostSetup
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -93,6 +93,9 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 
                     b.Property<string>("Email")
                         .HasColumnType("text");
+
+                    b.Property<bool>("EmailSent")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("EventId")
                         .HasColumnType("text");

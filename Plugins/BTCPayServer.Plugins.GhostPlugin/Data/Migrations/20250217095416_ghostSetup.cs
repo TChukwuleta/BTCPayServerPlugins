@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class projectSetup : Migration
+    public partial class ghostSetup : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -54,7 +54,8 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     InvoiceId = table.Column<string>(type: "text", nullable: true),
                     PaymentStatus = table.Column<string>(type: "text", nullable: true),
                     InvoiceStatus = table.Column<string>(type: "text", nullable: true),
-                    PurchaseDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    EmailSent = table.Column<bool>(type: "boolean", nullable: false),
+                    PurchaseDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>

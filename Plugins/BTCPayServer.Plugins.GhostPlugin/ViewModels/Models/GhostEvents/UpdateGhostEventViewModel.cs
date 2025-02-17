@@ -19,7 +19,7 @@ public class UpdateGhostEventViewModel
     [JsonIgnore]
     public IFormFile EventImageFile { get; set; }
 
-    [Display(Name = "Event Link")]
+    [Display(Name = "Event Link/Address")]
     public string EventLink { get; set; }
     public DateTime EventDate { get; set; }
     public string StoreDefaultCurrency { get; set; }

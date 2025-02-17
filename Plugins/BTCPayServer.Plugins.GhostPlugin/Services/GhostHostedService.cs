@@ -17,26 +17,33 @@ using System.Collections.Generic;
 using BTCPayServer.Services.PaymentRequests;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
+using BTCPayServer.Services.Mails;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
 public class GhostHostedService : EventHostedServiceBase
 {
-    private readonly GhostPluginService _ghostPluginService;
+    private readonly EmailService _emailService;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly EmailSenderFactory _emailSenderFactory;
     private readonly GhostDbContextFactory _dbContextFactory;
+    private readonly GhostPluginService _ghostPluginService;
 
-    public GhostHostedService(EventAggregator eventAggregator,
+    public GhostHostedService(EmailService emailService,
+        EventAggregator eventAggregator,
+        EmailSenderFactory emailSenderFactory,
         InvoiceRepository invoiceRepository,
         IHttpClientFactory httpClientFactory,
         GhostPluginService ghostPluginService,
         GhostDbContextFactory dbContextFactory,
         Logs logs) : base(eventAggregator, logs)
     {
+        _emailService = emailService;
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
         _httpClientFactory = httpClientFactory;
+        _emailSenderFactory = emailSenderFactory;
         _ghostPluginService = ghostPluginService;
     }
 
@@ -207,11 +214,22 @@ public class GhostHostedService : EventHostedServiceBase
             ticket.PurchaseDate = DateTime.UtcNow;
             ticket.InvoiceStatus = invoice.Status.ToString().ToLower();
             ticket.PaymentStatus = success ? TransactionStatus.Settled.ToString() : TransactionStatus.Expired.ToString();
-            ctx.UpdateRange(ticket);
             result.Write($"New ticket payment completed for Event: {ghostEvent?.Title} Buyer name: {ticket.Name}", InvoiceEventData.EventSeverity.Success);
-            await ctx.SaveChangesAsync();
 
-            // Sending email?
+            var emailSender = await _emailSenderFactory.GetEmailSender(ghostSetting.StoreId);
+            var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+            if (isEmailSettingsConfigured)
+            {
+                try
+                {
+                    await _emailService.SendTicketRegistrationEmail(ghostSetting.StoreId, ticket, ghostEvent);
+                    ticket.EmailSent = true;
+                    result.Write($"Email sent successfully to: {ticket?.Email}", InvoiceEventData.EventSeverity.Success);
+                }
+                catch (Exception){ }
+            }
+            ctx.UpdateRange(ticket);
+            await ctx.SaveChangesAsync();
 
             await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
         }
