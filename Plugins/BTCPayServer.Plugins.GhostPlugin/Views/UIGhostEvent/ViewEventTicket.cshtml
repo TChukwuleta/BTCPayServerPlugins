@@ -70,11 +70,8 @@
                         @if (!ticket.HasEmailNotificationBeenSent)
                         {
                             <td class="text-end amount-col">
-                                <a asp-action="SendReminder" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticket.Id">Send Reminder</a>
+                                <a asp-action="SendReminder" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticket.Id">Resend Ticket Confirmation</a>
                             </td>
-                            @* <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="SendReminder" asp-route-storeId="@member.StoreId" asp-route-memberId="@member.Id">Send Reminder</a>
-                            </div> *@
                         }
                     </tr>
                 }

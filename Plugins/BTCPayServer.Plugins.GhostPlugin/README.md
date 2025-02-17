@@ -138,7 +138,6 @@ Whether you're a blogger, journalist, or content creator, adding a Bitcoin donat
 
 
 
-
 ### Event management using BTCPay Server
 
 If you are an event organizers, conference hosts, or community managers, you can now create and manage events on your Ghost platform that accept payments on 
@@ -163,10 +162,17 @@ Manage ticket payments e.t.c.
 
 	N.B: It is important that you have configured your email service in server settings, this is needed so that customers get all required information needed in their email.
 
-4. Once done, click on create. This should create the event successfully, and you should see it populated in the list of events available.
+
+4. Once done, click on create. This should create the event successfully, and you should see it populated in the list of events available. The admin can 
+
+	delete the event, or edit details regarding the event.
 
 
+5. From the table, you'd see the column: Ticket purchase link, which represent the link you'd put in your event page on Ghost. Copy the link, go to your event page
 
+	edit the ticket purchase button and replace with the url that was copied
+
+	
 ![BTCPay Server Ghost img 12](./img/Ghost/Ghost_Event_View.png)
 
 
@@ -180,6 +186,45 @@ Manage ticket payments e.t.c.
 
 
 ![BTCPay Server Ghost img 16](./img/Ghost/Created_Ghost_Event_List_View.png)
+
+
+
+6. When customers/potential attendees clicks on the link, they are redirected to a page to input their Name and Email and purchase ticket.
+
+
+7. A BTCPay invoice is presented to the customer, to pay, and once paid, customer can then go ahead and download/print the invoice. 
+
+
+8. If email is properly configured, the customer should get an email with details about the event as defined when creating an event. 
+
+
+
+![BTCPay Server Ghost img 17](./img/Ghost/Purchase_Ticket_View.png)
+
+
+![BTCPay Server Ghost img 18](./img/Ghost/Invoice_Generation.png)
+
+
+![BTCPay Server Ghost img 19](./img/Ghost/Invoice_Payment.png)
+
+
+
+9. Once customers starts purchasing tickets, the admin can view all the tickets being purchased. To view, Navigate to Ghost plugin >> Ghost event list  
+
+
+10. Click on 'View Tickets', it would load all the tickets that have been purchased so far. The list includes the purchaser name, email, amount, invoiceId: which is 
+
+	a link to details regarding the particular purchase.
+
+
+11. The admin can resend ticket information for any customer that didn't get an email after purchasing ticket. The "Resend Ticket Confirmation" button would trigger this
+
+
+
+![BTCPay Server Ghost img 20](./img/Ghost/Paid_Event_List.png)
+
+
+![BTCPay Server Ghost img 21](./img/Ghost/Paid_Event_Tickets.png)
 
 
 

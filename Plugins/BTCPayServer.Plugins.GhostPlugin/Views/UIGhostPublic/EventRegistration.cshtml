@@ -25,7 +25,9 @@
 <div class="container mt-5">
     @if (!string.IsNullOrEmpty(Model.EventImageUrl))
     {
-        <img src="@Model.EventImageUrl" alt="@Model.EventTitle" id="crowdfund-main-image" class="img-fluid" asp-append-version="true" />
+        <div class="d-flex justify-content-center mb-4">
+            <img src="@Model.EventImageUrl" alt="@Model.EventTitle" id="crowdfund-main-image" class="img-fluid" asp-append-version="true" />
+        </div>
     }
     <div class="text-center mb-5">
         <h1 class="mb-4">@Model.EventTitle</h1>
