@@ -395,6 +395,25 @@ public class UIGhostPublicController : Controller
         return Content(jsFile, "text/javascript");
     }
 
+    [HttpGet("paywall/btcpay-ghost-paywall.js")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> GetBtcPayGhostPaywallJavascript(string storeId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var userStore = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        if (userStore == null || !userStore.CredentialsPopulated())
+        {
+            return BadRequest("Invalid BTCPay store specified");
+        }
+        StringBuilder combinedJavascript = new StringBuilder();
+        var fileContent = _emailService.GetEmbeddedResourceContent("Resources.js.btcpay_paywall_ghost.js");
+        combinedJavascript.AppendLine(fileContent);
+        string jsVariables = $"var BTCPAYSERVER_URL = '{Request.GetAbsoluteRoot()}'; var STORE_ID = '{userStore.StoreId}';";
+        combinedJavascript.Insert(0, jsVariables + Environment.NewLine);
+        var jsFile = combinedJavascript.ToString();
+        return Content(jsFile, "text/javascript");
+    }
+
     private async Task GetTransaction(GhostDbContext ctx, Tier tier, GhostMember member, InvoiceEntity invoice, Data.PaymentRequestData paymentRequest, string txnId)
     {
         // Amount is in lower denomination, so divided by 100
