@@ -286,9 +286,7 @@ This means subscription management remains the admin’s responsibility. However
 14. Once the invoice has been paid, a member account is created by the user on the Ghost platform, the user can then proceed to login.
 
 
-
 ![BTCPay Server Ghost img 28](./img/Ghost/Create_Membership.png)
-
 
 
 15. The admin can view all subscribed members by heading over to the Ghost plugin >> Ghost members.
@@ -301,7 +299,7 @@ This means subscription management remains the admin’s responsibility. However
 
 	The admin can proceed to notify the members, before the member's subscription expires.
 
-14. The admin can also view all payments a particular member has done with regards to the member's subscription
+19. The admin can also view all payments a particular member has done with regards to the member's subscription
 
 
 ![BTCPay Server Ghost img 29](./img/Ghost/Ghost_Members_List.png)
@@ -319,17 +317,24 @@ This means subscription management remains the admin’s responsibility. However
 ![BTCPay Server Ghost img 33](./img/Ghost/Ghost_Alert_Notification.png)
 
 
+20. As earlier mentioned, an admin can configure settings for his Ghost plugin
+
+21. The admin can enable or disable automated email reminders for expiring and expired subscriptions. This would require the admin to have configured email SMTP in admin settings.
+
+22. The admin can also set the time frame to begin notification for member subscription.
 
 
-Integrating BTCPay Server with Ghost Commerce to accept Bitcoin payments provides a variety of use cases, depending on your goals and the type of e-commerce or content-based transactions you're running. 
+![BTCPay Server Ghost img 34](./img/Ghost/Ghost_Settings.png)
 
-Here are some key use cases:
-
-1. Subscription Payments for Premium Content
-If you're offering premium content or memberships on your Ghost site (like articles, tutorials, or videos), you can allow users to pay for subscriptions using Bitcoin. This is especially appealing to users who prefer decentralized and censorship-resistant payment methods.
-2. One-Time Purchases
-Enable one-time payments for digital products, merchandise, or services through Ghost's commerce platform using Bitcoin. For instance, eBooks, online courses, or physical items.
-3. Donations or Crowdfunding
-Set up a seamless way to accept donations in Bitcoin for specific campaigns or ongoing funding. This can be particularly useful for creators, nonprofits, or activists.
+Congratulations, you have completed the setup.
 
 
+
+## Contribute
+
+BTCPay is built and maintained entirely by contributors around the internet. We welcome and appreciate new contributions.
+
+Do you notice any errors or bug? are you having issues with using the plugin? would you like to request a feature? or are you generally looking to support the project and plugin  please [create an issue](https://github.com/TChukwuleta/BTCPayServerPlugins/issues/new)
+
+
+Feel free to join our support channel over at [https://chat.btcpayserver.org/](https://chat.btcpayserver.org/) or [https://t.me/btcpayserver](https://t.me/btcpayserver) if you need help or have any further questions.
