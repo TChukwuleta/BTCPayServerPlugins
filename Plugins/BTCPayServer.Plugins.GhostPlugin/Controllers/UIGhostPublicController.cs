@@ -61,11 +61,11 @@ public class UIGhostPublicController : Controller
         UIInvoiceController invoiceController,
         GhostDbContextFactory dbContextFactory)
     {
-        _emailService = emailService;
         _context = context;
         _storeRepo = storeRepo;
         _uriResolver = uriResolver;
         _fileService = fileService;
+        _emailService = emailService;
         _linkGenerator = linkGenerator;
         _clientFactory = clientFactory;
         _dbContextFactory = dbContextFactory;
@@ -209,20 +209,22 @@ public class UIGhostPublicController : Controller
     }
 
 
+    // For the membership creation, I am searching against AppId. The input field on Ghost where they would display this URL, has limited space
+    // Since appId is shorter in length than storeId, it would take less space... this is only used in Create membership (GET and POST).
     [HttpGet("create-member")]
     public async Task<IActionResult> CreateMember(string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.AppId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
         var ghostTiers = await apiClient.RetrieveGhostTiers();
-        var storeData = await _storeRepo.FindStore(storeId);
+        var storeData = await _storeRepo.FindStore(ghostSetting.StoreId);
         return View(new CreateMemberViewModel { 
             GhostTiers = ghostTiers, 
-            StoreId = storeId, 
+            StoreId = ghostSetting.StoreId, 
             StoreName = storeData?.StoreName, 
             ShopName = ghostSetting.ApiUrl,
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, storeData?.GetStoreBlob()),
@@ -234,11 +236,11 @@ public class UIGhostPublicController : Controller
     public async Task<IActionResult> CreateMember(CreateMemberViewModel vm, string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.AppId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
-        var storeData = await _storeRepo.FindStore(storeId);
+        var storeData = await _storeRepo.FindStore(ghostSetting.StoreId);
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
         var ghostTiers = await apiClient.RetrieveGhostTiers();
         if (ghostTiers == null)
@@ -267,7 +269,7 @@ public class UIGhostPublicController : Controller
             Frequency = vm.TierSubscriptionFrequency,
             TierId = vm.TierId,
             TierName = tier.name,
-            StoreId = storeId
+            StoreId = ghostSetting.StoreId
         };
         ctx.GhostMembers.Add(entity);
         await ctx.SaveChangesAsync();
@@ -275,11 +277,11 @@ public class UIGhostPublicController : Controller
         InvoiceEntity invoice = await _ghostPluginService.CreateMemberInvoiceAsync(storeData, tier, entity, txnId, Request.GetAbsoluteRoot());
         await GetTransaction(ctx, tier, entity, invoice, null, txnId);
         await using var dbMain = _context.CreateContext();
-        var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == storeId);
+        var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == ghostSetting.StoreId);
 
         return View("InitiatePayment", new GhostOrderViewModel
         {
-            StoreId = storeId,
+            StoreId = ghostSetting.StoreId,
             StoreName = store.StoreName,
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
             BTCPayServerUrl = Request.GetAbsoluteRoot(),

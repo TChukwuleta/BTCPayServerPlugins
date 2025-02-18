@@ -166,7 +166,6 @@ public class GhostHostedService : EventHostedServiceBase
                     });
                     transaction.PeriodStart = DateTime.UtcNow;
                     transaction.PeriodEnd = expirationDate;
-                    //transaction.PeriodEnd = DateTime.UtcNow.AddDays(-1);
                     ghostMember.MemberId = response.members[0].id;
                     ghostMember.MemberUuid = response.members[0].uuid;
                     ghostMember.UnsubscribeUrl = response.members[0].unsubscribe_url;

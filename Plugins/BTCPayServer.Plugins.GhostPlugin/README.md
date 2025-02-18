@@ -156,17 +156,11 @@ Manage ticket payments e.t.c.
 
 3. Fill out all required event information such as title, Link (online event) or Address (Physical event), Event logo, Description, Ticket fee and currency
 
-	Event date, number of ticket for sale (if not an unlimited ticket event), the email subject and body that would be sent to customers on purchase of every
-
-	ticket.
+	Event date, number of ticket for sale (if not an unlimited ticket event), the email subject and body that would be sent to customers on purchase of every ticket.
 
 	N.B: It is important that you have configured your email service in server settings, this is needed so that customers get all required information needed in their email.
 
-
-4. Once done, click on create. This should create the event successfully, and you should see it populated in the list of events available. The admin can 
-
-	delete the event, or edit details regarding the event.
-
+4. Once done, click on create. This should create the event successfully, and you should see it populated in the list of events available. The admin can delete the event, or edit details regarding the event.
 
 5. From the table, you'd see the column: Ticket purchase link, which represent the link you'd put in your event page on Ghost. Copy the link, go to your event page
 
@@ -191,9 +185,7 @@ Manage ticket payments e.t.c.
 
 6. When customers/potential attendees clicks on the link, they are redirected to a page to input their Name and Email and purchase ticket.
 
-
 7. A BTCPay invoice is presented to the customer, to pay, and once paid, customer can then go ahead and download/print the invoice. 
-
 
 8. If email is properly configured, the customer should get an email with details about the event as defined when creating an event. 
 
@@ -211,11 +203,7 @@ Manage ticket payments e.t.c.
 
 9. Once customers starts purchasing tickets, the admin can view all the tickets being purchased. To view, Navigate to Ghost plugin >> Ghost event list  
 
-
-10. Click on 'View Tickets', it would load all the tickets that have been purchased so far. The list includes the purchaser name, email, amount, invoiceId: which is 
-
-	a link to details regarding the particular purchase.
-
+10. Click on 'View Tickets', it would load all the tickets that have been purchased so far. The list includes the purchaser name, email, amount, invoiceId: which is a link to details regarding the particular purchase.
 
 11. The admin can resend ticket information for any customer that didn't get an email after purchasing ticket. The "Resend Ticket Confirmation" button would trigger this
 
@@ -228,20 +216,125 @@ Manage ticket payments e.t.c.
 
 
 
+### Membership and subscription BTCPay Server
+
+
+Beyond accepting donations and managing events, if you are looking to monetize your content, community, or services with Bitcoin, this plugin also offers you
+
+the opportunity to do so. Following the steps below, you should be able to now accept Bitcoin for membership creation and subscriptions.
+
+Ghost doesn’t provide a direct way to integrate custom payment providers. Instead, it relies on a private API for payment processing, which is currently built around Stripe as the default processor.
+
+Why does this matter? While BTCPay Server can handle subscriptions and send notifications to both users and admins, it cannot automatically deactivate or delete members in Ghost once a subscription ends. 
+
+This means subscription management remains the admin’s responsibility. However, you can configure the Ghost plugin to send automated notifications to both the admin and the customer when a subscription is nearing expiration, allowing for timely action.
+
+
+#### Setting up membership subscription via BTCPay Server
+
+
+1. Head to your BTCPay Server Ghost plugin, scroll down on the page, Copy the 'Membership subscription Url'.
+
+2. Head over to your Ghost admin portal, click on Settings >> Portal Settings, click on the 'Customize' button.
+
+3. Edit the content at 'Display notice at signup' and to include instructions on how to signup if the want Bitcoin, directing users to use the link. For instance: "Sign up with Bitcoin using this link: {membership url}"
+
+4. Save the changes and the close to the portal. You can navigate to the signup page to view your changes.
 
 
 
+![BTCPay Server Ghost img 21](./img/Ghost/Membership_Url_Ghost_View.png)
 
 
-Integrating BTCPay Server with Ghost Commerce to accept Bitcoin payments provides a variety of use cases, depending on your goals and the type of e-commerce or content-based transactions you're running. 
-
-Here are some key use cases:
-
-1. Subscription Payments for Premium Content
-If you're offering premium content or memberships on your Ghost site (like articles, tutorials, or videos), you can allow users to pay for subscriptions using Bitcoin. This is especially appealing to users who prefer decentralized and censorship-resistant payment methods.
-2. One-Time Purchases
-Enable one-time payments for digital products, merchandise, or services through Ghost's commerce platform using Bitcoin. For instance, eBooks, online courses, or physical items.
-3. Donations or Crowdfunding
-Set up a seamless way to accept donations in Bitcoin for specific campaigns or ongoing funding. This can be particularly useful for creators, nonprofits, or activists.
+![BTCPay Server Ghost img 22](./img/Ghost/Setup_Membership_Portal.png)
 
 
+![BTCPay Server Ghost img 23](./img/Ghost/Setup_Membership_Portal.png)
+
+
+![BTCPay Server Ghost img 24](./img/Ghost/Membership_Portal_Setup.png)
+
+
+5. Before we proceed to testing it out, we need to configure webhooks for our integrations, these webhook would alert the plugin for when member's data are updated or deleted. 
+
+6. Go to your plugin view in BTCPay Server, and copy the 'Webhook Url'
+
+7. In your Ghost admin portal, navigate to Settings >>> Integrations. Select the custom integration you earlier created.
+
+8. Click on 'Add webhook'. Enter a name for the webhook, for the event, select 'Member Updated', paste the URL copied into the 'Target Url' field and click on Add.
+
+9. Create another webhook, this time the event would be 'Member Deleted'. Use the same Url for the target Url and click on Add also.
+
+10. Once you can confirm that both your webhooks has been populated, click on 'Save' and close the modal.
+
+
+![BTCPay Server Ghost img 25](./img/Ghost/Member_Update_Webhook.png)
+
+
+![BTCPay Server Ghost img 26](./img/Ghost/Member_Delete_Webhook.png)
+
+
+![BTCPay Server Ghost img 27](./img/Ghost/Member_Credentials_Webhook_View.png)
+
+
+11. Users can then proceed to create membership and pay vis BTCPay Server. 
+
+12. The user is promted to enter their name and email, and also prompted to select their tier to which they need to subscribe to.
+
+13. Once he is done filling his details, he then clicks on subscribe which would show an invoice containing his first payment to subscribe to being a member.
+
+14. Once the invoice has been paid, a member account is created by the user on the Ghost platform, the user can then proceed to login.
+
+
+![BTCPay Server Ghost img 28](./img/Ghost/Create_Membership.png)
+
+
+15. The admin can view all subscribed members by heading over to the Ghost plugin >> Ghost members.
+
+16. The admin can see all members, members with active subscription, members whose subscription would soon expire, and members whose subscription has expired
+
+17. A member subscription is tagged as 'soon to expire' when the subscription ends a few days away from the end date. The days specification can be configured in the Settings.
+
+18. Once a member subscription is about to expire, there is a green notification that appears on the Ghost plugin side nav. This is here to notify the admin. 
+
+	The admin can proceed to notify the members, before the member's subscription expires.
+
+19. The admin can also view all payments a particular member has done with regards to the member's subscription
+
+
+![BTCPay Server Ghost img 29](./img/Ghost/Ghost_Members_List.png)
+
+
+![BTCPay Server Ghost img 30](./img/Ghost/Ghost_Members_Active_List.png)
+
+
+![BTCPay Server Ghost img 31](./img/Ghost/Ghost_Members_SoonToExpire_List.png)
+
+
+![BTCPay Server Ghost img 32](./img/Ghost/Ghost_Members_Expired_List.png)
+
+
+![BTCPay Server Ghost img 33](./img/Ghost/Ghost_Alert_Notification.png)
+
+
+20. As earlier mentioned, an admin can configure settings for his Ghost plugin
+
+21. The admin can enable or disable automated email reminders for expiring and expired subscriptions. This would require the admin to have configured email SMTP in admin settings.
+
+22. The admin can also set the time frame to begin notification for member subscription.
+
+
+![BTCPay Server Ghost img 34](./img/Ghost/Ghost_Settings.png)
+
+Congratulations, you have completed the setup.
+
+
+
+## Contribute
+
+BTCPay is built and maintained entirely by contributors around the internet. We welcome and appreciate new contributions.
+
+Do you notice any errors or bug? are you having issues with using the plugin? would you like to request a feature? or are you generally looking to support the project and plugin  please [create an issue](https://github.com/TChukwuleta/BTCPayServerPlugins/issues/new)
+
+
+Feel free to join our support channel over at [https://chat.btcpayserver.org/](https://chat.btcpayserver.org/) or [https://t.me/btcpayserver](https://t.me/btcpayserver) if you need help or have any further questions.
