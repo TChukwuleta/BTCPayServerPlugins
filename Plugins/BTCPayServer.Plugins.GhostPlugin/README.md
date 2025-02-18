@@ -283,9 +283,40 @@ This means subscription management remains the admin’s responsibility. However
 
 13. Once he is done filling his details, he then clicks on subscribe which would show an invoice containing his first payment to subscribe to being a member.
 
-14. Once the invoice has been paid, a member account is created by the user on the Ghost platform, the user can then proceed to login
+14. Once the invoice has been paid, a member account is created by the user on the Ghost platform, the user can then proceed to login.
 
 
+
+![BTCPay Server Ghost img 28](./img/Ghost/Create_Membership.png)
+
+
+
+15. The admin can view all subscribed members by heading over to the Ghost plugin >> Ghost members.
+
+16. The admin can see all members, members with active subscription, members whose subscription would soon expire, and members whose subscription has expired
+
+17. A member subscription is tagged as 'soon to expire' when the subscription ends a few days away from the end date. The days specification can be configured in the Settings.
+
+18. Once a member subscription is about to expire, there is a green notification that appears on the Ghost plugin side nav. This is here to notify the admin. 
+
+	The admin can proceed to notify the members, before the member's subscription expires.
+
+14. The admin can also view all payments a particular member has done with regards to the member's subscription
+
+
+![BTCPay Server Ghost img 29](./img/Ghost/Ghost_Members_List.png)
+
+
+![BTCPay Server Ghost img 30](./img/Ghost/Ghost_Members_Active_List.png)
+
+
+![BTCPay Server Ghost img 31](./img/Ghost/Ghost_Members_SoonToExpire_List.png)
+
+
+![BTCPay Server Ghost img 32](./img/Ghost/Ghost_Members_Expired_List.png)
+
+
+![BTCPay Server Ghost img 33](./img/Ghost/Ghost_Alert_Notification.png)
 
 
 

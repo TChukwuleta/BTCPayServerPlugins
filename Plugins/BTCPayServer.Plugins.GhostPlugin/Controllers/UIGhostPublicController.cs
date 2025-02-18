@@ -209,6 +209,8 @@ public class UIGhostPublicController : Controller
     }
 
 
+    // For the membership creation, I am searching against AppId. The input field on Ghost where they would display this URL, has limited space
+    // Since appId is shorter in length than storeId, it would take less space... this is only used in Create membership (GET and POST).
     [HttpGet("create-member")]
     public async Task<IActionResult> CreateMember(string storeId)
     {
