@@ -390,6 +390,19 @@ public class UIGhostPublicController : Controller
         return Content(fileContent, "text/javascript");
     }
 
+
+    /*<div id = "paywall-config" data-price="100"></div>
+
+    <div id = "paywall-content" style="display: none;">
+        <h2>Premium Content</h2>
+        <p>This content is only available after payment.</p>
+    </div>
+
+    <div id = "paywall-overlay" >
+        < button id= "payButton" > Pay with Bitcoin to unlock content</button>
+    </div>*/
+
+
     [HttpGet("paywall/btcpay-ghost-paywall.js")]
     [EnableCors("AllowAllOrigins")]
     public async Task<IActionResult> GetBtcPayGhostPaywallJavascript(string storeId)

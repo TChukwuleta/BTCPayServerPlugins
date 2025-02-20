@@ -1,7 +1,11 @@
 document.addEventListener("DOMContentLoaded", function () {
     console.log("Script Loaded");
-
     loadModalScript();
+
+    if (localStorage.getItem('paywall_unlocked') === 'true') {
+        console.log("User has unlocked content")
+        unlockContent();
+    }
 
     const paywallConfig = document.getElementById("paywall-config");
 
@@ -10,17 +14,18 @@ document.addEventListener("DOMContentLoaded", function () {
             event.preventDefault();
             if (paywallConfig) {
                 const price = paywallConfig.getAttribute("data-price");
-                handleBitcoinPayment(price);
+                payButton.disabled = true;
+                payButton.textContent = "Loading..."; 
+                handleBitcoinPayment(price, payButton);
             }
             else {
-                console.error("Paywall config not found.");
+                alert("Error: Payment configuration missing.");
             }
         }
     });
-
 });
 
-function handleBitcoinPayment(amount) {
+function handleBitcoinPayment(amount, button) {
     const url = BTCPAYSERVER_URL + "/plugins/" + BTCPAYSERVER_STORE_ID + "/ghost/api/paywall/create-invoice?amount=" + amount;
     fetch(url, {
         method: "GET",
@@ -32,13 +37,22 @@ function handleBitcoinPayment(amount) {
             if (data.id) {
                 showBTCPayModal(data);
             }
-            //window.location.href = data.paymentUrl;
+            else {
+                button.disabled = false;
+                button.textContent = "Unlock with Bitcoin";
+                alert("Error: Failed to generate invoice. Please contact admin");
+            }
         })
-        .catch(error => console.error("Payment initiation failed. Error:", error));
+        .catch(error => {
+            button.disabled = false;
+            button.textContent = "Unlock with Bitcoin";
+            console.error("Payment initiation failed. Error:", error);
+            alert("Error: Payment initiation failed. Please try again.");
+        });
 }
 
 
-// Show BTCPay modal.
+
 const showBTCPayModal = function (data) {
     console.log('Triggered showBTCPayModal()');
 
@@ -59,12 +73,11 @@ const showBTCPayModal = function (data) {
                     case 'processing':
                     case 'settled':
                         invoice_paid = true;
-                        // Find a way to handle message
                         console.log('Invoice paid.');
+                        unlockContent();
                         break;
                     case 'expired':
                         window.btcpay.hideFrame();
-                        // todo: show error message
                         console.error('Invoice expired.');
                         break;
                     case 'invalid':
@@ -75,11 +88,10 @@ const showBTCPayModal = function (data) {
                         console.error('Unknown status: ' + event.data.status);
                 }
             }
-        } else { // handle event.data "loaded" "closed"
+        } else {
             if (event.data === 'close') {
                 if (invoice_paid === true) {
-
-                    // Find a way to handle message
+                    unlockContent();
                     console.log('Invoice paid.');
                 }
                 console.log('Modal closed.')
@@ -90,6 +102,15 @@ const showBTCPayModal = function (data) {
         return Object.prototype.toString.call(obj) === '[object Object]'
     }
 };
+
+
+function unlockContent() {
+    document.getElementById('paywall-overlay').style.display = 'none';
+    document.getElementById('paywall-content').style.display = 'block';
+
+    localStorage.setItem('paywall_unlocked', 'true');
+}
+
 
 
 const loadModalScript = () => {
