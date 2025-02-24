@@ -392,26 +392,26 @@ If you are a technical person and good with styling and customization, further c
 ![BTCPay Server Ghost img 38](./img/Ghost/Add_Html_To_Post.png)
 
 
-![BTCPay Server Ghost img 8](./img/Ghost/Html_Content.png)
+![BTCPay Server Ghost img 39](./img/Ghost/Html_Content.png)
 
 
 Once done, save your page/post, open the url to the post and proceed to make a payment. 
 
 
 
-![BTCPay Server Ghost img 7](./img/Ghost/Donation_Url.png)
+![BTCPay Server Ghost img 40](./img/Ghost/Paywall_View_One.png)
 
 
-![BTCPay Server Ghost img 8](./img/Ghost/Ghost_Donation_Page.png)
+![BTCPay Server Ghost img 41](./img/Ghost/Paywall_View_Two.png)
 
 
-![BTCPay Server Ghost img 9](./img/Ghost/Donation_Page.png)
+![BTCPay Server Ghost img 42](./img/Ghost/Paywall_View_Three.png)
 
 
-![BTCPay Server Ghost img 10](./img/Ghost/Donation_Invoice.png)
+![BTCPay Server Ghost img 43](./img/Ghost/Paywall_View_Four.png)
 
 
-![BTCPay Server Ghost img 11](./img/Ghost/Paid_Donation.png)
+![BTCPay Server Ghost img 44](./img/Ghost/Paywall_View_Five.png)
 
 
 One final note, this content would be available to the user, while his browser data is still on, and would stop being once the data is cleared. It would be good to inform users to save the content once revealed.
