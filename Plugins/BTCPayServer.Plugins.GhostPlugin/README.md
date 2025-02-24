@@ -330,6 +330,93 @@ Congratulations, you have completed the setup.
 
 
 
+### Payment Paywall on Ghost
+
+With BTCPay Server - Ghost plugin, you can now hide premium content on your blog post until the user makes a successful payment. This guide explains how to implement a Bitcoin paywall using BTCPay Server. 
+
+1. Go to your BTCPay Server Ghost plugin, scroll down the page, copy the paywall script url as shown in the image below.
+
+2. Head over to your Ghost admin portal, Settings > Code Injection > Add custom code, click on the open buton.
+
+3. Under the site header paste the script url, save and close the modal.
+
+
+![BTCPay Server Ghost img 35](./img/Ghost/Paywall_Script_Link.png)
+
+
+![BTCPay Server Ghost img 36](./img/Ghost/Code_Injection_Setting_View.png)
+
+
+![BTCPay Server Ghost img 37](./img/Ghost/Code_Injection_Script_view.png)
+
+
+Now that you have the script injected, head over to the post/page editor where you want to include your paywall.
+
+Click on the plus icon to add an item, select HTML, and in the input field paste the following code
+
+
+```
+    <div id = "paywall-config" data-price="100"></div>
+
+    <div id = "paywall-content" style="display: none;">
+        <h2>Premium Content</h2>
+        <p>This content is only available after payment.</p>
+    </div>
+
+    <div id = "paywall-overlay">
+        <button id= "payButton"> Pay with Bitcoin to unlock content</button>
+    </div>
+
+```
+
+These are HTML tags. For customization you can replace the button tag text with whatever you want the button text to be i.e replace `Pay with Bitcoin to unlock content` with `Any text you choose`
+
+
+You can also replace the h2 tag with any header/description text that you want to give to your premium item i.e replace `Premium Content` with `Any description/header of choice`
+
+
+Replace the p tag with the actual premium item which can be a link to download a book, or a text or anything at all i.e replace `This content is only available after payment.` with `My hidden item`
+
+
+Finally replace the data-price value from 100 to whatever amount you want to sell your content for i.e replace the 100 in `data-price="100"` with any amount.
+
+
+P.S The currency associated with the amount is the same as the currency of your BTCPay Server store
+
+P.S Do not change the Id of the tags i.e `paywall-config`, `paywall-content`, `paywall-overlay`.
+
+
+If you are a technical person and good with styling and customization, further customization can be done to the elements. 
+
+
+![BTCPay Server Ghost img 38](./img/Ghost/Add_Html_To_Post.png)
+
+
+![BTCPay Server Ghost img 39](./img/Ghost/Html_Content.png)
+
+
+Once done, save your page/post, open the url to the post and proceed to make a payment. 
+
+
+
+![BTCPay Server Ghost img 40](./img/Ghost/Paywall_View_One.png)
+
+
+![BTCPay Server Ghost img 41](./img/Ghost/Paywall_View_Two.png)
+
+
+![BTCPay Server Ghost img 42](./img/Ghost/Paywall_View_Three.png)
+
+
+![BTCPay Server Ghost img 43](./img/Ghost/Paywall_View_Four.png)
+
+
+![BTCPay Server Ghost img 44](./img/Ghost/Paywall_View_Five.png)
+
+
+One final note, this content would be available to the user, while his browser data is still on, and would stop being once the data is cleared. It would be good to inform users to save the content once revealed.
+
+
 ## Contribute
 
 BTCPay is built and maintained entirely by contributors around the internet. We welcome and appreciate new contributions.

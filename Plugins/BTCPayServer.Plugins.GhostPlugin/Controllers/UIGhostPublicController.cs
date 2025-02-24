@@ -386,13 +386,81 @@ public class UIGhostPublicController : Controller
         {
             return BadRequest("Invalid BTCPay store specified");
         }
-        StringBuilder combinedJavascript = new StringBuilder();
         var fileContent = _emailService.GetEmbeddedResourceContent("Resources.js.btcpay_ghost.js");
+        return Content(fileContent, "text/javascript");
+    }
+
+
+    /*<div id = "paywall-config" data-price="100"></div>
+
+    <div id = "paywall-content" style="display: none;">
+        <h2>Premium Content</h2>
+        <p>This content is only available after payment.</p>
+    </div>
+
+    <div id = "paywall-overlay" >
+        < button id= "payButton" > Pay with Bitcoin to unlock content</button>
+    </div>*/
+
+
+    [HttpGet("paywall/btcpay-ghost-paywall.js")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> GetBtcPayGhostPaywallJavascript(string storeId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var userStore = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        if (userStore == null || !userStore.CredentialsPopulated())
+            return BadRequest("Invalid BTCPay store specified");
+
+        var store = await _storeRepo.FindStore(storeId);
+        if (store == null)
+            return NotFound();
+
+        var storeBlob = store.GetStoreBlob();
+        StringBuilder combinedJavascript = new StringBuilder();
+        var fileContent = _emailService.GetEmbeddedResourceContent("Resources.js.btcpay_paywall_ghost.js");
+
         combinedJavascript.AppendLine(fileContent);
-        string jsVariables = $"var BTCPAYSERVER_URL = '{Request.GetAbsoluteRoot()}'; var STORE_ID = '{userStore.StoreId}';";
+        string jsVariables = $"var BTCPAYSERVER_URL = '{Request.GetAbsoluteRoot()}'; var BTCPAYSERVER_STORE_ID = '{userStore.StoreId}'; var STORE_CURRENCY = '{storeBlob.DefaultCurrency}';";
         combinedJavascript.Insert(0, jsVariables + Environment.NewLine);
         var jsFile = combinedJavascript.ToString();
         return Content(jsFile, "text/javascript");
+    }
+
+
+    [AllowAnonymous]
+    [HttpGet("paywall/create-invoice")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> CreateOrder(string storeId, decimal amount)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var userStore = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        if (userStore == null || !userStore.CredentialsPopulated())
+        {
+            return BadRequest("Invalid BTCPay store specified");
+        }
+        var store = await _storeRepo.FindStore(storeId);
+        if (store == null)
+            return NotFound();
+
+        var storeBlob = store.GetStoreBlob();
+        string orderId = "";
+        InvoiceMetadata metadata = new InvoiceMetadata
+        {
+            OrderId = orderId,
+        };
+        var result = await _invoiceController.CreateInvoiceCoreRaw(new Client.Models.CreateInvoiceRequest()
+        {
+            Amount = amount,
+            Currency = storeBlob.DefaultCurrency,
+            Metadata = metadata.ToJObject(),
+        }, store, HttpContext.Request.GetAbsoluteRoot());
+        return Ok(new
+        {
+            id = result.Id,
+            orderId,
+            Message = "Order created and invoice generated successfully"
+        });
     }
 
     private async Task GetTransaction(GhostDbContext ctx, Tier tier, GhostMember member, InvoiceEntity invoice, Data.PaymentRequestData paymentRequest, string txnId)

@@ -1,3 +1,4 @@
+@using BTCPayServer.Abstractions.Contracts
 @using BTCPayServer.Abstractions.Extensions
 @using BTCPayServer.Abstractions.Services
 @using BTCPayServer.Client
@@ -5,10 +6,12 @@
 @using BTCPayServer.Plugins.GhostPlugin.Data
 @using BTCPayServer.Plugins.GhostPlugin.ViewModels
 @using Microsoft.AspNetCore.Routing
+@inject IScopeProvider ScopeProvider
 @model GhostSettingViewModel
 @{
     ViewData.SetActivePage(PluginNavPages.Index, "Ghost");
     var ghostCredsSet = Model?.IntegratedAt.HasValue is true;
+    var storeId = ScopeProvider.GetCurrentStoreId();
 }
 
 <div class="sticky-header-setup"></div>
@@ -82,6 +85,17 @@
                     <div class="form-group">
                         <label asp-for="DonationUrl" class="form-label"></label>
                         <input asp-for="DonationUrl" class="form-control" readonly />
+                    </div>
+
+                    
+                    <div class="alert alert-warning">
+                        <h5 class="alert-heading">For Paywall, In Ghost admin portal, please do the following …</h5> 
+                        <ul>
+                            <li>
+                                Paste this script at <a href="https://@Model.ApiUrl/ghost/#/settings/code-injection" class="fw-bold alert-link" target="_blank" rel="noreferrer noopener">Settings &gt; Code Injection &gt; Open &gt; Site header</a>:
+                                <pre class="mt-2 mb-0 text-wrap">@($"<script src='{Url.Action("GetBtcPayGhostPaywallJavascript", "UIGhostPublic", new { storeId }, Context.Request.Scheme)}'></script>")</pre>
+                            </li>
+                        </ul>
                     </div>
 
                     <p class="alert alert-success">

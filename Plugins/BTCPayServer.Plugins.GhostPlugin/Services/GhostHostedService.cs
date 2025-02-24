@@ -17,6 +17,8 @@ using System.Collections.Generic;
 using BTCPayServer.Services.PaymentRequests;
 using Newtonsoft.Json.Linq;
 using BTCPayServer.Services.Mails;
+using BTCPayServer.Client.Models;
+using TransactionStatus = BTCPayServer.Plugins.GhostPlugin.Data.TransactionStatus;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
@@ -70,11 +72,13 @@ public class GhostHostedService : EventHostedServiceBase
                     var ghostOrderId = invoice.GetInternalTags(GhostApp.GHOST_PREFIX).FirstOrDefault();
                     if (ghostOrderId != null)
                     {
-                        string invoiceStatus = invoice.Status.ToString().ToLower();
-                        bool? success = invoiceStatus switch
+                        bool? success = invoice.Status switch
                         {
-                            _ when new[] { "complete", "confirmed", "paid", "settled" }.Contains(invoiceStatus) => true,
-                            _ when new[] { "invalid", "expired" }.Contains(invoiceStatus) => false,
+                            InvoiceStatus.Settled => true,
+
+                            InvoiceStatus.Invalid or
+                            InvoiceStatus.Expired => false,
+
                             _ => (bool?)null
                         };
                         if (success.HasValue)
