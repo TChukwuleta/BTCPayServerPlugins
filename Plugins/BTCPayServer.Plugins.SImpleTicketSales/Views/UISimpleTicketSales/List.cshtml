@@ -1,0 +1,84 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Plugins.SimpleTicketSales.Data
+@using BTCPayServer.Plugins.SimpleTicketSales.ViewModels
+@using BTCPayServer.Abstractions.Extensions
+@inject IScopeProvider ScopeProvider
+@model SalesTicketsEventsViewModel
+@{
+    ViewData.SetActivePage(PluginNavPages.Index, "Sales Tickets Events");
+    var storeEmailSettingsConfigured = (bool)ViewData["StoreEmailSettingsConfigured"];
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+
+
+<div class="sticky-header">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <a id="create-event" asp-action="ViewEvent" asp-route-storeId="@storeId"
+           class="btn btn-success @(storeEmailSettingsConfigured ? "" : "disabled")" role="button">
+            Create Event
+        </a>
+    </div>
+</div>
+<partial name="_StatusMessage" />
+
+
+@if (Model.DisplayedEvents != null && Model.DisplayedEvents.Any())
+{
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Description</th>
+                    <th>Event Date</th>
+                    <th>Ticket Purchase Link</th>
+                    <th>Tickets Sold</th>
+                    <th class="actions-col"></th>
+                    <th class="w-75px"></th>
+                </tr>
+            </thead>
+            <tbody id="UsersList">
+                @foreach (var ghostEvent in Model.DisplayedEvents)
+                {
+                    <tr id="user_@ghostEvent.Id" class="user-overview-row mass-action-row">
+                        <td>
+                            <div class="d-inline-flex align-items-center gap-3">
+                                <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ghostEvent.Id">@ghostEvent.Title</a>
+                            </div>
+                        </td>
+                        <td>@(!string.IsNullOrEmpty(ghostEvent.Description) && ghostEvent.Description.Length > 15 ? ghostEvent.Description.Substring(0, 15) + "..." : ghostEvent.Description)</td>
+                        <td>@ghostEvent.EventDate.ToString("M/d/yy, hh:mm tt")</td>
+                        <td>
+                            <a href="@ghostEvent.EventPurchaseLink" target="_blank">
+                                @(ghostEvent.EventPurchaseLink.Length > 15? ghostEvent.EventPurchaseLink.Substring(0, 20) + "..." : ghostEvent.EventPurchaseLink)
+                            </a>
+                        </td>
+                        <td>@ghostEvent.Tickets.Count</td>
+                        <td class="actions-col">
+                            <div class="d-inline-flex align-items-center gap-3">
+                                @if (ghostEvent.Tickets != null && ghostEvent.Tickets.Any())
+                                {
+                                    <a asp-action="ViewEventTicket" asp-route-storeId="@storeId" asp-route-eventId="@ghostEvent.Id">View Tickets</a>
+                                }
+                                @if (ghostEvent.Tickets == null || !ghostEvent.Tickets.Any() || ghostEvent.EventDate <= DateTime.UtcNow)
+                                {
+                                    <a asp-action="DeleteEvent" asp-route-storeId="@storeId" asp-route-eventId="@ghostEvent.Id" class="text-danger">Delete Event</a>
+                                }
+                            </div>
+                        </td>
+                        <td class="text-end">
+                            <div class="d-inline-flex align-items-center gap-3">
+                                <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ghostEvent.Id">Edit</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <p class="text-secondary mt-4">No events record found</p>
+}
