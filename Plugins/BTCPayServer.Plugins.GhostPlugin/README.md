@@ -29,7 +29,7 @@ Whether you’re receiving donations, selling tiered memberships, or offering ev
 
 Before diving into the setup process, ensure you have the following:
 
-- [A Ghost account](https://ghost.org/)
+- [A Ghost account](https://ghost.org/) or [self-hosted Ghost instance](https://ghost.org/docs/install/).
 - BTCPay Server - [self-hosted](Deployment.md) or run by a [third-party host](/Deployment/ThirdPartyHosting.md) v2.0.0 or later.
 - [Created BTCPay Server store](CreateStore.md) with [wallet set up](WalletSetup.md)
 
@@ -45,19 +45,19 @@ Before diving into the setup process, ensure you have the following:
 
 4. Log in to your Ghost Admin Panel on a new tab
 
-5. Navigate to Settings > Integrations. Click "Add custom integration" and name it e.g "BTCPay Server"
+5. Navigate to Settings (cogwheel at the bottom), in section "Advanced" click on "Integrations". Click "Add custom integration" and name it e.g "BTCPay Server"
 
-6. Save the integration, another screen would pop out showing the required Ghost credentials needed by the plugin.
+6. A modal will show the required Ghost credentials needed by the plugin
 
-7. Open up your BTCPay Server instance, and the Ghost plugin page.
+7. Click on "Save" to save your credentials, you can also put in a description before saving it.
 
-8. Copy your API Url (without the https://), Content API key, and Admin API Key from Ghost credential page into their respective input fields in your plugin page.
+8. Open up your BTCPay Server instance, make sure you selected the right store and open the Ghost plugin page.
 
-9. For the username/email and password fields, enter your Ghost admin email address, and password.
+9. Copy your API Url (without the https://), Content API key, and Admin API Key from Ghost credential page into their respective input fields in your plugin page.
 
-10. First save your Ghost credetials on Ghost admin portal (You can input a description before saving it if you want to) and close the pop up.
+10. For the username/email and password fields, enter your Ghost admin email address, and password.
 
-11. Now save the credetial details on BTCPay Plugin. If all data is correct, it should save successfully.
+11. Now save the credentials details on BTCPay Server Ghost Plugin. If all data is correct, it should save successfully.
 	
 
 ![BTCPay Server Ghost img 1](./img/Ghost/Add_Custom_Integration_View.png)
@@ -83,7 +83,7 @@ If you got here without any hassle, congratulations on successfully installing t
 
 You can discontinue the plugin by clicking on the stop Ghost calls button, and also deleting the custom integration that you created.
 
-In case you encountered any issue you can report them (Put directory to the section for opening an issue)
+In case you encountered any issue you can report them [here](https://github.com/TChukwuleta/BTCPayServerPlugins/issues) (prefix "Ghost" to title of the issue)
 
 
 ## 🎯 What can I do with the BTCPay-Ghost plugin?
@@ -92,7 +92,7 @@ Congratulations once again on installing your plugin successfully. Whether you�
 
 the Ghost - BTCPay Server plugin unlocks new revenue streams.
 
-1. Accept Donations – Allow readers support your work with with donations in Bitcoin.
+1. Accept Donations – Allow readers support your work with donations in Bitcoin.
 
 2. Event Ticketing - Sell tickets for virtual (workshops, consultation sessions and webinars) or in-person events using Bitcoin
 
@@ -110,10 +110,10 @@ Whether you're a blogger, journalist, or content creator, adding a Bitcoin donat
 
 #### Steps on how to receive donations on Ghost via BTCPay Server.
 
-1. Go to your BTCPay Server Ghost plugin, scroll down the page, you'd see donation URL, copy the URL.
+1. Go to your BTCPay Server Ghost plugin, scroll down the page, you'd see "Donation URL", copy the URL.
 
 2. Open your ghost admin page where you want to receive donations. You may be open to receiving donations on every content page of your Ghost blog, or on a single page dedicated to donations. Which ever you choose, 
-   accepting donations is pretty straightforward. Go to the editor of your donation page (Or any page). Add a new button with a title of your choice e.g Buy me a coffee in Bitcoin, for the Bitcoin URL, paste the
+   accepting donations is pretty straightforward. Go to the editor of your donation page (or any page). Add a new button with a title of your choice e.g Buy me a coffee in Bitcoin, for the Bitcoin URL, paste the
    Donation URL you copied, and paste it there. Save and publish your page
 
 3. When you go to the URL of the page, you should see the button now, click on the button, and a QR code would be displayed on the screen. Users can then scan this QR and support 
@@ -140,21 +140,19 @@ Whether you're a blogger, journalist, or content creator, adding a Bitcoin donat
 
 ### Event management using BTCPay Server
 
-If you are an event organizers, conference hosts, or community managers, you can now create and manage events on your Ghost platform that accept payments on 
+If you are an event organizers, conference hosts, or community managers, you can now create and manage events on your Ghost platform that accept payments via Bitcoin using BTCPay Server. With this you can create an event, set ticket pricing and available quantities, allow attendees purchase their tickets using Bitcoin.
 
-Bitcoin using BTCPay Server. With this you can create an event, set ticket pricing and available quantities, allow attendees purchase their tickets using Bitcoin.
+#### Prerequisites:
 
-Manage ticket payments e.t.c.
+On BTCPay Server side, make sure you have set up [Emails for your store](https://docs.btcpayserver.org/Notifications/#store-emails). This is needed so that customers get all required information about the ticket purchase. 
 
+#### Steps on how to set up events on Ghost via BTCPay Server.
 
-#### Steps on how to setup Events on Ghost via BTCPay Server.
+1. Click on your BTCPay Server Ghost plugin on the left sidebar, below that menu entry you will see submenu entries, "Ghost Member" and "Ghost Event", click on "Ghost Event".
 
+2. Click on "Create event" on the top right.
 
-1. Click on your BTCPay Server Ghost plugin, you'd see a dropdown of available use cases, select 'Ghost Event'.
-
-2. Click on Create event on the top right.
-
-3. Fill out all required event information such as title, Link (online event) or Address (Physical event), Event logo, Description, Ticket fee and currency
+3. Fill out all required event information such as title, link (for an online event) or Address (for a physical event), Event logo, Description, Ticket fee and currency
 
 	Event date, number of ticket for sale (if not an unlimited ticket event), the email subject and body that would be sent to customers on purchase of every ticket.
 
