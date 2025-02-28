@@ -87,10 +87,6 @@ public class GhostHostedService : EventHostedServiceBase
                             {
                                 await RegisterMembershipCreationTransaction(invoice, ghostOrderId, success.Value);
                             }
-                            else if (ghostOrderId.StartsWith(GhostApp.GHOST_TICKET_ID_PREFIX))
-                            {
-                                await RegisterTicketTransaction(invoice, ghostOrderId, success.Value);
-                            }
                         }
                     }
                     break;
@@ -191,49 +187,4 @@ public class GhostHostedService : EventHostedServiceBase
         }
     }
 
-    private async Task RegisterTicketTransaction(InvoiceEntity invoice, string orderId, bool success)
-    {
-        await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId);
-        if (ghostSetting.CredentialsPopulated())
-        {
-            var result = new InvoiceLogs();
-            result.Write($"Invoice status: {invoice.Status.ToString().ToLower()}", InvoiceEventData.EventSeverity.Info);
-            var ticket = ctx.GhostEventTickets.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id);
-            if (ticket == null)
-            {
-                result.Write("Couldn't find a corresponding Event ticket table record", InvoiceEventData.EventSeverity.Error);
-                await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
-                return;
-            }
-            if (ticket != null && ticket.PaymentStatus != TransactionStatus.New.ToString())
-            {
-                result.Write("Transaction has previously been completed", InvoiceEventData.EventSeverity.Info);
-                await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
-                return;
-            }
-            var ghostEvent = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == ticket.EventId && c.StoreId == ticket.StoreId);
-            ticket.PurchaseDate = DateTime.UtcNow;
-            ticket.InvoiceStatus = invoice.Status.ToString().ToLower();
-            ticket.PaymentStatus = success ? TransactionStatus.Settled.ToString() : TransactionStatus.Expired.ToString();
-            result.Write($"New ticket payment completed for Event: {ghostEvent?.Title} Buyer name: {ticket.Name}", InvoiceEventData.EventSeverity.Success);
-
-            var emailSender = await _emailSenderFactory.GetEmailSender(ghostSetting.StoreId);
-            var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
-            if (isEmailSettingsConfigured)
-            {
-                try
-                {
-                    await _emailService.SendTicketRegistrationEmail(ghostSetting.StoreId, ticket, ghostEvent);
-                    ticket.EmailSent = true;
-                    result.Write($"Email sent successfully to: {ticket?.Email}", InvoiceEventData.EventSeverity.Success);
-                }
-                catch (Exception){ }
-            }
-            ctx.UpdateRange(ticket);
-            await ctx.SaveChangesAsync();
-
-            await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
-        }
-    }
 }

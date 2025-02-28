@@ -54,30 +54,6 @@ public class EmailService
         }
     }
 
-    public async Task SendTicketRegistrationEmail(string storeId, GhostEventTicket ticket, GhostEvent ghostEvent)
-    {
-        string emailBody = ghostEvent.EmailBody
-                            .Replace("{{Title}}", ghostEvent.Title)
-                            .Replace("{{EventLink}}", ghostEvent.EventLink)
-                            .Replace("{{Name}}", ticket.Name)
-                            .Replace("{{Email}}", ticket.Email)
-                            .Replace("{{Description}}", ghostEvent.Description)
-                            .Replace("{{EventDate}}", ghostEvent.EventDate.ToString("MMMM dd, yyyy"))
-                            .Replace("{{Amount}}", ghostEvent.Amount.ToString())
-                            .Replace("{{Currency}}", ghostEvent.Currency);
-
-        var emailRecipients = new List<EmailRecipient>
-        {
-            new EmailRecipient
-            {
-                Address = InternetAddress.Parse(ticket.Email),
-                Subject = ghostEvent.EmailSubject,
-                MessageText = ghostEvent.EmailBody
-            }
-        };
-        await SendBulkEmail(storeId, emailRecipients);
-    }
-
     public async Task SendMembershipSubscriptionReminderEmail(EmailRequest model)
     {
         var settings = await (await _emailSender.GetEmailSender(model.StoreId)).GetEmailSettings();
