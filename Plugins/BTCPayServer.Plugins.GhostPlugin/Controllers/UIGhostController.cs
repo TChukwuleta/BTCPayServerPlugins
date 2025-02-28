@@ -92,7 +92,7 @@ public class UIGhostController : Controller
         {
             TempData.SetStatusMessageModel(new StatusMessageModel()
             {
-                Html = $"Kindly <a href='{Url.Action(nameof(UIServerController.Emails), "UIServer")}' class='alert-link'>configure Email SMTP</a> to be able to send reminder to subscribers you need to  first",
+                Html = $"Kindly <a href='{Url.Action(nameof(UIServerController.Emails), "UIServer")}' class='alert-link'>configure Email SMTP</a> to be able to send reminder to subscribers",
                 Severity = StatusMessageModel.StatusSeverity.Info,
                 AllowDismiss = true
             });
