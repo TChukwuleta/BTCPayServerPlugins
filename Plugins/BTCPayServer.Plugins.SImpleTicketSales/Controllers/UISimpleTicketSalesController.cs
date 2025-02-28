@@ -67,7 +67,7 @@ public class UISimpleTicketSalesController : Controller
 
 
     [HttpGet("list")]
-    public async Task<IActionResult> List(string storeId)
+    public async Task<IActionResult> List(string storeId, bool expired)
     {
         if (string.IsNullOrEmpty(storeId))
             return NotFound();
@@ -77,7 +77,7 @@ public class UISimpleTicketSalesController : Controller
         var events = ctx.TicketSalesEvents.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id).ToList();
         var eventTickets = ctx.TicketSalesEventTickets.AsNoTracking().Where(t => t.StoreId == CurrentStore.Id).ToList();
 
-        var ghostEventsViewModel = events
+        var eventsViewModel = events
            .Select(ticketEvent =>
            {
                var tickets = eventTickets.Where(t => t.EventId == ticketEvent.Id).ToList();
@@ -106,6 +106,11 @@ public class UISimpleTicketSalesController : Controller
                };
            }).ToList();
 
+        if (expired)
+        {
+            eventsViewModel = eventsViewModel.Where(c => c.EventDate <= DateTime.UtcNow).ToList();
+        }
+
         var emailSender = await _emailSenderFactory.GetEmailSender(storeId);
         var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
         ViewData["StoreEmailSettingsConfigured"] = isEmailSettingsConfigured;
@@ -117,7 +122,7 @@ public class UISimpleTicketSalesController : Controller
                 Severity = StatusMessageModel.StatusSeverity.Info
             });
         }
-        return View(new SalesTicketsEventsViewModel { DisplayedEvents = ghostEventsViewModel });
+        return View(new SalesTicketsEventsViewModel { DisplayedEvents = eventsViewModel, Expired = expired });
     }
 
 
@@ -136,7 +141,7 @@ public class UISimpleTicketSalesController : Controller
             var entity = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
             if (entity == null)
             {
-                TempData[WellKnownTempData.ErrorMessage] = "Invalid Ghost event record specified for this store";
+                TempData[WellKnownTempData.ErrorMessage] = "Invalid event record specified for this store";
                 return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
             }
             vm = TicketSalesEventToViewModel(entity);
@@ -163,6 +168,11 @@ public class UISimpleTicketSalesController : Controller
         if (vm.EventDate <= DateTime.UtcNow)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Event date cannot be in the past";
+            return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
+        }
+        if (vm.Amount <= 0)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Amount cannot be 0";
             return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
         }
         var entity = TicketSalesEventViewModelToEntity(vm);
@@ -202,7 +212,12 @@ public class UISimpleTicketSalesController : Controller
         var entity = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
         {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid Ghost event record specified for this store";
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid event record specified for this store";
+            return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+        }
+        if (vm.Amount <= 0)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Amount cannot be 0";
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
         }
         entity = TicketSalesEventViewModelToEntity(vm);

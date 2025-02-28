@@ -1,7 +1,8 @@
 @using BTCPayServer.Plugins.SimpleTicketSales.ViewModels
+@using System.Globalization
 @model CreateEventTicketViewModel
 @{
-    Layout = "_GhostPublicLayout";
+    Layout = "_BaseSimpleTicketPublicLayout";
     ViewBag.Title = "Register for Event";
 }
 
@@ -34,6 +35,11 @@
 
         <div class="d-inline-block">
             <span class="badge bg-info px-4 py-2 fs-6">@Model.EventDate.ToString("M/d/yy, hh:mm tt")</span>
+        </div>
+        <div class="mt-3">
+            <span class="badge bg-success px-3 py-2 fs-5">
+                Ticket Price: @Model.Currency @Model.Amount.ToString() 
+            </span>
         </div>
         <div class="text-muted mt-2" id="crowdfund-body-description">@Model.Description</div>
     </div>

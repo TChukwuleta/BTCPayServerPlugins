@@ -12,8 +12,8 @@
     var storeId = ScopeProvider.GetCurrentStoreId();
     bool isEditMode = !string.IsNullOrEmpty(Model.EventId);
     string formAction = isEditMode
-        ? Url.Action("UpdateEvent", "UIGhostEvent", new { eventId = Model.EventId, storeId })
-        : Url.Action("CreateEvent", "UIGhostEvent", new { storeId });
+        ? Url.Action("UpdateEvent", "UISimpleTicketSales", new { eventId = Model.EventId, storeId })
+        : Url.Action("CreateEvent", "UISimpleTicketSales", new { storeId });
 }
 
 <div class="sticky-header">

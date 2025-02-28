@@ -23,6 +23,24 @@
 <partial name="_StatusMessage" />
 
 
+<nav id="SectionNav" class="mb-3">
+    <div class="nav">
+        <a id="all-view"
+           asp-action="List"
+           asp-route-storeId="@storeId"
+           class="nav-link @(!Model.Expired ? "active" : "")"
+           role="tab">All</a>
+
+        <a id="expired-view"
+           asp-action="List"
+           asp-route-storeId="@storeId"
+           asp-route-expired="true"
+           class="nav-link @(Model.Expired ? "active" : "")"
+           role="tab">Expired Events</a>
+    </div>
+</nav>
+
+
 @if (Model.DisplayedEvents != null && Model.DisplayedEvents.Any())
 {
     <div class="table-responsive">
@@ -39,37 +57,40 @@
                 </tr>
             </thead>
             <tbody id="UsersList">
-                @foreach (var ghostEvent in Model.DisplayedEvents)
+                @foreach (var ticketEvent in Model.DisplayedEvents)
                 {
-                    <tr id="user_@ghostEvent.Id" class="user-overview-row mass-action-row">
+                    <tr id="user_@ticketEvent.Id" class="user-overview-row mass-action-row">
                         <td>
                             <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ghostEvent.Id">@ghostEvent.Title</a>
+                                <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">@ticketEvent.Title</a>
                             </div>
                         </td>
-                        <td>@(!string.IsNullOrEmpty(ghostEvent.Description) && ghostEvent.Description.Length > 15 ? ghostEvent.Description.Substring(0, 15) + "..." : ghostEvent.Description)</td>
-                        <td>@ghostEvent.EventDate.ToString("M/d/yy, hh:mm tt")</td>
+                        <td>@(!string.IsNullOrEmpty(ticketEvent.Description) && ticketEvent.Description.Length > 15 ? ticketEvent.Description.Substring(0, 15) + "..." : ticketEvent.Description)</td>
+                        <td>@ticketEvent.EventDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td>
-                            <a href="@ghostEvent.EventPurchaseLink" target="_blank">
-                                @(ghostEvent.EventPurchaseLink.Length > 15? ghostEvent.EventPurchaseLink.Substring(0, 20) + "..." : ghostEvent.EventPurchaseLink)
+                            <a href="@ticketEvent.EventPurchaseLink" target="_blank">
+                                <vc:truncate-center text="@ticketEvent.EventPurchaseLink" link="@ticketEvent.EventPurchaseLink" classes="truncate-center-id" />
                             </a>
                         </td>
-                        <td>@ghostEvent.Tickets.Count</td>
+                        <td>@ticketEvent.Tickets.Count(c => c.PaymentStatus == TransactionStatus.Settled.ToString())</td>
                         <td class="actions-col">
-                            <div class="d-inline-flex align-items-center gap-3">
-                                @if (ghostEvent.Tickets != null && ghostEvent.Tickets.Any())
-                                {
-                                    <a asp-action="ViewEventTicket" asp-route-storeId="@storeId" asp-route-eventId="@ghostEvent.Id">View Tickets</a>
-                                }
-                                @if (ghostEvent.Tickets == null || !ghostEvent.Tickets.Any() || ghostEvent.EventDate <= DateTime.UtcNow)
-                                {
-                                    <a asp-action="DeleteEvent" asp-route-storeId="@storeId" asp-route-eventId="@ghostEvent.Id" class="text-danger">Delete Event</a>
-                                }
-                            </div>
+                            @if (ticketEvent.EventDate > DateTime.UtcNow)
+                            {
+                                <div class="d-inline-flex align-items-center gap-3">
+                                    <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">Edit</a>
+                                </div>
+                            }
                         </td>
                         <td class="text-end">
                             <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ghostEvent.Id">Edit</a>
+                                @if (ticketEvent.Tickets != null && ticketEvent.Tickets.Any())
+                                {
+                                    <a asp-action="ViewEventTicket" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">View Tickets</a>
+                                }
+                                @if (ticketEvent.Tickets == null || !ticketEvent.Tickets.Any() || ticketEvent.EventDate <= DateTime.UtcNow)
+                                {
+                                    <a asp-action="DeleteEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id" class="text-danger">Delete Event</a>
+                                }
                             </div>
                         </td>
                     </tr>

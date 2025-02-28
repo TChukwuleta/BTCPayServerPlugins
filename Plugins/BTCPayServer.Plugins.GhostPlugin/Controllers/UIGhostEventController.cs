@@ -23,7 +23,6 @@ using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Services;
 using System;
-using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 

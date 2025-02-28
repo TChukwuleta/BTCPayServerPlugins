@@ -2,7 +2,7 @@
 
 namespace BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
 
-public class BaseGhostPublicViewModel
+public class BaseSimpleTicketPublicViewModel
 {
     public string StoreId { get; set; }
     public string StoreName { get; set; }
@@ -10,9 +10,8 @@ public class BaseGhostPublicViewModel
 }
 
 
-public class SimpleTicketSalesOrderViewModel : BaseGhostPublicViewModel
+public class SimpleTicketSalesOrderViewModel : BaseSimpleTicketPublicViewModel
 {
     public string InvoiceId { get; set; }
     public string BTCPayServerUrl { get; set; }
-    public string RedirectUrl { get; set; }
 }

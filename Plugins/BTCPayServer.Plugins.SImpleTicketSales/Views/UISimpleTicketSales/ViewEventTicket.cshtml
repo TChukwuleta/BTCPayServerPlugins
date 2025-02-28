@@ -66,7 +66,7 @@
                             <span data-sensitive>@DisplayFormatter.Currency(ticket.Amount, ticket.Currency)</span>
                         </td>
 
-                        @if (!ticket.HasEmailNotificationBeenSent)
+                        @if (!ticket.HasEmailNotificationBeenSent && ticket.TicketStatus == BTCPayServer.Plugins.SimpleTicketSales.Data.TransactionStatus.Settled.ToString())
                         {
                             <td class="text-end amount-col">
                                 <a asp-action="SendReminder" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticket.Id">Resend Ticket Confirmation</a>

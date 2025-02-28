@@ -6,10 +6,8 @@ using BTCPayServer.Services.Invoices;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using BTCPayServer.Services.PaymentRequests;
 using BTCPayServer.Services.Mails;
 using BTCPayServer.Client.Models;
 
@@ -20,7 +18,6 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
     public const string TICKET_SALES_PREFIX = "Ticket_Sales_";
     private readonly EmailService _emailService;
     private readonly InvoiceRepository _invoiceRepository;
-    private readonly IHttpClientFactory _httpClientFactory;
     private readonly EmailSenderFactory _emailSenderFactory;
     private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
 
@@ -28,21 +25,18 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
         EventAggregator eventAggregator,
         EmailSenderFactory emailSenderFactory,
         InvoiceRepository invoiceRepository,
-        IHttpClientFactory httpClientFactory,
         SimpleTicketSalesDbContextFactory dbContextFactory,
         Logs logs) : base(eventAggregator, logs)
     {
         _emailService = emailService;
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
-        _httpClientFactory = httpClientFactory;
         _emailSenderFactory = emailSenderFactory;
     }
 
     protected override void SubscribeToEvents()
     {
         Subscribe<InvoiceEvent>();
-        Subscribe<PaymentRequestEvent>();
         base.SubscribeToEvents();
     }
 
@@ -89,13 +83,9 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
         var result = new InvoiceLogs();
         result.Write($"Invoice status: {invoice.Status.ToString().ToLower()}", InvoiceEventData.EventSeverity.Info);
         var ticket = ctx.TicketSalesEventTickets.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id);
-        if (ticket == null)
-        {
-            result.Write("Couldn't find a corresponding Event ticket table record", InvoiceEventData.EventSeverity.Error);
-            await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
-            return;
-        }
-        if (ticket != null && ticket.PaymentStatus != SimpleTicketSales.Data.TransactionStatus.New.ToString())
+        if (ticket == null) return;
+
+        if (ticket != null && ticket.PaymentStatus != Data.TransactionStatus.New.ToString())
         {
             result.Write("Transaction has previously been completed", InvoiceEventData.EventSeverity.Info);
             await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
@@ -104,7 +94,7 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
         var ghostEvent = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.Id == ticket.EventId && c.StoreId == ticket.StoreId);
         ticket.PurchaseDate = DateTime.UtcNow;
         ticket.InvoiceStatus = invoice.Status.ToString().ToLower();
-        ticket.PaymentStatus = success ? SimpleTicketSales.Data.TransactionStatus.Settled.ToString() : SimpleTicketSales.Data.TransactionStatus.Expired.ToString();
+        ticket.PaymentStatus = success ? Data.TransactionStatus.Settled.ToString() : Data.TransactionStatus.Expired.ToString();
         result.Write($"New ticket payment completed for Event: {ghostEvent?.Title} Buyer name: {ticket.Name}", InvoiceEventData.EventSeverity.Success);
 
         var emailSender = await _emailSenderFactory.GetEmailSender(invoice.StoreId);
@@ -121,7 +111,6 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
         }
         ctx.UpdateRange(ticket);
         await ctx.SaveChangesAsync();
-
         await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
     }
 }

@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Authorization;
 using BTCPayServer.Services.Stores;
 using Microsoft.EntityFrameworkCore;
 using System;
-using System.Net.Http;
 using BTCPayServer.Models;
 using BTCPayServer.Services;
 using System.Collections.Generic;
@@ -21,6 +20,7 @@ using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Plugins.SimpleTicketSales.Services;
 using BTCPayServer.Plugins.SimpleTicketSales.Data;
 using BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
+using Microsoft.AspNetCore.Cors;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -32,19 +32,15 @@ public class UISimpleTicketSalesPublicController : Controller
     private readonly IFileService _fileService;
     private readonly StoreRepository _storeRepo;
     private readonly EmailService _emailService;
-    private readonly LinkGenerator _linkGenerator;
-    private readonly IHttpClientFactory _clientFactory;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly ApplicationDbContextFactory _context;
     private readonly UIInvoiceController _invoiceController;
     private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
     public UISimpleTicketSalesPublicController
-        (EmailService emailService,
-        UriResolver uriResolver,
+        (UriResolver uriResolver,
         IFileService fileService,
+        EmailService emailService,
         StoreRepository storeRepo,
-        LinkGenerator linkGenerator,
-        IHttpClientFactory clientFactory,
         ApplicationDbContextFactory context,
         InvoiceRepository invoiceRepository,
         UIInvoiceController invoiceController,
@@ -55,8 +51,6 @@ public class UISimpleTicketSalesPublicController : Controller
         _uriResolver = uriResolver;
         _fileService = fileService;
         _emailService = emailService;
-        _linkGenerator = linkGenerator;
-        _clientFactory = clientFactory;
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
         _invoiceController = invoiceController;
@@ -68,27 +62,29 @@ public class UISimpleTicketSalesPublicController : Controller
     public async Task<IActionResult> EventRegistration(string storeId, string eventId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostEvent = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
-        if (ghostEvent == null || ghostEvent.EventDate <= DateTime.UtcNow)
+        var ticketEvent = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
+        if (ticketEvent == null || ticketEvent.EventDate <= DateTime.UtcNow)
             return NotFound();
 
-        if (ghostEvent.HasMaximumCapacity)
+        if (ticketEvent.HasMaximumCapacity)
         {
             var eventTickets = await ctx.TicketSalesEventTickets.AsNoTracking().CountAsync(c => c.StoreId == storeId && c.EventId == eventId
                     && c.PaymentStatus == SimpleTicketSales.Data.TransactionStatus.Settled.ToString());
-            if (eventTickets >= ghostEvent.MaximumEventCapacity)
+            if (eventTickets >= ticketEvent.MaximumEventCapacity)
                 return NotFound();
         }
         var storeData = await _storeRepo.FindStore(storeId);
-        var getFile = ghostEvent.EventImageUrl == null ? null : await _fileService.GetFileUrl(Request.GetAbsoluteRootUri(), ghostEvent.EventImageUrl);
+        var getFile = ticketEvent.EventImageUrl == null ? null : await _fileService.GetFileUrl(Request.GetAbsoluteRootUri(), ticketEvent.EventImageUrl);
 
         return View(new CreateEventTicketViewModel { 
-            EventId = ghostEvent.Id, 
+            EventId = ticketEvent.Id, 
             StoreId = storeId,
+            Amount = ticketEvent.Amount,
+            Currency = ticketEvent.Currency,
             EventImageUrl = getFile == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile)),
-            EventDate = ghostEvent.EventDate,
-            Description = ghostEvent.Description,
-            EventTitle = ghostEvent.Title,
+            EventDate = ticketEvent.EventDate,
+            Description = ticketEvent.Description,
+            EventTitle = ticketEvent.Title,
             StoreName = storeData?.StoreName,
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, storeData?.GetStoreBlob()),
         });
@@ -154,7 +150,17 @@ public class UISimpleTicketSalesPublicController : Controller
     }
 
 
-    public async Task<InvoiceEntity> CreateInvoiceAsync(BTCPayServer.Data.StoreData store, string prefix, string txnId, decimal amount, string currency, string url)
+    [HttpGet("btcpay-ticketsales.js")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> GetBtcPayJavascript(string storeId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var userStore = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        var fileContent = _emailService.GetEmbeddedResourceContent("Resources.js.btcpay_ticketsales.js");
+        return Content(fileContent, "text/javascript");
+    }
+
+    public async Task<InvoiceEntity> CreateInvoiceAsync(Data.StoreData store, string prefix, string txnId, decimal amount, string currency, string url)
     {
         var ghostSearchTerm = $"{prefix}{txnId}";
         var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()

@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
 
-public class CreateEventTicketViewModel : BaseGhostPublicViewModel
+public class CreateEventTicketViewModel : BaseSimpleTicketPublicViewModel
 {
     [Display(Name = "Email Address")]
     public string Email { get; set; }
@@ -14,5 +14,7 @@ public class CreateEventTicketViewModel : BaseGhostPublicViewModel
     public DateTime EventDate { get; set; }
     public string EventImageUrl { get; set; }
     public string Description { get; set; }
+    public decimal Amount { get; set; }
+    public string Currency { get; set; }
     public string EventId { get; set; }
 }
