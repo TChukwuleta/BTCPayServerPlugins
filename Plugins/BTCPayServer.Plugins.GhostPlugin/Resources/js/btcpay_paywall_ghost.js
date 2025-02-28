@@ -1,6 +1,14 @@
 document.addEventListener("DOMContentLoaded", function () {
-    console.log("Script Loaded");
+
+    var extLinks = document.querySelectorAll('a[href*="://"]');
+    for (var i = 0; i < extLinks.length; i++) {
+        if (!extLinks[i].href.startsWith(window.location.origin)) {
+            extLinks[i].setAttribute('target', '_blank');
+        }
+    }
+
     loadModalScript();
+    console.log("Script Loaded");
 
     if (localStorage.getItem('paywall_unlocked') === 'true') {
         console.log("User has unlocked content")

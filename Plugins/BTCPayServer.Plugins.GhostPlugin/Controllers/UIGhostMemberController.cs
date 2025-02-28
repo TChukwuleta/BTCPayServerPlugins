@@ -20,6 +20,7 @@ using static BTCPayServer.Plugins.GhostPlugin.Services.EmailService;
 using BTCPayServer.Services.Mails;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 using Newtonsoft.Json;
+using BTCPayServer.Controllers;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -121,8 +122,9 @@ public class UIGhostMemberController : Controller
         {
             TempData.SetStatusMessageModel(new StatusMessageModel()
             {
-                Message = $"Kindly configure Email SMTP in the admin settings to be able to send reminder to subscribers",
-                Severity = StatusMessageModel.StatusSeverity.Info
+                Html = $"Kindly <a href='{Url.Action(nameof(UIServerController.Emails), "UIServer")}' class='alert-link'>configure Email SMTP</a> in the admin settings to be able to send reminder to subscribers",
+                Severity = StatusMessageModel.StatusSeverity.Info,
+                AllowDismiss = true
             });
         }
         return View(new GhostMembersViewModel { 
