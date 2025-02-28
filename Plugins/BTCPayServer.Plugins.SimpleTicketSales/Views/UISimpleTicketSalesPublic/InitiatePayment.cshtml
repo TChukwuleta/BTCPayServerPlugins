@@ -1,0 +1,96 @@
+@using BTCPayServer.Plugins.SimpleTicketSales.ViewModels
+@model SimpleTicketSalesOrderViewModel
+@{
+    Layout = "_BaseSimpleTicketPublicLayout";
+    ViewBag.Title = "Pay with BTCPay Server...";
+    string btcpayScriptUrl = $"{Model.BTCPayServerUrl}/plugins/{Model.StoreId}/ticket/api/btcpay-ticketsales.js";
+}
+
+<div class="public-page-wrap" style="--wrap-max-width: 576px;">
+    <h1 class="h3 text-center mt-3">@ViewBag.Title</h1>
+
+    <main class="flex-grow-1">
+        <div class="d-flex flex-column justify-content-center gap-4">
+            <div class="tile">
+                <p id="loadingMessage">
+                    Please wait while we load your payment modal. If you encounter any issues, try refreshing the page or contact support.
+                </p>
+                <div id="statusButton" style="display: none;">
+                    <p>Thank you for completing your payment. Kindly check your mail for further details about the event. If you didn't get any email, please contact admin.'</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="store-footer">
+        <a class="store-powered-by" href="https://btcpayserver.org" target="_blank" rel="noreferrer noopener">
+            Powered by <partial name="_StoreFooterLogo" />
+        </a>
+    </footer>
+</div>
+
+@section PageFootContent {
+    <script src="@btcpayScriptUrl"></script>
+    <script>
+        function showBTCPayModal() {
+            window.btcpay.setApiUrlPrefix("@Model.BTCPayServerUrl");
+            window.btcpay.showInvoice("@Model.InvoiceId");
+
+            let invoice_paid = false;
+            let loadingMessage = document.getElementById('loadingMessage');
+            let statusButton = document.getElementById('statusButton');
+
+            window.btcpay.onModalReceiveMessage(function (event) {
+                if (isObject(event.data)) {
+                    switch (event.data.status.toLowerCase()) {
+                        case 'complete':
+                        case 'paid':
+                        case 'confirmed':
+                        case 'processing':
+                        case 'settled':
+                            invoice_paid = true;
+                            console.log('Invoice paid.');
+                            break;
+                        case 'expired':
+                            window.btcpay.hideFrame();
+                            console.error('Invoice expired.');
+                            break;
+                        case 'invalid':
+                            window.btcpay.hideFrame();
+                            console.error('Invalid invoice.');
+                            break;
+                        default:
+                            console.error('Unknown status: ' + event.data.status);
+                    }
+                } else if (event.data === 'close') {
+                    if (invoice_paid === true) {
+                        console.log('Invoice paid.');
+                    }
+                    statusButton.style.display = 'block';
+                    if (loadingMessage) {
+                        loadingMessage.style.display = 'none';
+                    }
+                    console.log('Modal closed.');
+                }
+            });
+
+            function isObject(obj) {
+                return Object.prototype.toString.call(obj) === '[object Object]';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log('DOMContentLoaded fired');
+            if (window.btcpay) {
+                console.log('BTCPay script loaded');
+                showBTCPayModal();
+            } else {
+                console.error('BTCPay script not loaded.');
+            }
+        });
+
+        function closeTab() {
+            window.close();
+        }
+    </script>
+}

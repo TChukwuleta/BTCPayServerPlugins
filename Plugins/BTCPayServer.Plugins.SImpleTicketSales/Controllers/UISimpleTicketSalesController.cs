@@ -8,30 +8,28 @@ using Microsoft.AspNetCore.Authorization;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Services.Stores;
 using StoreData = BTCPayServer.Data.StoreData;
-using BTCPayServer.Plugins.GhostPlugin.Services;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.Net.Http;
-using BTCPayServer.Plugins.GhostPlugin.Helper;
-using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 using BTCPayServer.Services.Mails;
 using Microsoft.AspNetCore.Routing;
 using BTCPayServer.Services.Apps;
 using BTCPayServer.Client;
-using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Services;
-using System;
+using BTCPayServer.Plugins.SimpleTicketSales.Services;
+using BTCPayServer.Plugins.SimpleTicketSales.Data;
+using BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 
-[Route("~/plugins/{storeId}/ghost/event/")]
+[Route("~/plugins/{storeId}/ticketsales/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
-public class UIGhostEventController : Controller
+public class UISimpleTicketSalesController : Controller
 {
-    private GhostHelper helper;
     private readonly AppService _appService;
     private readonly UriResolver _uriResolver;
     private readonly IFileService _fileService;
@@ -40,66 +38,64 @@ public class UIGhostEventController : Controller
     private readonly IHttpClientFactory _clientFactory;
     private readonly EmailSenderFactory _emailSenderFactory;
     private readonly BTCPayNetworkProvider _networkProvider;
-    private readonly GhostDbContextFactory _dbContextFactory;
+    private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
-    public UIGhostEventController
+    public UISimpleTicketSalesController
         (AppService appService,
         UriResolver uriResolver,
         IFileService fileService,
-        EmailService emailService,
         StoreRepository storeRepo,
+        EmailService emailService,
         IHttpClientFactory clientFactory,
         EmailSenderFactory emailSenderFactory,
         BTCPayNetworkProvider networkProvider,
-        GhostDbContextFactory dbContextFactory,
+        SimpleTicketSalesDbContextFactory dbContextFactory,
         UserManager<ApplicationUser> userManager)
     {
         _storeRepo = storeRepo;
         _appService = appService;
         _uriResolver = uriResolver;
         _fileService = fileService;
+        _emailService = emailService;
         _userManager = userManager;
         _clientFactory = clientFactory;
         _networkProvider = networkProvider;
         _dbContextFactory = dbContextFactory;
-        helper = new GhostHelper(_appService);
         _emailSenderFactory = emailSenderFactory;
     }
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
+
     [HttpGet("list")]
-    public async Task<IActionResult> List(string storeId)
+    public async Task<IActionResult> List(string storeId, bool expired)
     {
         if (string.IsNullOrEmpty(storeId))
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null)
-            return NoGhostSetupResult(storeId);
 
-        var events = ctx.GhostEvents.AsNoTracking().Where(c => c.StoreId == ghostSetting.StoreId).ToList();
-        var eventTickets = ctx.GhostEventTickets.AsNoTracking().Where(t => t.StoreId == ghostSetting.StoreId).ToList();
+        var events = ctx.TicketSalesEvents.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id).ToList();
+        var eventTickets = ctx.TicketSalesEventTickets.AsNoTracking().Where(t => t.StoreId == CurrentStore.Id).ToList();
 
-        var ghostEventsViewModel = events
-           .Select(ghostEvent =>
+        var eventsViewModel = events
+           .Select(ticketEvent =>
            {
-               var tickets = eventTickets.Where(t => t.EventId == ghostEvent.Id).ToList();
-               return new GhostEventsListViewModel
+               var tickets = eventTickets.Where(t => t.EventId == ticketEvent.Id).ToList();
+               return new SalesTicketsEventsListViewModel
                {
-                   Id = ghostEvent.Id,
-                   Title = ghostEvent.Title,
-                   EventPurchaseLink = Url.Action("EventRegistration", "UIGhostPublic", new { storeId = CurrentStore.Id, eventId = ghostEvent.Id }, Request.Scheme),
-                   Description = ghostEvent.Description,
-                   EventDate = ghostEvent.EventDate,
-                   CreatedAt = ghostEvent.CreatedAt,
+                   Id = ticketEvent.Id,
+                   Title = ticketEvent.Title,
+                   EventPurchaseLink = Url.Action("EventRegistration", "UISimpleTicketSalesPublic", new { storeId = CurrentStore.Id, eventId = ticketEvent.Id }, Request.Scheme),
+                   Description = ticketEvent.Description,
+                   EventDate = ticketEvent.EventDate,
+                   CreatedAt = ticketEvent.CreatedAt,
                    StoreId = CurrentStore.Id,
-                   Tickets = tickets.Select(t => new GhostEventTicketsViewModel
+                   Tickets = tickets.Select(t => new SalesTicketEventTicketsViewModel
                    {
                        Id = t.Id,
                        Name = t.Name,
                        StoreId = CurrentStore.Id,
-                       EventId = ghostEvent.Id,
+                       EventId = ticketEvent.Id,
                        Amount = t.Amount,
                        Currency = t.Currency,
                        Email = t.Email,
@@ -109,6 +105,11 @@ public class UIGhostEventController : Controller
                    }).ToList()
                };
            }).ToList();
+
+        if (expired)
+        {
+            eventsViewModel = eventsViewModel.Where(c => c.EventDate <= DateTime.UtcNow).ToList();
+        }
 
         var emailSender = await _emailSenderFactory.GetEmailSender(storeId);
         var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
@@ -121,7 +122,7 @@ public class UIGhostEventController : Controller
                 Severity = StatusMessageModel.StatusSeverity.Info
             });
         }
-        return View(new GhostEventsViewModel { DisplayedEvents = ghostEventsViewModel });
+        return View(new SalesTicketsEventsViewModel { DisplayedEvents = eventsViewModel, Expired = expired });
     }
 
 
@@ -132,21 +133,18 @@ public class UIGhostEventController : Controller
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null)
-            return NoGhostSetupResult(storeId);
 
         var defaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, string.Empty);
-        var vm = new UpdateGhostEventViewModel { StoreId = CurrentStore.Id, StoreDefaultCurrency = defaultCurrency };
+        var vm = new UpdateSimpleTicketSalesEventViewModel { StoreId = CurrentStore.Id, StoreDefaultCurrency = defaultCurrency };
         if (!string.IsNullOrEmpty(eventId))
         {
-            var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == ghostSetting.StoreId);
+            var entity = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
             if (entity == null)
             {
-                TempData[WellKnownTempData.ErrorMessage] = "Invalid Ghost event record specified for this store";
+                TempData[WellKnownTempData.ErrorMessage] = "Invalid event record specified for this store";
                 return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
             }
-            vm = helper.GhostEventToViewModel(entity);
+            vm = TicketSalesEventToViewModel(entity);
             var getFile = entity.EventImageUrl == null ? null : await _fileService.GetFileUrl(Request.GetAbsoluteRootUri(), entity.EventImageUrl);
             vm.EventImageUrl = getFile == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile));
             vm.StoreDefaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, entity.Currency);
@@ -156,16 +154,12 @@ public class UIGhostEventController : Controller
 
 
     [HttpPost("create-event")]
-    public async Task<IActionResult> CreateEvent(string storeId, [FromForm] UpdateGhostEventViewModel vm)
+    public async Task<IActionResult> CreateEvent(string storeId, [FromForm] UpdateSimpleTicketSalesEventViewModel vm)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null)
-            return NoGhostSetupResult(storeId);
-
         if (vm.HasMaximumCapacity && (!vm.MaximumEventCapacity.HasValue || vm.MaximumEventCapacity.Value <= 0))
         {
             TempData[WellKnownTempData.ErrorMessage] = "Kindly input the event capacity";
@@ -176,11 +170,16 @@ public class UIGhostEventController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Event date cannot be in the past";
             return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
         }
-        var entity = helper.GhostEventViewModelToEntity(vm);
+        if (vm.Amount <= 0)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Amount cannot be 0";
+            return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
+        }
+        var entity = TicketSalesEventViewModelToEntity(vm);
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
         {
-            imageUpload = await _fileService.UploadImage(vm.EventImageFile, ghostSetting.ApplicationUserId);
+            imageUpload = await _fileService.UploadImage(vm.EventImageFile, GetUserId());
             if (!imageUpload.Success)
             {
                 TempData[WellKnownTempData.ErrorMessage] = imageUpload.Response;
@@ -192,9 +191,10 @@ public class UIGhostEventController : Controller
             }
         }
         vm.EventImageFile = null;
+        entity.CreatedAt = DateTime.UtcNow;
         entity.Currency = await GetStoreDefaultCurrentIfEmpty(storeId, vm.Currency);
         entity.StoreId = CurrentStore.Id;
-        ctx.GhostEvents.Update(entity);
+        ctx.TicketSalesEvents.Update(entity);
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Event created successfully";
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
@@ -202,28 +202,30 @@ public class UIGhostEventController : Controller
 
 
     [HttpPost("update-event/{eventId}")]
-    public async Task<IActionResult> UpdateEvent(string storeId, string eventId, UpdateGhostEventViewModel vm, [FromForm] bool RemoveEventLogoFile = false)
+    public async Task<IActionResult> UpdateEvent(string storeId, string eventId, UpdateSimpleTicketSalesEventViewModel vm, [FromForm] bool RemoveEventLogoFile = false)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null)
-            return NoGhostSetupResult(storeId);
 
-        var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == ghostSetting.StoreId);
+        var entity = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
         {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid Ghost event record specified for this store";
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid event record specified for this store";
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
         }
-        entity = helper.GhostEventViewModelToEntity(vm);
+        if (vm.Amount <= 0)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Amount cannot be 0";
+            return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+        }
+        entity = TicketSalesEventViewModelToEntity(vm);
         entity.Id = eventId;
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
         {
-            imageUpload = await _fileService.UploadImage(vm.EventImageFile, ghostSetting.ApplicationUserId);
+            imageUpload = await _fileService.UploadImage(vm.EventImageFile, GetUserId());
             if (!imageUpload.Success)
             {
                 TempData[WellKnownTempData.ErrorMessage] = imageUpload.Response;
@@ -240,7 +242,7 @@ public class UIGhostEventController : Controller
             vm.EventImageUrl = null;
             vm.EventImageUrl = null;
         }
-        ctx.GhostEvents.Update(entity);
+        ctx.TicketSalesEvents.Update(entity);
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Event updated successfully";
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
@@ -254,15 +256,12 @@ public class UIGhostEventController : Controller
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSettingExists = await ctx.GhostSettings.AnyAsync(c => c.StoreId == CurrentStore.Id);
-        if (!ghostSettingExists)
-            return NoGhostSetupResult(storeId);
 
-        var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        var entity = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
             return NotFound();
 
-        var tickets = ctx.GhostEventTickets.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id && c.EventId == eventId).ToList();
+        var tickets = ctx.TicketSalesEventTickets.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id && c.EventId == eventId).ToList();
         if (tickets.Any() && entity.EventDate > DateTime.UtcNow)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Cannot delete event as there are active tickets purchase and the event is in the future";
@@ -279,15 +278,12 @@ public class UIGhostEventController : Controller
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSettingExists = await ctx.GhostSettings.AnyAsync(c => c.StoreId == CurrentStore.Id);
-        if (!ghostSettingExists)
-            return NoGhostSetupResult(storeId);
 
-        var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        var entity = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
             return NotFound();
 
-        var tickets = ctx.GhostEventTickets.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id && c.EventId == eventId).ToList();
+        var tickets = ctx.TicketSalesEventTickets.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id && c.EventId == eventId).ToList();
         if (tickets.Any())
         {
             if (entity.EventDate > DateTime.UtcNow)
@@ -297,10 +293,10 @@ public class UIGhostEventController : Controller
             }
             else
             {
-                ctx.GhostEventTickets.RemoveRange(tickets);
+                ctx.TicketSalesEventTickets.RemoveRange(tickets);
             }
         }
-        ctx.GhostEvents.Remove(entity);
+        ctx.TicketSalesEvents.Remove(entity);
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Event deleted successfully";
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
@@ -314,18 +310,15 @@ public class UIGhostEventController : Controller
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null)
-            return NoGhostSetupResult(storeId);
 
-        var entity = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == ghostSetting.StoreId);
+        var entity = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Invalid Event specified";
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
         }
 
-        var query = ctx.GhostEventTickets.AsNoTracking().Where(c => c.EventId == eventId && c.StoreId == ghostSetting.StoreId);
+        var query = ctx.TicketSalesEventTickets.AsNoTracking().Where(c => c.EventId == eventId && c.StoreId == CurrentStore.Id);
         if (!string.IsNullOrWhiteSpace(searchText))
         {
             searchText = searchText.Trim().ToLowerInvariant();
@@ -367,16 +360,13 @@ public class UIGhostEventController : Controller
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null)
-            return NoGhostSetupResult(storeId);
 
-        var ghostEvent = ctx.GhostEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
-        var eventTicket = ctx.GhostEventTickets.AsNoTracking().FirstOrDefault(c => c.Id == ticketId && c.EventId == eventId);
+        var ghostEvent = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        var eventTicket = ctx.TicketSalesEventTickets.AsNoTracking().FirstOrDefault(c => c.Id == ticketId && c.EventId == eventId);
         if (ghostEvent == null || eventTicket == null)
             return NotFound();
 
-        var emailSender = await _emailSenderFactory.GetEmailSender(ghostSetting.StoreId);
+        var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStore.Id);
         var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
         if (!isEmailConfigured)
         {
@@ -385,9 +375,9 @@ public class UIGhostEventController : Controller
         }
         try
         {
-            await _emailService.SendTicketRegistrationEmail(ghostSetting.StoreId, eventTicket, ghostEvent);
+            await _emailService.SendTicketRegistrationEmail(CurrentStore.Id, eventTicket, ghostEvent);
             eventTicket.EmailSent = true;
-            ctx.GhostEventTickets.Update(eventTicket);
+            ctx.TicketSalesEventTickets.Update(eventTicket);
             await ctx.SaveChangesAsync();
         }
         catch (Exception ex)
@@ -409,14 +399,44 @@ public class UIGhostEventController : Controller
         return currency.Trim().ToUpperInvariant();
     }
 
-    public IActionResult NoGhostSetupResult(string storeId)
+
+    private string GetUserId() => _userManager.GetUserId(User);
+
+    private UpdateSimpleTicketSalesEventViewModel TicketSalesEventToViewModel(TicketSalesEvent entity)
     {
-        TempData.SetStatusMessageModel(new StatusMessageModel
+        return new UpdateSimpleTicketSalesEventViewModel
         {
-            Severity = StatusMessageModel.StatusSeverity.Error,
-            Html = $"To manage ghost events, you need to set up Ghost credentials first",
-            AllowDismiss = false
-        });
-        return RedirectToAction(nameof(UIGhostController.Index), "UIGhost", new { storeId });
+            StoreId = entity.StoreId,   
+            EventId = entity.Id,
+            Title = entity.Title,
+            Description = entity.Description,
+            EventLink = entity.EventLink,
+            EventDate = entity.EventDate,
+            Amount = entity.Amount,
+            Currency = entity.Currency,
+            EmailBody = entity.EmailBody,
+            EmailSubject = entity.EmailSubject,
+            HasMaximumCapacity = entity.HasMaximumCapacity,
+            MaximumEventCapacity = entity.MaximumEventCapacity
+        };
+    }
+
+    private TicketSalesEvent TicketSalesEventViewModelToEntity(UpdateSimpleTicketSalesEventViewModel model)
+    {
+        return new TicketSalesEvent
+        {
+            StoreId = model.StoreId,
+            Title = model.Title,
+            Description = model.Description,
+            EventImageUrl = model.EventImageUrl,
+            EventLink = model.EventLink,
+            EventDate = model.EventDate,
+            Amount = model.Amount,
+            Currency = model.Currency,
+            EmailBody = model.EmailBody,
+            EmailSubject = model.EmailSubject,
+            HasMaximumCapacity = model.HasMaximumCapacity,
+            MaximumEventCapacity = model.MaximumEventCapacity
+        };
     }
 }
