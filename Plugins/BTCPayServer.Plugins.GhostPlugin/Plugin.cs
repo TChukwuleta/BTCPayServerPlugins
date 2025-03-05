@@ -26,7 +26,6 @@ public class Plugin : BaseBTCPayServerPlugin
         services.AddHostedService<GhostHostedService>();
         services.AddHostedService<ApplicationPartsLogger>();
         services.AddHostedService(s => s.GetRequiredService<GhostPluginService>());
-        services.AddSingleton<IWebhookProvider>(o => o.GetRequiredService<GhostPluginService>());
         services.AddDbContext<GhostDbContext>((provider, o) =>
         {
             var factory = provider.GetRequiredService<GhostDbContextFactory>();

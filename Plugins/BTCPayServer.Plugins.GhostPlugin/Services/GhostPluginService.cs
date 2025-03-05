@@ -18,21 +18,18 @@ using System.Threading;
 using System.Net.Http;
 using Microsoft.EntityFrameworkCore;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
-using BTCPayServer.HostedServices.Webhooks;
 using TransactionStatus = BTCPayServer.Plugins.GhostPlugin.Data.TransactionStatus;
 using Newtonsoft.Json;
 using static BTCPayServer.Plugins.GhostPlugin.Services.EmailService;
 using BTCPayServer.Services.Mails;
-using BTCPayServer.Events;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
-public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
+public class GhostPluginService : EventHostedServiceBase
 {
     private readonly AppService _appService;
     private readonly EmailService _emailService;
-    private readonly WebhookSender _webhookSender;
     private readonly IHttpClientFactory _clientFactory;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly EmailSenderFactory _emailSenderFactory;
@@ -43,7 +40,6 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
     public GhostPluginService(
         AppService appService,
         EmailService emailService,
-        WebhookSender webhookSender,
         EventAggregator eventAggregator,
         IHttpClientFactory clientFactory,
         ILogger<GhostPluginService> logger,
@@ -55,7 +51,6 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
     {
         _appService = appService;
         _emailService = emailService;
-        _webhookSender = webhookSender;
         _clientFactory = clientFactory;
         _dbContextFactory = dbContextFactory;
         _invoiceController = invoiceController;
@@ -70,36 +65,7 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
         _ = ScheduleChecks();
     }
 
-    protected override void SubscribeToEvents()
-    {
-        Subscribe<InvoiceEvent>();
-        Subscribe<PaymentRequestEvent>();
-        Subscribe<SequentialExecute>();
-        base.SubscribeToEvents();
-    }
-
     private CancellationTokenSource _checkTcs = new();
-    public record SequentialExecute(Func<Task<object>> Action, TaskCompletionSource<object> TaskCompletionSource);
-
-    protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
-    {
-        switch (evt)
-        {
-            case SequentialExecute sequentialExecute:
-                {
-                    var task = await sequentialExecute.Action();
-                    sequentialExecute.TaskCompletionSource.SetResult(task);
-                    return;
-                }
-
-            case InvoiceEvent invoiceEvent:
-                {
-                    await CreatePaymentRequestForActiveSubscriptionCloseToEnding();
-                    break;
-                }
-        }
-        await base.ProcessEvent(evt, cancellationToken);
-    }
 
     private async Task ScheduleChecks()
     {
@@ -132,6 +98,26 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
             }
         }
     }
+
+    protected override void SubscribeToEvents()
+    {
+        Subscribe<SequentialExecute>();
+        base.SubscribeToEvents();
+    }
+
+    public record SequentialExecute(Func<Task<object>> Action, TaskCompletionSource<object> TaskCompletionSource);
+
+    protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
+    {
+        if (evt is SequentialExecute sequentialExecute)
+        {
+            var task = await sequentialExecute.Action();
+            sequentialExecute.TaskCompletionSource.SetResult(task);
+            return;
+        }
+        await base.ProcessEvent(evt, cancellationToken);
+    }
+
 
     public async Task CreatePaymentRequestForActiveSubscriptionCloseToEnding()
     {
@@ -219,17 +205,6 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
                 {
                     Console.WriteLine($"Error sending an email: {ex.Message}");
                 }
-            }
-            foreach (var deliverRequest in deliverRequests)
-            {
-                var webhooks = await _webhookSender.GetWebhooks(app.StoreDataId, GhostApp.GhostSubscriptionRenewalRequested);
-                foreach (var webhook in webhooks)
-                {
-                    _webhookSender.EnqueueDelivery(CreateSubscriptionRenewalRequestedDeliveryRequest(webhook, app.Id, app.StoreDataId, deliverRequest.memberId,
-                         deliverRequest.email));
-                }
-                EventAggregator.Publish(CreateSubscriptionRenewalRequestedDeliveryRequest(null, app.Id, app.StoreDataId, deliverRequest.memberId,
-                    deliverRequest.email));
             }
         }
     }
@@ -414,90 +389,6 @@ public class GhostPluginService : EventHostedServiceBase, IWebhookProvider
                 ctx.SaveChanges();
             }
         }
-    }
-
-    GhostSubscriptionWebhookDeliveryRequest CreateSubscriptionRenewalRequestedDeliveryRequest(WebhookData? webhook,
-        string ghostSettingId, string storeId, string memberId, string email)
-    {
-        var webhookEvent = new WebhookSubscriptionEvent(GhostApp.GhostSubscriptionRenewalRequested, storeId)
-        {
-            WebhookId = webhook?.Id,
-            GhostSettingId = ghostSettingId,
-            MemberId = memberId,
-            Email = email
-        };
-        var delivery = webhook is null ? null : WebhookExtensions.NewWebhookDelivery(webhook.Id);
-        if (delivery is not null)
-        {
-            webhookEvent.DeliveryId = delivery.Id;
-            webhookEvent.OriginalDeliveryId = delivery.Id;
-            webhookEvent.Timestamp = delivery.Timestamp;
-        }
-        return new GhostSubscriptionWebhookDeliveryRequest(webhook?.Id, webhookEvent, delivery, webhook?.GetBlob());
-    }
-
-
-    public class WebhookSubscriptionEvent : StoreWebhookEvent
-    {
-        public WebhookSubscriptionEvent(string type, string storeId)
-        {
-            if (!type.StartsWith("ghost", StringComparison.InvariantCultureIgnoreCase))
-                throw new ArgumentException("Invalid event type", nameof(type));
-            Type = type;
-            StoreId = storeId;
-        }
-        [JsonProperty(Order = 2)] public string GhostSettingId { get; set; }
-        [JsonProperty(Order = 3)] public string MemberId { get; set; }
-        [JsonProperty(Order = 4)] public string Status { get; set; }
-        [JsonProperty(Order = 6)] public string Email { get; set; }
-    }
-
-
-    public class GhostSubscriptionWebhookDeliveryRequest(string? webhookId,
-        WebhookSubscriptionEvent webhookEvent, BTCPayServer.Data.WebhookDeliveryData? delivery, WebhookBlob? webhookBlob)
-        : WebhookSender.WebhookDeliveryRequest(webhookId!, webhookEvent, delivery!, webhookBlob!)
-    {
-        public override Task<SendEmailRequest?> Interpolate(SendEmailRequest req,
-            UIStoresController.StoreEmailRule storeEmailRule)
-        {
-            if (storeEmailRule.CustomerEmail &&
-                MailboxAddressValidator.TryParse(webhookEvent.Email, out var bmb))
-            {
-                req.Email ??= string.Empty;
-                req.Email += $",{bmb}";
-            }
-
-            req.Subject = Interpolate(req.Subject);
-            req.Body = Interpolate(req.Body);
-            return Task.FromResult(req)!;
-        }
-
-        private string Interpolate(string str)
-        {
-            var res = str.Replace("{Ghost.MemberId}", webhookEvent.MemberId)
-                .Replace("{Ghost.Status}", webhookEvent.Status)
-                .Replace("{Ghost.GhostSettingId}", webhookEvent.GhostSettingId);
-            return res;
-        }
-    }
-
-    public Dictionary<string, string> GetSupportedWebhookTypes()
-    {
-        return new Dictionary<string, string>
-        {
-            {GhostApp.GhostSubscriptionRenewalRequested, "A subscription has generated a payment request for ghost membership renewal"}
-        };
-    }
-
-    public WebhookEvent CreateTestEvent(string type, params object[] args)
-    {
-        var storeId = args[0].ToString();
-        return new WebhookSubscriptionEvent(type, storeId)
-        {
-            GhostSettingId = "__test__" + Guid.NewGuid() + "__test__",
-            MemberId = "__test__" + Guid.NewGuid() + "__test__",
-            Status = GhostSubscriptionStatus.New.ToString()
-        };
     }
 
     private async Task SendReminderEmail(GhostSetting ghostSetting, GhostMember member, DateTime expirationDate, EmailRequest emailRequest)
