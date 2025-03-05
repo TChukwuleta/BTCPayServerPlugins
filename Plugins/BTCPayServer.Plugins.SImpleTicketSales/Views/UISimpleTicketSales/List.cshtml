@@ -48,7 +48,6 @@
             <thead>
                 <tr>
                     <th>Title</th>
-                    <th>Description</th>
                     <th>Event Date</th>
                     <th>Ticket Purchase Link</th>
                     <th>Tickets Sold</th>
@@ -65,7 +64,6 @@
                                 <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">@ticketEvent.Title</a>
                             </div>
                         </td>
-                        <td>@(!string.IsNullOrEmpty(ticketEvent.Description) && ticketEvent.Description.Length > 15 ? ticketEvent.Description.Substring(0, 15) + "..." : ticketEvent.Description)</td>
                         <td>@ticketEvent.EventDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td>
                             <a href="@ticketEvent.EventPurchaseLink" target="_blank">
@@ -75,7 +73,7 @@
                         <td>@ticketEvent.Tickets.Count(c => c.PaymentStatus == TransactionStatus.Settled.ToString())</td>
                         <td class="actions-col">
                             @if (ticketEvent.EventDate > DateTime.UtcNow)
-                            {
+                            { 
                                 <div class="d-inline-flex align-items-center gap-3">
                                     <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">Edit</a>
                                 </div>
@@ -85,11 +83,11 @@
                             <div class="d-inline-flex align-items-center gap-3">
                                 @if (ticketEvent.Tickets != null && ticketEvent.Tickets.Any())
                                 {
-                                    <a asp-action="ViewEventTicket" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">View Tickets</a>
+                                    <a asp-action="ViewEventTicket" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">View</a>
                                 }
                                 @if (ticketEvent.Tickets == null || !ticketEvent.Tickets.Any() || ticketEvent.EventDate <= DateTime.UtcNow)
                                 {
-                                    <a asp-action="DeleteEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id" class="text-danger">Delete Event</a>
+                                    <a asp-action="DeleteEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id" class="text-danger">Delete</a>
                                 }
                             </div>
                         </td>

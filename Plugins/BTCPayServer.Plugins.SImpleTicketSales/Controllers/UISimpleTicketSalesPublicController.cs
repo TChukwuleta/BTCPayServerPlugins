@@ -21,11 +21,12 @@ using BTCPayServer.Plugins.SimpleTicketSales.Services;
 using BTCPayServer.Plugins.SimpleTicketSales.Data;
 using BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
 using Microsoft.AspNetCore.Cors;
+using TransactionStatus = BTCPayServer.Plugins.SimpleTicketSales.Data.TransactionStatus;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 [AllowAnonymous]
-[Route("~/plugins/{storeId}/ticket/api/")]
+[Route("~/plugins/{storeId}/ticket/public/")]
 public class UISimpleTicketSalesPublicController : Controller
 {
     private readonly UriResolver _uriResolver;
@@ -68,8 +69,7 @@ public class UISimpleTicketSalesPublicController : Controller
 
         if (ticketEvent.HasMaximumCapacity)
         {
-            var eventTickets = await ctx.TicketSalesEventTickets.AsNoTracking().CountAsync(c => c.StoreId == storeId && c.EventId == eventId
-                    && c.PaymentStatus == SimpleTicketSales.Data.TransactionStatus.Settled.ToString());
+            var eventTickets = ctx.TicketSalesEventTickets.Count(c => c.StoreId == storeId && c.EventId == eventId && c.PaymentStatus == TransactionStatus.Settled.ToString());
             if (eventTickets >= ticketEvent.MaximumEventCapacity)
                 return NotFound();
         }
@@ -94,20 +94,20 @@ public class UISimpleTicketSalesPublicController : Controller
     public async Task<IActionResult> EventRegistration(string storeId, string eventId, CreateEventTicketViewModel vm)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostEvent = await ctx.TicketSalesEvents.AsNoTracking().SingleOrDefaultAsync(c => c.StoreId == storeId && c.Id == eventId);
-        if (ghostEvent == null)
+        var ticketEvent = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
+        if (ticketEvent == null)
             return NotFound();
         
-        if (ghostEvent.HasMaximumCapacity)
+        if (ticketEvent.HasMaximumCapacity && ctx.TicketSalesEventTickets
+               .AsNoTracking().Where(c => c.StoreId == storeId && c.EventId == eventId)
+               .Count(c => c.PaymentStatus == TransactionStatus.Settled.ToString()) >= ticketEvent.MaximumEventCapacity)
         {
-            var eventTickets = await ctx.TicketSalesEventTickets.AsNoTracking().CountAsync(c => c.StoreId == storeId && c.EventId == eventId
-                    && c.PaymentStatus == SimpleTicketSales.Data.TransactionStatus.Settled.ToString());
-            if (eventTickets >= ghostEvent.MaximumEventCapacity)
-                return NotFound();
+            return NotFound();
         }
 
-        var existingTicket = await ctx.TicketSalesEventTickets.SingleOrDefaultAsync(c => c.Email == vm.Email.Trim() && c.EventId == eventId && c.StoreId == storeId);
-        if (existingTicket?.PaymentStatus == SimpleTicketSales.Data.TransactionStatus.Settled.ToString())
+        var trimmedEmail = vm.Email.Trim();
+        var existingTicket = ctx.TicketSalesEventTickets.FirstOrDefault(c => c.Email == trimmedEmail && c.EventId == eventId && c.StoreId == storeId);
+        if (existingTicket?.PaymentStatus == TransactionStatus.Settled.ToString())
         {
             ModelState.AddModelError(nameof(vm.Email), $"A user with this email has already purchased a ticket. Please contact support");
             return View(vm);
@@ -118,10 +118,13 @@ public class UISimpleTicketSalesPublicController : Controller
         if (store == null) return NotFound();
 
         var uid = existingTicket?.Id ?? Guid.NewGuid().ToString();
-        var invoice = await CreateInvoiceAsync(store, $"{SimpleTicketSalesHostedService.TICKET_SALES_PREFIX}", uid, ghostEvent.Amount, ghostEvent.Currency, Request.GetAbsoluteRoot());
+        var invoice = await CreateInvoiceAsync(store, $"{SimpleTicketSalesHostedService.TICKET_SALES_PREFIX}", uid, 
+            ticketEvent.Amount, ticketEvent.Currency, Request.GetAbsoluteRoot());
+
         if (existingTicket != null)
         {
             existingTicket.InvoiceId = invoice.Id;
+            ctx.TicketSalesEventTickets.Update(existingTicket);
         }
         else
         {
@@ -130,10 +133,10 @@ public class UISimpleTicketSalesPublicController : Controller
                 StoreId = storeId,
                 EventId = eventId,
                 Name = vm.Name.Trim(),
-                Amount = ghostEvent.Amount,
-                Currency = ghostEvent.Currency,
+                Amount = ticketEvent.Amount,
+                Currency = ticketEvent.Currency,
                 Email = vm.Email.Trim(),
-                PaymentStatus = SimpleTicketSales.Data.TransactionStatus.New.ToString(),
+                PaymentStatus = TransactionStatus.New.ToString(),
                 CreatedAt = DateTime.UtcNow,
                 InvoiceId = invoice.Id
             });

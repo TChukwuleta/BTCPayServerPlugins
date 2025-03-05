@@ -54,8 +54,8 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
         }.Contains(invoiceEvent.Name):
                 {
                     var invoice = invoiceEvent.Invoice;
-                    var ghostOrderId = invoice.GetInternalTags(TICKET_SALES_PREFIX).FirstOrDefault();
-                    if (ghostOrderId != null)
+                    var ticketOrderId = invoice.GetInternalTags(TICKET_SALES_PREFIX).FirstOrDefault();
+                    if (ticketOrderId != null)
                     {
                         bool? success = invoice.Status switch
                         {
@@ -68,7 +68,7 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
                         };
                         if (success.HasValue)
                         {
-                            await RegisterTicketTransaction(invoice, ghostOrderId, success.Value);
+                            await RegisterTicketTransaction(invoice, ticketOrderId, success.Value);
                         }
                     }
                     break;
