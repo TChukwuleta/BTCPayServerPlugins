@@ -14,14 +14,12 @@ public class SimpleTicketSalesDbContext : DbContext
         _designTime = designTime;
     }
 
-    public DbSet<TicketSalesTransaction> TicketSalesTransactions { get; set; }
     public DbSet<TicketSalesEvent> TicketSalesEvents { get; set; }
     public DbSet<TicketSalesEventTicket> TicketSalesEventTickets { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.Ghost");
-        TicketSalesTransaction.OnModelCreating(modelBuilder);
+        modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.SimpleTicketSale");
     }
 }
