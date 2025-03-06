@@ -23,10 +23,11 @@ public class Plugin : BaseBTCPayServerPlugin
         services.AddSingleton<EmailService>();
         services.AddSingleton<GhostHostedService>();
         services.AddSingleton<GhostDbContextFactory>();
+        services.AddSingleton<GhostPluginService>();
         services.AddHostedService<GhostHostedService>();
         services.AddHostedService<ApplicationPartsLogger>();
-        //services.AddSingleton<IHostedService, GhostPluginService>();
-        services.AddHostedService(s => s.GetRequiredService<GhostPluginService>());
+        services.AddSingleton<IHostedService, GhostPluginService>();
+        //services.AddHostedService(s => s.GetRequiredService<GhostPluginService>());
         services.AddDbContext<GhostDbContext>((provider, o) =>
         {
             var factory = provider.GetRequiredService<GhostDbContextFactory>();

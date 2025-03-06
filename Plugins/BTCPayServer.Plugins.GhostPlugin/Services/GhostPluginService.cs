@@ -86,13 +86,10 @@ public class GhostPluginService : EventHostedServiceBase
                 Logs.PayServer.LogError(e, "Error while checking Ghost membership subscriptions");
             }
             _checkTcs = new CancellationTokenSource();
-            //_checkTcs.CancelAfter(TimeSpan.FromHours(1));
-            _checkTcs.CancelAfter(TimeSpan.FromMinutes(3));
+            _checkTcs.CancelAfter(TimeSpan.FromHours(1));
             try
             {
-                /*await Task.Delay(TimeSpan.FromHours(1),
-                    CancellationTokenSource.CreateLinkedTokenSource(_checkTcs.Token, CancellationToken).Token);*/
-                await Task.Delay(TimeSpan.FromMinutes(3),
+                await Task.Delay(TimeSpan.FromHours(1),
                     CancellationTokenSource.CreateLinkedTokenSource(_checkTcs.Token, CancellationToken).Token);
             }
             catch (OperationCanceledException)

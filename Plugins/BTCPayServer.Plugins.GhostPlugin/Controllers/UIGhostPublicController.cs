@@ -41,7 +41,6 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 public class UIGhostPublicController : Controller
 {
     private readonly UriResolver _uriResolver;
-    private readonly IFileService _fileService;
     private readonly StoreRepository _storeRepo;
     private readonly EmailService _emailService;
     private readonly LinkGenerator _linkGenerator;
@@ -54,7 +53,6 @@ public class UIGhostPublicController : Controller
     public UIGhostPublicController
         (EmailService emailService,
         UriResolver uriResolver,
-        IFileService fileService,
         StoreRepository storeRepo,
         LinkGenerator linkGenerator,
         IHttpClientFactory clientFactory,
@@ -66,7 +64,6 @@ public class UIGhostPublicController : Controller
         _context = context;
         _storeRepo = storeRepo;
         _uriResolver = uriResolver;
-        _fileService = fileService;
         _emailService = emailService;
         _linkGenerator = linkGenerator;
         _clientFactory = clientFactory;
@@ -232,10 +229,6 @@ public class UIGhostPublicController : Controller
     {
         try
         {
-            foreach (var header in Request.Headers)
-            {
-                Console.WriteLine($"Header: {header.Key} = {header.Value}");
-            }
             Request.Headers.TryGetValue("X-Ghost-Signature", out var signatureHeaderValues);
             Console.WriteLine($"Signature header values: {signatureHeaderValues}");
             var signatureHeader = signatureHeaderValues.FirstOrDefault();
@@ -248,13 +241,10 @@ public class UIGhostPublicController : Controller
 
             if (!ValidateSignature(requestBody, signatureHeader))
             {
-                Console.WriteLine("Invalid webhook signature");
                 return Unauthorized("Invalid webhook signature");
             }
 
-            Console.WriteLine("Webhook received and validated");
             var webhookResponse = JsonConvert.DeserializeObject<GhostWebhookResponse>(requestBody);
-
             await using var ctx = _dbContextFactory.CreateContext();
             var webhookMember = webhookResponse.member;
             string memberId = webhookMember?.previous?.id ?? webhookMember?.current?.id;
@@ -352,7 +342,7 @@ public class UIGhostPublicController : Controller
             return NotFound();
 
         var storeBlob = store.GetStoreBlob();
-        string orderId = "";
+        string orderId = string.Empty;
         InvoiceMetadata metadata = new InvoiceMetadata
         {
             OrderId = orderId,
@@ -395,47 +385,37 @@ public class UIGhostPublicController : Controller
 
     private bool ValidateSignature(string payload, string signatureHeader)
     {
-        try
-        {
-            Console.WriteLine($"Signature header: {signatureHeader}");
-            Console.WriteLine($"Payload: {payload}");
-            // Extract the signature from the header (format: "sha256=SIGNATURE")
-            var parts = signatureHeader.Split('=');
-            if (parts.Length != 2 || parts[0] != "sha256")
-            {
-                return false;
-            }
+        // Parse the signature header which has format: "sha256=SIGNATURE, t=TIMESTAMP"
+        var headerParts = signatureHeader.Split(',');
+        if (headerParts.Length != 2) return false;
 
-            var providedSignature = parts[1];
+        var signaturePart = headerParts[0].Trim();
+        var signatureParts = signaturePart.Split('=');
+        if (signatureParts.Length != 2 || signatureParts[0] != "sha256") return false;
+        var providedSignature = signatureParts[1];
 
-            // Compute the expected signature using HMAC-SHA256
-            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_webhookSecret));
-            var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
-            var computedSignature = BitConverter.ToString(computedHash).Replace("-", "").ToLower();
+        var timestampPart = headerParts[1].Trim();
+        var timestampParts = timestampPart.Split('=');
+        if (timestampParts.Length != 2 || timestampParts[0] != "t") return false;
+        var timestamp = timestampParts[1];
 
-            // Compare signatures (constant-time comparison to prevent timing attacks)
-            return SecureCompare(providedSignature, computedSignature);
-        }
-        catch
-        {
-            return false;
-        }
+        string dataToSign = payload + timestamp;
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_webhookSecret));
+        var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(dataToSign));
+        var computedSignature = BitConverter.ToString(computedHash).Replace("-", "").ToLower();
+        return SecureCompare(providedSignature, computedSignature);
     }
 
-    // Constant-time string comparison to prevent timing attacks
+
     private bool SecureCompare(string a, string b)
     {
-        if (a.Length != b.Length)
-        {
-            return false;
-        }
+        if (a.Length != b.Length) return false;
 
         var result = 0;
         for (var i = 0; i < a.Length; i++)
         {
             result |= a[i] ^ b[i];
         }
-
         return result == 0;
     }
 }
