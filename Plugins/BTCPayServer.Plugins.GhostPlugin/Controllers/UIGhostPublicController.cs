@@ -31,6 +31,7 @@ using BTCPayServer.Plugins.GhostPlugin;
 using NBitcoin.DataEncoders;
 using NBitcoin;
 using BTCPayServer.Abstractions.Contracts;
+using System.Security.Cryptography;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -49,6 +50,7 @@ public class UIGhostPublicController : Controller
     private readonly GhostPluginService _ghostPluginService;
     private readonly UIInvoiceController _invoiceController;
     private readonly GhostDbContextFactory _dbContextFactory;
+    private readonly string _webhookSecret = "12345";
     public UIGhostPublicController
         (EmailService emailService,
         UriResolver uriResolver,
@@ -230,8 +232,27 @@ public class UIGhostPublicController : Controller
     {
         try
         {
+            foreach (var header in Request.Headers)
+            {
+                Console.WriteLine($"Header: {header.Key} = {header.Value}");
+            }
+            Request.Headers.TryGetValue("X-Ghost-Signature", out var signatureHeaderValues);
+            Console.WriteLine($"Signature header values: {signatureHeaderValues}");
+            var signatureHeader = signatureHeaderValues.FirstOrDefault();
+            if (string.IsNullOrEmpty(signatureHeader))
+            {
+                return BadRequest("Missing signature header");
+            }
             using var reader = new StreamReader(Request.Body, Encoding.UTF8);
             var requestBody = await reader.ReadToEndAsync();
+
+            if (!ValidateSignature(requestBody, signatureHeader))
+            {
+                Console.WriteLine("Invalid webhook signature");
+                return Unauthorized("Invalid webhook signature");
+            }
+
+            Console.WriteLine("Webhook received and validated");
             var webhookResponse = JsonConvert.DeserializeObject<GhostWebhookResponse>(requestBody);
 
             await using var ctx = _dbContextFactory.CreateContext();
@@ -370,5 +391,51 @@ public class UIGhostPublicController : Controller
         };
         ctx.GhostTransactions.Add(transaction);
         await ctx.SaveChangesAsync();
+    }
+
+    private bool ValidateSignature(string payload, string signatureHeader)
+    {
+        try
+        {
+            Console.WriteLine($"Signature header: {signatureHeader}");
+            Console.WriteLine($"Payload: {payload}");
+            // Extract the signature from the header (format: "sha256=SIGNATURE")
+            var parts = signatureHeader.Split('=');
+            if (parts.Length != 2 || parts[0] != "sha256")
+            {
+                return false;
+            }
+
+            var providedSignature = parts[1];
+
+            // Compute the expected signature using HMAC-SHA256
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_webhookSecret));
+            var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
+            var computedSignature = BitConverter.ToString(computedHash).Replace("-", "").ToLower();
+
+            // Compare signatures (constant-time comparison to prevent timing attacks)
+            return SecureCompare(providedSignature, computedSignature);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    // Constant-time string comparison to prevent timing attacks
+    private bool SecureCompare(string a, string b)
+    {
+        if (a.Length != b.Length)
+        {
+            return false;
+        }
+
+        var result = 0;
+        for (var i = 0; i < a.Length; i++)
+        {
+            result |= a[i] ^ b[i];
+        }
+
+        return result == 0;
     }
 }

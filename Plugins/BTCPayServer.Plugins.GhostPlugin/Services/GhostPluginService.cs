@@ -86,11 +86,13 @@ public class GhostPluginService : EventHostedServiceBase
                 Logs.PayServer.LogError(e, "Error while checking Ghost membership subscriptions");
             }
             _checkTcs = new CancellationTokenSource();
-            _checkTcs.CancelAfter(TimeSpan.FromHours(1));
-
+            //_checkTcs.CancelAfter(TimeSpan.FromHours(1));
+            _checkTcs.CancelAfter(TimeSpan.FromMinutes(3));
             try
             {
-                await Task.Delay(TimeSpan.FromHours(1),
+                /*await Task.Delay(TimeSpan.FromHours(1),
+                    CancellationTokenSource.CreateLinkedTokenSource(_checkTcs.Token, CancellationToken).Token);*/
+                await Task.Delay(TimeSpan.FromMinutes(3),
                     CancellationTokenSource.CreateLinkedTokenSource(_checkTcs.Token, CancellationToken).Token);
             }
             catch (OperationCanceledException)
@@ -121,6 +123,7 @@ public class GhostPluginService : EventHostedServiceBase
 
     public async Task HandleActiveSubscriptionCloseToEnding()
     {
+        Console.WriteLine("Jesus help me");
         await using var ctx = _dbContextFactory.CreateContext();
         var apps = (await _appService.GetApps(GhostApp.AppType)).Where(data => !data.Archived).ToList();
         List<(string ghostSettingId, string memberId, string email)> deliverRequests = new();
