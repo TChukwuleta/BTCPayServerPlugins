@@ -12,15 +12,15 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
 {
     [DbContext(typeof(SimpleTicketSalesDbContext))]
-    [Migration("20250225165704_initialMigration")]
-    partial class initialMigration
+    [Migration("20250305195730_pluginSetup")]
+    partial class pluginSetup
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasDefaultSchema("BTCPayServer.Plugins.Ghost")
+                .HasDefaultSchema("BTCPayServer.Plugins.SimpleTicketSale")
                 .HasAnnotation("ProductVersion", "8.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
@@ -73,7 +73,7 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("TicketSalesEvents", "BTCPayServer.Plugins.Ghost");
+                    b.ToTable("TicketSalesEvents", "BTCPayServer.Plugins.SimpleTicketSale");
                 });
 
             modelBuilder.Entity("BTCPayServer.Plugins.SimpleTicketSales.Data.TicketSalesEventTicket", b =>
@@ -120,57 +120,7 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("TicketSalesEventTickets", "BTCPayServer.Plugins.Ghost");
-                });
-
-            modelBuilder.Entity("BTCPayServer.Plugins.SimpleTicketSales.Data.TicketSalesTransaction", b =>
-                {
-                    b.Property<string>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Currency")
-                        .HasColumnType("text");
-
-                    b.Property<string>("InvoiceId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("InvoiceStatus")
-                        .HasColumnType("text");
-
-                    b.Property<string>("MemberId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("PaymentRequestId")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("PeriodEnd")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("PeriodStart")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("StoreId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("TierId")
-                        .HasColumnType("text");
-
-                    b.Property<int>("TransactionStatus")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("TxnId")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("TicketSalesTransactions", "BTCPayServer.Plugins.Ghost");
+                    b.ToTable("TicketSalesEventTickets", "BTCPayServer.Plugins.SimpleTicketSale");
                 });
 #pragma warning restore 612, 618
         }

@@ -16,7 +16,6 @@ using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using System.Collections.Generic;
 using BTCPayServer.Services.PaymentRequests;
 using Newtonsoft.Json.Linq;
-using BTCPayServer.Services.Mails;
 using BTCPayServer.Client.Models;
 using TransactionStatus = BTCPayServer.Plugins.GhostPlugin.Data.TransactionStatus;
 
@@ -24,27 +23,21 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
 public class GhostHostedService : EventHostedServiceBase
 {
-    private readonly EmailService _emailService;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly EmailSenderFactory _emailSenderFactory;
     private readonly GhostDbContextFactory _dbContextFactory;
     private readonly GhostPluginService _ghostPluginService;
 
-    public GhostHostedService(EmailService emailService,
-        EventAggregator eventAggregator,
-        EmailSenderFactory emailSenderFactory,
+    public GhostHostedService(EventAggregator eventAggregator,
         InvoiceRepository invoiceRepository,
         IHttpClientFactory httpClientFactory,
         GhostPluginService ghostPluginService,
         GhostDbContextFactory dbContextFactory,
         Logs logs) : base(eventAggregator, logs)
     {
-        _emailService = emailService;
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
         _httpClientFactory = httpClientFactory;
-        _emailSenderFactory = emailSenderFactory;
         _ghostPluginService = ghostPluginService;
     }
 
@@ -75,18 +68,13 @@ public class GhostHostedService : EventHostedServiceBase
                         bool? success = invoice.Status switch
                         {
                             InvoiceStatus.Settled => true,
-
                             InvoiceStatus.Invalid or
                             InvoiceStatus.Expired => false,
-
                             _ => (bool?)null
                         };
-                        if (success.HasValue)
+                        if (success.HasValue && ghostOrderId.StartsWith(GhostApp.GHOST_MEMBER_ID_PREFIX))
                         {
-                            if (ghostOrderId.StartsWith(GhostApp.GHOST_MEMBER_ID_PREFIX))
-                            {
-                                await RegisterMembershipCreationTransaction(invoice, ghostOrderId, success.Value);
-                            }
+                            await RegisterMembershipCreationTransaction(invoice, ghostOrderId, success.Value);
                         }
                     }
                     break;
@@ -101,8 +89,7 @@ public class GhostHostedService : EventHostedServiceBase
                         return;
                     }
                     var memberId = memberIdToken.Value<string>();
-                    var memberEmail = prBlob.Email;
-                    await _ghostPluginService.HandlePaidMembershipSubscription(prBlob, memberId, paymentRequestStatusUpdated.Data.Id, memberEmail);
+                    await _ghostPluginService.HandlePaidMembershipSubscription(memberId, paymentRequestStatusUpdated.Data.Id, prBlob.Email);
                     break;
                 }
 
@@ -113,14 +100,14 @@ public class GhostHostedService : EventHostedServiceBase
 
     private async Task RegisterMembershipCreationTransaction(InvoiceEntity invoice, string orderId, bool success)
     {
+        var result = new InvoiceLogs();
+
+        result.Write($"Invoice status: {invoice.Status.ToString().ToLower()}", InvoiceEventData.EventSeverity.Info);
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId);
 
         if (ghostSetting.CredentialsPopulated())
         {
-            var result = new InvoiceLogs();
-
-            result.Write($"Invoice status: {invoice.Status.ToString().ToLower()}", InvoiceEventData.EventSeverity.Info);
             var transaction = ctx.GhostTransactions.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id);
             if (transaction == null)
             {
@@ -169,14 +156,13 @@ public class GhostHostedService : EventHostedServiceBase
                     ghostMember.MemberId = response.members[0].id;
                     ghostMember.MemberUuid = response.members[0].uuid;
                     ghostMember.UnsubscribeUrl = response.members[0].unsubscribe_url;
-                    ghostMember.MemberId = response.members[0].id;
                     ctx.UpdateRange(ghostMember);
                     result.Write($"Successfully created member with name: {ghostMember.Name} on Ghost.", InvoiceEventData.EventSeverity.Info);
                 }
                 catch (Exception ex)
                 {
                     Logs.PayServer.LogError(ex,
-                        $"Shopify error while trying to create member on Ghost platfor. " +
+                        $"Ghost error while trying to create member on Ghost platform. {ex.Message}" +
                         $"Triggered by invoiceId: {invoice.Id}");
                 }
 
@@ -186,5 +172,4 @@ public class GhostHostedService : EventHostedServiceBase
             await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
         }
     }
-
 }

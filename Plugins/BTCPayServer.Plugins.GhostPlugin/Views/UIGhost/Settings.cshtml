@@ -28,12 +28,7 @@
 
 <form method="post" asp-action="Settings" id="settingsForm">
     <div class="row">
-        <div class="col-md-6"> 
-            <div class="form-group">
-                <label asp-for="SubscriptionRenewalGracePeriod" class="form-label"></label>
-                <input asp-for="SubscriptionRenewalGracePeriod" min="1" class="form-control" required />
-                <span asp-validation-for="SubscriptionRenewalGracePeriod" class="text-danger"></span>
-            </div>
+        <div class="col-md-6">
             <div class="form-group d-flex align-items-center">
                 <input asp-for="EnableAutomatedEmailReminders" type="checkbox" class="btcpay-toggle me-3" id="emailToggle" disabled="@(storeEmailSettingsConfigured ? null : "disabled")" />
                 <div>
