@@ -5,6 +5,7 @@ using BTCPayServer.HostedServices.Webhooks;
 using BTCPayServer.Plugins.GhostPlugin.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using System;
 
 namespace BTCPayServer.Plugins.GhostPlugin;
@@ -20,11 +21,11 @@ public class Plugin : BaseBTCPayServerPlugin
     {
         services.AddSingleton<IUIExtension>(new UIExtension("GhostPluginHeaderNav", "header-nav"));
         services.AddSingleton<EmailService>();
-        services.AddScoped<GhostPluginService>();
         services.AddSingleton<GhostHostedService>();
         services.AddSingleton<GhostDbContextFactory>();
         services.AddHostedService<GhostHostedService>();
         services.AddHostedService<ApplicationPartsLogger>();
+        //services.AddSingleton<IHostedService, GhostPluginService>();
         services.AddHostedService(s => s.GetRequiredService<GhostPluginService>());
         services.AddDbContext<GhostDbContext>((provider, o) =>
         {
