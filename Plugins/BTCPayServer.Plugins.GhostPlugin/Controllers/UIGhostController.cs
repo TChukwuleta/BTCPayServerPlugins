@@ -142,13 +142,10 @@ public class UIGhostController : Controller
                         entity.ApplicationUserId = GetUserId();
                         var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStore.Id);
                         var isEmailSetup = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
-                        var settingModel = new GhostSettingsPageViewModel { SubscriptionRenewalGracePeriod = 2 };
                         if (isEmailSetup)
                         {
-                            settingModel.ReminderStartDaysBeforeExpiration = 4;
-                            settingModel.EnableAutomatedEmailReminders = true;
+                            entity.Setting = JsonConvert.SerializeObject(new GhostSettingsPageViewModel { ReminderStartDaysBeforeExpiration = 4, EnableAutomatedEmailReminders = true });
                         }
-                        entity.Setting = JsonConvert.SerializeObject(settingModel);
                         var storeBlob = store.GetStoreBlob();
                         var newApp = await helper.CreateGhostApp(CurrentStore.Id, storeBlob.DefaultCurrency);
                         entity.AppId = newApp.Id;
@@ -207,7 +204,7 @@ public class UIGhostController : Controller
         {
             TempData.SetStatusMessageModel(new StatusMessageModel()
             {
-                Message = $"Kindly specify reminder day",
+                Message = $"Kindly specify the number of days to initiate reminder notifications",
                 Severity = StatusMessageModel.StatusSeverity.Error
             });
             return RedirectToAction(nameof(Settings), new { storeId = CurrentStore.Id });

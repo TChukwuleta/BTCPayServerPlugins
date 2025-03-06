@@ -6,9 +6,7 @@ fees and third party?
 Introducing BTCPay Server for Ghost – a plugin that allows you accept bitcoin payments directly on your blog from customers with no fee.
 
 Monetizing your content should be simple, and free from third-party fees. Our integration with Ghost allows you to connect your self-hosted BTCPay Server with your 
-[Ghost blog](https://ghost.org/), enabling you accept Bitcoin payments swiftly and securely.
-
-With this plugin, you're not just adding a payment gateway, you're embracing a transparent, and secure way to monetize your content which also keeps you in full control of your funds.
+[Ghost blog](https://ghost.org/), enabling you accept Bitcoin payments swiftly and securely, while keeping you in full control of your funds.
 
 Whether you’re receiving donations, selling tiered memberships or use it to make a paywall and accept micropayments, this integration ensures seamless Bitcoin payments without third-party fees.
 
@@ -64,6 +62,9 @@ Before diving into the setup process, ensure you have the following:
 
 ![BTCPay Server Ghost img 6](./img/Ghost/Ghost_BTCPay_Credential_Saved_2.png)
 
+
+12. In your Ghost plugin page, copy the script URL. Open your Ghost admin portal > Settings > Code Injection, open code injection and under site header paste the script url, save and close
+
 If you got here without any hassle, congratulations on successfully installing the plugin. 
 
 In case you encountered any issue you can report them [here](https://github.com/TChukwuleta/BTCPayServerPlugins/issues) (prefix "Ghost" to title of the issue)
@@ -79,7 +80,7 @@ the Ghost - BTCPay Server plugin unlocks new revenue streams.
 
 1. Accept Donations – Allow readers support your work with donations in Bitcoin.
 
-2. Event Ticketing - Sell tickets for virtual (workshops, consultation sessions and webinars) or in-person events using Bitcoin
+2. Paywall Content – Restrict access to premium articles, videos, or other content, unlocking it through Bitcoin payments.
 
 3. Tiered Membership Creation and Subscriptions - Offer exclusive content to members and subscribers in a tier.
 

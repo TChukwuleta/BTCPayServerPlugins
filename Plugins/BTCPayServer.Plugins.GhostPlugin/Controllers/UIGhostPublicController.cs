@@ -36,7 +36,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 // This api route is used in GhostPluginService ... If you change here, go change there too
 [AllowAnonymous]
-[Route("~/plugins/{storeId}/ghost/api/")]
+[Route("~/plugins/{storeId}/ghost/public/")]
 public class UIGhostPublicController : Controller
 {
     private readonly UriResolver _uriResolver;
@@ -215,13 +215,9 @@ public class UIGhostPublicController : Controller
         var storeData = await _storeRepo.FindStore(storeId);
         var latestTransaction = ctx.GhostTransactions
             .AsNoTracking().Where(t => t.StoreId == storeId && t.TransactionStatus == GhostPlugin.Data.TransactionStatus.Settled && t.MemberId == memberId)
-            .OrderByDescending(t => t.PeriodEnd)
-            .FirstOrDefault();
+            .OrderByDescending(t => t.PeriodEnd).First();
 
-        var ghostPluginSetting = ghostSetting?.Setting != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) : new GhostSettingsPageViewModel();
-        var gracePeriod = ghostPluginSetting?.SubscriptionRenewalGracePeriod is 0 ? 1 : ghostPluginSetting.SubscriptionRenewalGracePeriod;
-
-        var endDate = DateTime.UtcNow.Date > latestTransaction.PeriodEnd.Date ? DateTime.UtcNow.Date.AddDays(gracePeriod) : latestTransaction.PeriodEnd;
+        var endDate = DateTime.UtcNow.Date > latestTransaction.PeriodEnd.Date ? DateTime.UtcNow.Date.AddDays(1) : latestTransaction.PeriodEnd.AddHours(1);
         var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
         var pr = await _ghostPluginService.CreatePaymentRequest(member, tier, ghostSetting.AppId, endDate);
         await GetTransaction(ctx, tier, member, null, pr, txnId);
@@ -292,18 +288,6 @@ public class UIGhostPublicController : Controller
         var fileContent = _emailService.GetEmbeddedResourceContent("Resources.js.btcpay_ghost.js");
         return Content(fileContent, "text/javascript");
     }
-
-
-    /*<div id = "paywall-config" data-price="100"></div>
-
-    <div id = "paywall-content" style="display: none;">
-        <h2>Premium Content</h2>
-        <p>This content is only available after payment.</p>
-    </div>
-
-    <div id = "paywall-overlay" >
-        < button id= "payButton" > Pay with Bitcoin to unlock content</button>
-    </div>*/
 
 
     [HttpGet("paywall/btcpay-ghost-paywall.js")]

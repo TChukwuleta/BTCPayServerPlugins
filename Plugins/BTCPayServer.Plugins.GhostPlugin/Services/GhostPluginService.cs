@@ -76,14 +76,14 @@ public class GhostPluginService : EventHostedServiceBase
                 var tcs = new TaskCompletionSource<object>();
                 PushEvent(new SequentialExecute(async () =>
                 {
-                    await CreatePaymentRequestForActiveSubscriptionCloseToEnding();
+                    await HandleActiveSubscriptionCloseToEnding();
                     return null;
                 }, tcs));
                 await tcs.Task;
             }
             catch (Exception e)
             {
-                Logs.PayServer.LogError(e, "Error while checking subscriptions");
+                Logs.PayServer.LogError(e, "Error while checking Ghost membership subscriptions");
             }
             _checkTcs = new CancellationTokenSource();
             _checkTcs.CancelAfter(TimeSpan.FromHours(1));
@@ -119,7 +119,7 @@ public class GhostPluginService : EventHostedServiceBase
     }
 
 
-    public async Task CreatePaymentRequestForActiveSubscriptionCloseToEnding()
+    public async Task HandleActiveSubscriptionCloseToEnding()
     {
         await using var ctx = _dbContextFactory.CreateContext();
         var apps = (await _appService.GetApps(GhostApp.AppType)).Where(data => !data.Archived).ToList();
@@ -129,8 +129,12 @@ public class GhostPluginService : EventHostedServiceBase
             var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.AppId == app.Id);
             if (ghostSetting == null) continue;
 
+            var emailSender = await _emailSenderFactory.GetEmailSender(ghostSetting.StoreId);
+            var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+            if (!isEmailConfigured) continue;
+
             var ghostMembers = ctx.GhostMembers.AsNoTracking().Where(c => c.StoreId == ghostSetting.StoreId).ToList();
-            if (!ghostMembers.Any()) continue;
+            if (ghostMembers == null || !ghostMembers.Any()) continue;
 
             var ghostPluginSetting = ghostSetting?.Setting != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) : new GhostSettingsPageViewModel();
             var automateReminder = ghostPluginSetting?.EnableAutomatedEmailReminders ?? false;
@@ -144,11 +148,10 @@ public class GhostPluginService : EventHostedServiceBase
                 var value => value
             };
 
+
             foreach (var member in ghostMembers)
             {
-                var emailSender = await _emailSenderFactory.GetEmailSender(ghostSetting.StoreId);
-                var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
-                if (!isEmailConfigured || (member.LastReminderSent != null && member.LastReminderSent.Value.Date >= now.Date))
+                if (member.LastReminderSent.HasValue && member.LastReminderSent.Value.Date >= now.Date)
                     continue;
 
                 var emailRequest = new EmailRequest
@@ -182,6 +185,7 @@ public class GhostPluginService : EventHostedServiceBase
                                 p.TransactionStatus == TransactionStatus.Settled && !string.IsNullOrEmpty(p.PaymentRequestId)).ToList();
 
                             var currentPeriod = transactions.FirstOrDefault(p => p.PeriodStart.Date <= now.Date && p.PeriodEnd.Date >= now.Date);
+                            // What happens if the time has elapssed and the member hasn't renewed?
                             var nextPeriod = transactions.FirstOrDefault(p => p.PeriodStart.Date > now.Date);
                             if (currentPeriod is null || nextPeriod is not null)
                                 return;
@@ -203,7 +207,7 @@ public class GhostPluginService : EventHostedServiceBase
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error sending an email: {ex.Message}");
+                    Logs.PayServer.LogError("Ghost Plugin: An error occurred while sending email to member {0}: {1} ", member.Email, ex);
                 }
             }
         }
@@ -310,47 +314,8 @@ public class GhostPluginService : EventHostedServiceBase
         return invoice;
     }
 
-    public async Task<InvoiceEntity> CreateInvoiceAsync(BTCPayServer.Data.StoreData store, string prefix, string txnId, decimal amount, string currency, string url)
-    {
-        var ghostSearchTerm = $"{prefix}{txnId}";
-        var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
-        {
-            TextSearch = ghostSearchTerm,
-            StoreId = new[] { store.Id }
-        });
 
-        matchedExistingInvoices = matchedExistingInvoices.Where(entity =>
-                entity.GetInternalTags(ghostSearchTerm).Any(s => s == txnId.ToString())).ToArray();
-
-        var firstInvoiceSettled =
-            matchedExistingInvoices.LastOrDefault(entity =>
-                new[] { "settled", "processing", "confirmed", "paid", "complete" }
-                    .Contains(
-                        entity.GetInvoiceState().Status.ToString().ToLower()));
-
-        if (firstInvoiceSettled != null)
-            return firstInvoiceSettled;
-
-        var invoice = await _invoiceController.CreateInvoiceCoreRaw(
-            new CreateInvoiceRequest()
-            {
-                Amount = amount,
-                Currency = currency,
-                Metadata = new JObject
-                {
-                    ["TxnId"] = txnId
-                },
-                AdditionalSearchTerms = new[]
-                {
-                    txnId.ToString(CultureInfo.InvariantCulture),
-                    ghostSearchTerm
-                }
-            }, store, url, new List<string>() { ghostSearchTerm });
-
-        return invoice;
-    }
-
-    public async Task HandlePaidMembershipSubscription(PaymentRequestBaseData pr, string memberId, string paymentRequestId, string email)
+    public async Task HandlePaidMembershipSubscription(string memberId, string paymentRequestId, string email)
     {
         await using var ctx = _dbContextFactory.CreateContext();
 
@@ -362,7 +327,7 @@ public class GhostPluginService : EventHostedServiceBase
         var startDate = ctx.GhostTransactions
             .AsNoTracking().Where(t => t.StoreId == member.StoreId && t.TransactionStatus == TransactionStatus.Settled && t.MemberId == memberId)
             .OrderByDescending(t => t.CreatedAt)
-            .FirstOrDefault().PeriodEnd;
+            .First().PeriodEnd;
 
         var start = DateOnly.FromDateTime(startDate);
         bool change = false;
@@ -393,7 +358,7 @@ public class GhostPluginService : EventHostedServiceBase
 
     private async Task SendReminderEmail(GhostSetting ghostSetting, GhostMember member, DateTime expirationDate, EmailRequest emailRequest)
     {
-        var url = $"{ghostSetting.BaseUrl}/plugins/{ghostSetting.StoreId}/ghost/api/subscription/{member.Id}/subscribe";
+        var url = $"{ghostSetting.BaseUrl}/plugins/{ghostSetting.StoreId}/ghost/public/subscription/{member.Id}/subscribe";
         emailRequest.SubscriptionUrl = url;
         emailRequest.ExpirationDate = expirationDate;
         await _emailService.SendMembershipSubscriptionReminderEmail(emailRequest);

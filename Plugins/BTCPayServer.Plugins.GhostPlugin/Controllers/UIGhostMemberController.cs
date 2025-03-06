@@ -55,7 +55,15 @@ public class UIGhostMemberController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         if (ghostSetting == null)
-            return NoGhostSetupResult(storeId);
+        {
+            TempData.SetStatusMessageModel(new StatusMessageModel
+            {
+                Severity = StatusMessageModel.StatusSeverity.Error,
+                Html = $"To manage ghost events, you need to set up Ghost credentials first",
+                AllowDismiss = false
+            });
+            return RedirectToAction(nameof(UIGhostController.Index), "UIGhost", new { storeId });
+        }
 
         var ghostMembers = ctx.GhostMembers.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id && !string.IsNullOrEmpty(c.MemberId)).ToList();
         var ghostTransactions = ctx.GhostTransactions.AsNoTracking().Where(t => t.StoreId == CurrentStore.Id && t.TransactionStatus == TransactionStatus.Settled).ToList();
@@ -189,16 +197,5 @@ public class UIGhostMemberController : Controller
         }
         TempData[WellKnownTempData.SuccessMessage] = $"Reminder has been sent to {member.Name}";
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
-    }
-
-    public IActionResult NoGhostSetupResult(string storeId)
-    {
-        TempData.SetStatusMessageModel(new StatusMessageModel
-        {
-            Severity = StatusMessageModel.StatusSeverity.Error,
-            Html = $"To manage ghost events, you need to set up Ghost credentials first",
-            AllowDismiss = false
-        });
-        return RedirectToAction(nameof(UIGhostController.Index), "UIGhost", new { storeId });
     }
 }

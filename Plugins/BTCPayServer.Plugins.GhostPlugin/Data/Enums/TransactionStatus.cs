@@ -5,6 +5,5 @@ public enum TransactionStatus
     New,
     Processing,
     Expired,
-    Invalid,
     Settled
 }

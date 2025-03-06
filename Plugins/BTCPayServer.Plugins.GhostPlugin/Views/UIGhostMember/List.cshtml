@@ -64,16 +64,7 @@
             <thead>
                 <tr>
                     <th>Name</th>
-                    <th>
-                        Email
-                        @* <a asp-action="ListUsers"
-                       asp-route-sortOrder="@(nextUserEmailSortOrder ?? "asc")"
-                       class="text-nowrap"
-                       title="@(nextUserEmailSortOrder == "desc" ? sortByAsc : sortByDesc)">
-                        Email
-                        <vc:icon symbol="actions-sort-alpha-@(userEmailSortOrder ?? nextUserEmailSortOrder ?? "desc")" />
-                    </a> *@
-                    </th>
+                    <th>Email</th>
                     <th>Tier</th>
                     <th>Tier Frequency</th>
                     <th>Created Date</th>
