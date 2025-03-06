@@ -72,7 +72,7 @@
 
                 <div class="form-group">
                     <label asp-for="WebhookSecret" class="form-label"></label>
-                    <input asp-for="WebhookSecret" class="form-control" type="password" value="@Model?.WebhookSecret" readonly="@ghostCredsSet" />
+                    <input asp-for="WebhookSecret" class="form-control" readonly="@ghostCredsSet" />
                     <span asp-validation-for="WebhookSecret" class="text-danger"></span>
                 </div>
 

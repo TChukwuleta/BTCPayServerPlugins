@@ -89,8 +89,7 @@ public class GhostPluginService : EventHostedServiceBase
             _checkTcs.CancelAfter(TimeSpan.FromHours(1));
             try
             {
-                await Task.Delay(TimeSpan.FromHours(1),
-                    CancellationTokenSource.CreateLinkedTokenSource(_checkTcs.Token, CancellationToken).Token);
+                await Task.Delay(TimeSpan.FromHours(1), CancellationTokenSource.CreateLinkedTokenSource(_checkTcs.Token, CancellationToken).Token);
             }
             catch (OperationCanceledException)
             {
@@ -120,7 +119,6 @@ public class GhostPluginService : EventHostedServiceBase
 
     public async Task HandleActiveSubscriptionCloseToEnding()
     {
-        Console.WriteLine("Jesus help me");
         await using var ctx = _dbContextFactory.CreateContext();
         var apps = (await _appService.GetApps(GhostApp.AppType)).Where(data => !data.Archived).ToList();
         List<(string ghostSettingId, string memberId, string email)> deliverRequests = new();
