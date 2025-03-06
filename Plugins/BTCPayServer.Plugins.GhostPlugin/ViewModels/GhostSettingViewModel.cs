@@ -23,6 +23,9 @@ public class GhostSettingViewModel
     public bool HasWallet { get; set; } = true;
     public string CryptoCode { get; set; }
 
+    [Display(Name = "Webhook Secret")]
+    public string WebhookSecret { get; set; }
+
     [Display(Name = "Membership subscription Url")]
     public string MemberCreationUrl { get; set; }
 

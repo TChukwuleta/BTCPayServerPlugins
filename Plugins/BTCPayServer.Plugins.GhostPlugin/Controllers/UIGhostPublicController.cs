@@ -30,7 +30,6 @@ using System.IO;
 using BTCPayServer.Plugins.GhostPlugin;
 using NBitcoin.DataEncoders;
 using NBitcoin;
-using BTCPayServer.Abstractions.Contracts;
 using System.Security.Cryptography;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
@@ -49,7 +48,6 @@ public class UIGhostPublicController : Controller
     private readonly GhostPluginService _ghostPluginService;
     private readonly UIInvoiceController _invoiceController;
     private readonly GhostDbContextFactory _dbContextFactory;
-    private readonly string _webhookSecret = "12345";
     public UIGhostPublicController
         (EmailService emailService,
         UriResolver uriResolver,
@@ -81,7 +79,7 @@ public class UIGhostPublicController : Controller
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
@@ -117,7 +115,7 @@ public class UIGhostPublicController : Controller
     public async Task<IActionResult> CreateMember(string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.AppId == storeId);
+        var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.AppId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
@@ -138,7 +136,7 @@ public class UIGhostPublicController : Controller
     public async Task<IActionResult> CreateMember(CreateMemberViewModel vm, string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.AppId == storeId);
+        var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.AppId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
@@ -197,8 +195,8 @@ public class UIGhostPublicController : Controller
     public async Task<IActionResult> Subscribe(string storeId, string memberId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var member = ctx.GhostMembers.AsNoTracking().FirstOrDefault(c => c.Id == memberId && c.StoreId == storeId);
-        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        var member = ctx.GhostMembers.FirstOrDefault(c => c.Id == memberId && c.StoreId == storeId);
+        var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (member == null || ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
@@ -212,8 +210,7 @@ public class UIGhostPublicController : Controller
             return NotFound();
 
         var storeData = await _storeRepo.FindStore(storeId);
-        var latestTransaction = ctx.GhostTransactions
-            .AsNoTracking().Where(t => t.StoreId == storeId && t.TransactionStatus == GhostPlugin.Data.TransactionStatus.Settled && t.MemberId == memberId)
+        var latestTransaction = ctx.GhostTransactions.Where(t => t.StoreId == storeId && t.TransactionStatus == GhostPlugin.Data.TransactionStatus.Settled && t.MemberId == memberId)
             .OrderByDescending(t => t.PeriodEnd).First();
 
         var endDate = DateTime.UtcNow.Date > latestTransaction.PeriodEnd.Date ? DateTime.UtcNow.Date.AddDays(1) : latestTransaction.PeriodEnd.AddHours(1);
@@ -229,31 +226,39 @@ public class UIGhostPublicController : Controller
     {
         try
         {
-            Request.Headers.TryGetValue("X-Ghost-Signature", out var signatureHeaderValues);
-            Console.WriteLine($"Signature header values: {signatureHeaderValues}");
-            var signatureHeader = signatureHeaderValues.FirstOrDefault();
-            if (string.IsNullOrEmpty(signatureHeader))
-            {
-                return BadRequest("Missing signature header");
-            }
+            await using var ctx = _dbContextFactory.CreateContext();
+            var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
+            if (ghostSetting == null)
+                return BadRequest();
+
             using var reader = new StreamReader(Request.Body, Encoding.UTF8);
             var requestBody = await reader.ReadToEndAsync();
 
-            if (!ValidateSignature(requestBody, signatureHeader))
+            if (string.IsNullOrEmpty(requestBody))
+                return BadRequest("Empty request body");
+
+            if (!string.IsNullOrEmpty(ghostSetting.WebhookSecret))
             {
-                return Unauthorized("Invalid webhook signature");
+                if (!Request.Headers.TryGetValue("X-Ghost-Signature", out var signatureHeaderValues) ||
+                    string.IsNullOrEmpty(signatureHeaderValues.FirstOrDefault()))
+                {
+                    return BadRequest("Missing signature header");
+                }
+
+                if (!ValidateSignature(requestBody, signatureHeaderValues.First(), ghostSetting.WebhookSecret))
+                {
+                    return Unauthorized("Invalid webhook signature");
+                }
             }
 
             var webhookResponse = JsonConvert.DeserializeObject<GhostWebhookResponse>(requestBody);
-            await using var ctx = _dbContextFactory.CreateContext();
             var webhookMember = webhookResponse.member;
             string memberId = webhookMember?.previous?.id ?? webhookMember?.current?.id;
             if (string.IsNullOrEmpty(memberId))
                 return NotFound();
 
-            var member = ctx.GhostMembers.AsNoTracking().FirstOrDefault(c => c.MemberId == memberId);
-            var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
-            if (member == null || ghostSetting == null)
+            var member = ctx.GhostMembers.FirstOrDefault(c => c.MemberId == memberId);
+            if (member == null)
                 return NotFound();
 
             // Ghost webhook doesn't contain the kind of event triggered.But contains two member objects: previous and current.
@@ -262,7 +267,7 @@ public class UIGhostPublicController : Controller
             // If both "previous" and "current" exist → Member was updated(member.updated)
             if (webhookMember.previous != null && webhookMember.current == null)
             {
-                var transactions = ctx.GhostTransactions.AsNoTracking().Where(c => c.MemberId == member.Id).ToList();
+                var transactions = ctx.GhostTransactions.Where(c => c.MemberId == member.Id).ToList();
                 if (transactions.Any())
                 {
                     ctx.RemoveRange(transactions);
@@ -291,7 +296,7 @@ public class UIGhostPublicController : Controller
     public async Task<IActionResult> GetBtcPayJavascript(string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var userStore = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        var userStore = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (userStore == null || !userStore.CredentialsPopulated())
         {
             return BadRequest("Invalid BTCPay store specified");
@@ -306,7 +311,7 @@ public class UIGhostPublicController : Controller
     public async Task<IActionResult> GetBtcPayGhostPaywallJavascript(string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var userStore = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        var userStore = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (userStore == null || !userStore.CredentialsPopulated())
             return BadRequest("Invalid BTCPay store specified");
 
@@ -332,7 +337,7 @@ public class UIGhostPublicController : Controller
     public async Task<IActionResult> CreateOrder(string storeId, decimal amount)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var userStore = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == storeId);
+        var userStore = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (userStore == null || !userStore.CredentialsPopulated())
         {
             return BadRequest("Invalid BTCPay store specified");
@@ -383,7 +388,7 @@ public class UIGhostPublicController : Controller
         await ctx.SaveChangesAsync();
     }
 
-    private bool ValidateSignature(string payload, string signatureHeader)
+    private bool ValidateSignature(string payload, string signatureHeader, string webhookSecret)
     {
         // Parse the signature header which has format: "sha256=SIGNATURE, t=TIMESTAMP"
         var headerParts = signatureHeader.Split(',');
@@ -400,7 +405,7 @@ public class UIGhostPublicController : Controller
         var timestamp = timestampParts[1];
 
         string dataToSign = payload + timestamp;
-        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_webhookSecret));
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(webhookSecret));
         var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(dataToSign));
         var computedSignature = BitConverter.ToString(computedHash).Replace("-", "").ToLower();
         return SecureCompare(providedSignature, computedSignature);

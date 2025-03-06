@@ -185,7 +185,6 @@ public class GhostPluginService : EventHostedServiceBase
                                 p.TransactionStatus == TransactionStatus.Settled && !string.IsNullOrEmpty(p.PaymentRequestId)).ToList();
 
                             var currentPeriod = transactions.FirstOrDefault(p => p.PeriodStart.Date <= now.Date && p.PeriodEnd.Date >= now.Date);
-                            // What happens if the time has elapssed and the member hasn't renewed?
                             var nextPeriod = transactions.FirstOrDefault(p => p.PeriodStart.Date > now.Date);
                             if (currentPeriod is null || nextPeriod is not null)
                                 return;

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using BTCPayServer.Data;
 using BTCPayServer.Plugins.GhostPlugin.Data;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
@@ -52,6 +51,7 @@ public class GhostHelper
             ContentApiKey = ghostSetting.ContentApiKey,
             Username = ghostSetting.Username,
             Password = ghostSetting.Password,
+            WebhookSecret = ghostSetting.WebhookSecret,
             StoreId = ghostSetting.StoreId,
             StoreName = ghostSetting.StoreName,
             IntegratedAt = ghostSetting.IntegratedAt
@@ -68,6 +68,7 @@ public class GhostHelper
             Username = vm.Username,
             Password = vm.Password,
             StoreId = vm.StoreId,
+            WebhookSecret = vm.WebhookSecret,
             StoreName = vm.StoreName
         };
     }
