@@ -83,7 +83,7 @@ public class UIGhostController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new GhostSetting();
         var viewModel = helper.GhostSettingsToViewModel(ghostSetting);
-        viewModel.MemberCreationUrl = Url.Action("CreateMember", "UIGhostPublic", new { storeId = ghostSetting?.AppId }, Request.Scheme);
+        viewModel.MemberCreationUrl = Url.Action("CreateMember", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
         viewModel.DonationUrl = Url.Action("Donate", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
         viewModel.WebhookUrl = Url.Action("ReceiveWebhook", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
         var emailSender = await _emailSenderFactory.GetEmailSender(storeId);

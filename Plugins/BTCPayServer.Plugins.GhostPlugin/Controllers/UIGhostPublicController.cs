@@ -109,13 +109,11 @@ public class UIGhostPublicController : Controller
         return Redirect(url);
     }
 
-    // For the membership creation, I am searching against AppId. The input field on Ghost where they would display this URL, has limited space
-    // Since appId is shorter in length than storeId, it would take less space... this is only used in Create membership (GET and POST).
     [HttpGet("create-member")]
     public async Task<IActionResult> CreateMember(string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.AppId == storeId);
+        var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
@@ -136,7 +134,7 @@ public class UIGhostPublicController : Controller
     public async Task<IActionResult> CreateMember(CreateMemberViewModel vm, string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.AppId == storeId);
+        var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
@@ -237,18 +235,15 @@ public class UIGhostPublicController : Controller
             if (string.IsNullOrEmpty(requestBody))
                 return BadRequest("Empty request body");
 
-            if (!string.IsNullOrEmpty(ghostSetting.WebhookSecret))
-            {
-                if (!Request.Headers.TryGetValue("X-Ghost-Signature", out var signatureHeaderValues) ||
+            if (!Request.Headers.TryGetValue("X-Ghost-Signature", out var signatureHeaderValues) ||
                     string.IsNullOrEmpty(signatureHeaderValues.FirstOrDefault()))
-                {
-                    return BadRequest("Missing signature header");
-                }
+            {
+                return BadRequest("Missing signature header");
+            }
 
-                if (!ValidateSignature(requestBody, signatureHeaderValues.First(), ghostSetting.WebhookSecret))
-                {
-                    return Unauthorized("Invalid webhook signature");
-                }
+            if (!ValidateSignature(requestBody, signatureHeaderValues.First(), ghostSetting.WebhookSecret))
+            {
+                return Unauthorized("Invalid webhook signature");
             }
 
             var webhookResponse = JsonConvert.DeserializeObject<GhostWebhookResponse>(requestBody);
