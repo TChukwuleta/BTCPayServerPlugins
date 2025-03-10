@@ -36,7 +36,8 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 // This api route is used in GhostPluginService ... If you change here, go change there too
 [AllowAnonymous]
-[Route("~/plugins/{storeId}/ghost/public/")]
+[Route("~/plugins/{storeId}/ghost/public/", Order = 0)]
+[Route("~/plugins/{storeId}/ghost/api/", Order = 1)]
 public class UIGhostPublicController : Controller
 {
     private readonly UriResolver _uriResolver;

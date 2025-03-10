@@ -157,6 +157,11 @@ public class UIGhostController : Controller
 
                 case "GhostUpdateWebhookSecret":
                     {
+                        if (string.IsNullOrEmpty(vm.WebhookSecret))
+                        {
+                            TempData[WellKnownTempData.ErrorMessage] = "Webhook secret cannot be empty";
+                            return RedirectToAction(nameof(Index), new { storeId = CurrentStore.Id });
+                        }
                         var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
                         if (ghostSetting != null)
                         {

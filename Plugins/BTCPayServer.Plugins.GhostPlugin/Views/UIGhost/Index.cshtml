@@ -73,7 +73,7 @@
                 <div class="form-group">
                     <label asp-for="WebhookSecret" class="form-label"></label>
                     <div class="input-group">
-                        <input asp-for="WebhookSecret" class="form-control" required />
+                        <input asp-for="WebhookSecret" class="form-control" />
                         @if (ghostCredsSet)
                         {
                             <button name="command" type="submit" class="btn btn-primary" value="GhostUpdateWebhookSecret">Update</button>
@@ -109,11 +109,6 @@
                             </li>
                         </ul>
                     </div>
-
-                    <p class="alert alert-success">
-                        Orders on <b>@Model.ApiUrl</b> will be marked as paid on successful invoice payment.
-                        Started: @Model.IntegratedAt.Value.ToBrowserDate()
-                    </p>
 
                     <button name="command" type="submit" class="btn btn-danger mt-3" value="GhostClearCredentials">
                         Stop Ghost calls and clear credentials

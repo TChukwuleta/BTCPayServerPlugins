@@ -17,10 +17,6 @@
                 </p>
                 <div id="statusButton" style="display: none;">
                     <p>Thank you for completing your payment.</p>
-                    @if (!string.IsNullOrEmpty(Model.RedirectUrl))
-                    {
-                        <a class="btn btn-success" href="@Model.RedirectUrl">Kindly click the link to continue with Ghost</a>
-                    }
                 </div>
             </div>
         </div>
@@ -37,6 +33,7 @@
     <script src="@btcpayScriptUrl"></script>
     <script>
         function showBTCPayModal() {
+            let redirectUrl = "@Model.RedirectUrl";
             window.btcpay.setApiUrlPrefix("@Model.BTCPayServerUrl");
             window.btcpay.showInvoice("@Model.InvoiceId");
 
@@ -67,14 +64,14 @@
                             console.error('Unknown status: ' + event.data.status);
                     }
                 } else if (event.data === 'close') {
-                    if (invoice_paid === true) {
-                        console.log('Invoice paid.');
+                    console.log('Modal closed.');
+                    if (invoice_paid && redirectUrl.trim()) {
+                        console.log('Redirecting user...');
+                        window.location.href = redirectUrl;
+                        return;
                     }
                     statusButton.style.display = 'block';
-                    if (loadingMessage) {
-                        loadingMessage.style.display = 'none';
-                    }
-                    console.log('Modal closed.');
+                    loadingMessage.style.display = 'none';
                 }
             });
 
