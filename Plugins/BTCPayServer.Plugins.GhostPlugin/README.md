@@ -238,15 +238,15 @@ Please note that this is not fully protecting your content but just hiding it un
 4. Now that you have the script injected, head over to the post/page editor where you want to include your paywall. Click on the plus icon to add an item, select HTML, and in the input field paste the following code
    ![BTCPay Server Ghost img 38](./img/Ghost/Add_Html_To_Post.png)
 ```
-    <div id = "paywall-config" data-price="2"></div>
-
-    <div id = "paywall-content" style="display: none;">
-        <h2>Premium Content</h2>
-        <p>This content is only available after payment.</p>
-    </div>
-
-    <div id = "paywall-overlay">
-        <button id= "payButton"> Pay with Bitcoin to unlock content</button>
+    <div class="paywall-section">
+        <div id="paywall-config" data-price="2"></div>
+        <div id="paywall-content" style="display: none;">
+            <h2>Premium Content</h2>
+            <p>This content is only available after payment.</p>
+        </div>
+        <div id="paywall-overlay">
+            <button id="payButton">Pay with Bitcoin to unlock content</button>
+        </div>
     </div>
 ```
 
