@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", function () {
+﻿document.addEventListener("DOMContentLoaded", function () {
 
     var extLinks = document.querySelectorAll('a[href*="://"]');
     for (var i = 0; i < extLinks.length; i++) {
@@ -10,30 +10,50 @@ document.addEventListener("DOMContentLoaded", function () {
     loadModalScript();
     console.log("Script Loaded");
 
-    if (localStorage.getItem('paywall_unlocked') === 'true') {
-        console.log("User has unlocked content")
-        unlockContent();
-    }
+    document.querySelectorAll('#paywall-overlay').forEach((overlay, index) => {
+        const container = overlay.closest('.paywall-section');
+        if (!container) return;
 
-    const paywallConfig = document.getElementById("paywall-config");
+        const paywallConfig = container.querySelector('#paywall-config');
+        if (!paywallConfig || !paywallConfig.dataset.price) return;
 
-    document.addEventListener("click", function (event) {
-        if (event.target.id === "payButton") {
-            event.preventDefault();
-            if (paywallConfig) {
-                const price = paywallConfig.getAttribute("data-price");
-                payButton.disabled = true;
-                payButton.textContent = "Loading..."; 
-                handleBitcoinPayment(price, payButton);
-            }
-            else {
-                alert("Error: Payment configuration missing.");
-            }
+        const price = paywallConfig.getAttribute("data-price");
+        const uniqueId = generateUniqueId(index);
+
+        if (localStorage.getItem('paywall_unlocked_' + uniqueId) === 'true') {
+            console.log(`Content ${uniqueId} is already unlocked`);
+            unlockContent(uniqueId);
         }
+
+        overlay.addEventListener("click", function (event) {
+            if (event.target.id === "payButton") {
+                event.preventDefault();
+                event.target.disabled = true;
+                event.target.textContent = "Loading...";
+                handleBitcoinPayment(price, event.target, uniqueId);
+            }
+        });
     });
 });
 
-function handleBitcoinPayment(amount, button) {
+
+function generateUniqueId(index) {
+    const urlPath = window.location.pathname;
+    return btoa(urlPath + "_paywall_" + index);
+}
+
+function unlockContent(uniqueId) {
+    document.querySelectorAll('#paywall-overlay').forEach((overlay, index) => {
+        const generatedId = generateUniqueId(index);
+        if (generatedId === uniqueId) {
+            overlay.style.display = 'none';
+            overlay.previousElementSibling.style.display = 'block';
+        }
+    });
+    localStorage.setItem('paywall_unlocked_' + uniqueId, 'true');
+}
+
+function handleBitcoinPayment(amount, button, uniqueId) {
     const url = BTCPAYSERVER_URL + "/plugins/" + BTCPAYSERVER_STORE_ID + "/ghost/api/paywall/create-invoice?amount=" + amount;
     fetch(url, {
         method: "GET",
@@ -43,7 +63,7 @@ function handleBitcoinPayment(amount, button) {
         .then(data => {
             console.log("Invoice created:", data);
             if (data.id) {
-                showBTCPayModal(data);
+                showBTCPayModal(data, uniqueId);
             }
             else {
                 button.disabled = false;
@@ -61,7 +81,7 @@ function handleBitcoinPayment(amount, button) {
 
 
 
-const showBTCPayModal = function (data) {
+const showBTCPayModal = function (data, uniqueId) {
     console.log('Triggered showBTCPayModal()');
 
     if (data.id == undefined) {
@@ -82,7 +102,7 @@ const showBTCPayModal = function (data) {
                     case 'settled':
                         invoice_paid = true;
                         console.log('Invoice paid.');
-                        unlockContent();
+                        unlockContent(uniqueId);
                         break;
                     case 'expired':
                         window.btcpay.hideFrame();
@@ -99,7 +119,7 @@ const showBTCPayModal = function (data) {
         } else {
             if (event.data === 'close') {
                 if (invoice_paid === true) {
-                    unlockContent();
+                    unlockContent(uniqueId);
                     console.log('Invoice paid.');
                 }
                 console.log('Modal closed.')
@@ -110,15 +130,6 @@ const showBTCPayModal = function (data) {
         return Object.prototype.toString.call(obj) === '[object Object]'
     }
 };
-
-
-function unlockContent() {
-    document.getElementById('paywall-overlay').style.display = 'none';
-    document.getElementById('paywall-content').style.display = 'block';
-
-    localStorage.setItem('paywall_unlocked', 'true');
-}
-
 
 
 const loadModalScript = () => {

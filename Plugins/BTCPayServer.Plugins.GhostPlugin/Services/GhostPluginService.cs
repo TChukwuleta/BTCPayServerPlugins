@@ -268,7 +268,7 @@ public class GhostPluginService : EventHostedServiceBase
     }
 
 
-    public async Task<InvoiceEntity> CreateMemberInvoiceAsync(BTCPayServer.Data.StoreData store, Tier tier, GhostMember member, string txnId, string url)
+    public async Task<InvoiceEntity> CreateMemberInvoiceAsync(BTCPayServer.Data.StoreData store, Tier tier, GhostMember member, string txnId, string url, string redirectUrl)
     {
         var ghostSearchTerm = $"{GhostApp.GHOST_PREFIX}{GhostApp.GHOST_MEMBER_ID_PREFIX}{member.Id}_{txnId}";
         var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
@@ -305,6 +305,10 @@ public class GhostPluginService : EventHostedServiceBase
                 {
                     member.Id.ToString(CultureInfo.InvariantCulture),
                     ghostSearchTerm
+                },
+                Checkout = new()
+                {
+                    RedirectURL = redirectUrl
                 }
             }, store, url, new List<string>() { ghostSearchTerm });
 

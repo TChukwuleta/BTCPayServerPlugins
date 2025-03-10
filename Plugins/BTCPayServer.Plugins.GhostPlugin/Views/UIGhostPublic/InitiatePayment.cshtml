@@ -33,7 +33,6 @@
     <script src="@btcpayScriptUrl"></script>
     <script>
         function showBTCPayModal() {
-            let redirectUrl = "@Model.RedirectUrl";
             window.btcpay.setApiUrlPrefix("@Model.BTCPayServerUrl");
             window.btcpay.showInvoice("@Model.InvoiceId");
 
@@ -64,14 +63,10 @@
                             console.error('Unknown status: ' + event.data.status);
                     }
                 } else if (event.data === 'close') {
-                    console.log('Modal closed.');
-                    if (invoice_paid && redirectUrl.trim()) {
-                        console.log('Redirecting user...');
-                        window.location.href = redirectUrl;
-                        return;
+                    if (invoice_paid === true) {
+                        statusButton.style.display = 'block';
+                        loadingMessage.style.display = 'none';
                     }
-                    statusButton.style.display = 'block';
-                    loadingMessage.style.display = 'none';
                 }
             });
 

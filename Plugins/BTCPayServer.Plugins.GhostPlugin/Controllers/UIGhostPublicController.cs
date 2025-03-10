@@ -102,8 +102,7 @@ public class UIGhostPublicController : Controller
             },
             AdditionalSearchTerms = new[]
             {
-                    id.ToString(CultureInfo.InvariantCulture),
-                    $"Ghost_{id}"
+                    $"Ghost_{id.ToString(CultureInfo.InvariantCulture)}"
             }
         }, store, HttpContext.Request.GetAbsoluteRoot(), new List<string>() { $"Ghost_{id}" });
         var url = GreenfieldInvoiceController.ToModel(invoice, _linkGenerator, HttpContext.Request).CheckoutLink;
@@ -120,6 +119,7 @@ public class UIGhostPublicController : Controller
 
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
         var ghostTiers = await apiClient.RetrieveGhostTiers();
+        ghostTiers = ghostTiers.Where(tier => tier.monthly_price > 0 || tier.yearly_price > 0).ToList();
         var storeData = await _storeRepo.FindStore(ghostSetting.StoreId);
         return View(new CreateMemberViewModel { 
             GhostTiers = ghostTiers, 
@@ -173,7 +173,7 @@ public class UIGhostPublicController : Controller
         ctx.GhostMembers.Add(entity);
         await ctx.SaveChangesAsync();
         var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
-        InvoiceEntity invoice = await _ghostPluginService.CreateMemberInvoiceAsync(storeData, tier, entity, txnId, Request.GetAbsoluteRoot());
+        InvoiceEntity invoice = await _ghostPluginService.CreateMemberInvoiceAsync(storeData, tier, entity, txnId, Request.GetAbsoluteRoot(), $"https://{ghostSetting.ApiUrl}/#/portal/signin");
         await GetTransaction(ctx, tier, entity, invoice, null, txnId);
         await using var dbMain = _context.CreateContext();
         var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == ghostSetting.StoreId);
@@ -184,7 +184,6 @@ public class UIGhostPublicController : Controller
             StoreName = store.StoreName,
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
             BTCPayServerUrl = Request.GetAbsoluteRoot(),
-            RedirectUrl = $"https://{ghostSetting.ApiUrl}/#/portal/signin",
             InvoiceId = invoice.Id
         });
     }

@@ -9,10 +9,8 @@ public class BaseGhostPublicViewModel
     public StoreBrandingViewModel StoreBranding { get; set; }
 }
 
-
 public class GhostOrderViewModel : BaseGhostPublicViewModel
 {
     public string InvoiceId { get; set; }
     public string BTCPayServerUrl { get; set; }
-    public string RedirectUrl { get; set; }
 }
