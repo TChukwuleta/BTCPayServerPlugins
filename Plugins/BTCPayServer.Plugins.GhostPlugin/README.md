@@ -56,14 +56,15 @@ Before diving into the setup process, ensure you have the following:
 
 10. For the username/email and password fields, enter your Ghost admin email address, and password.
 
-11. Now save the credentials details on BTCPay Server Ghost Plugin. If all data is correct, it should save successfully.
+11. For the Webhook Secret you can enter a secret on your own or if left empty it will auto-generate one. This will only be used for the membership functionality.
+
+12. Now save the credentials details on BTCPay Server Ghost Plugin. If all data is correct, it should save successfully.
 
 ![BTCPay Server Ghost img 5](./img/Ghost/Ghost_BTCPay_Credential_Saved_1.png)   
 
 ![BTCPay Server Ghost img 6](./img/Ghost/Ghost_BTCPay_Credential_Saved_2.png)
 
-
-12. In your Ghost plugin page, copy the script URL. Open your Ghost admin portal > Settings > Code Injection, open code injection and under site header paste the script url, save and close
+13. On BTCPay, go to your Ghost plugin page, copy the script snippet from the bottom of the page. Open your Ghost admin portal: Settings >> Code Injection, open code injection and under site header paste the script url, save and close
  
  
 ![BTCPay Server Ghost img 60](./img/Ghost/GhostPluginWithScript.png)
@@ -99,11 +100,11 @@ Whether you're a blogger, journalist, or content creator, adding a Bitcoin donat
 
 #### Steps on how to receive donations on Ghost via BTCPay Server.
 
-1. Go to your BTCPay Server Ghost plugin, scroll down the page, you'd see "Donation URL", copy the URL.
+1. Go to your BTCPay Server Ghost plugin, scroll down the page, you'd see "Donation Url", copy the URL.
 
 2. Open your ghost admin page where you want to receive donations. You may be open to receiving donations on every content page of your Ghost blog, or on a single page dedicated to donations. Which ever you choose, 
-   accepting donations is pretty straightforward. Go to the editor of your donation page (or any page). Add a new button with a title of your choice e.g Buy me a coffee in Bitcoin, for the Bitcoin URL, paste the
-   Donation URL you copied, and paste it there. Save and publish your page
+   accepting donations is pretty straightforward. Go to the editor of your donation page (or any page). Add a new button (by clicking the (+) sign) with a title of your choice e.g Buy me a coffee in Bitcoin, for the Bitcoin URL, paste the
+   Donation URL you copied, and paste it there. Save and publish your page.
 
 3. When you go to the URL of the page, you should see the button now, click on the button, and a QR code would be displayed on the screen. Users can then scan this QR and support 
    you with any amount they want to. 
@@ -142,7 +143,7 @@ This means subscription management remains the admin’s responsibility. However
 #### Setting up membership subscription via BTCPay Server
 
 
-1. Head to your BTCPay Server Ghost plugin, scroll down on the page, Copy the 'Membership subscription Url'.
+1. Head to your BTCPay Server Ghost plugin, scroll down on the page, copy the 'Membership subscription Url'.
 
    ![BTCPay Server Ghost img 21](./img/Ghost/Membership_Url_Ghost_View.png)   
 
@@ -155,19 +156,19 @@ This means subscription management remains the admin’s responsibility. However
 3. Edit the field at 'Display notice at signup' in the right sidebar and to include instructions on how to signup with Bitcoin as payment option, directing users to use the link. For instance: "Sign up with Bitcoin using this link". **Important**: Mark "this link" with your mouse and add a link with the URL copied from the plugin.
    ![BTCPay Server Ghost img 24](./img/Ghost/Membership_Portal_Setup.png)
 
-4. Save the changes and the close to the portal. You can navigate to the signup page to view your changes. It should look similar to this:
+4. Save the changes and the close to the portal. You can navigate to the signup page to view your changes. It should look similar to this:   
    ![Membership_signup.png](./img/Ghost/Membership_signup.png)
 
 5. Before we proceed to testing it out, we need to configure webhooks for our integrations, these webhook would alert the plugin for when member's data are updated or deleted. 
 
-6. Go to your Ghost plugin view in BTCPay Server, and copy the 'Webhook Url'
+6. Go to your Ghost plugin view in BTCPay Server, and note down/copy the 'Webhook Secret' and 'Webhook Url' values.
 
-7. In your Ghost admin portal, navigate to Settings >>> Integrations. Select the custom integration you earlier created.
+7. In your Ghost admin portal, navigate to Settings >> Integrations. Select the custom integration you earlier created.
 
-8. Click on 'Add webhook'. Enter a name for the webhook, for the event, select 'Member Updated', paste the URL copied into the 'Target Url' field and click on "Add".
+8. Click on 'Add webhook'. Enter a name for the webhook, for the event, select 'Member Updated', paste the URL copied into the 'Target URL' and secret into 'Secret' fields. Click on "Add".
    ![BTCPay Server Ghost img 25](./img/Ghost/Member_Update_Webhook.png)
 
-9. Create another webhook, this time the event would be 'Member Deleted'. Use the same Url for the target Url and click on "Add" also.
+9. Create another webhook, this time the event would be 'Member Deleted'. Use the same URL and Secret for the 'Target URL' and 'Secret' and click on "Add" again.
    ![BTCPay Server Ghost img 26](./img/Ghost/Member_Delete_Webhook.png)
 
 10. Once you can confirm that both your webhooks has been populated, click on 'Save' and close the modal.
@@ -228,7 +229,7 @@ Please note that this is not fully protecting your content but just hiding it un
 1. Ensure you have copied the script url into the site header. If you haven't, go to your BTCPay Server Ghost plugin, scroll down the page, copy the paywall script url as shown in the image below.
    ![BTCPay Server Ghost img 35](./img/Ghost/Paywall_Script_Link.png)   
 
-2. Head over to your Ghost admin portal, Settings > Code Injection > Add custom code, click on the "Open" button.
+2. Head over to your Ghost admin portal, Settings >> Code Injection >> Add custom code, click on the "Open" button.
    ![BTCPay Server Ghost img 36](./img/Ghost/Code_Injection_Setting_View.png)   
 
 3. Under the site header paste the script url, click on "save" and close the modal.
