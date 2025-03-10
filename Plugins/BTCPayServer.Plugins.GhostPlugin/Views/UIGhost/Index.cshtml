@@ -53,15 +53,15 @@
                 </div>
 
                 <div class="form-group">
-                    <label asp-for="Username" class="form-label"></label>
-                    <input asp-for="Username" class="form-control" readonly="@ghostCredsSet" />
-                    <span asp-validation-for="Username" class="text-danger"></span>
-                </div>
-
-                <div class="form-group">
                     <label asp-for="AdminApiKey" class="form-label"></label>
                     <input asp-for="AdminApiKey" class="form-control" type="password" value="@Model?.AdminApiKey" readonly="@ghostCredsSet" />
                     <span asp-validation-for="AdminApiKey" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Username" class="form-label"></label>
+                    <input asp-for="Username" class="form-control" readonly="@ghostCredsSet" />
+                    <span asp-validation-for="Username" class="text-danger"></span>
                 </div>
 
                 <div class="form-group">
@@ -72,7 +72,13 @@
 
                 <div class="form-group">
                     <label asp-for="WebhookSecret" class="form-label"></label>
-                    <input asp-for="WebhookSecret" class="form-control" readonly="@ghostCredsSet" />
+                    <div class="input-group">
+                        <input asp-for="WebhookSecret" class="form-control" required />
+                        @if (ghostCredsSet)
+                        {
+                            <button name="command" type="submit" class="btn btn-primary" value="GhostUpdateWebhookSecret">Update</button>
+                        }
+                    </div>
                     <span asp-validation-for="WebhookSecret" class="text-danger"></span>
                 </div>
 

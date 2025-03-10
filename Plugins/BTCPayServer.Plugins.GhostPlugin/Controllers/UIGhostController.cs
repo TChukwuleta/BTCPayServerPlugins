@@ -154,9 +154,23 @@ public class UIGhostController : Controller
                         TempData[WellKnownTempData.SuccessMessage] = "Ghost plugin successfully updated";
                         break;
                     }
+
+                case "GhostUpdateWebhookSecret":
+                    {
+                        var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+                        if (ghostSetting != null)
+                        {
+                            ghostSetting.WebhookSecret = vm.WebhookSecret;
+                            ctx.Update(ghostSetting);
+                            await ctx.SaveChangesAsync();
+                            TempData[WellKnownTempData.SuccessMessage] = "Webhook secret updated successfully";
+                        }
+                        break;
+                    }
+
                 case "GhostClearCredentials":
                     {
-                        var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+                        var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
                         if (ghostSetting != null)
                         {
                             await helper.DeleteGhostApp(CurrentStore.Id, ghostSetting.AppId);
