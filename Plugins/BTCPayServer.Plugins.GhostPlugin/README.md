@@ -226,8 +226,7 @@ With BTCPay Server - Ghost plugin, you can now hide premium content on your blog
 
 Please note that this is not fully protecting your content but just hiding it until payment is made. Technical users can easily bypass this paywall by inspecting the page source.
 
-1. Ensure you have copied the script url into the site header. If you haven't, go to your BTCPay Server Ghost plugin, scroll down the page, copy the paywall script url as shown in the image below.
-   ![BTCPay Server Ghost img 35](./img/Ghost/Paywall_Script_Link.png)   
+1. Ensure you have copied the script url into the site header. If you haven't, go to your BTCPay Server Ghost plugin, scroll down the page, copy the paywall script url.  
 
 2. Head over to your Ghost admin portal, Settings >> Code Injection >> Add custom code, click on the "Open" button.
    ![BTCPay Server Ghost img 36](./img/Ghost/Code_Injection_Setting_View.png)   
