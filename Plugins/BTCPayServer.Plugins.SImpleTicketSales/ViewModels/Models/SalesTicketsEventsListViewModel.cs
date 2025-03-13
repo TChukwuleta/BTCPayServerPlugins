@@ -13,7 +13,8 @@ public class SalesTicketsEventsListViewModel
     public string StoreId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public string EventLink { get; set; }
-    public List<SalesTicketTransactionViewModel> Subscriptions { get; set; }
+    public bool IsPublished { get; set; }
+    public long TicketSold { get; set; }
     public List<SalesTicketEventTicketsViewModel> Tickets { get; set; }
 }
 

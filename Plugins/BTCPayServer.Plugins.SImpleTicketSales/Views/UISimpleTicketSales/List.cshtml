@@ -70,7 +70,7 @@
                                 <vc:truncate-center text="@ticketEvent.EventPurchaseLink" link="@ticketEvent.EventPurchaseLink" classes="truncate-center-id" />
                             </a>
                         </td>
-                        <td>@ticketEvent.Tickets.Count(c => c.PaymentStatus == TransactionStatus.Settled.ToString())</td>
+                        <td>@ticketEvent.TicketSold</td>
                         <td class="actions-col">
                             @if (ticketEvent.EventDate > DateTime.UtcNow)
                             { 

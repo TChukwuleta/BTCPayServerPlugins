@@ -22,13 +22,14 @@ public class EmailService
         _emailSender = emailSender;
     }
 
-    private async Task SendBulkEmail(string storeId, IEnumerable<EmailRecipient> recipients)
+    private async Task<EmailDispatchResult> SendBulkEmail(string storeId, IEnumerable<EmailRecipient> recipients)
     {
         var settings = await (await _emailSender.GetEmailSender(storeId)).GetEmailSettings();
         if (!settings.IsComplete())
-            return;
+            return new EmailDispatchResult { IsSuccessful = false };
 
         var client = await settings.CreateSmtpClient();
+        List<string> failedRecipients = new List<string>();
         try
         {
             foreach (var recipient in recipients)
@@ -44,6 +45,7 @@ public class EmailService
                 }
                 catch (Exception ex)
                 {
+                    failedRecipients.Add(recipient.Address.ToString());
                     _logs.PayServer.LogError(ex, $"Error sending email to: {recipient.Address}");
                 }
             }
@@ -52,30 +54,32 @@ public class EmailService
         {
             await client.DisconnectAsync(true);
         }
+        return new EmailDispatchResult { IsSuccessful = failedRecipients.Any(), FailedRecipients = failedRecipients };
     }
 
-    public async Task SendTicketRegistrationEmail(string storeId, TicketSalesEventTicket ticket, TicketSalesEvent ghostEvent)
+    public async Task<EmailDispatchResult> SendTicketRegistrationEmail(string storeId, ICollection<Ticket> tickets, Event ticketEvent)
     {
-        string emailBody = ghostEvent.EmailBody
-                            .Replace("{{Title}}", ghostEvent.Title)
-                            .Replace("{{EventLink}}", ghostEvent.EventLink)
+        var emailRecipients = new List<EmailRecipient>();
+        foreach (var ticket in tickets)
+        {
+            string emailBody = ticketEvent.EmailBody
+                            .Replace("{{Title}}", ticketEvent.Title)
+                            .Replace("{{EventLink}}", ticketEvent.Location)
                             .Replace("{{Name}}", ticket.Name)
                             .Replace("{{Email}}", ticket.Email)
-                            .Replace("{{Description}}", ghostEvent.Description)
-                            .Replace("{{EventDate}}", ghostEvent.EventDate.ToString("MMMM dd, yyyy"))
-                            .Replace("{{Amount}}", ghostEvent.Amount.ToString())
-                            .Replace("{{Currency}}", ghostEvent.Currency);
+                            .Replace("{{Description}}", ticketEvent.Description)
+                            .Replace("{{EventDate}}", ticketEvent.StartDate.ToString("MMMM dd, yyyy"))
+                            .Replace("{{Amount}}", ticketEvent.Amount.ToString())
+                            .Replace("{{Currency}}", ticketEvent.Currency);
 
-        var emailRecipients = new List<EmailRecipient>
-        {
-            new EmailRecipient
+            emailRecipients.Add(new EmailRecipient
             {
                 Address = InternetAddress.Parse(ticket.Email),
-                Subject = ghostEvent.EmailSubject,
-                MessageText = ghostEvent.EmailBody
-            }
-        };
-        await SendBulkEmail(storeId, emailRecipients);
+                Subject = ticketEvent.EmailSubject,
+                MessageText = ticketEvent.EmailBody
+            });
+        }
+        return await SendBulkEmail(storeId, emailRecipients);
     }
 
 
@@ -99,5 +103,11 @@ public class EmailService
         public InternetAddress Address { get; set; }
         public string Subject { get; set; }
         public string MessageText { get; set; }
+    }
+
+    public class EmailDispatchResult
+    {
+        public List<string> FailedRecipients { get; set; } = new();
+        public bool IsSuccessful { get; set; }
     }
 }

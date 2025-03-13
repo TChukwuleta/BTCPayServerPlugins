@@ -14,8 +14,10 @@ public class SimpleTicketSalesDbContext : DbContext
         _designTime = designTime;
     }
 
-    public DbSet<TicketSalesEvent> TicketSalesEvents { get; set; }
-    public DbSet<TicketSalesEventTicket> TicketSalesEventTickets { get; set; }
+    public DbSet<Event> Events { get; set; }
+    public DbSet<Ticket> Tickets { get; set; }
+    public DbSet<TicketType> TicketTypes { get; set; }
+    public DbSet<Order> Orders { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

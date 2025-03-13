@@ -3,6 +3,7 @@ using System;
 using BTCPayServer.Plugins.SimpleTicketSales;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
 {
     [DbContext(typeof(SimpleTicketSalesDbContext))]
-    partial class SimpleTicketSalesDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250313132857_initialMigration")]
+    partial class initialMigration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
