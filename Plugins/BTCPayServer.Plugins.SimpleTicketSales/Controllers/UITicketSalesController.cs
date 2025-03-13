@@ -29,7 +29,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 [Route("~/plugins/{storeId}/ticketsales/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
-public class UISimpleTicketSalesController : Controller
+public class UITicketSalesController : Controller
 {
     private readonly AppService _appService;
     private readonly UriResolver _uriResolver;
@@ -41,7 +41,7 @@ public class UISimpleTicketSalesController : Controller
     private readonly BTCPayNetworkProvider _networkProvider;
     private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
-    public UISimpleTicketSalesController
+    public UITicketSalesController
         (AppService appService,
         UriResolver uriResolver,
         IFileService fileService,
