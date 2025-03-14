@@ -2,6 +2,9 @@
 using Microsoft.AspNetCore.Http;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using BTCPayServer.Plugins.SimpleTicketSales.Data;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Collections.Generic;
 
 namespace BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
 
@@ -10,6 +13,8 @@ public class UpdateSimpleTicketSalesEventViewModel
     public string EventId { get; set; }
     public string StoreId { get; set; }
     public string Title { get; set; }
+    public EventType EventType { get; set; }
+    public List<SelectListItem> EventTypes { get; set; }
     public string Description { get; set; }
 
     [Display(Name = "Event Image URL")]
@@ -19,9 +24,10 @@ public class UpdateSimpleTicketSalesEventViewModel
     [JsonIgnore]
     public IFormFile EventImageFile { get; set; }
 
-    [Display(Name = "Event Link/Address")]
-    public string EventLink { get; set; }
+    [Display(Name = "Event Address or Link")]
+    public string Location { get; set; }
     public DateTime EventDate { get; set; } = DateTime.UtcNow.Date;
+    public DateTime? EndDate { get; set; }
     public string StoreDefaultCurrency { get; set; }
     public decimal Amount { get; set; }
     public string Currency { get; set; }
@@ -37,5 +43,4 @@ public class UpdateSimpleTicketSalesEventViewModel
 
     [Display(Name = "Maximum number of ticket for sale")]
     public int? MaximumEventCapacity { get; set; }
-    public string EventPaymentUrl { get; set; }
 }

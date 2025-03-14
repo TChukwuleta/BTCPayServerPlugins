@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using BTCPayServer.Plugins.SimpleTicketSales.Data;
 
 namespace BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
 
@@ -12,10 +13,10 @@ public class SalesTicketsEventsListViewModel
     public DateTime EventDate { get; set; }
     public string StoreId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
-    public string EventLink { get; set; }
+    public string Location { get; set; }
+    public EntityState EventState { get; set; }
     public bool IsPublished { get; set; }
     public long TicketSold { get; set; }
-    public List<SalesTicketEventTicketsViewModel> Tickets { get; set; }
 }
 
 public class SalesTicketTransactionViewModel

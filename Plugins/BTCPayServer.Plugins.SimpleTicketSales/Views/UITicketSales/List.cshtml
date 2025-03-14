@@ -5,6 +5,7 @@
 @inject IScopeProvider ScopeProvider
 @model SalesTicketsEventsViewModel
 @{
+    Layout = "_Layout";
     ViewData.SetActivePage(PluginNavPages.Index, "Sales Tickets Events");
     var storeEmailSettingsConfigured = (bool)ViewData["StoreEmailSettingsConfigured"];
     var storeId = ScopeProvider.GetCurrentStoreId();
@@ -70,7 +71,7 @@
                                 <vc:truncate-center text="@ticketEvent.EventPurchaseLink" link="@ticketEvent.EventPurchaseLink" classes="truncate-center-id" />
                             </a>
                         </td>
-                        <td>@ticketEvent.Tickets.Count(c => c.PaymentStatus == TransactionStatus.Settled.ToString())</td>
+                        <td>@ticketEvent.TicketSold</td>
                         <td class="actions-col">
                             @if (ticketEvent.EventDate > DateTime.UtcNow)
                             { 
@@ -81,11 +82,11 @@
                         </td>
                         <td class="text-end">
                             <div class="d-inline-flex align-items-center gap-3">
-                                @if (ticketEvent.Tickets != null && ticketEvent.Tickets.Any())
+                                @if (ticketEvent.TicketSold > 0)
                                 {
                                     <a asp-action="ViewEventTicket" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">View</a>
                                 }
-                                @if (ticketEvent.Tickets == null || !ticketEvent.Tickets.Any() || ticketEvent.EventDate <= DateTime.UtcNow)
+                                @if (ticketEvent.TicketSold <= 0 || ticketEvent.EventDate <= DateTime.UtcNow)
                                 {
                                     <a asp-action="DeleteEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id" class="text-danger">Delete</a>
                                 }

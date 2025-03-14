@@ -23,6 +23,8 @@ using StoreData = BTCPayServer.Data.StoreData;
 using BTCPayServer.Plugins.SimpleTicketSales.Data;
 using BTCPayServer.Plugins.SimpleTicketSales.Services;
 using BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -82,6 +84,7 @@ public class UITicketSalesController : Controller
         {
             return new SalesTicketsEventsListViewModel
             {
+                Location = ticketEvent.Location,
                 Id = ticketEvent.Id,
                 Title = ticketEvent.Title,
                 EventPurchaseLink = Url.Action("EventRegistration", "UITicketSalesPublic", new { storeId = CurrentStore.Id, eventId = ticketEvent.Id }, Request.Scheme),
@@ -109,7 +112,9 @@ public class UITicketSalesController : Controller
                 Severity = StatusMessageModel.StatusSeverity.Info
             });
         }
-        return View(new SalesTicketsEventsViewModel { DisplayedEvents = eventsViewModel, Expired = expired });
+        var vm = new SalesTicketsEventsViewModel { DisplayedEvents = eventsViewModel, Expired = expired };
+        Console.WriteLine(JsonConvert.SerializeObject(vm, Formatting.Indented));
+        return View(vm);
     }
 
 
@@ -136,6 +141,13 @@ public class UITicketSalesController : Controller
             vm.EventImageUrl = getFile == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile));
             vm.StoreDefaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, entity.Currency);
         }
+        vm.EventTypes = Enum.GetValues(typeof(EventType))
+            .Cast<EventType>()
+            .Select(e => new SelectListItem
+            {
+                Value = e.ToString(),
+                Text = e.ToString()
+            }).ToList();
         return View(vm);
     }
 
@@ -163,6 +175,7 @@ public class UITicketSalesController : Controller
             return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
         }
         var entity = TicketSalesEventViewModelToEntity(vm);
+        entity.EventState = SimpleTicketSales.Data.EntityState.Active;
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
         {
@@ -402,11 +415,12 @@ public class UITicketSalesController : Controller
             EventId = entity.Id,
             Title = entity.Title,
             Description = entity.Description,
-            EventLink = entity.Location,
+            Location = entity.Location,
             EventDate = entity.StartDate,
             Amount = entity.Amount,
             Currency = entity.Currency,
             EmailBody = entity.EmailBody,
+            EventType = entity.EventType,
             EmailSubject = entity.EmailSubject,
             HasMaximumCapacity = entity.HasMaximumCapacity,
             MaximumEventCapacity = entity.MaximumEventCapacity
@@ -421,11 +435,13 @@ public class UITicketSalesController : Controller
             Title = model.Title,
             Description = model.Description,
             EventLogo = model.EventImageUrl,
-            Location = model.EventLink,
+            Location = model.Location,
             StartDate = model.EventDate,
+            EndDate = model.EndDate,
             Amount = model.Amount,
             Currency = model.Currency,
             EmailBody = model.EmailBody,
+            EventType = model.EventType,
             EmailSubject = model.EmailSubject,
             HasMaximumCapacity = model.HasMaximumCapacity,
             MaximumEventCapacity = model.MaximumEventCapacity

@@ -4,7 +4,6 @@ using System.Linq;
 using Microsoft.AspNetCore.Routing;
 using BTCPayServer.Client;
 using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
 using BTCPayServer.Abstractions.Models;
 using Microsoft.AspNetCore.Authorization;
 using BTCPayServer.Abstractions.Constants;
@@ -12,6 +11,9 @@ using StoreData = BTCPayServer.Data.StoreData;
 using BTCPayServer.Plugins.SimpleTicketSales.Data;
 using BTCPayServer.Plugins.SimpleTicketSales.Services;
 using BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
+using System;
+using Newtonsoft.Json;
+using Microsoft.Extensions.Logging;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -44,6 +46,7 @@ public class UITicketTypeController : Controller
         {
             return new TicketTypeViewModel
             {
+                TicketTypeId = x.Id,
                 Name = x.Name,
                 Price = x.Price,
                 Quantity = x.Quantity,
@@ -64,7 +67,7 @@ public class UITicketTypeController : Controller
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var ticketEvent = ctx.Events.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (ticketEvent == null)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Invalid event";
@@ -72,7 +75,7 @@ public class UITicketTypeController : Controller
         }
 
         var vm = new TicketTypeViewModel { EventId = eventId };
-        if (!string.IsNullOrEmpty(eventId))
+        if (!string.IsNullOrEmpty(ticketTypeId))
         {
             var entity = ctx.TicketTypes.FirstOrDefault(c => c.EventId == eventId && c.Id == ticketTypeId);
             if (entity == null)
@@ -87,8 +90,9 @@ public class UITicketTypeController : Controller
 
 
     [HttpPost("create")]
-    public async Task<IActionResult> CreateTicketType(string storeId, string eventId, [FromBody] TicketTypeViewModel vm)
+    public async Task<IActionResult> CreateTicketType(string storeId, string eventId, TicketTypeViewModel vm)
     {
+        Console.WriteLine(JsonConvert.SerializeObject(vm));
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
@@ -99,9 +103,9 @@ public class UITicketTypeController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Invalid event";
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
-        if (vm.Quantity <= 0)
+        if (vm.Price <= 0)
         {
-            TempData[WellKnownTempData.ErrorMessage] = "Quantity cannot be 0 or smaller";
+            TempData[WellKnownTempData.ErrorMessage] = "Price cannot be zero or negative";
             return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
         }
         var entity = TicketTypeViewModelToEntity(vm);
@@ -115,7 +119,7 @@ public class UITicketTypeController : Controller
 
 
     [HttpPost("update/{ticketTypeId}")]
-    public async Task<IActionResult> UpdateTicketType(string storeId, string eventId, string ticketTypeId, [FromBody] TicketTypeViewModel vm)
+    public async Task<IActionResult> UpdateTicketType(string storeId, string eventId, string ticketTypeId, TicketTypeViewModel vm)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
@@ -133,18 +137,21 @@ public class UITicketTypeController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Invalid ticket type specifed";
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
-
-        if (vm.Quantity <= 0)
+        if (vm.Price <= 0)
         {
-            TempData[WellKnownTempData.ErrorMessage] = "Quantity cannot be 0 or smaller";
+            TempData[WellKnownTempData.ErrorMessage] = "Price cannot be zero or negative";
             return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
         }
-        entity = TicketTypeViewModelToEntity(vm);
-        entity.Id = ticketTypeId;
+        entity.Name = vm.Name;
+        entity.Price = vm.Price;
+        entity.Quantity = vm.Quantity;
+        entity.Description = vm.Description;
+        entity.QuantitySold = vm.QuantitySold;
+        ctx.TicketTypes.Update(entity);
         ctx.TicketTypes.Update(entity);
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Ticket type updated successfully";
-        return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
+        return RedirectToAction(nameof(List), new { storeId, eventId });
     }
 
 
@@ -221,7 +228,7 @@ public class UITicketTypeController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Invalid route specified";
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
-        return View("Confirm", new ConfirmModel($"Delete Ticket Type", $"Ticket type: {ticketType.Name} would also be deleted. Are you sure?", "Delete ticket type"));
+        return View("Confirm", new ConfirmModel($"Delete Ticket Type", $"Ticket type: {ticketType.Name} would also be deleted. Are you sure?", $"Delete {ticketType.Name}"));
     }
 
 
@@ -254,7 +261,7 @@ public class UITicketTypeController : Controller
         return new TicketTypeViewModel
         {
             EventId = entity.EventId,
-            Id = entity.Id,
+            TicketTypeId = entity.Id,
             Name = entity.Name,
             Price = entity.Price,
             Quantity = entity.Quantity,

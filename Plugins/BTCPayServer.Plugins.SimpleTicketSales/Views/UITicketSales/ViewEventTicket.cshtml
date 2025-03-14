@@ -8,6 +8,7 @@
 @inject IScopeProvider ScopeProvider
 @model EventTicketViewModel
 @{
+    Layout = "_Layout";
     ViewData.SetActivePage(PluginNavPages.Index, $"Ghost Event Tickets: {Model.EventTitle}");
     var canUpload = await FileService.IsAvailable();
     var storeId = ScopeProvider.GetCurrentStoreId();

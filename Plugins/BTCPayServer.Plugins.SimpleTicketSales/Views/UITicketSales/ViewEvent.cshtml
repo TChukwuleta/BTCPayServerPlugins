@@ -7,6 +7,7 @@
 @inject IScopeProvider ScopeProvider
 @model UpdateSimpleTicketSalesEventViewModel
 @{
+    Layout = "_Layout";
     ViewData.SetActivePage(PluginNavPages.Index, "Ghost Events");
     var canUpload = await FileService.IsAvailable();
     var storeId = ScopeProvider.GetCurrentStoreId();
@@ -21,7 +22,7 @@
     <div class="d-flex gap-3 mt-3 mt-sm-0">
         @if (!string.IsNullOrEmpty(Model.EventId))
         {
-            <a asp-controller="UITicketType" asp-action="List" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Ticket Type</a>
+            <a asp-controller="UITicketType" asp-action="List" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Ticket Tiers</a>
         }
         <button type="submit" form="event-form" class="btn btn-success">@(isEditMode ? "Update Event" : "Create Event")</button>
     </div>
@@ -64,41 +65,47 @@
 <form id="event-form" action="@formAction" method="post" enctype="multipart/form-data">
     <div class="row">
         <div class="col-sm-10 col-md-9 col-xl-7 col-xxl-6">
-            <div class="row">
-                <div class="col-sm-6">
-                    <div class="form-group">
-                        <label asp-for="Title" class="form-label" data-required></label>
-                        <input asp-for="Title" class="form-control" required />
-                        <span asp-validation-for="Title" class="text-danger"></span>
-                    </div>
-                </div>
-                <div class="col-sm-6">
-                    <div class="form-group">
-                        <label asp-for="EventLink" class="form-label" data-required></label>
-                        <input asp-for="EventLink" class="form-control" required />
-                        <span asp-validation-for="EventLink" class="text-danger"></span>
-                    </div>
-                </div>
+            <div class="form-group">
+                <label asp-for="Title" class="form-label" data-required></label>
+                <input asp-for="Title" class="form-control" required />
+                <span asp-validation-for="Title" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Location" class="form-label" data-required></label>
+                <input asp-for="Location" class="form-control" required />
+                <span asp-validation-for="Location" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="EventType" class="form-label" data-required></label>
+                <select asp-for="EventType" asp-items="Model.EventTypes" class="form-control" required></select>
+                <span asp-validation-for="EventType" class="text-danger"></span>
             </div>
 
             <div class="form-group">
                 <div class="d-flex align-items-center justify-content-between gap-2">
                     <label asp-for="EventImageFile" class="form-label"></label>
-                    @if (!string.IsNullOrEmpty(Model.EventImageUrl)) {
+                    @if (!string.IsNullOrEmpty(Model.EventImageUrl))
+                    {
                         <button type="submit" class="btn btn-link p-0 text-danger" name="RemoveEventLogoFile" value="true">
                             <vc:icon symbol="cross" /> Remove
                         </button>
                     }
                 </div>
-                @if (canUpload) {
+                @if (canUpload)
+                {
                     <div class="d-flex align-items-center gap-3">
                         <input asp-for="EventImageFile" type="file" class="form-control flex-grow" />
-                        @if (!string.IsNullOrEmpty(Model.EventImageUrl)) {
+                        @if (!string.IsNullOrEmpty(Model.EventImageUrl))
+                        {
                             <img src="@Model.EventImageUrl" alt="Logo" style="height:2.1rem;max-width:10.5rem;" />
                         }
                     </div>
                     <span asp-validation-for="EventImageFile" class="text-danger"></span>
-                } else {
+                }
+                else
+                {
                     <input asp-for="EventImageFile" type="file" class="form-control" disabled />
                     <div class="form-text">In order to upload an image, a <a asp-controller="UIServer" asp-action="Files">file storage</a> must be configured.</div>
                 }

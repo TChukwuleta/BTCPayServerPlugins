@@ -5,6 +5,7 @@
 @inject IScopeProvider ScopeProvider
 @model TicketTypeListViewModel
 @{
+    Layout = "_Layout";
     ViewData.SetActivePage(PluginNavPages.Index, "Event Ticket Types");
     var storeId = ScopeProvider.GetCurrentStoreId();
 }
@@ -13,7 +14,8 @@
 <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
-        <a id="create-event" asp-action="ViewTicketType" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-success" role="button">Create Ticket Type</a>
+        <a asp-controller="UITicketSales" asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Go Back</a>
+        <a asp-action="ViewTicketType" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-success" role="button">Configure Ticket Tiers</a>
     </div>
 </div>
 <partial name="_StatusMessage" />
@@ -29,7 +31,6 @@
                     <th>Price</th>
                     <th>Total Quantity</th>
                     <th>Quantity Sold</th>
-                    <th class="actions-col"></th>
                     <th class="w-75px"></th>
                 </tr>
             </thead>
@@ -39,55 +40,36 @@
                     <tr id="event_@ticketType.EventId" class="user-overview-row mass-action-row">
                         <td>
                             <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketType.Id">@ticketType.Name</a>
+                                <a asp-action="ViewTicketType" 
+                                asp-route-storeId="@storeId" 
+                                asp-route-eventId="@ticketType.EventId" 
+                                asp-route-ticketTypeId="@ticketType.TicketTypeId">@ticketType.Name</a>
                             </div>
                         </td>
                         <td>@ticketType.Price</td>
                         <td>@ticketType.Quantity</td>
                         <td>@ticketType.QuantitySold</td>
-                        <td class="actions-col">
-                            <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketType.Id">Edit</a>
-                            </div>
-                        </td>
                         <td class="text-end">
                             <div class="d-inline-flex align-items-center gap-3">
-                                <div class="dropdown">
-                                    <button class="btn btn-link dropdown-toggle p-0 dropdown-toggle-no-caret text-body" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="ToggleActions-@ticketType.Id">
-                                        <vc:icon symbol="dots" />
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        <li>
-                                            <a class="dropdown-item" asp-controller="UITicketType" asp-action="Edit" asp-route-storeId="@storeId" asp-route-userId="@ticketType.Id">Edit</a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item"
-                                               asp-controller="UITicketType"
-                                               asp-action="ToggleTicketTypeStatus"
-                                               asp-route-eventId="@ticketType.EventId"
-                                               asp-route-ticketTypeId="@ticketType.Id"
-                                               asp-route-storeId="@storeId"
-                                               asp-route-enable="@(ticketType.TicketTypeState == EntityState.Disabled)">
-                                                @(ticketType.TicketTypeState == EntityState.Disabled ? "Activate" : "Disable")
-                                            </a>
-                                        </li>
-                                        <li class="dropdown-divider"></li>
-                                        <li>
-                                            <a asp-controller="UITicketType"
-                                               asp-action="DeleteTicketType"
-                                               asp-route-eventId="@ticketType.EventId"
-                                               asp-route-ticketTypeId="@ticketType.Id"
-                                               asp-route-storeId="@storeId"
-                                               class="dropdown-item text-danger">
-                                                Delete
-                                            </a>
-                                        </li>
-                                    </ul>
-                                </div>
+
+                                <a class="dropdown-item text-success"
+                                   asp-action="ToggleTicketTypeStatus"
+                                   asp-route-storeId="@storeId"
+                                   asp-route-eventId="@ticketType.EventId"
+                                   asp-route-ticketTypeId="@ticketType.TicketTypeId"
+                                   asp-route-enable="@(ticketType.TicketTypeState == EntityState.Disabled)">
+                                    @(ticketType.TicketTypeState == EntityState.Disabled ? "Activate" : "Disable")
+                                </a>
+
+                                <a asp-action="DeleteTicketType"
+                                   asp-route-eventId="@ticketType.EventId"
+                                   asp-route-ticketTypeId="@ticketType.TicketTypeId"
+                                   asp-route-storeId="@storeId"
+                                   class="dropdown-item text-danger">
+                                    Delete
+                                </a>
                             </div>
                         </td>
-
-
                     </tr>
                 }
             </tbody>
