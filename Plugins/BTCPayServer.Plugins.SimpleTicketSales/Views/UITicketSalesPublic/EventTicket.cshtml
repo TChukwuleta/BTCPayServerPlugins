@@ -71,33 +71,13 @@
             }
         </div>
 
-        <form id="ticketForm" asp-action="Contact" asp-controller="Tickets" method="post">
-            <input type="hidden" name="storeId" value="@Model.StoreId" />
-            <input type="hidden" name="eventId" value="@Model.EventId" />
-            <input type="hidden" name="eventTitle" value="@Model.EventTitle" />
-            <div id="ticketSelections"></div>
+        <div class="col-md-4">
+            <form id="ticketForm" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" asp-action="SaveEventTickets" method="post">
+                <input type="hidden" name="storeId" value="@Model.StoreId" />
+                <input type="hidden" name="eventId" value="@Model.EventId" />
+                <input type="hidden" name="eventTitle" value="@Model.EventTitle" />
+                <div id="ticketSelections"></div>
 
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <h5 class="fw-bold mb-4">Summary <span class="text-muted small">(in @Model.Currency)</span></h5>
-                    <h6 class="text-center fw-bold mb-4">@Model.EventTitle</h6>
-
-                    <div id="summary-details"></div>
-                    <hr>
-                    <div class="d-flex justify-content-between mb-3">
-                        <span>Subtotal</span>
-                        <span id="subtotal">0</span>
-                    </div> <hr>
-                    <div class="d-flex justify-content-between mb-4">
-                        <span class="fw-bold">Total</span>
-                        <span class="fw-bold" id="total">0</span>
-                    </div>
-                    <button type="submit" class="btn btn-success w-100 py-3" id="continue-btn">Continue</button>
-                </div>
-            </div>
-
-
-            @* <div class="col-md-4">
                 <div class="card border-0 shadow-sm">
                     <div class="card-body">
                         <h5 class="fw-bold mb-4">Summary <span class="text-muted small">(in @Model.Currency)</span></h5>
@@ -113,31 +93,29 @@
                             <span class="fw-bold">Total</span>
                             <span class="fw-bold" id="total">0</span>
                         </div>
-                        <button class="btn btn-success w-100 py-3" id="continue-btn">Continue</button>
+                        <button type="submit" class="btn btn-success w-100 py-3 disabled" disabled>Continue</button>
                     </div>
                 </div>
-            </div> *@
-        </form>
+            </form>
+        </div>
+
     </div>
 </div>
 
 
 @section PageFootContent {
     <script>
-
         document.addEventListener("DOMContentLoaded", function () {
             function updateSummary() {
                 let summaryDetails = document.getElementById("summary-details");
                 let ticketSelections = document.getElementById("ticketSelections");
                 let subtotalElem = document.getElementById("subtotal");
                 let totalElem = document.getElementById("total");
-                let continueBtn = document.getElementById("continue-btn");
+                let continueButton = document.querySelector(".btn-success");
                 let totalAmount = 0;
                 let summaryHtml = "";
                 let ticketInputsHtml = "";
                 let ticketIndex = 0;
-
-
 
                 document.querySelectorAll(".ticket-quantity").forEach(input => {
                     let quantity = parseInt(input.value) || 0;
@@ -172,9 +150,6 @@
                     continueButton.classList.remove("disabled");
                     continueButton.removeAttribute("disabled");
                 }
-
-
-
             }
             document.querySelectorAll(".ticket-quantity").forEach(input => {
                 input.addEventListener("input", updateSummary);

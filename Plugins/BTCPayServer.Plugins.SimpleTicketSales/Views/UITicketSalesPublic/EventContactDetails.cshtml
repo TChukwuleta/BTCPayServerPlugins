@@ -1,0 +1,122 @@
+﻿@using BTCPayServer.Plugins.SimpleTicketSales.Data
+@using BTCPayServer.Plugins.SimpleTicketSales.ViewModels
+@using System.Globalization
+@model ContactInfoPageViewModel
+@{
+    Layout = "_BaseSimpleTicketPublicLayout";
+}
+
+<nav aria-label="breadcrumb" class="mt-5 mb-4 py-3 ps-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-action="EventTicket" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId">Event Ticket</a></li>
+        <li class="breadcrumb-item active" aria-current="page">CONTACT DETAILS</li>
+    </ol>
+</nav>
+
+<div class="container py-4">
+    <div class="row">
+        <form asp-action="SaveContactDetails" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" method="post">
+            <input type="hidden" asp-for="EventId" />
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="d-flex mb-2">
+                        <div class="flex-grow-1 d-flex align-items-center">
+                            <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
+                                <i class="bi bi-check"></i>
+                            </div>
+                            <span class="ms-2 text-success fw-bold">Tickets</span>
+                            <hr class="flex-grow-1 mx-3">
+                        </div>
+                        <div class="flex-grow-1 d-flex align-items-center">
+                            <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
+                                <i class="bi bi-check"></i>
+                            </div>
+                            <span class="ms-2 text-muted">Contact</span>
+                            <hr class="flex-grow-1 mx-3">
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle border d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
+                                <span class="text-muted">3</span>
+                            </div>
+                            <span class="ms-2 text-muted">Payment</span>
+                        </div>
+                    </div>
+
+                    <div class="p-3 rounded mb-4">
+                        <div id="contactList">
+                            @for (var i = 0; i < Model.ContactInfo.Count; i++)
+                            {
+                                <div class="contact-group">
+                                    <div class="mb-3">
+                                        <label class="form-label" data-required>First name</label>
+                                        <input type="text" class="form-control" asp-for="ContactInfo[i].FirstName" placeholder="First name" required>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label" data-required>Last name</label>
+                                        <input type="text" class="form-control" asp-for="ContactInfo[i].LastName" placeholder="Last name">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label" data-required>Email Address</label>
+                                        <input type="email" class="form-control" asp-for="ContactInfo[i].Email" placeholder="Email address">
+                                    </div>
+                                    <hr />
+                                </div>
+                            }
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Want to send ticket to different email addresses?</label>
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-info-circle text-muted me-2"></i>
+                                    <i class="bi bi-info-circle text-muted me-2"></i>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="ticketEmail" id="sameEmail" value="no">
+                                    <label class="form-check-label" for="sameEmail">Yes</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="ticketEmail" id="differentEmail" value="yes" checked>
+                                    <label class="form-check-label" for="differentEmail">No</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="fw-bold mb-4">Summary <span class="text-muted small">(in @Model.Currency)</span></h5>
+
+                            <h6 class="text-center fw-bold mb-4">@Model.EventTitle</h6>
+
+                            @foreach (var ticket in Model.Tickets)
+                            {
+                                <div class="d-flex justify-content-between mb-3">
+                                    <span>@ticket.Quantity × @ticket.TicketTypeName</span>
+                                    <span>@((ticket.Quantity * ticket.Price).ToString("N0"))</span>
+                                </div>
+                            }
+                            <hr>
+
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Subtotal</span>
+                                <span>@Model.Tickets.Sum(t => t.Quantity * t.Price).ToString("N0")</span>
+                            </div>
+                            <hr>
+
+                            <div class="d-flex justify-content-between mb-4">
+                                <span class="fw-bold">Total</span>
+                                <span class="fw-bold">@Model.Tickets.Sum(t => t.Quantity * t.Price).ToString("N0")</span>
+                            </div>
+
+                            <button type="submit" class="btn btn-success w-100 py-3">Complete Payment</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

@@ -71,7 +71,16 @@ public class EventTicketPageViewModel : BaseSimpleTicketPublicViewModel
     public List<TicketTypeViewModel> TicketTypes { get; set; }
 }
 
-public class TicketOrderViewModel
+public class ContactInfoPageViewModel : BaseSimpleTicketPublicViewModel
+{
+    public string Currency { get; set; }
+    public string EventId { get; set; }
+    public string EventTitle { get; set; }
+    public List<TicketSelectionViewModel> Tickets { get; set; }
+    public List<TicketContactInfoViewModel> ContactInfo { get; set; } = new List<TicketContactInfoViewModel>();
+}
+
+public class TicketPageViewModel
 {
     public int StoreId { get; set; }
     public int EventId { get; set; }
@@ -87,22 +96,24 @@ public class TicketSelectionViewModel
 }
 public class TicketContactInfoViewModel
 {
-    public string Name { get; set; }
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
     public string Email { get; set; }
-    public string Phone { get; set; }
     public string TicketTypeId { get; set; }
     public int Quantity { get; set; }
 }
 
 
-public class TIcketOrderViewModel
+public class TicketOrderViewModel
 {
-    public int StoreId { get; set; }
-    public int EventId { get; set; }
+    public string StoreId { get; set; }
+    public string EventId { get; set; }
     public string EventTitle { get; set; }
     public List<TicketSelectionViewModel> Tickets { get; set; } = new List<TicketSelectionViewModel>();
     public List<TicketContactInfoViewModel> ContactInfo { get; set; } = new List<TicketContactInfoViewModel>();
-    public int CurrentStep { get; set; } = 1; // 1=Tickets, 2=Contact, 3=Payment
+    public bool IsStepOneComplete { get; set; } // Tickets
+    public bool IsStepTwoComplete { get; set; } // Contact
+    public bool IsStepThreeComplete { get; set; } // Payment
 }
 
 
