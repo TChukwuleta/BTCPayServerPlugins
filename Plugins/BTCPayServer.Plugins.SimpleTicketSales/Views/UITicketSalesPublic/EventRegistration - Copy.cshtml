@@ -1,0 +1,395 @@
+@using BTCPayServer.Plugins.SimpleTicketSales.Data
+@using BTCPayServer.Plugins.SimpleTicketSales.ViewModels
+@using System.Globalization
+@model CreateEventTicketViewModel
+@{
+    Layout = "_BaseSimpleTicketPublicLayout";
+    ViewBag.Title = "Register for Event";
+}
+
+<style>
+    #crowdfund-main-image {
+        border-radius: var(--btcpay-border-radius);
+        object-fit: cover;
+        max-width: 100%;
+        max-height: 40vh;
+    }
+    #crowdfund-body-description {
+        font-size: 16px;
+    }
+
+    .perk.card .card-img-top {
+        max-height: 210px;
+        object-fit: scale-down;
+    }
+</style>
+
+<div class="container mt-5">
+    @if (!string.IsNullOrEmpty(Model.EventImageUrl))
+    {
+        <div class="d-flex justify-content-center mb-4">
+            <img src="@Model.EventImageUrl" alt="@Model.EventTitle" id="crowdfund-main-image" class="img-fluid" asp-append-version="true" />
+        </div>
+    }
+    <div class="text-center mb-5">
+        <h1 class="mb-4">@Model.EventTitle</h1>
+
+        <div class="d-inline-block">
+            <span class="badge bg-info px-4 py-2 fs-6">@Model.EventDate.ToString("M/d/yy, hh:mm tt")</span>
+        </div>
+        <div class="mt-3">
+            <span class="badge bg-success px-3 py-2 fs-5">
+                Ticket Price: @Model.Currency @Model.Amount.ToString() 
+            </span>
+        </div>
+        <div class="text-muted mt-2" id="crowdfund-body-description">
+            @if (Model.EventType == EventType.Virtual)
+            {
+                <div class="alert alert-info">
+                    <i class="bi bi-laptop"></i> This is an online event. Access details will be sent to your email.
+                </div>
+            }
+            else if (Model.EventType == EventType.Physical)
+            {
+                <div class="alert alert-info">
+                    <i class="bi bi-geo-alt"></i> This is a physical event. QR code tickets will be sent to your email.
+                </div>
+            }
+        </div>
+    </div>
+
+
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">@Model.EventTitle</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <p class="lead">@Model.Description</p>
+                        <div class="d-flex mt-3">
+                            <div class="me-4">
+                                <strong>Date:</strong> @Model.EventDate.ToString("MMM dd, yyyy")
+                            </div>
+                            <div class="me-4">
+                                <strong>Time:</strong> @Model.EventDate.ToString("h:mm tt") - @Model.EventDate.ToString("h:mm tt")
+                            </div>
+                            <div>
+                                <strong>Location:</strong> @Model.Location
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        @if (Model.EventType == EventType.Virtual)
+                        {
+                            <div class="alert alert-info">
+                                <i class="bi bi-laptop"></i> This is an online event. Access details will be sent to your email.
+                            </div>
+                        }
+                        else if (Model.EventType == EventType.Physical)
+                        {
+                            <div class="alert alert-info">
+                                <i class="bi bi-geo-alt"></i> This is a physical event. QR code tickets will be sent to your email.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info">
+                                <i class="bi bi-display"></i> This is a hybrid event. Choose your attendance type below.
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form asp-action="PurchaseTickets" method="post">
+        <input type="hidden" asp-for="EventId" />
+
+        <div class="mb-3">
+            <label for="ticketTier" class="form-label">Select Ticket Tier</label>
+            <select asp-for="SelectedTierId" class="form-control" id="ticketTier">
+                @if (Model.TicketTypes.Any())
+                {
+                    foreach (var tier in Model.TicketTypes)
+                    {
+                        <option value="@tier.Id">@tier.Name - $@tier.Price</option>
+                    }
+                }
+                else
+                {
+                    <option value="">General Admission</option>
+                }
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="quantity" class="form-label">Number of Tickets</label>
+            <input type="number" asp-for="Quantity" class="form-control" id="quantity" min="1" max="10" required />
+        </div>
+
+        <div class="mb-3">
+            <input type="checkbox" id="assignToSelf" />
+            <label for="assignToSelf">Assign all tickets to myself</label>
+        </div>
+
+        <div id="ticketDetailsContainer"></div>
+
+        <div class="mb-3">
+            <button type="submit" class="btn btn-primary">Purchase Tickets</button>
+        </div>
+    </form>
+
+
+
+    <!-- Ticket Purchase Form -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Select Tickets</h4>
+                </div>
+                <div class="card-body">
+                <form id="ticketPurchaseForm" asp-action="PurchaseTickets" asp-controller="UITicketSalesPublic" method="post">
+                        <input type="hidden" name="EventId" value="@Model.EventId" />
+                        
+                        <!-- Ticket Tiers Selection -->
+                        @if (Model.TicketTypes.Count > 1)
+                        {
+                            <h5>Select Ticket Tier</h5>
+                            <div class="ticket-tiers mb-4">
+                                @foreach (var ticketType in Model.TicketTypes)
+                                {
+                                    <div class="card mb-2 ticket-tier-card @(ticketType.QuantityAvailable <= 0 ? "disabled" : "")">
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <h5 class="card-title">@ticketType.Name</h5>
+                                                    @if (ticketType.QuantityAvailable <= 5 && ticketType.QuantityAvailable > 0)
+                                                    {
+                                                        <span class="badge bg-warning">Only @(ticketType.QuantityAvailable) left!</span>
+                                                    }
+                                                    else if (ticketType.QuantityAvailable <= 0)
+                                                    {
+                                                        <span class="badge bg-danger">Sold Out</span>
+                                                    }
+                                                </div>
+                                                <div class="col-md-3 text-end">
+                                                    <span class="h5">@ticketType.Price.ToString("C")</span>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <div class="form-group">
+                                                        <label for="quantity-@ticketType.Id">Quantity:</label>
+                                                        <select id="quantity-@ticketType.Id" 
+                                                                name="Quantities[@ticketType.Id]" 
+                                                                class="form-control quantity-selector"
+                                                                data-ticket-price="@ticketType.Price"
+                                                                data-ticket-id="@ticketType.Id"
+                                                                @(ticketType.QuantityAvailable <= 0 ? "disabled" : "")>
+                                                            @for (var i = 0; i <= Math.Min(10, ticketType.QuantityAvailable); i++)
+                                                            {
+                                                                <option value="@i">@i</option>
+                                                            }
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else if (Model.TicketTypes.Count == 1)
+                        {
+                            var ticketType = Model.TicketTypes[0];
+                            <input type="hidden" name="SingleTicketTypeId" value="@ticketType.Id" />
+                            <div class="mb-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h5 class="card-title">@ticketType.Name</h5>
+                                                <p class="card-text">@ticketType.Description</p>
+                                                @if (ticketType.QuantityAvailable <= 5 && ticketType.QuantityAvailable > 0)
+                                                {
+                                                    <span class="badge bg-warning">Only @(ticketType.QuantityAvailable) left!</span>
+                                                }
+                                                else if (ticketType.QuantityAvailable <= 0)
+                                                {
+                                                    <span class="badge bg-danger">Sold Out</span>
+                                                }
+                                            </div>
+                                            <div class="col-md-3 text-end">
+                                                <span class="h5">@ticketType.Price.ToString("C")</span>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="form-group">
+                                                    <label for="quantity-single">Quantity:</label>
+                                                    <select id="quantity-single" 
+                                                            name="SingleQuantity" 
+                                                            class="form-control quantity-selector"
+                                                            data-ticket-price="@ticketType.Price"
+                                                            data-ticket-id="@ticketType.Id"
+                                                            @(ticketType.QuantityAvailable <= 0 ? "disabled" : "")>
+                                                        @for (var i = 0; i <= Math.Min(10, ticketType.QuantityAvailable); i++)
+                                                        {
+                                                            <option value="@i">@i</option>
+                                                        }
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Attendee Information -->
+                        <div id="attendee-container" class="mt-4 d-none">
+                            <h5>Attendee Information</h5>
+                            
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="assignAllToMe" name="AssignAllToMe">
+                                        <label class="form-check-label" for="assignAllToMe">
+                                            Assign all tickets to me
+                                        </label>
+                                    </div>
+                                    
+                                    <div id="primary-attendee-info">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label for="primaryName">Your Name</label>
+                                                    <input type="text" class="form-control" id="primaryName" name="PrimaryAttendeeName" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label for="primaryEmail">Your Email</label>
+                                                    <input type="email" class="form-control" id="primaryEmail" name="PrimaryAttendeeEmail" required>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Additional Attendees Section (will be dynamically populated) -->
+                            <div id="additional-attendees-container">
+                                <!-- Will be filled with JavaScript when tickets are selected -->
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg" id="continueToPayment" disabled>
+                                Continue to Payment
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Order Summary -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Order Summary</h4>
+                </div>
+                <div class="card-body">
+                    <div id="summary-items">
+                        <p class="text-muted">Select tickets to see your order summary</p>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <h5>Total</h5>
+                        <h5 id="total-price">$0.00</h5>
+                    </div>
+                    <div class="mt-3">
+                        <p class="text-muted small">
+                            Payment will be processed securely through BTCPay Server.  
+                            You will be redirected to complete your payment.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <form method="POST">
+                <div class="mb-3">
+                    <label asp-for="Name" class="form-label">Full Name</label>
+                    <input asp-for="Name" type="text" class="form-control" required>
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Email" class="form-label">Email address</label>
+                    <input asp-for="Email" type="email" class="form-control" required>
+                    <div class="form-text">Kindly include a valid email as event details would be sent to the email provided.</div>
+                    <span asp-validation-for="Email" class="text-danger"></span>
+                </div>
+
+                <div class="text-center mt-4">
+                    <button type="submit" class="btn btn-success btn-md px-5">
+                        Buy Ticket
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+@section PageFootContent {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const quantityInput = document.getElementById("quantity");
+            const assignToSelfCheckbox = document.getElementById("assignToSelf");
+            const ticketDetailsContainer = document.getElementById("ticketDetailsContainer");
+
+            function updateTicketFields() {
+                const quantity = parseInt(quantityInput.value) || 1;
+                ticketDetailsContainer.innerHTML = "";
+
+                if (assignToSelfCheckbox.checked) {
+                    ticketDetailsContainer.innerHTML = `
+                        <div class="mb-3">
+                            <label for="buyerName" class="form-label">Your Name</label>
+                            <input type="text" name="BuyerName" class="form-control" required />
+                        </div>
+                        <div class="mb-3">
+                            <label for="buyerEmail" class="form-label">Your Email</label>
+                            <input type="email" name="BuyerEmail" class="form-control" required />
+                        </div>
+                    `;
+                } else {
+                    for (let i = 0; i < quantity; i++) {
+                        ticketDetailsContainer.innerHTML += `
+                            <h5>Ticket ${i + 1}</h5>
+                            <div class="mb-3">
+                                <label>Name</label>
+                                <input type="text" name="Tickets[${i}].Name" class="form-control" required />
+                            </div>
+                            <div class="mb-3">
+                                <label>Email</label>
+                                <input type="email" name="Tickets[${i}].Email" class="form-control" required />
+                            </div>
+                        `;
+                    }
+                }
+            }
+
+            quantityInput.addEventListener("input", updateTicketFields);
+            assignToSelfCheckbox.addEventListener("change", updateTicketFields);
+            updateTicketFields();
+        });
+    </script>
+}

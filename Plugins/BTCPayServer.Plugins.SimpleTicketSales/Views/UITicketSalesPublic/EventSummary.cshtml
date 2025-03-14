@@ -1,10 +1,9 @@
 @using BTCPayServer.Plugins.SimpleTicketSales.Data
 @using BTCPayServer.Plugins.SimpleTicketSales.ViewModels
 @using System.Globalization
-@model CreateEventTicketViewModel
+@model EventSummaryViewModel
 @{
     Layout = "_BaseSimpleTicketPublicLayout";
-    ViewBag.Title = "Register for Event";
 }
 
 <div class="container py-4">
@@ -31,19 +30,25 @@
                 <div class="me-2">
                     <i class="bi bi-clock fs-5"></i>
                 </div>
-                <div>@Model.FormattedEventTime</div>
+                <div>FormattedEventTime</div>
             </div>
 
-            <!-- Event Location -->
             <div class="d-flex align-items-center mb-3">
                 <div class="me-2">
                     <i class="bi bi-geo-alt fs-5"></i>
                 </div>
-                <div>BATURE BREWERY</div>
+                <div>@Model.Location</div>
             </div>
 
             <div class="bg-light p-3 rounded mb-4">
-                <p class="mb-0">@Model.Location</p>
+                @if (Model.EventType == EventType.Virtual)
+                {
+                    <p>This is an online event. Access details will be sent to your email once purchase is complete.</p>
+                }
+                @if (Model.EventType == EventType.Physical)
+                {
+                    <p>This is a physical event. QR code tickets will be sent to your email once purchase is complete.</p>
+                }
             </div>
 
             <hr class="my-4">
@@ -51,11 +56,6 @@
             <h2 class="h4 fw-bold mb-3">About this event</h2>
 
             <p>@Model.Description</p>
-
-            <p>"Cavy People" isn't just a concert— it's a <strong>gathering of the tribe</strong>.</p>
-            <p>It's a mindset, a movement, a collective of people who <strong>vibe deeply with live music, culture, and feel-good energy</strong>.</p>
-            <p>Whether you discovered The Cavemen through Afrovibes or just joined the journey.</p>
-            <p>It's a unique celebration of highlife, culture and community.</p>
         </div>
     </div>
 </div>

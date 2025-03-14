@@ -11,14 +11,11 @@ using StoreData = BTCPayServer.Data.StoreData;
 using BTCPayServer.Plugins.SimpleTicketSales.Data;
 using BTCPayServer.Plugins.SimpleTicketSales.Services;
 using BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
-using System;
-using Newtonsoft.Json;
-using Microsoft.Extensions.Logging;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 
-[Route("~/plugins/{storeId}/ticketsales/{eventId}/tickettype/")]
+[Route("~/plugins/{storeId}/ticketevent/{eventId}/tickettype/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UITicketTypeController : Controller
 {
@@ -92,7 +89,6 @@ public class UITicketTypeController : Controller
     [HttpPost("create")]
     public async Task<IActionResult> CreateTicketType(string storeId, string eventId, TicketTypeViewModel vm)
     {
-        Console.WriteLine(JsonConvert.SerializeObject(vm));
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
@@ -110,7 +106,7 @@ public class UITicketTypeController : Controller
         }
         var entity = TicketTypeViewModelToEntity(vm);
         entity.EventId = eventId;
-        entity.TicketTypeState = SimpleTicketSales.Data.EntityState.Disabled;
+        entity.TicketTypeState = EntityState.Disabled;
         ctx.TicketTypes.Add(entity);
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Ticket type created successfully";

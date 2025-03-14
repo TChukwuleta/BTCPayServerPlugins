@@ -61,8 +61,8 @@ public class UITicketSalesPublicController : Controller
 
 
 
-    [HttpGet("event/{eventId}/register")]
-    public async Task<IActionResult> EventRegistration(string storeId, string eventId)
+    [HttpGet("event/{eventId}/summary")]
+    public async Task<IActionResult> EventSummary(string storeId, string eventId)
     {
         var now = DateTime.UtcNow;
         await using var ctx = _dbContextFactory.CreateContext();
@@ -81,22 +81,72 @@ public class UITicketSalesPublicController : Controller
             if (totalTicketsSold >= ticketEvent.MaximumEventCapacity)
                 return NotFound();
         }
-
         var storeData = await _storeRepo.FindStore(storeId);
         var getFile = ticketEvent.EventLogo == null ? null : await _fileService.GetFileUrl(Request.GetAbsoluteRootUri(), ticketEvent.EventLogo);
+        return View(new EventSummaryViewModel
+        {
+            EventTitle = ticketEvent.Title,
+            EventDate = ticketEvent.StartDate,
+            EventId = ticketEvent.Id,
+            EventImageUrl = getFile == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile)),
+            Description = ticketEvent.Description,
+            Location = ticketEvent.Location,
+            EventType = ticketEvent.EventType,
+        });
+    }
 
-        return View(new CreateEventTicketViewModel { 
-            EventId = ticketEvent.Id, 
+    [HttpGet("event/{eventId}/summarysth")]
+    public async Task<IActionResult> EventSummarySth(string storeId, string eventId)
+    {
+        var now = DateTime.UtcNow;
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
+        if (ticketEvent == null || ticketEvent.StartDate.Date > now.Date || (ticketEvent.EndDate.HasValue && ticketEvent.EndDate.Value.Date < now.Date))
+        {
+            return NotFound();
+        }
+
+        if (ticketEvent.HasMaximumCapacity)
+        {
+            var totalTicketsSold = ctx.Orders.AsNoTracking()
+                .Where(c => c.StoreId == storeId && c.EventId == eventId && c.PaymentStatus == TransactionStatus.Settled.ToString())
+                .SelectMany(c => c.Tickets).Count();
+
+            if (totalTicketsSold >= ticketEvent.MaximumEventCapacity)
+                return NotFound();
+        }
+        var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == eventId).ToList();
+        var storeData = await _storeRepo.FindStore(storeId);
+        var getFile = ticketEvent.EventLogo == null ? null : await _fileService.GetFileUrl(Request.GetAbsoluteRootUri(), ticketEvent.EventLogo);
+        var vm = new CreateEventTicketViewModel
+        {
+            EventId = ticketEvent.Id,
             StoreId = storeId,
             Amount = ticketEvent.Amount,
             Currency = ticketEvent.Currency,
+            EventType = ticketEvent.EventType,
+            Location = ticketEvent.Location,
             EventImageUrl = getFile == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile)),
             EventDate = ticketEvent.StartDate,
             Description = ticketEvent.Description,
             EventTitle = ticketEvent.Title,
             StoreName = storeData?.StoreName,
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, storeData?.GetStoreBlob()),
-        });
+        };
+        vm.SelectedTierId = ticketTypes.FirstOrDefault()?.Id;
+        if (ticketTypes.Any())
+        {
+            vm.TicketTypes = ticketTypes.Select(e => new TicketTypePurchaseViewModel
+            {
+                Id = e.Id,
+                QuantityAvailable = e.Quantity - e.QuantitySold,
+                Description = e.Description,
+                EventId = ticketEvent.Id,
+                Name = e.Name,
+                Price = e.Price
+            }).ToList();
+        }
+        return View(vm);
     }
 
 

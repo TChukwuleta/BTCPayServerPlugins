@@ -29,7 +29,7 @@ using Newtonsoft.Json;
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 
-[Route("~/plugins/{storeId}/ticketsales/")]
+[Route("~/plugins/{storeId}/ticketevent/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UITicketSalesController : Controller
 {
@@ -87,7 +87,7 @@ public class UITicketSalesController : Controller
                 Location = ticketEvent.Location,
                 Id = ticketEvent.Id,
                 Title = ticketEvent.Title,
-                EventPurchaseLink = Url.Action("EventRegistration", "UITicketSalesPublic", new { storeId = CurrentStore.Id, eventId = ticketEvent.Id }, Request.Scheme),
+                EventPurchaseLink = Url.Action("EventSummary", "UITicketSalesPublic", new { storeId = CurrentStore.Id, eventId = ticketEvent.Id }, Request.Scheme),
                 Description = ticketEvent.Description,
                 EventDate = ticketEvent.StartDate,
                 CreatedAt = ticketEvent.CreatedAt,
