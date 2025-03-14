@@ -84,7 +84,7 @@ public class UITicketSalesController : Controller
             {
                 Id = ticketEvent.Id,
                 Title = ticketEvent.Title,
-                EventPurchaseLink = Url.Action("EventRegistration", "UISimpleTicketSalesPublic", new { storeId = CurrentStore.Id, eventId = ticketEvent.Id }, Request.Scheme),
+                EventPurchaseLink = Url.Action("EventRegistration", "UITicketSalesPublic", new { storeId = CurrentStore.Id, eventId = ticketEvent.Id }, Request.Scheme),
                 Description = ticketEvent.Description,
                 EventDate = ticketEvent.StartDate,
                 CreatedAt = ticketEvent.CreatedAt,

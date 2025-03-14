@@ -3,9 +3,10 @@
 @using BTCPayServer.Plugins.SimpleTicketSales.ViewModels
 @using BTCPayServer.Abstractions.Extensions
 @inject IScopeProvider ScopeProvider
-@model List<TicketTypeViewModel>
+@model SalesTicketsEventsViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Tickets Events Type");
+    ViewData.SetActivePage(PluginNavPages.Index, "Sales Tickets Events");
+    var storeEmailSettingsConfigured = (bool)ViewData["StoreEmailSettingsConfigured"];
     var storeId = ScopeProvider.GetCurrentStoreId();
 }
 
@@ -14,7 +15,7 @@
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
         <a id="create-event" asp-action="ViewEvent" asp-route-storeId="@storeId"
-           class="btn btn-success" role="button">
+           class="btn btn-success @(storeEmailSettingsConfigured ? "" : "disabled")" role="button">
             Create Event
         </a>
     </div>
@@ -22,73 +23,74 @@
 <partial name="_StatusMessage" />
 
 
-@if (Model.Any())
+<nav id="SectionNav" class="mb-3">
+    <div class="nav">
+        <a id="all-view"
+           asp-action="List"
+           asp-route-storeId="@storeId"
+           class="nav-link @(!Model.Expired ? "active" : "")"
+           role="tab">All</a>
+
+        <a id="expired-view"
+           asp-action="List"
+           asp-route-storeId="@storeId"
+           asp-route-expired="true"
+           class="nav-link @(Model.Expired ? "active" : "")"
+           role="tab">Expired Events</a>
+    </div>
+</nav>
+
+
+@if (Model.DisplayedEvents != null && Model.DisplayedEvents.Any())
 {
     <div class="table-responsive">
         <table class="table table-hover">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Price</th>
-                    <th>Total Quantity</th>
-                    <th>Quantity Sold</th>
+                    <th>Title</th>
+                    <th>Event Date</th>
+                    <th>Ticket Purchase Link</th>
+                    <th>Tickets Sold</th>
                     <th class="actions-col"></th>
                     <th class="w-75px"></th>
                 </tr>
             </thead>
             <tbody id="UsersList">
-                @foreach (var ticketType in Model)
+                @foreach (var ticketEvent in Model.DisplayedEvents)
                 {
-                    <tr id="event_@ticketType.EventId" class="user-overview-row mass-action-row">
+                    <tr id="user_@ticketEvent.Id" class="user-overview-row mass-action-row">
                         <td>
                             <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketType.Id">@ticketType.Name</a>
+                                <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">@ticketEvent.Title</a>
                             </div>
                         </td>
-                        <td>@ticketType.Price</td>
-                        <td>@ticketType.Quantity</td>
-                        <td>@ticketType.QuantitySold</td>
+                        <td>@ticketEvent.EventDate.ToString("M/d/yy, hh:mm tt")</td>
+                        <td>
+                            <a href="@ticketEvent.EventPurchaseLink" target="_blank">
+                                <vc:truncate-center text="@ticketEvent.EventPurchaseLink" link="@ticketEvent.EventPurchaseLink" classes="truncate-center-id" />
+                            </a>
+                        </td>
+                        <td>@ticketEvent.Tickets.Count(c => c.PaymentStatus == TransactionStatus.Settled.ToString())</td>
                         <td class="actions-col">
-                            <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketType.Id">Edit</a>
-                            </div>
+                            @if (ticketEvent.EventDate > DateTime.UtcNow)
+                            { 
+                                <div class="d-inline-flex align-items-center gap-3">
+                                    <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">Edit</a>
+                                </div>
+                            }
                         </td>
                         <td class="text-end">
                             <div class="d-inline-flex align-items-center gap-3">
-                                <div class="dropdown">
-                                    <button class="btn btn-link dropdown-toggle p-0 dropdown-toggle-no-caret text-body" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="ToggleActions-@ticketType.Id">
-                                        <vc:icon symbol="dots" />
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        <li>
-                                            <a class="dropdown-item" asp-controller="UITicketType" asp-action="Edit" asp-route-storeId="@storeId" asp-route-userId="@ticketType.Id">Edit</a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item"
-                                               asp-controller="PayrollUser"
-                                               asp-action="ToggleUserStatus"
-                                               asp-route-userId="@ticketType.Id"
-                                               asp-route-storeId="@storeId"
-                                               asp-route-enable="@(ticketType.TicketTypeState == EntityState.Disabled)">
-                                                @(ticketType.TicketTypeState == EntityState.Disabled ? "Activate" : "Disable")
-                                            </a>
-                                        </li>
-                                        <li class="dropdown-divider"></li>
-                                        <li>
-                                            <a asp-controller="PayrollUser"
-                                               asp-action="Delete"
-                                               asp-route-userId="@ticketType.Id"
-                                               asp-route-storeId="@storeId"
-                                               class="dropdown-item text-danger">
-                                                Delete
-                                            </a>
-                                        </li>
-                                    </ul>
-                                </div>
+                                @if (ticketEvent.Tickets != null && ticketEvent.Tickets.Any())
+                                {
+                                    <a asp-action="ViewEventTicket" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">View</a>
+                                }
+                                @if (ticketEvent.Tickets == null || !ticketEvent.Tickets.Any() || ticketEvent.EventDate <= DateTime.UtcNow)
+                                {
+                                    <a asp-action="DeleteEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id" class="text-danger">Delete</a>
+                                }
                             </div>
                         </td>
-
-
                     </tr>
                 }
             </tbody>
@@ -97,5 +99,5 @@
 }
 else
 {
-    <p class="text-secondary mt-4">No tickets type found</p>
+    <p class="text-secondary mt-4">No events record found</p>
 }

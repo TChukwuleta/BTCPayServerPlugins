@@ -12,13 +12,17 @@
     var storeId = ScopeProvider.GetCurrentStoreId();
     bool isEditMode = !string.IsNullOrEmpty(Model.EventId);
     string formAction = isEditMode
-        ? Url.Action("UpdateEvent", "UISimpleTicketSales", new { eventId = Model.EventId, storeId })
-        : Url.Action("CreateEvent", "UISimpleTicketSales", new { storeId });
+        ? Url.Action("UpdateEvent", "UITicketSales", new { eventId = Model.EventId, storeId })
+        : Url.Action("CreateEvent", "UITicketSales", new { storeId });
 }
 
 <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
+        @if (!string.IsNullOrEmpty(Model.EventId))
+        {
+            <a asp-controller="UITicketType" asp-action="List" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Ticket Type</a>
+        }
         <button type="submit" form="event-form" class="btn btn-success">@(isEditMode ? "Update Event" : "Create Event")</button>
     </div>
 </div>

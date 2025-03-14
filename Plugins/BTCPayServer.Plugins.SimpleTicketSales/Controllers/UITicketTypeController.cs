@@ -1,22 +1,13 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using BTCPayServer.Data;
-using Microsoft.AspNetCore.Identity;
 using System.Linq;
-using System.Net.Http;
-using BTCPayServer.Services.Mails;
 using Microsoft.AspNetCore.Routing;
-using BTCPayServer.Services.Apps;
 using BTCPayServer.Client;
-using BTCPayServer.Services;
 using Microsoft.AspNetCore.Http;
-using BTCPayServer.Services.Stores;
 using Microsoft.EntityFrameworkCore;
 using BTCPayServer.Abstractions.Models;
 using Microsoft.AspNetCore.Authorization;
-using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Constants;
-using BTCPayServer.Abstractions.Extensions;
 using StoreData = BTCPayServer.Data.StoreData;
 using BTCPayServer.Plugins.SimpleTicketSales.Data;
 using BTCPayServer.Plugins.SimpleTicketSales.Services;
@@ -29,38 +20,10 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UITicketTypeController : Controller
 {
-    private readonly AppService _appService;
-    private readonly UriResolver _uriResolver;
-    private readonly IFileService _fileService;
-    private readonly StoreRepository _storeRepo;
-    private readonly EmailService _emailService;
-    private readonly IHttpClientFactory _clientFactory;
-    private readonly EmailSenderFactory _emailSenderFactory;
-    private readonly BTCPayNetworkProvider _networkProvider;
     private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
-    private readonly UserManager<ApplicationUser> _userManager;
-    public UITicketTypeController
-        (AppService appService,
-        UriResolver uriResolver,
-        IFileService fileService,
-        StoreRepository storeRepo,
-        EmailService emailService,
-        IHttpClientFactory clientFactory,
-        EmailSenderFactory emailSenderFactory,
-        BTCPayNetworkProvider networkProvider,
-        SimpleTicketSalesDbContextFactory dbContextFactory,
-        UserManager<ApplicationUser> userManager)
+    public UITicketTypeController(SimpleTicketSalesDbContextFactory dbContextFactory)
     {
-        _storeRepo = storeRepo;
-        _appService = appService;
-        _uriResolver = uriResolver;
-        _fileService = fileService;
-        _emailService = emailService;
-        _userManager = userManager;
-        _clientFactory = clientFactory;
-        _networkProvider = networkProvider;
         _dbContextFactory = dbContextFactory;
-        _emailSenderFactory = emailSenderFactory;
     }
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
@@ -90,39 +53,103 @@ public class UITicketTypeController : Controller
                 Description = x.Description,
             };
         }).ToList();
-        return View(tickets);
+        return View(new TicketTypeListViewModel { TicketTypes = tickets, EventId = eventId });
     }
 
 
     [HttpGet("view")]
-    public async Task<IActionResult> ViewTicketType(string storeId, string eventId)
+    public async Task<IActionResult> ViewTicketType(string storeId, string eventId, string ticketTypeId)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
+        var ticketEvent = ctx.Events.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        if (ticketEvent == null)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid event";
+            return RedirectToAction(nameof(List), new { storeId, eventId });
+        }
 
-        var defaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, string.Empty);
-        var vm = new UpdateSimpleTicketSalesEventViewModel { StoreId = CurrentStore.Id, StoreDefaultCurrency = defaultCurrency };
+        var vm = new TicketTypeViewModel { EventId = eventId };
         if (!string.IsNullOrEmpty(eventId))
         {
-            var entity = ctx.Events.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+            var entity = ctx.TicketTypes.FirstOrDefault(c => c.EventId == eventId && c.Id == ticketTypeId);
             if (entity == null)
             {
-                TempData[WellKnownTempData.ErrorMessage] = "Invalid event record specified for this store";
-                return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+                TempData[WellKnownTempData.ErrorMessage] = "Invalid event ticket type record specified";
+                return RedirectToAction(nameof(List), new { storeId, eventId });
             }
-            vm = TicketSalesEventToViewModel(entity);
-            var getFile = entity.EventLogo == null ? null : await _fileService.GetFileUrl(Request.GetAbsoluteRootUri(), entity.EventLogo);
-            vm.EventImageUrl = getFile == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile));
-            vm.StoreDefaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, entity.Currency);
+            vm = TicketTypeToViewModel(entity);
         }
         return View(vm);
     }
 
 
+    [HttpPost("create")]
+    public async Task<IActionResult> CreateTicketType(string storeId, string eventId, [FromBody] TicketTypeViewModel vm)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        if (ticketEvent == null)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid event";
+            return RedirectToAction(nameof(List), new { storeId, eventId });
+        }
+        if (vm.Quantity <= 0)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Quantity cannot be 0 or smaller";
+            return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
+        }
+        var entity = TicketTypeViewModelToEntity(vm);
+        entity.EventId = eventId;
+        entity.TicketTypeState = SimpleTicketSales.Data.EntityState.Disabled;
+        ctx.TicketTypes.Add(entity);
+        await ctx.SaveChangesAsync();
+        TempData[WellKnownTempData.SuccessMessage] = "Ticket type created successfully";
+        return RedirectToAction(nameof(List), new { storeId, eventId });
+    }
+
+
+    [HttpPost("update/{ticketTypeId}")]
+    public async Task<IActionResult> UpdateTicketType(string storeId, string eventId, string ticketTypeId, [FromBody] TicketTypeViewModel vm)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        if (ticketEvent == null)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid event";
+            return RedirectToAction(nameof(List), new { storeId, eventId });
+        }
+        var entity = ctx.TicketTypes.FirstOrDefault(c => c.Id == ticketTypeId && c.EventId == eventId);
+        if (entity == null)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid ticket type specifed";
+            return RedirectToAction(nameof(List), new { storeId, eventId });
+        }
+
+        if (vm.Quantity <= 0)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Quantity cannot be 0 or smaller";
+            return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
+        }
+        entity = TicketTypeViewModelToEntity(vm);
+        entity.Id = ticketTypeId;
+        ctx.TicketTypes.Update(entity);
+        await ctx.SaveChangesAsync();
+        TempData[WellKnownTempData.SuccessMessage] = "Ticket type updated successfully";
+        return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
+    }
+
+
     [HttpGet("toggle/{ticketTypeId}")]
-    public async Task<IActionResult> ToggleUserStatus(string storeId, string eventId, string ticketTypeId, bool enable)
+    public async Task<IActionResult> ToggleTicketTypeStatus(string storeId, string eventId, string ticketTypeId, bool enable)
     {
         if (CurrentStore is null)
             return NotFound();
@@ -143,7 +170,7 @@ public class UITicketTypeController : Controller
 
 
     [HttpPost("toggle/{ticketTypeId}")]
-    public async Task<IActionResult> ToggleUserStatusPost(string storeId, string eventId, string ticketTypeId, bool enable)
+    public async Task<IActionResult> ToggleTicketTypeStatusPost(string storeId, string eventId, string ticketTypeId, bool enable)
     {
         if (CurrentStore is null)
             return NotFound();
@@ -222,157 +249,32 @@ public class UITicketTypeController : Controller
     }
 
 
-
-
-
-
-
-
-    /*[HttpPost("create-event")]
-    public async Task<IActionResult> CreateEvent(string storeId, [FromForm] UpdateSimpleTicketSalesEventViewModel vm)
+    private TicketTypeViewModel TicketTypeToViewModel(TicketType entity)
     {
-        if (string.IsNullOrEmpty(CurrentStore.Id))
-            return NotFound();
-
-        await using var ctx = _dbContextFactory.CreateContext();
-        if (vm.HasMaximumCapacity && (!vm.MaximumEventCapacity.HasValue || vm.MaximumEventCapacity.Value <= 0))
+        return new TicketTypeViewModel
         {
-            TempData[WellKnownTempData.ErrorMessage] = "Kindly input the event capacity";
-            return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
-        }
-        if (vm.EventDate <= DateTime.UtcNow)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Event date cannot be in the past";
-            return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
-        }
-        if (vm.Amount <= 0)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Amount cannot be 0";
-            return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
-        }
-        var entity = TicketSalesEventViewModelToEntity(vm);
-        UploadImageResultModel imageUpload = null;
-        if (vm.EventImageFile != null)
-        {
-            imageUpload = await _fileService.UploadImage(vm.EventImageFile, GetUserId());
-            if (!imageUpload.Success)
-            {
-                TempData[WellKnownTempData.ErrorMessage] = imageUpload.Response;
-                return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
-            }
-            else
-            {
-                entity.EventLogo = imageUpload.StoredFile.Id;
-            }
-        }
-        vm.EventImageFile = null;
-        entity.CreatedAt = DateTime.UtcNow;
-        entity.Currency = await GetStoreDefaultCurrentIfEmpty(storeId, vm.Currency);
-        entity.StoreId = CurrentStore.Id;
-        ctx.Events.Update(entity);
-        await ctx.SaveChangesAsync();
-        TempData[WellKnownTempData.SuccessMessage] = "Event created successfully";
-        return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
-    }*/
-
-
-    /*[HttpPost("update-event/{eventId}")]
-    public async Task<IActionResult> UpdateEvent(string storeId, string eventId, UpdateSimpleTicketSalesEventViewModel vm, [FromForm] bool RemoveEventLogoFile = false)
-    {
-        if (string.IsNullOrEmpty(CurrentStore.Id))
-            return NotFound();
-
-        await using var ctx = _dbContextFactory.CreateContext();
-
-        var entity = ctx.Events.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
-        if (entity == null)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid event record specified for this store";
-            return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
-        }
-        if (vm.Amount <= 0)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Amount cannot be 0";
-            return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
-        }
-        entity = TicketSalesEventViewModelToEntity(vm);
-        entity.Id = eventId;
-        UploadImageResultModel imageUpload = null;
-        if (vm.EventImageFile != null)
-        {
-            imageUpload = await _fileService.UploadImage(vm.EventImageFile, GetUserId());
-            if (!imageUpload.Success)
-            {
-                TempData[WellKnownTempData.ErrorMessage] = imageUpload.Response;
-                return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id, eventId });
-            }
-        }
-        if (imageUpload?.Success is true)
-        {
-            entity.EventLogo = imageUpload.StoredFile.Id;
-        }
-        else if (RemoveEventLogoFile)
-        {
-            entity.EventLogo = null;
-            vm.EventImageUrl = null;
-            vm.EventImageUrl = null;
-        }
-        ctx.Events.Update(entity);
-        await ctx.SaveChangesAsync();
-        TempData[WellKnownTempData.SuccessMessage] = "Event updated successfully";
-        return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
-    }*/
-
-
-
-
-    private async Task<string> GetStoreDefaultCurrentIfEmpty(string storeId, string currency)
-    {
-        if (string.IsNullOrWhiteSpace(currency))
-        {
-            var store = await _storeRepo.FindStore(storeId);
-            currency = store.GetStoreBlob().DefaultCurrency;
-        }
-        return currency.Trim().ToUpperInvariant();
-    }
-
-    private string GetUserId() => _userManager.GetUserId(User);
-
-    private UpdateSimpleTicketSalesEventViewModel TicketSalesEventToViewModel(Event entity)
-    {
-        return new UpdateSimpleTicketSalesEventViewModel
-        {
-            StoreId = entity.StoreId,   
-            EventId = entity.Id,
-            Title = entity.Title,
-            Description = entity.Description,
-            EventLink = entity.Location,
-            EventDate = entity.StartDate,
-            Amount = entity.Amount,
-            Currency = entity.Currency,
-            EmailBody = entity.EmailBody,
-            EmailSubject = entity.EmailSubject,
-            HasMaximumCapacity = entity.HasMaximumCapacity,
-            MaximumEventCapacity = entity.MaximumEventCapacity
+            EventId = entity.EventId,
+            Id = entity.Id,
+            Name = entity.Name,
+            Price = entity.Price,
+            Quantity = entity.Quantity,
+            QuantitySold = entity.QuantitySold,
+            TicketTypeState = entity.TicketTypeState,
+            Description = entity.Description
         };
     }
 
-    private Event TicketSalesEventViewModelToEntity(UpdateSimpleTicketSalesEventViewModel model)
+    private TicketType TicketTypeViewModelToEntity(TicketTypeViewModel model)
     {
-        return new Event
+        return new TicketType
         {
-            StoreId = model.StoreId,
-            Title = model.Title,
-            Description = model.Description,
-            EventLogo = model.EventImageUrl,
-            Location = model.EventLink,
-            StartDate = model.EventDate,
-            Amount = model.Amount,
-            Currency = model.Currency,
-            EmailBody = model.EmailBody,
-            EmailSubject = model.EmailSubject,
-            HasMaximumCapacity = model.HasMaximumCapacity,
-            MaximumEventCapacity = model.MaximumEventCapacity
+            Name = model.Name,
+            Price = model.Price,
+            EventId = model.EventId,
+            Quantity = model.Quantity,
+            QuantitySold = model.QuantitySold,
+            TicketTypeState = model.TicketTypeState,
+            Description = model.Description
         };
     }
 }
