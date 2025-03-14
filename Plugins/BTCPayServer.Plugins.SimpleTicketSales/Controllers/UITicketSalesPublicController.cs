@@ -24,6 +24,8 @@ using Microsoft.AspNetCore.Cors;
 using TransactionStatus = BTCPayServer.Plugins.SimpleTicketSales.Data.TransactionStatus;
 using NBitcoin;
 using NBitcoin.DataEncoders;
+using BTCPayServer.Plugins.SimpleTicketSales.Helper.Extensions;
+using BTCPayServer.Plugins.SimpleTicketSales;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -39,6 +41,7 @@ public class UITicketSalesPublicController : Controller
     private readonly ApplicationDbContextFactory _context;
     private readonly UIInvoiceController _invoiceController;
     private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
+    private const string SessionKeyOrder = "Ticket_Order_";
     public UITicketSalesPublicController
         (UriResolver uriResolver,
         IFileService fileService,
@@ -60,40 +63,132 @@ public class UITicketSalesPublicController : Controller
     }
 
 
-
     [HttpGet("event/{eventId}/summary")]
     public async Task<IActionResult> EventSummary(string storeId, string eventId)
     {
         var now = DateTime.UtcNow;
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
-        if (ticketEvent == null || ticketEvent.StartDate.Date > now.Date || (ticketEvent.EndDate.HasValue && ticketEvent.EndDate.Value.Date < now.Date))
+        if (!ValidateEvent(ctx, storeId, eventId))
         {
             return NotFound();
         }
-
-        if (ticketEvent.HasMaximumCapacity)
-        {
-            var totalTicketsSold = ctx.Orders.AsNoTracking()
-                .Where(c => c.StoreId == storeId && c.EventId == eventId && c.PaymentStatus == TransactionStatus.Settled.ToString())
-                .SelectMany(c => c.Tickets).Count();
-
-            if (totalTicketsSold >= ticketEvent.MaximumEventCapacity)
-                return NotFound();
-        }
         var storeData = await _storeRepo.FindStore(storeId);
         var getFile = ticketEvent.EventLogo == null ? null : await _fileService.GetFileUrl(Request.GetAbsoluteRootUri(), ticketEvent.EventLogo);
+        Console.WriteLine(getFile);
+        var imageUrl = getFile == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile));
+        Console.WriteLine(imageUrl);
         return View(new EventSummaryViewModel
         {
+            StoreId = storeId,
             EventTitle = ticketEvent.Title,
+            EventDate = ticketEvent.StartDate,
+            EventId = ticketEvent.Id,
+            EventImageUrl = imageUrl,
+            Description = ticketEvent.Description,
+            Location = ticketEvent.Location,
+            EventType = ticketEvent.EventType,
+        });
+    }
+
+
+    [HttpGet("event/{eventId}/summary/tickets")]
+    public async Task<IActionResult> EventTicket(string storeId, string eventId)
+    {
+        var now = DateTime.UtcNow;
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
+        if (!ValidateEvent(ctx, storeId, eventId))
+        {
+            return NotFound();
+        }
+        var ticketTypes = ctx.TicketTypes.Where(c => c.TicketTypeState == SimpleTicketSales.Data.EntityState.Active && c.EventId == eventId).ToList();
+        var storeData = await _storeRepo.FindStore(storeId);
+        var getFile = ticketEvent.EventLogo == null ? null : await _fileService.GetFileUrl(Request.GetAbsoluteRootUri(), ticketEvent.EventLogo);
+        return View(new EventTicketPageViewModel
+        {
+            StoreId = storeId,
+            EventTitle = ticketEvent.Title,
+            Currency = ticketEvent.Currency,
             EventDate = ticketEvent.StartDate,
             EventId = ticketEvent.Id,
             EventImageUrl = getFile == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile)),
             Description = ticketEvent.Description,
             Location = ticketEvent.Location,
             EventType = ticketEvent.EventType,
+            TicketTypes = ticketTypes.Select(tt =>
+            {
+                return new TicketTypeViewModel
+                {
+                    Name = tt.Name,
+                    Price = tt.Price,
+                    Description = tt.Description,
+                    Quantity = tt.Quantity,
+                    QuantitySold = tt.QuantitySold,
+                    TicketTypeId = tt.Id,
+                    EventId = tt.EventId
+                };
+            }).ToList()
         });
     }
+
+
+    [HttpPost]
+    public async Task<IActionResult> SaveEventTickets(string storeId, string eventId, TIcketOrderViewModel model)
+    {
+        var eventKey = $"{SessionKeyOrder}{eventId}";
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
+        if (!ValidateEvent(ctx, storeId, eventId))
+        {
+            return NotFound();
+        }
+        if (model.Tickets == null || !model.Tickets.Any(t => t.Quantity > 0))
+        {
+            return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
+        }
+        model.CurrentStep = 2; // Move to Contact step
+        HttpContext.Session.SetObject(SessionKeyOrder, model);
+        return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId });
+    }
+
+
+    [HttpGet("event/{eventId}/summary/contact")]
+    public async Task<IActionResult> EventContactDetails(string storeId, string eventId)
+    {
+        var eventKey = $"{SessionKeyOrder}{eventId}";
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
+        if (!ValidateEvent(ctx, storeId, eventId))
+        {
+            return NotFound();
+        }
+        var order = HttpContext.Session.GetObject<TIcketOrderViewModel>(eventKey);
+        if (order == null || order.CurrentStep < 2)
+        {
+            return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
+        }
+
+
+
+        var storeData = await _storeRepo.FindStore(storeId);
+        var getFile = ticketEvent.EventLogo == null ? null : await _fileService.GetFileUrl(Request.GetAbsoluteRootUri(), ticketEvent.EventLogo);
+        Console.WriteLine(getFile);
+        var imageUrl = getFile == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile));
+        Console.WriteLine(imageUrl);
+        return View(new EventSummaryViewModel
+        {
+            StoreId = storeId,
+            EventTitle = ticketEvent.Title,
+            EventDate = ticketEvent.StartDate,
+            EventId = ticketEvent.Id,
+            EventImageUrl = imageUrl,
+            Description = ticketEvent.Description,
+            Location = ticketEvent.Location,
+            EventType = ticketEvent.EventType,
+        });
+    }
+
 
     [HttpGet("event/{eventId}/summarysth")]
     public async Task<IActionResult> EventSummarySth(string storeId, string eventId)
@@ -246,7 +341,7 @@ public class UITicketSalesPublicController : Controller
         return Content(fileContent, "text/javascript");
     }
 
-    public async Task<InvoiceEntity> CreateInvoiceAsync(Data.StoreData store, Order order, string currency, string url, string redirectUrl)
+    private async Task<InvoiceEntity> CreateInvoiceAsync(Data.StoreData store, Order order, string currency, string url, string redirectUrl)
     {
         var ticketSalesSearchTerm = $"{SimpleTicketSalesHostedService.TICKET_SALES_PREFIX}{order.TxnId}";
         var matchedExistingInvoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
@@ -291,5 +386,25 @@ public class UITicketSalesPublicController : Controller
         }
 
         return await _invoiceController.CreateInvoiceCoreRaw(invoiceRequest, store, url, new List<string>() { ticketSalesSearchTerm });
+    }
+
+    private bool ValidateEvent(SimpleTicketSalesDbContext ctx, string storeId, string eventId)
+    {
+        var now = DateTime.UtcNow;
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
+        if (ticketEvent == null || ticketEvent.StartDate.Date > now.Date || (ticketEvent.EndDate.HasValue && ticketEvent.EndDate.Value.Date < now.Date))
+        {
+            return false;
+        }
+        if (ticketEvent.HasMaximumCapacity)
+        {
+            var totalTicketsSold = ctx.Orders.AsNoTracking()
+                .Where(c => c.StoreId == storeId && c.EventId == eventId && c.PaymentStatus == TransactionStatus.Settled.ToString())
+                .SelectMany(c => c.Tickets).Count();
+
+            if (totalTicketsSold >= ticketEvent.MaximumEventCapacity)
+                return false;
+        }
+        return true;
     }
 }

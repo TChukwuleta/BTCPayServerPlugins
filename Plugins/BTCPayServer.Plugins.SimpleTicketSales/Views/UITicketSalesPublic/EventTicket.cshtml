@@ -1,0 +1,185 @@
+﻿@using BTCPayServer.Plugins.SimpleTicketSales.Data
+@using BTCPayServer.Plugins.SimpleTicketSales.ViewModels
+@using System.Globalization
+@model EventTicketPageViewModel
+@{
+    Layout = "_BaseSimpleTicketPublicLayout";
+}
+
+<nav aria-label="breadcrumb" class="mt-5 mb-4 py-3 ps-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-action="EventSummary" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId">Event Summary</a></li>
+        <li class="breadcrumb-item active" aria-current="page">TICKETS</li>
+    </ol>
+</nav>
+
+
+<div class="container py-4">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="d-flex mb-5">
+                <div class="flex-grow-1 d-flex align-items-center">
+                    <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
+                        <i class="bi bi-check"></i>
+                    </div>
+                    <span class="ms-2 text-success fw-bold">Tickets</span>
+                    <hr class="flex-grow-1 mx-3">
+                </div>
+                <div class="flex-grow-1 d-flex align-items-center">
+                    <div class="rounded-circle border d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
+                        <span class="text-muted">2</span>
+                    </div>
+                    <span class="ms-2 text-muted">Contact</span>
+                    <hr class="flex-grow-1 mx-3">
+                </div>
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle border d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
+                        <span class="text-muted">3</span>
+                    </div>
+                    <span class="ms-2 text-muted">Payment</span>
+                </div>
+            </div>
+
+            @foreach (var ticket in Model.TicketTypes)
+            {
+                <div class="card mb-4 border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <div>
+                                <h5 class="fw-bold mb-1">@ticket.Name</h5>
+                                <p class="text-success fw-bold mb-1">@Model.Currency @ticket.Price</p>
+                                <p class="text-muted small mb-1">@ticket.Description</p>
+                            </div>
+                            <div>
+                                @if (ticket.Quantity - ticket.QuantitySold == 0)
+                                {
+                                    <span class="badge bg-light text-dark p-2">Sold Out</span>
+                                }
+                                else
+                                {
+                                    <input type="number" class="form-control ticket-quantity"
+                                           data-price="@ticket.Price"
+                                           data-ticket-type-id="@ticket.TicketTypeId"
+                                           data-ticket-name="@ticket.Name"
+                                           min="0" max="10" value="0"
+                                           onchange="updateSummary()" />
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <form id="ticketForm" asp-action="Contact" asp-controller="Tickets" method="post">
+            <input type="hidden" name="storeId" value="@Model.StoreId" />
+            <input type="hidden" name="eventId" value="@Model.EventId" />
+            <input type="hidden" name="eventTitle" value="@Model.EventTitle" />
+            <div id="ticketSelections"></div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-4">Summary <span class="text-muted small">(in @Model.Currency)</span></h5>
+                    <h6 class="text-center fw-bold mb-4">@Model.EventTitle</h6>
+
+                    <div id="summary-details"></div>
+                    <hr>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span>Subtotal</span>
+                        <span id="subtotal">0</span>
+                    </div> <hr>
+                    <div class="d-flex justify-content-between mb-4">
+                        <span class="fw-bold">Total</span>
+                        <span class="fw-bold" id="total">0</span>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100 py-3" id="continue-btn">Continue</button>
+                </div>
+            </div>
+
+
+            @* <div class="col-md-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="fw-bold mb-4">Summary <span class="text-muted small">(in @Model.Currency)</span></h5>
+                        <h6 class="text-center fw-bold mb-4">@Model.EventTitle</h6>
+
+                        <div id="summary-details"></div>
+                        <hr>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Subtotal</span>
+                            <span id="subtotal">0</span>
+                        </div> <hr>
+                        <div class="d-flex justify-content-between mb-4">
+                            <span class="fw-bold">Total</span>
+                            <span class="fw-bold" id="total">0</span>
+                        </div>
+                        <button class="btn btn-success w-100 py-3" id="continue-btn">Continue</button>
+                    </div>
+                </div>
+            </div> *@
+        </form>
+    </div>
+</div>
+
+
+@section PageFootContent {
+    <script>
+
+        document.addEventListener("DOMContentLoaded", function () {
+            function updateSummary() {
+                let summaryDetails = document.getElementById("summary-details");
+                let ticketSelections = document.getElementById("ticketSelections");
+                let subtotalElem = document.getElementById("subtotal");
+                let totalElem = document.getElementById("total");
+                let continueBtn = document.getElementById("continue-btn");
+                let totalAmount = 0;
+                let summaryHtml = "";
+                let ticketInputsHtml = "";
+                let ticketIndex = 0;
+
+
+
+                document.querySelectorAll(".ticket-quantity").forEach(input => {
+                    let quantity = parseInt(input.value) || 0;
+                    let price = parseFloat(input.getAttribute("data-price"));
+                    let ticketTypeId = input.getAttribute("data-ticket-type-id");
+                    let ticketName = input.closest(".card-body").querySelector("h5").innerText;
+                    if (quantity > 0) {
+                        let ticketTotal = quantity * price;
+                        totalAmount += ticketTotal;
+                        summaryHtml += `
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>${quantity} × ${ticketName}</span>
+                                <span>${ticketTotal.toLocaleString()}</span>
+                            </div>`;
+
+                        ticketInputsHtml += `
+                        <input type="hidden" name="Tickets[${ticketIndex}].TicketTypeId" value="${ticketTypeId}" />
+                        <input type="hidden" name="Tickets[${ticketIndex}].TicketTypeName" value="${ticketName}" />
+                        <input type="hidden" name="Tickets[${ticketIndex}].Quantity" value="${quantity}" />
+                        <input type="hidden" name="Tickets[${ticketIndex}].Price" value="${price}" />`;
+                        ticketIndex++;
+                    }
+                });
+
+                subtotalElem.innerText = (totalAmount || 0).toLocaleString();
+                totalElem.innerText = (totalAmount || 0).toLocaleString();
+                summaryDetails.innerHTML = summaryHtml || '<p class="text-muted small text-center">No tickets selected</p>';
+                if (totalAmount <= 0) {
+                    continueButton.classList.add("disabled");
+                    continueButton.setAttribute("disabled", "disabled");
+                } else {
+                    continueButton.classList.remove("disabled");
+                    continueButton.removeAttribute("disabled");
+                }
+
+
+
+            }
+            document.querySelectorAll(".ticket-quantity").forEach(input => {
+                input.addEventListener("input", updateSummary);
+            });
+            updateSummary();
+        });
+    </script>
+}

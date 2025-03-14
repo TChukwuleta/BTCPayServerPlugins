@@ -113,7 +113,6 @@ public class UITicketSalesController : Controller
             });
         }
         var vm = new SalesTicketsEventsViewModel { DisplayedEvents = eventsViewModel, Expired = expired };
-        Console.WriteLine(JsonConvert.SerializeObject(vm, Formatting.Indented));
         return View(vm);
     }
 

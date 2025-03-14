@@ -29,6 +29,12 @@ public class Plugin : BaseBTCPayServerPlugin
             factory.ConfigureBuilder(o);
         });
         services.AddHostedService<PluginMigrationRunner>();
+        services.AddSession(options =>
+        {
+            options.IdleTimeout = TimeSpan.FromMinutes(30);
+            options.Cookie.HttpOnly = true;
+            options.Cookie.IsEssential = true;
+        });
 
         services.AddCors(options =>
         {
@@ -44,6 +50,7 @@ public class Plugin : BaseBTCPayServerPlugin
     public override void Execute(IApplicationBuilder applicationBuilder, IServiceProvider applicationBuilderApplicationServices)
     {
         applicationBuilder.UseCors("AllowAllOrigins");
+        applicationBuilder.UseSession();
         base.Execute(applicationBuilder, applicationBuilderApplicationServices);
     }
 }
