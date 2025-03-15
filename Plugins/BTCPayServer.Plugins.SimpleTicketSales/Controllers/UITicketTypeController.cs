@@ -51,6 +51,7 @@ public class UITicketTypeController : Controller
                 EventId = x.EventId,
                 TicketTypeState = x.TicketTypeState,
                 Description = x.Description,
+                IsDefault = x.IsDefault,
             };
         }).ToList();
         return View(new TicketTypeListViewModel { TicketTypes = tickets, EventId = eventId });
@@ -70,7 +71,6 @@ public class UITicketTypeController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Invalid event";
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
-
         var vm = new TicketTypeViewModel { EventId = eventId };
         if (!string.IsNullOrEmpty(ticketTypeId))
         {
@@ -104,9 +104,24 @@ public class UITicketTypeController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Price cannot be zero or negative";
             return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
         }
+        if (ticketEvent.HasMaximumCapacity && !ValidateTicketCapacity(ticketEvent, ctx.TicketTypes.Sum(c => c.Quantity), vm.Quantity))
+        {
+            TempData[WellKnownTempData.ErrorMessage] = $"Quantity specified is higher than avaible event capacity ({ticketEvent.MaximumEventCapacity - ctx.TicketTypes.Sum(c => c.Quantity)}). Kindly update event to cater for more";
+            return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
+        }
         var entity = TicketTypeViewModelToEntity(vm);
         entity.EventId = eventId;
-        entity.TicketTypeState = EntityState.Disabled;
+        entity.TicketTypeState = EntityState.Active;
+
+        var existingDefaultTicketType = ctx.TicketTypes.FirstOrDefault(c => c.EventId == entity.EventId && c.IsDefault);
+        if (existingDefaultTicketType != null)
+        {
+            existingDefaultTicketType.IsDefault = vm.IsDefault ? false : true;
+            ctx.TicketTypes.Update(existingDefaultTicketType);
+        }
+        else
+            entity.IsDefault = true;
+
         ctx.TicketTypes.Add(entity);
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Ticket type created successfully";
@@ -138,12 +153,24 @@ public class UITicketTypeController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Price cannot be zero or negative";
             return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
         }
+        if (ticketEvent.HasMaximumCapacity && !ValidateTicketCapacity(ticketEvent, ctx.TicketTypes.Sum(c => c.Quantity), vm.Quantity))
+        {
+            TempData[WellKnownTempData.ErrorMessage] = $"Quantity specified is higher than avaible event capacity ({ticketEvent.MaximumEventCapacity - ctx.TicketTypes.Sum(c => c.Quantity)}). Kindly update event to cater for more";
+            return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
+        }
         entity.Name = vm.Name;
         entity.Price = vm.Price;
         entity.Quantity = vm.Quantity;
         entity.Description = vm.Description;
         entity.QuantitySold = vm.QuantitySold;
-        ctx.TicketTypes.Update(entity);
+        entity.IsDefault = vm.IsDefault;
+
+        if (!entity.IsDefault)
+        {
+            var existingDefaultTicketType = ctx.TicketTypes.FirstOrDefault(c => c.EventId == entity.EventId && c.IsDefault);
+            if (existingDefaultTicketType == null)
+                entity.IsDefault = true;
+        }
         ctx.TicketTypes.Update(entity);
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Ticket type updated successfully";
@@ -168,7 +195,7 @@ public class UITicketTypeController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Invalid route specified";
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
-        return View("Confirm", new ConfirmModel($"{(enable ? "Activate" : "Disable")} user", $"The ticket type ({ticketType.Name}) will be {(enable ? "activated" : "disabled")}. Are you sure?", (enable ? "Activate" : "Disable")));
+        return View("Confirm", new ConfirmModel($"{(enable ? "Activate" : "Disable")} ticket type", $"The ticket type ({ticketType.Name}) will be {(enable ? "activated" : "disabled")}. Are you sure?", (enable ? "Activate" : "Disable")));
     }
 
 
@@ -191,13 +218,12 @@ public class UITicketTypeController : Controller
         }
         switch (ticketType.TicketTypeState)
         {
-            case SimpleTicketSales.Data.EntityState.Disabled:
-                ticketType.TicketTypeState = SimpleTicketSales.Data.EntityState.Active;
+            case EntityState.Disabled:
+                ticketType.TicketTypeState = EntityState.Active;
                 break;
-            case SimpleTicketSales.Data.EntityState.Active:
-                ticketType.TicketTypeState = SimpleTicketSales.Data.EntityState.Disabled;
-                break;
+            case EntityState.Active:
             default:
+                ticketType.TicketTypeState = EntityState.Disabled;
                 break;
         }
         ctx.TicketTypes.Update(ticketType);
@@ -251,6 +277,9 @@ public class UITicketTypeController : Controller
         return RedirectToAction(nameof(List), new { storeId, eventId });
     }
 
+    private bool ValidateTicketCapacity(Event ticketEvent, int quantityOfTicketsUsed, int ticketModelQuantity)
+        => ticketModelQuantity <= (ticketEvent.MaximumEventCapacity - quantityOfTicketsUsed);
+
 
     private TicketTypeViewModel TicketTypeToViewModel(TicketType entity)
     {
@@ -277,7 +306,8 @@ public class UITicketTypeController : Controller
             Quantity = model.Quantity,
             QuantitySold = model.QuantitySold,
             TicketTypeState = model.TicketTypeState,
-            Description = model.Description
+            Description = model.Description,
+            IsDefault = model.IsDefault
         };
     }
 }

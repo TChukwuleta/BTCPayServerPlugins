@@ -12,7 +12,10 @@ public class Ticket
     public string TicketTypeId { get; set; }
     public decimal Amount { get; set; }
     public string Currency { get; set; }
-    public string Name { get; set; }
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+    public string TicketNumber { get; set; }
+    public string TxnNumber { get; set; }
     public string Email { get; set; }
     public bool EmailSent { get; set; }
     public string QRCodeData { get; set; }

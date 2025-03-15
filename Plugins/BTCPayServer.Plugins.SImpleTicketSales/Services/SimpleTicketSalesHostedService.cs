@@ -54,7 +54,6 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
             {
                 var invoice = invoiceEvent.Invoice;
                 var ticketOrderId = invoice.GetInternalTags(TICKET_SALES_PREFIX).FirstOrDefault();
-
                 if (ticketOrderId != null)
                 {
                     bool? success = invoice.Status switch
@@ -63,7 +62,6 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
                         InvoiceStatus.Invalid or InvoiceStatus.Expired => false,
                         _ => null
                     };
-
                     if (success.HasValue)
                     {
                         await RegisterTicketTransaction(invoice, ticketOrderId, success.Value);
@@ -87,12 +85,15 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
             await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
             return;
         }
-        var ticketEvent = ctx.Events.AsNoTracking().FirstOrDefault(c => c.Id == order.EventId && c.StoreId == order.StoreId);
+
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == order.EventId && c.StoreId == order.StoreId);
         order.PurchaseDate = DateTime.UtcNow;
         order.InvoiceStatus = invoice.Status.ToString().ToLower();
         order.PaymentStatus = success ? Data.TransactionStatus.Settled.ToString() : Data.TransactionStatus.Expired.ToString();
         order.Tickets.ToList().ForEach(c => c.PaymentStatus = success ? Data.TransactionStatus.Settled.ToString() : Data.TransactionStatus.Expired.ToString());
         result.Write($"New ticket payment completed for Event: {ticketEvent?.Title}, Order Id: {order.Id}, Order Txn Id: {order.TxnId}", InvoiceEventData.EventSeverity.Success);
+        ctx.Orders.Update(order);
+        await ctx.SaveChangesAsync();
 
         var emailSender = await _emailSenderFactory.GetEmailSender(invoice.StoreId);
         var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
@@ -109,9 +110,9 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
                 result.Write($"Email sent successfully to recipients in Order with Id: {order.Id}", InvoiceEventData.EventSeverity.Success);
             }
             catch (Exception) { }
+            ctx.Orders.Update(order);
+            await ctx.SaveChangesAsync();
         }
-        ctx.UpdateRange(order);
-        await ctx.SaveChangesAsync();
         await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
     }
 }

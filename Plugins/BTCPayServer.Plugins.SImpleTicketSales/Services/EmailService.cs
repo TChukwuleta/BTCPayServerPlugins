@@ -65,11 +65,10 @@ public class EmailService
             string emailBody = ticketEvent.EmailBody
                             .Replace("{{Title}}", ticketEvent.Title)
                             .Replace("{{EventLink}}", ticketEvent.Location)
-                            .Replace("{{Name}}", ticket.Name)
+                            .Replace("{{Name}}", $"{ticket.FirstName} {ticket.LastName}")
                             .Replace("{{Email}}", ticket.Email)
                             .Replace("{{Description}}", ticketEvent.Description)
                             .Replace("{{EventDate}}", ticketEvent.StartDate.ToString("MMMM dd, yyyy"))
-                            .Replace("{{Amount}}", ticketEvent.Amount.ToString())
                             .Replace("{{Currency}}", ticketEvent.Currency);
 
             emailRecipients.Add(new EmailRecipient

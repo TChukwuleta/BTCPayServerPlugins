@@ -126,11 +126,6 @@
     <div class="row">
         <div class="col-xl-10 col-xxl-constrain">
             <div class="d-flex flex-wrap gap-3 mb-3">
-                <div class="form-group w-250px mb-0">
-                    <label asp-for="Amount" class="form-label" data-required></label>
-                    <input inputmode="decimal" asp-for="Amount" class="form-control" required min="1" step="1" />
-                    <span asp-validation-for="Amount" class="text-danger"></span>
-                </div>
                 <div class="form-group">
                     <label asp-for="Currency" class="form-label"></label>
                     <input asp-for="Currency" class="form-control w-auto" currency-selection />
@@ -212,7 +207,6 @@
                 'EventLink',
                 'Description',
                 'EventDate',
-                'Amount',
                 'Currency'
             ];
             const textarea = document.getElementById('EmailBody');

@@ -68,6 +68,7 @@ public class EventTicketPageViewModel : BaseSimpleTicketPublicViewModel
     public string EventId { get; set; }
     public string Location { get; set; }
     public EventType EventType { get; set; }
+    public List<TicketSelectionViewModel> Tickets { get; set; } = new List<TicketSelectionViewModel>();
     public List<TicketTypeViewModel> TicketTypes { get; set; }
 }
 
@@ -89,7 +90,7 @@ public class TicketPageViewModel
 
 public class TicketSelectionViewModel
 {
-    public int TicketTypeId { get; set; }
+    public string TicketTypeId { get; set; }
     public string TicketTypeName { get; set; }
     public int Quantity { get; set; }
     public decimal Price { get; set; }

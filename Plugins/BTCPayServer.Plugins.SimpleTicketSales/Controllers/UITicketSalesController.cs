@@ -24,7 +24,7 @@ using BTCPayServer.Plugins.SimpleTicketSales.Data;
 using BTCPayServer.Plugins.SimpleTicketSales.Services;
 using BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Newtonsoft.Json;
+using BTCPayServer.Controllers;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -77,9 +77,8 @@ public class UITicketSalesController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var events = ctx.Events.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id).ToList();
-
-        var eventTickets = ctx.Tickets.AsNoTracking().Where(t => t.StoreId == CurrentStore.Id).ToList();
+        var events = ctx.Events.Where(c => c.StoreId == CurrentStore.Id).ToList();
+        var eventTickets = ctx.Tickets.AsNoTracking().Where(t => t.StoreId == CurrentStore.Id && t.PaymentStatus == TransactionStatus.Settled.ToString()).ToList();
         var eventsViewModel = events.Select(ticketEvent =>
         {
             return new SalesTicketsEventsListViewModel
@@ -108,7 +107,7 @@ public class UITicketSalesController : Controller
         {
             TempData.SetStatusMessageModel(new StatusMessageModel
             {
-                Message = $"Kindly configure Email SMTP in the admin settings to be able to create an event",
+                Html = $"Kindly <a href='{Url.Action(nameof(UIServerController.Emails), "UIServer")}' class='alert-link'>configure Email SMTP</a> to create an event",
                 Severity = StatusMessageModel.StatusSeverity.Info
             });
         }
@@ -117,7 +116,7 @@ public class UITicketSalesController : Controller
     }
 
 
-    [HttpGet("view-event")]
+    [HttpGet("view")]
     public async Task<IActionResult> ViewEvent(string storeId, string eventId)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
@@ -151,7 +150,7 @@ public class UITicketSalesController : Controller
     }
 
 
-    [HttpPost("create-event")]
+    [HttpPost("create")]
     public async Task<IActionResult> CreateEvent(string storeId, [FromForm] UpdateSimpleTicketSalesEventViewModel vm)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
@@ -168,13 +167,8 @@ public class UITicketSalesController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Event date cannot be in the past";
             return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
         }
-        if (vm.Amount <= 0)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Amount cannot be 0";
-            return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
-        }
         var entity = TicketSalesEventViewModelToEntity(vm);
-        entity.EventState = SimpleTicketSales.Data.EntityState.Active;
+        entity.EventState = SimpleTicketSales.Data.EntityState.Disabled;
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
         {
@@ -195,12 +189,12 @@ public class UITicketSalesController : Controller
         entity.StoreId = CurrentStore.Id;
         ctx.Events.Update(entity);
         await ctx.SaveChangesAsync();
-        TempData[WellKnownTempData.SuccessMessage] = "Event created successfully";
+        TempData[WellKnownTempData.SuccessMessage] = "Event created successfully. Kindly create ticket tiers for your event to publish your event";
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
     }
 
 
-    [HttpPost("update-event/{eventId}")]
+    [HttpPost("update/{eventId}")]
     public async Task<IActionResult> UpdateEvent(string storeId, string eventId, UpdateSimpleTicketSalesEventViewModel vm, [FromForm] bool RemoveEventLogoFile = false)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
@@ -212,11 +206,6 @@ public class UITicketSalesController : Controller
         if (entity == null)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Invalid event record specified for this store";
-            return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
-        }
-        if (vm.Amount <= 0)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Amount cannot be 0";
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
         }
         entity = TicketSalesEventViewModelToEntity(vm);
@@ -244,7 +233,65 @@ public class UITicketSalesController : Controller
         ctx.Events.Update(entity);
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Event updated successfully";
-        return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+        return RedirectToAction(nameof(UITicketTypeController.List), "UITicketType", new { storeId = CurrentStore.Id, eventId });
+    }
+
+
+
+    [HttpGet("toggle/{eventId}")]
+    public async Task<IActionResult> ToggleTicketTypeStatus(string storeId, string eventId, bool enable)
+    {
+        if (CurrentStore is null)
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == eventId).ToList();
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == eventId);
+        if (ticketEvent == null || !ticketTypes.Any())
+        {
+            TempData.SetStatusMessageModel(new StatusMessageModel
+            {
+                Html = $"No ticket type available. Click <a href='{Url.Action(nameof(UITicketTypeController.List), "UITicketType")}' class='alert-link'>here</a> to create one",
+                Severity = StatusMessageModel.StatusSeverity.Error
+            });
+            return RedirectToAction(nameof(List), new { storeId, eventId });
+        }
+        return View("Confirm", new ConfirmModel($"{(enable ? "Activate" : "Disable")} event", $"The event ({ticketEvent.Title}) will be {(enable ? "activated" : "disabled")}. Are you sure?", (enable ? "Activate" : "Disable")));
+    }
+
+
+    [HttpPost("toggle/{eventId}")]
+    public async Task<IActionResult> ToggleTicketTypeStatusPost(string storeId, string eventId, bool enable)
+    {
+        if (CurrentStore is null)
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == eventId).ToList();
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == eventId);
+        if (ticketEvent == null || !ticketTypes.Any())
+        {
+            TempData.SetStatusMessageModel(new StatusMessageModel
+            {
+                Html = $"No ticket type available. Click <a href='{Url.Action(nameof(UITicketTypeController.List), "UITicketType", new { storeId = CurrentStore.Id, eventId })}' class='alert-link'>here</a> to create one",
+                Severity = StatusMessageModel.StatusSeverity.Info
+            });
+            return RedirectToAction(nameof(List), new { storeId, eventId });
+        }
+        switch (ticketEvent.EventState)
+        {
+            case SimpleTicketSales.Data.EntityState.Active:
+            default:
+                ticketEvent.EventState = SimpleTicketSales.Data.EntityState.Disabled;
+                break;
+            case SimpleTicketSales.Data.EntityState.Disabled:
+                ticketEvent.EventState = SimpleTicketSales.Data.EntityState.Active;
+                break;
+        }
+        ctx.Events.Update(ticketEvent);
+        await ctx.SaveChangesAsync();
+        TempData[WellKnownTempData.SuccessMessage] = $"Event {(enable ? "activated" : "disabled")} successfully";
+        return RedirectToAction(nameof(List), new { storeId });
     }
 
 
@@ -317,38 +364,33 @@ public class UITicketSalesController : Controller
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
         }
 
-        /*var query = ctx.Tickets.AsNoTracking().Where(c => c.EventId == eventId && c.StoreId == CurrentStore.Id);
-        if (!string.IsNullOrWhiteSpace(searchText))
-        {
-            searchText = searchText.Trim().ToLowerInvariant();
-            query = query.Where(t =>
-                t.Email.ToLower().Contains(searchText) ||
-                t.Name.ToLower().Contains(searchText) ||
-                t.InvoiceId.ToLower().Contains(searchText));
-        }
-        var tickets = query.ToList();
+        var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets)
+            .Where(c => c.EventId == eventId && c.StoreId == CurrentStore.Id && c.PaymentStatus == TransactionStatus.Settled.ToString()).ToList();
 
         var vm = new EventTicketViewModel
         {
-            StoreId = CurrentStore.Id,
+            StoreId = storeId,
             EventId = eventId,
-            SearchText = searchText,
             EventTitle = entity.Title,
-            Tickets = tickets.Select(t => new EventTicketVm
+            SearchText = searchText,
+            TicketOrders = order.Select(o => new EventTicketOrdersVm
             {
-                Id = t.Id,
-                HasEmailNotificationBeenSent = t.EmailSent,
-                CreatedDate = t.CreatedAt,
-                Name = t.Name,
-                Amount = t.Amount,
-                Currency = t.Currency,
-                Email = t.Email,
-                TicketStatus = t.PaymentStatus,
-                InvoiceId = t.InvoiceId
+                OrderId = o.Id,
+                Quantity = o.Tickets.Count(c => c.PaymentStatus == TransactionStatus.Settled.ToString()),
+                InvoiceId = o.InvoiceId,
+                HasEmailNotificationBeenSent = o.Tickets.First(c => c.PaymentStatus == TransactionStatus.Settled.ToString()).EmailSent,
+                FirstName = o.Tickets.First(c => c.PaymentStatus == TransactionStatus.Settled.ToString()).FirstName,
+                LastName = o.Tickets.First(c => c.PaymentStatus == TransactionStatus.Settled.ToString()).LastName,
+                Email = o.Tickets.First(c => c.PaymentStatus == TransactionStatus.Settled.ToString()).Email,
+                PurchaseDate = o.PurchaseDate,
+                Tickets = o.Tickets.Select(t => new EventContactPersonTicketVm
+                {
+                    Id = t.Id,
+                    TicketTypeId = t.TicketTypeId,
+                }).ToList(),
             }).ToList()
         };
-        return View(vm);*/
-        return View();
+        return View(vm);
     }
 
 
@@ -416,7 +458,6 @@ public class UITicketSalesController : Controller
             Description = entity.Description,
             Location = entity.Location,
             EventDate = entity.StartDate,
-            Amount = entity.Amount,
             Currency = entity.Currency,
             EmailBody = entity.EmailBody,
             EventType = entity.EventType,
@@ -437,7 +478,6 @@ public class UITicketSalesController : Controller
             Location = model.Location,
             StartDate = model.EventDate,
             EndDate = model.EndDate,
-            Amount = model.Amount,
             Currency = model.Currency,
             EmailBody = model.EmailBody,
             EventType = model.EventType,

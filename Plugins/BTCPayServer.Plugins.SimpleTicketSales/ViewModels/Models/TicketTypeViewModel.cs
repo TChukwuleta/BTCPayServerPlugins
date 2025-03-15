@@ -11,8 +11,10 @@ public class TicketTypeViewModel
     public string Description { get; set; }
     public int Quantity { get; set; }
     public int QuantitySold { get; set; }
+    public int QuantityAvailable { get; set; }
     public string EventId { get; set; }
     public EntityState TicketTypeState { get; set; }
+    public bool IsDefault { get; set; }
 }
 
 public class TicketTypeListViewModel

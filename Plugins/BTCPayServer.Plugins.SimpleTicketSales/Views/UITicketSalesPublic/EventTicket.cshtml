@@ -51,7 +51,7 @@
                                 <p class="text-muted small mb-1">@ticket.Description</p>
                             </div>
                             <div>
-                                @if (ticket.Quantity - ticket.QuantitySold == 0)
+                                @if (ticket.QuantityAvailable <= 0)
                                 {
                                     <span class="badge bg-light text-dark p-2">Sold Out</span>
                                 }
@@ -143,6 +143,7 @@
                 subtotalElem.innerText = (totalAmount || 0).toLocaleString();
                 totalElem.innerText = (totalAmount || 0).toLocaleString();
                 summaryDetails.innerHTML = summaryHtml || '<p class="text-muted small text-center">No tickets selected</p>';
+                ticketSelections.innerHTML = ticketInputsHtml;
                 if (totalAmount <= 0) {
                     continueButton.classList.add("disabled");
                     continueButton.setAttribute("disabled", "disabled");

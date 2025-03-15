@@ -29,7 +29,6 @@ public class UpdateSimpleTicketSalesEventViewModel
     public DateTime EventDate { get; set; } = DateTime.UtcNow.Date;
     public DateTime? EndDate { get; set; }
     public string StoreDefaultCurrency { get; set; }
-    public decimal Amount { get; set; }
     public string Currency { get; set; }
 
     [Display(Name = "Email Subject")]

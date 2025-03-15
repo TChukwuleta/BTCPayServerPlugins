@@ -29,7 +29,6 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                     StartDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     EndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    Amount = table.Column<decimal>(type: "numeric", nullable: false),
                     Currency = table.Column<string>(type: "text", nullable: true),
                     EmailSubject = table.Column<string>(type: "text", nullable: true),
                     EmailBody = table.Column<string>(type: "text", nullable: true),
@@ -56,7 +55,7 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                     InvoiceStatus = table.Column<string>(type: "text", nullable: true),
                     TxnId = table.Column<string>(type: "text", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    PurchaseDate = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    PurchaseDate = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -69,6 +68,7 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "text", nullable: false),
+                    IsDefault = table.Column<bool>(type: "boolean", nullable: false),
                     Name = table.Column<string>(type: "text", nullable: true),
                     Price = table.Column<decimal>(type: "numeric", nullable: false),
                     Description = table.Column<string>(type: "text", nullable: true),
@@ -80,12 +80,6 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_TicketTypes", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_TicketTypes_Events_EventId",
-                        column: x => x.EventId,
-                        principalSchema: "BTCPayServer.Plugins.SimpleTicketSale",
-                        principalTable: "Events",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -99,7 +93,10 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                     TicketTypeId = table.Column<string>(type: "text", nullable: true),
                     Amount = table.Column<decimal>(type: "numeric", nullable: false),
                     Currency = table.Column<string>(type: "text", nullable: true),
-                    Name = table.Column<string>(type: "text", nullable: true),
+                    FirstName = table.Column<string>(type: "text", nullable: true),
+                    LastName = table.Column<string>(type: "text", nullable: true),
+                    TicketNumber = table.Column<string>(type: "text", nullable: true),
+                    TxnNumber = table.Column<string>(type: "text", nullable: true),
                     Email = table.Column<string>(type: "text", nullable: true),
                     EmailSent = table.Column<bool>(type: "boolean", nullable: false),
                     QRCodeData = table.Column<string>(type: "text", nullable: true),
@@ -124,17 +121,15 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                 schema: "BTCPayServer.Plugins.SimpleTicketSale",
                 table: "Tickets",
                 column: "OrderId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_TicketTypes_EventId",
-                schema: "BTCPayServer.Plugins.SimpleTicketSale",
-                table: "TicketTypes",
-                column: "EventId");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "Events",
+                schema: "BTCPayServer.Plugins.SimpleTicketSale");
+
             migrationBuilder.DropTable(
                 name: "Tickets",
                 schema: "BTCPayServer.Plugins.SimpleTicketSale");
@@ -145,10 +140,6 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "Orders",
-                schema: "BTCPayServer.Plugins.SimpleTicketSale");
-
-            migrationBuilder.DropTable(
-                name: "Events",
                 schema: "BTCPayServer.Plugins.SimpleTicketSale");
         }
     }

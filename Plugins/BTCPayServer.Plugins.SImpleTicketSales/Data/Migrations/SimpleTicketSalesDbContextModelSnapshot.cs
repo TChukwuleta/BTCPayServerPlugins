@@ -29,9 +29,6 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text");
 
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("numeric");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -147,7 +144,10 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                     b.Property<string>("EventId")
                         .HasColumnType("text");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("FirstName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("LastName")
                         .HasColumnType("text");
 
                     b.Property<string>("OrderId")
@@ -162,7 +162,13 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                     b.Property<string>("StoreId")
                         .HasColumnType("text");
 
+                    b.Property<string>("TicketNumber")
+                        .HasColumnType("text");
+
                     b.Property<string>("TicketTypeId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TxnNumber")
                         .HasColumnType("text");
 
                     b.HasKey("Id");
@@ -184,6 +190,9 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                     b.Property<string>("EventId")
                         .HasColumnType("text");
 
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Name")
                         .HasColumnType("text");
 
@@ -201,8 +210,6 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EventId");
-
                     b.ToTable("TicketTypes", "BTCPayServer.Plugins.SimpleTicketSale");
                 });
 
@@ -211,18 +218,6 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                     b.HasOne("BTCPayServer.Plugins.SimpleTicketSales.Data.Order", null)
                         .WithMany("Tickets")
                         .HasForeignKey("OrderId");
-                });
-
-            modelBuilder.Entity("BTCPayServer.Plugins.SimpleTicketSales.Data.TicketType", b =>
-                {
-                    b.HasOne("BTCPayServer.Plugins.SimpleTicketSales.Data.Event", null)
-                        .WithMany("TicketTypes")
-                        .HasForeignKey("EventId");
-                });
-
-            modelBuilder.Entity("BTCPayServer.Plugins.SimpleTicketSales.Data.Event", b =>
-                {
-                    b.Navigation("TicketTypes");
                 });
 
             modelBuilder.Entity("BTCPayServer.Plugins.SimpleTicketSales.Data.Order", b =>

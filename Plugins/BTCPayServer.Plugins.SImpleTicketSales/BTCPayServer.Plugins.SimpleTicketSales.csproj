@@ -24,12 +24,7 @@
       <Private>false</Private>
       <ExcludeAssets>runtime;native;build;buildTransitive;contentFiles</ExcludeAssets>
     </ProjectReference>
-  </ItemDefinitionGroup>
-
-	<ItemGroup>
-		<EmbeddedResource Include="Resources\js\btcpay_ticketsales.js" />
-	</ItemGroup>
-	
+  </ItemDefinitionGroup>	
 	
 		<!-- If you need Entity Framework, you can uncomment this. This will make it usable in your project without publishing assemblies
   already referenced by BTCPay Server Core project -->
@@ -59,5 +54,6 @@
 	
   <ItemGroup>
     <Folder Include="img\" />
+    <Folder Include="Resources\js\" />
   </ItemGroup>
 </Project>
