@@ -26,7 +26,7 @@ public class UpdateSimpleTicketSalesEventViewModel
 
     [Display(Name = "Event Address or Link")]
     public string Location { get; set; }
-    public DateTime EventDate { get; set; } = DateTime.UtcNow.Date;
+    public DateTime StartDate { get; set; } = DateTime.UtcNow.Date;
     public DateTime? EndDate { get; set; }
     public string StoreDefaultCurrency { get; set; }
     public string Currency { get; set; }

@@ -16,6 +16,7 @@ public class Order
     public string PaymentStatus { get; set; }
     public string InvoiceStatus { get; set; }
     public string TxnId { get; set; }
+    public bool EmailSent { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset PurchaseDate { get; set; }
+    public DateTimeOffset? PurchaseDate { get; set; }
 }

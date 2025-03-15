@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
 {
     [DbContext(typeof(SimpleTicketSalesDbContext))]
-    [Migration("20250315112615_initialMigration")]
+    [Migration("20250315140907_initialMigration")]
     partial class initialMigration
     {
         /// <inheritdoc />
@@ -91,6 +91,9 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("EmailSent")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("EventId")
                         .HasColumnType("text");
 
@@ -103,7 +106,7 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                     b.Property<string>("PaymentStatus")
                         .HasColumnType("text");
 
-                    b.Property<DateTimeOffset>("PurchaseDate")
+                    b.Property<DateTimeOffset?>("PurchaseDate")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("StoreId")
@@ -124,9 +127,6 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                 {
                     b.Property<string>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("text");
-
-                    b.Property<string>("AccessLink")
                         .HasColumnType("text");
 
                     b.Property<decimal>("Amount")
@@ -153,6 +153,9 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                     b.Property<string>("LastName")
                         .HasColumnType("text");
 
+                    b.Property<string>("Location")
+                        .HasColumnType("text");
+
                     b.Property<string>("OrderId")
                         .HasColumnType("text");
 
@@ -169,6 +172,9 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("TicketTypeId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TicketTypeName")
                         .HasColumnType("text");
 
                     b.Property<string>("TxnNumber")

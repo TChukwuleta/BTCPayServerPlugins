@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using BTCPayServer.Services.Mails;
 using BTCPayServer.Client.Models;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.SimpleTicketSales.Services;
 
@@ -92,8 +93,6 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
         order.PaymentStatus = success ? Data.TransactionStatus.Settled.ToString() : Data.TransactionStatus.Expired.ToString();
         order.Tickets.ToList().ForEach(c => c.PaymentStatus = success ? Data.TransactionStatus.Settled.ToString() : Data.TransactionStatus.Expired.ToString());
         result.Write($"New ticket payment completed for Event: {ticketEvent?.Title}, Order Id: {order.Id}, Order Txn Id: {order.TxnId}", InvoiceEventData.EventSeverity.Success);
-        ctx.Orders.Update(order);
-        await ctx.SaveChangesAsync();
 
         var emailSender = await _emailSenderFactory.GetEmailSender(invoice.StoreId);
         var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
@@ -101,18 +100,16 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
         {
             try
             {
-                var emailResponse = await _emailService.SendTicketRegistrationEmail(invoice.StoreId, order.Tickets, ticketEvent);
-                var failedRecipients = new HashSet<string>(emailResponse.FailedRecipients);
-                foreach (var ticket in order.Tickets)
-                {
-                    ticket.EmailSent = !failedRecipients.Contains(ticket.Email);
-                }
+                var emailResponse = await _emailService.SendTicketRegistrationEmail(invoice.StoreId, order.Tickets.First(), ticketEvent);
+                Console.WriteLine(JsonConvert.SerializeObject(emailResponse));
+                if (emailResponse.IsSuccessful)
+                    order.EmailSent = true;
                 result.Write($"Email sent successfully to recipients in Order with Id: {order.Id}", InvoiceEventData.EventSeverity.Success);
             }
             catch (Exception) { }
-            ctx.Orders.Update(order);
-            await ctx.SaveChangesAsync();
         }
+        ctx.Orders.Update(order);
+        await ctx.SaveChangesAsync();
         await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
     }
 }

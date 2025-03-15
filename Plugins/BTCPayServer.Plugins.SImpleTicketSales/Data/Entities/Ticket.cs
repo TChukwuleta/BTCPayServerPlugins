@@ -10,6 +10,7 @@ public class Ticket
     public string StoreId { get; set; }
     public string EventId { get; set; }
     public string TicketTypeId { get; set; }
+    public string TicketTypeName { get; set; }
     public decimal Amount { get; set; }
     public string Currency { get; set; }
     public string FirstName { get; set; }
@@ -20,6 +21,6 @@ public class Ticket
     public bool EmailSent { get; set; }
     public string QRCodeData { get; set; }
     public string PaymentStatus { get; set; }
-    public string AccessLink { get; set; }
+    public string Location { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }

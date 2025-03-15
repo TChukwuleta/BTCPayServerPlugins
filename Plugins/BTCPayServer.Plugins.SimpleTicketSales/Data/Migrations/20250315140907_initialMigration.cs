@@ -54,6 +54,7 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                     PaymentStatus = table.Column<string>(type: "text", nullable: true),
                     InvoiceStatus = table.Column<string>(type: "text", nullable: true),
                     TxnId = table.Column<string>(type: "text", nullable: true),
+                    EmailSent = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     PurchaseDate = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
@@ -91,6 +92,7 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                     StoreId = table.Column<string>(type: "text", nullable: true),
                     EventId = table.Column<string>(type: "text", nullable: true),
                     TicketTypeId = table.Column<string>(type: "text", nullable: true),
+                    TicketTypeName = table.Column<string>(type: "text", nullable: true),
                     Amount = table.Column<decimal>(type: "numeric", nullable: false),
                     Currency = table.Column<string>(type: "text", nullable: true),
                     FirstName = table.Column<string>(type: "text", nullable: true),
@@ -101,7 +103,7 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.Data.Migrations
                     EmailSent = table.Column<bool>(type: "boolean", nullable: false),
                     QRCodeData = table.Column<string>(type: "text", nullable: true),
                     PaymentStatus = table.Column<string>(type: "text", nullable: true),
-                    AccessLink = table.Column<string>(type: "text", nullable: true),
+                    Location = table.Column<string>(type: "text", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     OrderId = table.Column<string>(type: "text", nullable: true)
                 },

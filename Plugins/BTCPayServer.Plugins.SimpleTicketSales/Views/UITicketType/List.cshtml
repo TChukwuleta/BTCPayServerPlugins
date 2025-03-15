@@ -6,7 +6,7 @@
 @model TicketTypeListViewModel
 @{
     Layout = "_Layout";
-    ViewData.SetActivePage(PluginNavPages.Index, "Event Ticket Types");
+    ViewData.SetActivePage(PluginNavPages.Index, "Ticket Tiers");
     var storeId = ScopeProvider.GetCurrentStoreId();
 }
 
@@ -14,7 +14,7 @@
 <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
-        <a asp-controller="UITicketSales" asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Go Back</a>
+        <a asp-controller="UITicketSales" asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Go to Event</a>
         <a asp-action="ViewTicketType" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-success" role="button">Configure Ticket Tiers</a>
     </div>
 </div>
@@ -78,5 +78,5 @@
 }
 else
 {
-    <p class="text-secondary mt-4">No tickets type found</p>
+    <p class="text-secondary mt-4">No tickets tiers found</p>
 }

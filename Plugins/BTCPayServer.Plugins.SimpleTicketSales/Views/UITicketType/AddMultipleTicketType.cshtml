@@ -8,7 +8,7 @@
 @model List<TicketTypeViewModel>
 @{
     Layout = "_Layout";
-    ViewData.SetActivePage(PluginNavPages.Index, "Ticket Types");
+    ViewData.SetActivePage(PluginNavPages.Index, "Ticket Tiers");
     var canUpload = await FileService.IsAvailable();
     var storeId = ScopeProvider.GetCurrentStoreId();
     bool isEditMode = !string.IsNullOrEmpty(Model.First().TicketTypeId);

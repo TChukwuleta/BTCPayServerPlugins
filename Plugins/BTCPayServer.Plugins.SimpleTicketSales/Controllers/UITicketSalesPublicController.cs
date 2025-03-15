@@ -87,7 +87,6 @@ public class UITicketSalesPublicController : Controller
             EventId = ticketEvent.Id,
             EventImageUrl = imageUrl,
             Description = ticketEvent.Description,
-            Location = ticketEvent.Location,
             EventType = ticketEvent.EventType,
         });
     }
@@ -248,6 +247,7 @@ public class UITicketSalesPublicController : Controller
 
             for (int i = 0; i < ticketRequest.Quantity; i++)
             {
+                string ticketTxn = Encoders.Base58.EncodeData(RandomUtils.GetBytes(6));
                 var ticket = new Ticket
                 {
                     StoreId = storeId,
@@ -259,8 +259,11 @@ public class UITicketSalesPublicController : Controller
                     LastName = model.ContactInfo.First().LastName.Trim(),
                     Email = model.ContactInfo.First().Email.Trim(),
                     CreatedAt = now,
+                    TxnNumber = ticketTxn,
+                    TicketNumber = $"EVT-{eventId:D4}-{now:yyMMdd}-{ticketTxn}",
+                    TicketTypeName = ticketType.Name,
                     PaymentStatus = TransactionStatus.New.ToString(),
-                    AccessLink = ticketEvent.Location
+                    Location = ticketEvent.Location
                 };
                 tickets.Add(ticket);
             }
@@ -330,7 +333,7 @@ public class UITicketSalesPublicController : Controller
         var now = DateTime.UtcNow;
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
         if (ticketEvent == null || ticketEvent.EventState == SimpleTicketSales.Data.EntityState.Disabled 
-            || ticketEvent.StartDate.Date > now.Date || (ticketEvent.EndDate.HasValue && ticketEvent.EndDate.Value.Date < now.Date))
+            || ticketEvent.StartDate.Date < now.Date || (ticketEvent.EndDate.HasValue && ticketEvent.EndDate.Value.Date < now.Date))
             return false;
 
         if (ticketEvent.HasMaximumCapacity)

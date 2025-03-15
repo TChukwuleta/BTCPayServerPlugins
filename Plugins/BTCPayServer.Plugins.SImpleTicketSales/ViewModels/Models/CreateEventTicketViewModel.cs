@@ -52,7 +52,6 @@ public class EventSummaryViewModel : BaseSimpleTicketPublicViewModel
     public string EventImageUrl { get; set; }
     public string Description { get; set; }
     public string EventId { get; set; }
-    public string Location { get; set; }
     public EventType EventType { get; set; }
     public string FormattedEventDate => EventDate.ToString("dddd, MMMM d yyyy");
     public string FormattedEventTime => EventDate.ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture);

@@ -7,7 +7,7 @@
 @inject IScopeProvider ScopeProvider
 @model TicketTypeViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Ticket Types");
+    ViewData.SetActivePage(PluginNavPages.Index, "Ticket Tiers");
     var canUpload = await FileService.IsAvailable();
     var storeId = ScopeProvider.GetCurrentStoreId();
     bool isEditMode = !string.IsNullOrEmpty(Model.TicketTypeId);
@@ -19,7 +19,7 @@
 <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
-        <a id="create-event" asp-controller="UITicketSales" asp-action="List" asp-route-storeId="@storeId" class="btn btn-secondary" role="button">Go to Events</a>
+        <a id="create-event" asp-controller="UITicketSales" asp-action="List" asp-route-storeId="@storeId" class="btn btn-secondary" role="button">Go to Event</a>
         <button type="submit" form="event-form" class="btn btn-success">@(isEditMode ? "Update Ticket Tier" : "Create Ticket Tier")</button>
     </div>
 </div>

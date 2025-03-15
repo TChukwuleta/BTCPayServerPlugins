@@ -57,12 +57,10 @@ public class EmailService
         return new EmailDispatchResult { IsSuccessful = failedRecipients.Any(), FailedRecipients = failedRecipients };
     }
 
-    public async Task<EmailDispatchResult> SendTicketRegistrationEmail(string storeId, ICollection<Ticket> tickets, Event ticketEvent)
+    public async Task<EmailDispatchResult> SendTicketRegistrationEmail(string storeId, Ticket ticket, Event ticketEvent)
     {
         var emailRecipients = new List<EmailRecipient>();
-        foreach (var ticket in tickets)
-        {
-            string emailBody = ticketEvent.EmailBody
+        string emailBody = ticketEvent.EmailBody
                             .Replace("{{Title}}", ticketEvent.Title)
                             .Replace("{{EventLink}}", ticketEvent.Location)
                             .Replace("{{Name}}", $"{ticket.FirstName} {ticket.LastName}")
@@ -71,13 +69,12 @@ public class EmailService
                             .Replace("{{EventDate}}", ticketEvent.StartDate.ToString("MMMM dd, yyyy"))
                             .Replace("{{Currency}}", ticketEvent.Currency);
 
-            emailRecipients.Add(new EmailRecipient
-            {
-                Address = InternetAddress.Parse(ticket.Email),
-                Subject = ticketEvent.EmailSubject,
-                MessageText = ticketEvent.EmailBody
-            });
-        }
+        emailRecipients.Add(new EmailRecipient
+        {
+            Address = InternetAddress.Parse(ticket.Email),
+            Subject = ticketEvent.EmailSubject,
+            MessageText = ticketEvent.EmailBody
+        });
         return await SendBulkEmail(storeId, emailRecipients);
     }
 

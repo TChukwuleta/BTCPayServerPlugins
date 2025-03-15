@@ -32,6 +32,7 @@ public class EventContactPersonTicketVm
     public int Quantity { get; set; }
     public string TicketTypeId { get; set; }
     public string TicketTypeName { get; set; }
+    public string TicketNumber { get; set; }
     public string Currency { get; set; }
     public DateTimeOffset CreatedDate { get; set; }
 
