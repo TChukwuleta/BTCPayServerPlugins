@@ -1,0 +1,82 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Plugins.SimpleTicketSales.Data
+@using BTCPayServer.Plugins.SimpleTicketSales.ViewModels
+@using BTCPayServer.Abstractions.Extensions
+@inject IScopeProvider ScopeProvider
+@model TicketTypeListViewModel
+@{
+    Layout = "_Layout";
+    ViewData.SetActivePage(PluginNavPages.Index, "Ticket Tiers");
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+
+
+<div class="sticky-header">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <a asp-controller="UITicketSales" asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Go to Event</a>
+        <a asp-action="ViewTicketType" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-success" role="button">Configure Ticket Tiers</a>
+    </div>
+</div>
+<partial name="_StatusMessage" />
+
+
+@if (Model.TicketTypes.Any())
+{
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Price</th>
+                    <th>Total Quantity</th>
+                    <th>Quantity Sold</th>
+                    <th class="w-75px"></th>
+                </tr>
+            </thead>
+            <tbody id="UsersList">
+                @foreach (var ticketType in Model.TicketTypes)
+                {
+                    <tr id="event_@ticketType.EventId" class="user-overview-row mass-action-row">
+                        <td>
+                            <div class="d-inline-flex align-items-center gap-3">
+                                <a asp-action="ViewTicketType" 
+                                asp-route-storeId="@storeId" 
+                                asp-route-eventId="@ticketType.EventId" 
+                                asp-route-ticketTypeId="@ticketType.TicketTypeId">@ticketType.Name</a>
+                            </div>
+                        </td>
+                        <td>@ticketType.Price</td>
+                        <td>@ticketType.Quantity</td>
+                        <td>@ticketType.QuantitySold</td>
+                        <td class="text-end">
+                            <div class="d-inline-flex align-items-center gap-3">
+
+                                <a class="dropdown-item text-success"
+                                   asp-action="ToggleTicketTypeStatus"
+                                   asp-route-storeId="@storeId"
+                                   asp-route-eventId="@ticketType.EventId"
+                                   asp-route-ticketTypeId="@ticketType.TicketTypeId"
+                                   asp-route-enable="@(ticketType.TicketTypeState == EntityState.Disabled)">
+                                    @(ticketType.TicketTypeState == EntityState.Disabled ? "Activate" : "Disable")
+                                </a>
+
+                                <a asp-action="DeleteTicketType"
+                                   asp-route-eventId="@ticketType.EventId"
+                                   asp-route-ticketTypeId="@ticketType.TicketTypeId"
+                                   asp-route-storeId="@storeId"
+                                   class="dropdown-item text-danger">
+                                    Delete
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <p class="text-secondary mt-4">No tickets tiers found</p>
+}
