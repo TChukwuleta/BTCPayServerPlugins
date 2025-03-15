@@ -10,6 +10,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Services.Mails;
 using BTCPayServer.Client.Models;
+using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.SimpleTicketSales.Services;
 
@@ -42,38 +44,31 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
 
     protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
     {
-        switch (evt)
+        if (evt is InvoiceEvent invoiceEvent && new[]
         {
-            case InvoiceEvent invoiceEvent when new[]
-            {
             InvoiceEvent.MarkedCompleted,
             InvoiceEvent.MarkedInvalid,
             InvoiceEvent.Expired,
             InvoiceEvent.Confirmed,
             InvoiceEvent.Completed
-        }.Contains(invoiceEvent.Name):
+        }.Contains(invoiceEvent.Name))
+            {
+                var invoice = invoiceEvent.Invoice;
+                var ticketOrderId = invoice.GetInternalTags(TICKET_SALES_PREFIX).FirstOrDefault();
+                if (ticketOrderId != null)
                 {
-                    var invoice = invoiceEvent.Invoice;
-                    var ticketOrderId = invoice.GetInternalTags(TICKET_SALES_PREFIX).FirstOrDefault();
-                    if (ticketOrderId != null)
+                    bool? success = invoice.Status switch
                     {
-                        bool? success = invoice.Status switch
-                        {
-                            InvoiceStatus.Settled => true,
-
-                            InvoiceStatus.Invalid or
-                            InvoiceStatus.Expired => false,
-
-                            _ => (bool?)null
-                        };
-                        if (success.HasValue)
-                        {
-                            await RegisterTicketTransaction(invoice, ticketOrderId, success.Value);
-                        }
+                        InvoiceStatus.Settled => true,
+                        InvoiceStatus.Invalid or InvoiceStatus.Expired => false,
+                        _ => null
+                    };
+                    if (success.HasValue)
+                    {
+                        await RegisterTicketTransaction(invoice, ticketOrderId, success.Value);
                     }
-                    break;
                 }
-        }
+            }
         await base.ProcessEvent(evt, cancellationToken);
     }
 
@@ -82,20 +77,22 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
         await using var ctx = _dbContextFactory.CreateContext();
         var result = new InvoiceLogs();
         result.Write($"Invoice status: {invoice.Status.ToString().ToLower()}", InvoiceEventData.EventSeverity.Info);
-        var ticket = ctx.TicketSalesEventTickets.AsNoTracking().FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id);
-        if (ticket == null) return;
+        var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets).FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id);
+        if (order == null) return;
 
-        if (ticket != null && ticket.PaymentStatus != Data.TransactionStatus.New.ToString())
+        if (order != null && order.PaymentStatus != Data.TransactionStatus.New.ToString())
         {
             result.Write("Transaction has previously been completed", InvoiceEventData.EventSeverity.Info);
             await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
             return;
         }
-        var ghostEvent = ctx.TicketSalesEvents.AsNoTracking().FirstOrDefault(c => c.Id == ticket.EventId && c.StoreId == ticket.StoreId);
-        ticket.PurchaseDate = DateTime.UtcNow;
-        ticket.InvoiceStatus = invoice.Status.ToString().ToLower();
-        ticket.PaymentStatus = success ? Data.TransactionStatus.Settled.ToString() : Data.TransactionStatus.Expired.ToString();
-        result.Write($"New ticket payment completed for Event: {ghostEvent?.Title} Buyer name: {ticket.Name}", InvoiceEventData.EventSeverity.Success);
+
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == order.EventId && c.StoreId == order.StoreId);
+        order.PurchaseDate = DateTime.UtcNow;
+        order.InvoiceStatus = invoice.Status.ToString().ToLower();
+        order.PaymentStatus = success ? Data.TransactionStatus.Settled.ToString() : Data.TransactionStatus.Expired.ToString();
+        order.Tickets.ToList().ForEach(c => c.PaymentStatus = success ? Data.TransactionStatus.Settled.ToString() : Data.TransactionStatus.Expired.ToString());
+        result.Write($"New ticket payment completed for Event: {ticketEvent?.Title}, Order Id: {order.Id}, Order Txn Id: {order.TxnId}", InvoiceEventData.EventSeverity.Success);
 
         var emailSender = await _emailSenderFactory.GetEmailSender(invoice.StoreId);
         var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
@@ -103,13 +100,15 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
         {
             try
             {
-                await _emailService.SendTicketRegistrationEmail(invoice.StoreId, ticket, ghostEvent);
-                ticket.EmailSent = true;
-                result.Write($"Email sent successfully to: {ticket?.Email}", InvoiceEventData.EventSeverity.Success);
+                var emailResponse = await _emailService.SendTicketRegistrationEmail(invoice.StoreId, order.Tickets.First(), ticketEvent);
+                Console.WriteLine(JsonConvert.SerializeObject(emailResponse));
+                if (emailResponse.IsSuccessful)
+                    order.EmailSent = true;
+                result.Write($"Email sent successfully to recipients in Order with Id: {order.Id}", InvoiceEventData.EventSeverity.Success);
             }
             catch (Exception) { }
         }
-        ctx.UpdateRange(ticket);
+        ctx.Orders.Update(order);
         await ctx.SaveChangesAsync();
         await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
     }

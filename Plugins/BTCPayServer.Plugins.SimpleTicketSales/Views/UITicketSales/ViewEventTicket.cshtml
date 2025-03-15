@@ -8,7 +8,8 @@
 @inject IScopeProvider ScopeProvider
 @model EventTicketViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, $"Ghost Event Tickets: {Model.EventTitle}");
+    Layout = "_Layout";
+    ViewData.SetActivePage(PluginNavPages.Index, $"{Model.EventTitle}");
     var canUpload = await FileService.IsAvailable();
     var storeId = ScopeProvider.GetCurrentStoreId();
 }
@@ -28,50 +29,39 @@
     <input asp-for="SearchText" class="form-control" name="searchText" placeholder="Search…" />
 </form>
 
-@if (Model.Tickets.Any())
+@if (Model.TicketOrders.Any())
 {
     <div class="table-responsive">
         <table id="invoices" class="table table-hover mass-action">
             <thead class="mass-action-head">
                 <tr>
-                    <th class="date-col">
-                        <div class="d-flex align-items-center gap-1">
-                            Date
-                        </div>
-                    </th>
-                    <th class="text-nowrap">Invoice Id</th>
-                    <th class="text-nowrap">Name</th>
+                    <th class="text-nowrap">Invoice</th>
+                    <th class="text-nowrap">First Name</th>
+                    <th class="text-nowrap">Last Name</th>
                     <th class="text-nowrap">Email</th>
-                    <th>Status</th>
-                    <th class="text-nowrap">Amount</th>
+                    <th class="text-nowrap">Quantity Purchased</th>
                     <th class="w-75px"></th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var ticket in Model.Tickets)
+                @foreach (var ticket in Model.TicketOrders)
                 {
                     <tr id="invoice_@ticket.InvoiceId">
-                        <td class="align-middle date-col">@ticket.CreatedDate.ToBrowserDate()</td>
                         <td class="text-break align-middle invoiceId-col">
                             <a asp-action="Invoice" asp-controller="UIInvoice" class="invoice-details-link" asp-route-invoiceId="@ticket.InvoiceId">@ticket.InvoiceId</a>
                         </td>
-                        <td class="align-middle">@ticket.Name</td>
+                        <td class="align-middle">@ticket.FirstName</td>
+                        <td class="align-middle">@ticket.LastName</td>
                         <td class="align-middle">@ticket.Email</td>
+                        <td class="align-middle">@ticket.Quantity</td>
+
                         <td class="align-middle">
-                            <div class="d-inline-flex align-items-center gap-2">
-                                @ticket.TicketStatus
-                            </div>
-                        </td>
-                        <td class="align-middle">
-                            <span data-sensitive>@DisplayFormatter.Currency(ticket.Amount, ticket.Currency)</span>
+                            @* <span data-sensitive>@DisplayFormatter.Currency(ticket.Amount, ticket.Currency)</span> *@
                         </td>
 
-                        @if (!ticket.HasEmailNotificationBeenSent && ticket.TicketStatus == BTCPayServer.Plugins.SimpleTicketSales.Data.TransactionStatus.Settled.ToString())
-                        {
-                            <td class="text-end amount-col">
-                                <a asp-action="SendReminder" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticket.Id">Resend Ticket Confirmation</a>
-                            </td>
-                        }
+                        <td class="text-end amount-col">
+                            <a asp-action="SendReminder" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticket.FirstName">Resend Ticket Confirmation</a>
+                        </td>
                     </tr>
                 }
             </tbody>

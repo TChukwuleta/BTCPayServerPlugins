@@ -7,18 +7,22 @@
 @inject IScopeProvider ScopeProvider
 @model UpdateSimpleTicketSalesEventViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Ghost Events");
+    ViewData.SetActivePage(PluginNavPages.Index, "Events");
     var canUpload = await FileService.IsAvailable();
     var storeId = ScopeProvider.GetCurrentStoreId();
     bool isEditMode = !string.IsNullOrEmpty(Model.EventId);
     string formAction = isEditMode
-        ? Url.Action("UpdateEvent", "UISimpleTicketSales", new { eventId = Model.EventId, storeId })
-        : Url.Action("CreateEvent", "UISimpleTicketSales", new { storeId });
+        ? Url.Action("UpdateEvent", "UITicketSales", new { eventId = Model.EventId, storeId })
+        : Url.Action("CreateEvent", "UITicketSales", new { storeId });
 }
 
 <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
+        @if (!string.IsNullOrEmpty(Model.EventId))
+        {
+            <a asp-controller="UITicketType" asp-action="List" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Ticket Tiers</a>
+        }
         <button type="submit" form="event-form" class="btn btn-success">@(isEditMode ? "Update Event" : "Create Event")</button>
     </div>
 </div>
@@ -60,41 +64,47 @@
 <form id="event-form" action="@formAction" method="post" enctype="multipart/form-data">
     <div class="row">
         <div class="col-sm-10 col-md-9 col-xl-7 col-xxl-6">
-            <div class="row">
-                <div class="col-sm-6">
-                    <div class="form-group">
-                        <label asp-for="Title" class="form-label" data-required></label>
-                        <input asp-for="Title" class="form-control" required />
-                        <span asp-validation-for="Title" class="text-danger"></span>
-                    </div>
-                </div>
-                <div class="col-sm-6">
-                    <div class="form-group">
-                        <label asp-for="EventLink" class="form-label" data-required></label>
-                        <input asp-for="EventLink" class="form-control" required />
-                        <span asp-validation-for="EventLink" class="text-danger"></span>
-                    </div>
-                </div>
+            <div class="form-group">
+                <label asp-for="Title" class="form-label" data-required></label>
+                <input asp-for="Title" class="form-control" required />
+                <span asp-validation-for="Title" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Location" class="form-label" data-required></label>
+                <input asp-for="Location" class="form-control" required />
+                <span asp-validation-for="Location" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="EventType" class="form-label" data-required></label>
+                <select asp-for="EventType" asp-items="Model.EventTypes" class="form-control" required></select>
+                <span asp-validation-for="EventType" class="text-danger"></span>
             </div>
 
             <div class="form-group">
                 <div class="d-flex align-items-center justify-content-between gap-2">
                     <label asp-for="EventImageFile" class="form-label"></label>
-                    @if (!string.IsNullOrEmpty(Model.EventImageUrl)) {
+                    @if (!string.IsNullOrEmpty(Model.EventImageUrl))
+                    {
                         <button type="submit" class="btn btn-link p-0 text-danger" name="RemoveEventLogoFile" value="true">
                             <vc:icon symbol="cross" /> Remove
                         </button>
                     }
                 </div>
-                @if (canUpload) {
+                @if (canUpload)
+                {
                     <div class="d-flex align-items-center gap-3">
                         <input asp-for="EventImageFile" type="file" class="form-control flex-grow" />
-                        @if (!string.IsNullOrEmpty(Model.EventImageUrl)) {
+                        @if (!string.IsNullOrEmpty(Model.EventImageUrl))
+                        {
                             <img src="@Model.EventImageUrl" alt="Logo" style="height:2.1rem;max-width:10.5rem;" />
                         }
                     </div>
                     <span asp-validation-for="EventImageFile" class="text-danger"></span>
-                } else {
+                }
+                else
+                {
                     <input asp-for="EventImageFile" type="file" class="form-control" disabled />
                     <div class="form-text">In order to upload an image, a <a asp-controller="UIServer" asp-action="Files">file storage</a> must be configured.</div>
                 }
@@ -116,31 +126,38 @@
         <div class="col-xl-10 col-xxl-constrain">
             <div class="d-flex flex-wrap gap-3 mb-3">
                 <div class="form-group w-250px mb-0">
-                    <label asp-for="Amount" class="form-label" data-required></label>
-                    <input inputmode="decimal" asp-for="Amount" class="form-control" required min="1" step="1" />
-                    <span asp-validation-for="Amount" class="text-danger"></span>
+                    <label asp-for="StartDate" class="form-label" data-required></label>
+                    <div class="input-group flex-nowrap">
+                        <input type="datetime-local" asp-for="StartDate" value="@(Model.StartDate.ToString("u", CultureInfo.InvariantCulture))" class="form-control flatdtpicker" placeholder="No Event date has been set" required />
+                        <button class="btn btn-secondary input-group-clear px-3" type="button" title="Clear">
+                            <vc:icon symbol="close" />
+                        </button>
+                    </div>
+                    <span asp-validation-for="StartDate" class="text-danger"></span>
                 </div>
+                <div class="form-group">
+                    <label asp-for="EndDate" class="form-label"></label>
+                    <div class="input-group flex-nowrap">
+                        <input type="datetime-local" asp-for="EndDate" value="@(Model.EndDate?.ToString("u", CultureInfo.InvariantCulture))" class="form-control flatdtpicker" placeholder="No Event date has been set" />
+                        <button class="btn btn-secondary input-group-clear px-3" type="button" title="Clear">
+                            <vc:icon symbol="close" />
+                        </button>
+                    </div>
+                    <span asp-validation-for="EndDate" class="text-danger"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-xl-10 col-xxl-constrain">
+            <div class="d-flex flex-wrap gap-3 mb-3">
                 <div class="form-group">
                     <label asp-for="Currency" class="form-label"></label>
                     <input asp-for="Currency" class="form-control w-auto" currency-selection />
                     <div class="form-text">Defaults to (@Model.StoreDefaultCurrency) if empty.</div>
                     <span asp-validation-for="Currency" class="text-danger"></span>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row align-items-center mb-3">
-        <div class="col-md-12">
-            <div class="form-group mb-0">
-                <label asp-for="EventDate" class="form-label" data-required></label>
-                <div class="input-group flex-nowrap">
-                    <input type="datetime-local" asp-for="EventDate" value="@(Model.EventDate.ToString("u", CultureInfo.InvariantCulture))" class="form-control flatdtpicker" placeholder="No Event date has been set" required />
-                    <button class="btn btn-secondary input-group-clear px-3" type="button" title="Clear">
-                        <vc:icon symbol="close" />
-                    </button>
-                </div>
-                <span asp-validation-for="EventDate" class="text-danger"></span>
             </div>
         </div>
     </div>
@@ -201,7 +218,6 @@
                 'EventLink',
                 'Description',
                 'EventDate',
-                'Amount',
                 'Currency'
             ];
             const textarea = document.getElementById('EmailBody');
