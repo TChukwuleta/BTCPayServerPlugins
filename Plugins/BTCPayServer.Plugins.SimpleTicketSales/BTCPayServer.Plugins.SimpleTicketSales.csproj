@@ -42,6 +42,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="Resources\**" />
+    <Content Remove="Resources\**" />
+    <EmbeddedResource Remove="Resources\**" />
+    <None Remove="Resources\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis" Version="4.10.0" />
     <PackageReference Include="RestSharp" Version="112.1.0" />
   </ItemGroup>
@@ -54,6 +61,5 @@
 	
   <ItemGroup>
     <Folder Include="img\" />
-    <Folder Include="Resources\js\" />
   </ItemGroup>
 </Project>

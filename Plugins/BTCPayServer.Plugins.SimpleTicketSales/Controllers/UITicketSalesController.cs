@@ -11,7 +11,6 @@ using BTCPayServer.Services.Apps;
 using BTCPayServer.Client;
 using BTCPayServer.Services;
 using Microsoft.AspNetCore.Http;
-using System.Collections.Generic;
 using BTCPayServer.Services.Stores;
 using Microsoft.EntityFrameworkCore;
 using BTCPayServer.Abstractions.Models;
@@ -25,6 +24,7 @@ using BTCPayServer.Plugins.SimpleTicketSales.Services;
 using BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using BTCPayServer.Controllers;
+using System.Text;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -445,6 +445,38 @@ public class UITicketSalesController : Controller
         }
         TempData[WellKnownTempData.SuccessMessage] = $"Ticket details has been sent to recipients via email";
         return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
+    }
+
+
+    [HttpGet("{eventId}/export")]
+    public async Task<IActionResult> ExportTickets(string storeId, string eventId)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id.Equals(eventId) && c.StoreId.Equals(CurrentStore.Id));
+        var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets).FirstOrDefault(o => o.StoreId == CurrentStore.Id && o.EventId == eventId);
+        if (ticketEvent == null || order == null || !order.Tickets.Any())
+            return NotFound();
+
+        return ExportInvoices(order, ticketEvent.Title);
+    }
+
+
+    private IActionResult ExportInvoices(Order order, string eventName)
+    {
+        var fileName = $"{eventName}_Tickets-{DateTime.Now:yyyy_MM_dd-HH_mm_ss}.csv";
+
+        var csvData = new StringBuilder();
+        csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency");
+        foreach (var ticket in order.Tickets)
+        {
+            csvData.AppendLine($"{order.PurchaseDate:MM/dd/yy HH:mm},{ticket.TicketNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{order.Currency}");
+        }
+
+        byte[] fileBytes = Encoding.UTF8.GetBytes(csvData.ToString());
+        return File(fileBytes, "text/csv", fileName);
     }
 
 
