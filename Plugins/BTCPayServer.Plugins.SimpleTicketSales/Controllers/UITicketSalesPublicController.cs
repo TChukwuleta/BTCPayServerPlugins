@@ -138,7 +138,8 @@ public class UITicketSalesPublicController : Controller
     [HttpPost("save-event-tickets")]
     public async Task<IActionResult> SaveEventTickets(string storeId, string eventId, EventTicketPageViewModel model)
     {
-        var eventKey = $"{SessionKeyOrder}{eventId}";
+        string txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(10));
+        var eventKey = $"{SessionKeyOrder}{eventId}_{txnId}";
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
         var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == eventId).ToList();
@@ -160,20 +161,21 @@ public class UITicketSalesPublicController : Controller
         }
         var newOrder = new TicketOrderViewModel
         {
+            TxnId = txnId,
             EventId = eventId,
             StoreId = storeId,
             IsStepOneComplete = true, // Move to Contact page
             Tickets = model.Tickets
         };
         HttpContext.Session.SetObject(eventKey, newOrder);
-        return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId });
+        return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, txnId });
     }
 
 
     [HttpGet("event/{eventId}/summary/contact")]
-    public async Task<IActionResult> EventContactDetails(string storeId, string eventId)
+    public async Task<IActionResult> EventContactDetails(string storeId, string eventId, string txnId)
     {
-        var eventKey = $"{SessionKeyOrder}{eventId}";
+        var eventKey = $"{SessionKeyOrder}{eventId}_{txnId}";
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
         if (!ValidateEvent(ctx, storeId, eventId))
@@ -189,6 +191,7 @@ public class UITicketSalesPublicController : Controller
 
         return View(new ContactInfoPageViewModel
         {
+            TxnId = txnId,
             EventId = eventId,
             StoreId = storeId,
             StoreName = store.StoreName,
@@ -202,10 +205,11 @@ public class UITicketSalesPublicController : Controller
     [HttpPost("save-contact-details")]
     public async Task<IActionResult> SaveContactDetails(string storeId, string eventId, ContactInfoPageViewModel model)
     {
+        Console.WriteLine(JsonConvert.SerializeObject(model));
         var now = DateTime.UtcNow;
         decimal totalAmount = 0;
         var tickets = new List<Ticket>();
-        var eventKey = $"{SessionKeyOrder}{eventId}";
+        var eventKey = $"{SessionKeyOrder}{eventId}_{model.TxnId}";
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
         var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == eventId).ToList();
@@ -214,7 +218,7 @@ public class UITicketSalesPublicController : Controller
 
         if (model.ContactInfo == null || !model.ContactInfo.Any())
         {
-            return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId });
+            return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, model.TxnId });
         }
         var orderViewModel = HttpContext.Session.GetObject<TicketOrderViewModel>(eventKey);
         if (orderViewModel == null || !orderViewModel.Tickets.Any())
@@ -241,7 +245,7 @@ public class UITicketSalesPublicController : Controller
 
         var order = new Order
         {
-            TxnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(10)),
+            TxnId = model.TxnId,
             EventId = eventId,
             StoreId = storeId,
             Currency = ticketEvent.Currency,
@@ -249,7 +253,6 @@ public class UITicketSalesPublicController : Controller
             CreatedAt = now 
         };
 
-        Console.WriteLine(JsonConvert.SerializeObject(model.ContactInfo.First()));
         foreach (var ticketRequest in orderViewModel.Tickets)
         {
             var ticketType = ticketTypes.FirstOrDefault(c => c.Id == ticketRequest.TicketTypeId);

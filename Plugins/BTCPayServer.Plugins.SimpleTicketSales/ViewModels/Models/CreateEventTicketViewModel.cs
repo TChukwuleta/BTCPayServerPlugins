@@ -59,6 +59,7 @@ public class EventSummaryViewModel : BaseSimpleTicketPublicViewModel
 
 public class EventTicketPageViewModel : BaseSimpleTicketPublicViewModel
 {
+    public string TransactionNumber { get; set; }
     public string EventTitle { get; set; }
     public string Currency { get; set; }
     public DateTime EventDate { get; set; }
@@ -72,6 +73,7 @@ public class EventTicketPageViewModel : BaseSimpleTicketPublicViewModel
 
 public class ContactInfoPageViewModel : BaseSimpleTicketPublicViewModel
 {
+    public string TxnId { get; set; }
     public string Currency { get; set; }
     public string EventId { get; set; }
     public string EventTitle { get; set; }
@@ -105,6 +107,7 @@ public class TicketContactInfoViewModel
 
 public class TicketOrderViewModel
 {
+    public string TxnId { get; set; }
     public string StoreId { get; set; }
     public string EventId { get; set; }
     public string EventTitle { get; set; }
