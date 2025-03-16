@@ -93,6 +93,12 @@ Voila!!! You have completed your first ticket purchase. At this stage, an email 
 ![BTCPay Server SatoshiTickets img 13](./img/SatoshiTickets/SatoshiTickets_13.png)
 
 
+As an admin, you can navigate back to your plugin, click on "View" button for easch plugin, and view all order and ticket information regarding that particular events.
+
+
+![BTCPay Server SatoshiTickets img 14](./img/SatoshiTickets/SatoshiTickets_14.png)
+
+
 
 
 
