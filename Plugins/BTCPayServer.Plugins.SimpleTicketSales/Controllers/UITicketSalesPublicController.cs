@@ -250,8 +250,11 @@ public class UITicketSalesPublicController : Controller
             StoreId = storeId,
             Currency = ticketEvent.Currency,
             PaymentStatus = TransactionStatus.New.ToString(),
-            CreatedAt = now 
+            CreatedAt = now,
+            TotalAmount = 0,
         };
+        ctx.Orders.Add(order);
+        await ctx.SaveChangesAsync();
 
         foreach (var ticketRequest in orderViewModel.Tickets)
         {
@@ -268,6 +271,7 @@ public class UITicketSalesPublicController : Controller
                     EventId = eventId,
                     TicketTypeId = ticketType.Id,
                     Amount = ticketType.Price,
+                    QRCodeLink = Url.Action("EventTicketDisplay", "UITicketSalesPublic", new { storeId, eventId, orderId = order.Id }, Request.Scheme),
                     FirstName = model.ContactInfo.First().FirstName.Trim(),
                     LastName = model.ContactInfo.First().LastName.Trim(),
                     Email = model.ContactInfo.First().Email.Trim(),
@@ -282,18 +286,51 @@ public class UITicketSalesPublicController : Controller
         }
         order.Tickets = tickets;
         order.TotalAmount = totalAmount;
-        ctx.Orders.Add(order);
-        ctx.TicketTypes.UpdateRange(ticketTypes);
-        await ctx.SaveChangesAsync();
 
         var invoice = await CreateInvoiceAsync(store, order, ticketEvent.Currency, Request.GetAbsoluteRoot(), ticketEvent.RedirectUrl ?? string.Empty);
         order.InvoiceId = invoice.Id;
         order.InvoiceStatus = invoice.Status.ToString();
+        ctx.TicketTypes.UpdateRange(ticketTypes);
         ctx.Orders.Update(order);
         await ctx.SaveChangesAsync();
         return RedirectToAction(nameof(UIInvoiceController.Checkout), "UIInvoice", new { invoiceId = invoice.Id });
     }
 
+    [HttpGet("event/{eventId}/ticket/{orderId}/summary")]
+    public async Task<IActionResult> EventTicketDisplay(string storeId, string eventId, string orderId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
+        if (ticketEvent == null)
+            return NotFound();
+
+        await using var dbMain = _context.CreateContext();
+        var store = await dbMain.Stores.AsNoTracking().FirstOrDefaultAsync(a => a.Id == storeId);
+        if (store == null) return NotFound();
+
+        var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets).FirstOrDefault(o => o.StoreId == storeId && o.EventId == eventId && o.Id == orderId);
+        if (order == null || !order.Tickets.Any()) return NotFound();
+
+        return View(new TicketViewModel
+        {
+            EventName = ticketEvent.Title,
+            Location = ticketEvent.Location,
+            StartDate = ticketEvent.StartDate,
+            EndDate = ticketEvent.EndDate,
+            PurchaseDate = order.PurchaseDate.Value,
+            Tickets = order.Tickets.Select(t => new TicketListViewModel
+            {
+                FirstName = t.FirstName,
+                LastName = t.LastName,
+                Email = t.Email,
+                Currency = order.Currency,
+                Amount = t.Amount,
+                TicketNumber = t.TicketNumber,
+                TicketType = t.TicketTypeName
+            }).ToList(),
+            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
+        });
+    }
 
     private async Task<InvoiceEntity> CreateInvoiceAsync(Data.StoreData store, Order order, string currency, string url, string redirectUrl)
     {

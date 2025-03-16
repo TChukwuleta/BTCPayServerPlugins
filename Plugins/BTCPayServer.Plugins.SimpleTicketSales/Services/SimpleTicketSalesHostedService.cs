@@ -10,7 +10,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Services.Mails;
 using BTCPayServer.Client.Models;
-using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.SimpleTicketSales.Services;
 

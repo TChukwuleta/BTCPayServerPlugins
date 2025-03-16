@@ -7,7 +7,7 @@
 @inject IScopeProvider ScopeProvider
 @model UpdateSimpleTicketSalesEventViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Events");
+    ViewData.SetActivePage(PluginNavPages.Index, "Event");
     var canUpload = await FileService.IsAvailable();
     var storeId = ScopeProvider.GetCurrentStoreId();
     bool isEditMode = !string.IsNullOrEmpty(Model.EventId);

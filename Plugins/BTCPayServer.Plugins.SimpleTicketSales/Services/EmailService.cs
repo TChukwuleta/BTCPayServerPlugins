@@ -68,6 +68,10 @@ public class EmailService
                             .Replace("{{EventDate}}", ticketEvent.StartDate.ToString("MMMM dd, yyyy"))
                             .Replace("{{Currency}}", ticketEvent.Currency);
 
+        emailBody = @$" {emailBody}
+
+Click the link to view your tickets: {ticket.QRCodeLink}";
+
         emailRecipients.Add(new EmailRecipient
         {
             Address = InternetAddress.Parse(ticket.Email),
