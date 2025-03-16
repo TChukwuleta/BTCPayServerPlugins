@@ -88,7 +88,6 @@
                         </td>
                         <td class="text-end">
                             <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">Edit</a>
                                 @if (ticketEvent.TicketSold > 0)
                                 {
                                     <a asp-action="ViewEventTicket" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">View</a>

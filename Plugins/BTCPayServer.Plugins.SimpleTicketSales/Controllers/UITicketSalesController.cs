@@ -25,6 +25,7 @@ using BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using BTCPayServer.Controllers;
 using System.Text;
+using AngleSharp.Dom;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -376,8 +377,17 @@ public class UITicketSalesController : Controller
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
         }
 
-        var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets)
-            .Where(c => c.EventId == eventId && c.StoreId == CurrentStore.Id && c.PaymentStatus == TransactionStatus.Settled.ToString()).ToList();
+        var ordersQuery = ctx.Orders.AsNoTracking().Include(c => c.Tickets)
+            .Where(c => c.EventId == eventId && c.StoreId == CurrentStore.Id && c.PaymentStatus == TransactionStatus.Settled.ToString());
+
+        if (!string.IsNullOrEmpty(searchText))
+        {
+            ordersQuery = ordersQuery.Where(o =>
+                o.InvoiceId.Contains(searchText) ||
+                o.Tickets.Any(t => t.TxnNumber.Contains(searchText) || t.FirstName.Contains(searchText) ||  t.LastName.Contains(searchText) || t.Email.Contains(searchText)
+                ));
+        }
+        var orders = ordersQuery.ToList();
 
         var vm = new EventTicketViewModel
         {
@@ -385,12 +395,12 @@ public class UITicketSalesController : Controller
             EventId = eventId,
             EventTitle = entity.Title,
             SearchText = searchText,
-            TicketOrders = order.Select(o => new EventTicketOrdersVm
+            TicketOrders = orders.Select(o => new EventTicketOrdersVm
             {
                 OrderId = o.Id,
                 Quantity = o.Tickets.Count(c => c.PaymentStatus == TransactionStatus.Settled.ToString()),
                 InvoiceId = o.InvoiceId,
-                HasEmailNotificationBeenSent = o.Tickets.First(c => c.PaymentStatus == TransactionStatus.Settled.ToString()).EmailSent, //o.EmailSent
+                HasEmailNotificationBeenSent = o.EmailSent,
                 FirstName = o.Tickets.First(c => c.PaymentStatus == TransactionStatus.Settled.ToString()).FirstName,
                 LastName = o.Tickets.First(c => c.PaymentStatus == TransactionStatus.Settled.ToString()).LastName,
                 Email = o.Tickets.First(c => c.PaymentStatus == TransactionStatus.Settled.ToString()).Email,
@@ -400,12 +410,13 @@ public class UITicketSalesController : Controller
                     Id = t.Id,
                     Amount = t.Amount,
                     TicketTypeId = t.TicketTypeId,
-                    TicketNumber = t.TicketNumber,
+                    TicketNumber = t.TxnNumber,
                     Currency = o.Currency,
                     TicketTypeName = t.TicketTypeName,
                 }).ToList(),
             }).ToList()
         };
+
         return View(vm);
     }
 
@@ -460,13 +471,7 @@ public class UITicketSalesController : Controller
         if (ticketEvent == null || order == null || !order.Tickets.Any())
             return NotFound();
 
-        return ExportInvoices(order, ticketEvent.Title);
-    }
-
-
-    private IActionResult ExportInvoices(Order order, string eventName)
-    {
-        var fileName = $"{eventName}_Tickets-{DateTime.Now:yyyy_MM_dd-HH_mm_ss}.csv";
+        var fileName = $"{ticketEvent.Title}_Tickets-{DateTime.Now:yyyy_MM_dd-HH_mm_ss}.csv";
 
         var csvData = new StringBuilder();
         csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency");
