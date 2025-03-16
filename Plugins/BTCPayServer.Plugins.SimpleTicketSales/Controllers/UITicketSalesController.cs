@@ -25,7 +25,7 @@ using BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using BTCPayServer.Controllers;
 using System.Text;
-using AngleSharp.Dom;
+using BTCPayServer.Components.QRCode;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -467,19 +467,31 @@ public class UITicketSalesController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id.Equals(eventId) && c.StoreId.Equals(CurrentStore.Id));
-        var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets).FirstOrDefault(o => o.StoreId == CurrentStore.Id && o.EventId == eventId);
-        if (ticketEvent == null || order == null || !order.Tickets.Any())
+        var ordersWithTickets = ctx.Orders.AsNoTracking()
+            .Where(o => o.StoreId == CurrentStore.Id && o.EventId == eventId)
+            .SelectMany(o => o.Tickets.Select(t => new
+            {
+                o.PurchaseDate,
+                t.TxnNumber,
+                t.FirstName,
+                t.LastName,
+                t.Email,
+                t.TicketTypeName,
+                t.Amount,
+                o.Currency
+            })).ToList();
+        if (ticketEvent == null || ordersWithTickets == null || !ordersWithTickets.Any())
             return NotFound();
+
 
         var fileName = $"{ticketEvent.Title}_Tickets-{DateTime.Now:yyyy_MM_dd-HH_mm_ss}.csv";
 
         var csvData = new StringBuilder();
-        csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency");
-        foreach (var ticket in order.Tickets)
+        csvData.AppendLine("Event Name,Event Id,Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency");
+        foreach (var ticket in ordersWithTickets)
         {
-            csvData.AppendLine($"{order.PurchaseDate:MM/dd/yy HH:mm},{ticket.TicketNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{order.Currency}");
+            csvData.AppendLine($"{ticketEvent.Title},{ticketEvent.Id},{ticket.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{ticket.Currency}");
         }
-
         byte[] fileBytes = Encoding.UTF8.GetBytes(csvData.ToString());
         return File(fileBytes, "text/csv", fileName);
     }
