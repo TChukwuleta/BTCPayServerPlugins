@@ -85,6 +85,7 @@ public class UITicketSalesPublicController : Controller
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
             EventTitle = ticketEvent.Title,
             EventDate = ticketEvent.StartDate,
+            EndDate = ticketEvent.EndDate,
             EventId = ticketEvent.Id,
             EventImageUrl = imageUrl,
             Description = ticketEvent.Description,
