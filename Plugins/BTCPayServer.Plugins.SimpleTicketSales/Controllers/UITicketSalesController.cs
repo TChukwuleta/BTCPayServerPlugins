@@ -26,6 +26,8 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using BTCPayServer.Controllers;
 using System.Text;
 using BTCPayServer.Components.QRCode;
+using Microsoft.CodeAnalysis;
+using System.Diagnostics;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -169,7 +171,7 @@ public class UITicketSalesController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Event date cannot be in the past";
             return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
         }
-        var entity = TicketSalesEventViewModelToEntity(vm);
+        var entity = TicketSalesEventViewModelToEntity(vm, null);
         entity.EventState = SimpleTicketSales.Data.EntityState.Disabled;
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
@@ -217,7 +219,7 @@ public class UITicketSalesController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Maximum capacity is less that the sum of all tiers capacity. Kindly increase capacity";
             return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id, eventId });
         }
-        entity = TicketSalesEventViewModelToEntity(vm);
+        entity = TicketSalesEventViewModelToEntity(vm, entity);
         entity.Id = eventId;
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
@@ -570,24 +572,42 @@ public class UITicketSalesController : Controller
         };
     }
 
-    private Event TicketSalesEventViewModelToEntity(UpdateSimpleTicketSalesEventViewModel model)
+    private Event TicketSalesEventViewModelToEntity(UpdateSimpleTicketSalesEventViewModel model, Event entity)
     {
-        return new Event
+        if (entity == null)
         {
-            StoreId = model.StoreId,
-            Title = model.Title,
-            Description = model.Description,
-            EventLogo = model.EventImageUrl,
-            Location = model.Location,
-            StartDate = model.StartDate,
-            EndDate = model.EndDate,
-            Currency = model.Currency,
-            EmailBody = model.EmailBody,
-            EventType = model.EventType,
-            RedirectUrl= model.RedirectUrl,
-            EmailSubject = model.EmailSubject,
-            HasMaximumCapacity = model.HasMaximumCapacity,
-            MaximumEventCapacity = model.MaximumEventCapacity
-        };
+            return new Event
+            {
+                StoreId = model.StoreId,
+                Title = model.Title,
+                Description = model.Description,
+                EventLogo = model.EventImageUrl,
+                Location = model.Location,
+                StartDate = model.StartDate,
+                EndDate = model.EndDate,
+                Currency = model.Currency,
+                EmailBody = model.EmailBody,
+                EventType = model.EventType,
+                RedirectUrl = model.RedirectUrl,
+                EmailSubject = model.EmailSubject,
+                HasMaximumCapacity = model.HasMaximumCapacity,
+                MaximumEventCapacity = model.MaximumEventCapacity
+            };
+        }
+        entity.StoreId = model.StoreId;
+        entity.Title = model.Title;
+        entity.Description = model.Description;
+        entity.EventLogo = model.EventImageUrl;
+        entity.Location = model.Location;
+        entity.StartDate = model.StartDate;
+        entity.EndDate = model.EndDate;
+        entity.Currency = model.Currency;
+        entity.EmailBody = model.EmailBody;
+        entity.EventType = model.EventType;
+        entity.RedirectUrl = model.RedirectUrl;
+        entity.EmailSubject = model.EmailSubject;
+        entity.HasMaximumCapacity = model.HasMaximumCapacity;
+        entity.MaximumEventCapacity = model.MaximumEventCapacity;
+        return entity;
     }
 }
