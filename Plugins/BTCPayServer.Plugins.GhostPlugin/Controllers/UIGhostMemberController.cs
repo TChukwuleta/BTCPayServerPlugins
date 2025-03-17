@@ -159,8 +159,7 @@ public class UIGhostMemberController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         var member = ctx.GhostMembers.AsNoTracking().FirstOrDefault(c => c.Id == memberId && c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null || member == null)
-            return NotFound();
+        if (ghostSetting == null || member == null) return NotFound();
 
         var emailSender = await _emailSenderFactory.GetEmailSender(ghostSetting.StoreId);
         var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();

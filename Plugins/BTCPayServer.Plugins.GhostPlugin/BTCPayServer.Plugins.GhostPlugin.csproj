@@ -31,7 +31,6 @@
     </ItemGroup>
     <ItemGroup>
 	    <EmbeddedResource Include="Templates\SubscriptionExpirationReminder.cshtml" />
-		<EmbeddedResource Include="Resources\js\btcpay_ghost.js" />
 		<EmbeddedResource Include="Resources\js\btcpay_paywall_ghost.js" />
     </ItemGroup>
 	
