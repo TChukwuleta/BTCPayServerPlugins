@@ -14,7 +14,7 @@
 <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
-        <a asp-controller="UITicketSales" asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Go to Event</a>
+        <a asp-controller="UITicketSales" asp-action="List" asp-route-storeId="@storeId" class="btn btn-secondary" role="button">Go to Events</a>
         <a asp-action="ViewTicketType" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-success" role="button">Configure Ticket Tiers</a>
     </div>
 </div>

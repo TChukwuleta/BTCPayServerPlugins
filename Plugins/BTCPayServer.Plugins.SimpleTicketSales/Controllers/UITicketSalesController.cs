@@ -25,9 +25,7 @@ using BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using BTCPayServer.Controllers;
 using System.Text;
-using BTCPayServer.Components.QRCode;
 using Microsoft.CodeAnalysis;
-using System.Diagnostics;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -111,7 +109,7 @@ public class UITicketSalesController : Controller
         {
             TempData.SetStatusMessageModel(new StatusMessageModel
             {
-                Html = $"Kindly <a href='{Url.Action(nameof(UIServerController.Emails), "UIServer")}' class='alert-link'>configure Email SMTP</a> to create an event",
+                Html = $"Kindly <a href='{Url.Action(nameof(UIStoresController.StoreEmailSettings), "UIStores", new { storeId = CurrentStore.Id })}' class='alert-link'>configure Email SMTP</a> to create an event",
                 Severity = StatusMessageModel.StatusSeverity.Info
             });
         }
@@ -597,7 +595,7 @@ public class UITicketSalesController : Controller
         entity.StoreId = model.StoreId;
         entity.Title = model.Title;
         entity.Description = model.Description;
-        entity.EventLogo = model.EventImageUrl;
+        entity.EventLogo = entity.EventLogo;
         entity.Location = model.Location;
         entity.StartDate = model.StartDate;
         entity.EndDate = model.EndDate;

@@ -11,6 +11,8 @@ using StoreData = BTCPayServer.Data.StoreData;
 using BTCPayServer.Plugins.SimpleTicketSales.Data;
 using BTCPayServer.Plugins.SimpleTicketSales.Services;
 using BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
+using System;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -54,6 +56,7 @@ public class UITicketTypeController : Controller
                 IsDefault = x.IsDefault,
             };
         }).ToList();
+        Console.WriteLine(JsonConvert.SerializeObject(tickets));
         return View(new TicketTypeListViewModel { TicketTypes = tickets, EventId = eventId });
     }
 
@@ -82,6 +85,7 @@ public class UITicketTypeController : Controller
             }
             vm = TicketTypeToViewModel(entity);
         }
+        vm.TicketHasMaximumCapacity = ticketEvent.HasMaximumCapacity;
         return View(vm);
     }
 
@@ -100,6 +104,11 @@ public class UITicketTypeController : Controller
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
         if (vm.Price <= 0)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Price cannot be zero or negative";
+            return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
+        }
+        if (vm.Quantity <= 0 && ticketEvent.HasMaximumCapacity)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Price cannot be zero or negative";
             return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
@@ -149,6 +158,11 @@ public class UITicketTypeController : Controller
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
         if (vm.Price <= 0)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Price cannot be zero or negative";
+            return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
+        }
+        if (vm.Quantity <= 0 && ticketEvent.HasMaximumCapacity)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Price cannot be zero or negative";
             return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });

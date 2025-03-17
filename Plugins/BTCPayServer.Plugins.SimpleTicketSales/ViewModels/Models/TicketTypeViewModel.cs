@@ -6,6 +6,7 @@ namespace BTCPayServer.Plugins.SimpleTicketSales.ViewModels;
 public class TicketTypeViewModel
 {
     public string TicketTypeId { get; set; }
+    public bool TicketHasMaximumCapacity { get; set; }
     public string Name { get; set; }
     public decimal Price { get; set; }
     public string Description { get; set; }

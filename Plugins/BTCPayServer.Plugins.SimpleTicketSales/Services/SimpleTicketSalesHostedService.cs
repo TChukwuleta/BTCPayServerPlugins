@@ -94,6 +94,7 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
 
         var emailSender = await _emailSenderFactory.GetEmailSender(invoice.StoreId);
         var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+        Console.WriteLine(isEmailSettingsConfigured);
         if (isEmailSettingsConfigured)
         {
             try
