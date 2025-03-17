@@ -286,35 +286,35 @@ public class GhostPluginService : EventHostedServiceBase
                     .Contains(
                         entity.GetInvoiceState().Status.ToString().ToLower()));
 
-        if (firstInvoiceSettled != null)
-            return firstInvoiceSettled;
+        if (firstInvoiceSettled != null) return firstInvoiceSettled;
 
         // Amount is in lower denomination, so divided by 100
         var price = Convert.ToDecimal(member.Frequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price) / 100;
-        var invoice = await _invoiceController.CreateInvoiceCoreRaw(
-            new CreateInvoiceRequest()
+        var invoiceRequest = new CreateInvoiceRequest()
+        {
+            Amount = price,
+            Currency = tier.currency,
+            Metadata = new JObject
             {
-                Amount = price,
-                Currency = tier.currency,
-                Metadata = new JObject
-                {
-                    ["MemberId"] = member.Id,
-                    ["TxnId"] = txnId
-                },
-                AdditionalSearchTerms = new[]
+                ["MemberId"] = member.Id,
+                ["TxnId"] = txnId
+            },
+            AdditionalSearchTerms = new[]
                 {
                     member.Id.ToString(CultureInfo.InvariantCulture),
                     ghostSearchTerm
-                },
-                Checkout = new()
-                {
-                    RedirectURL = redirectUrl
                 }
-            }, store, url, new List<string>() { ghostSearchTerm });
-
+        };
+        if (!string.IsNullOrEmpty(redirectUrl))
+        {
+            invoiceRequest.Checkout = new()
+            {
+                RedirectURL = redirectUrl
+            };
+        }
+        var invoice = await _invoiceController.CreateInvoiceCoreRaw(invoiceRequest, store, url, new List<string>() { ghostSearchTerm });
         return invoice;
     }
-
 
     public async Task HandlePaidMembershipSubscription(string memberId, string paymentRequestId, string email)
     {
