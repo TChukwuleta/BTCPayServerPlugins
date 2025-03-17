@@ -169,6 +169,11 @@ public class UITicketSalesController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Event date cannot be in the past";
             return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
         }
+        if (vm.EndDate.HasValue && vm.EndDate.Value < vm.StartDate)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Event end date cannot be before start date";
+            return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
+        }
         var entity = TicketSalesEventViewModelToEntity(vm, null);
         entity.EventState = SimpleTicketSales.Data.EntityState.Disabled;
         UploadImageResultModel imageUpload = null;
@@ -215,6 +220,11 @@ public class UITicketSalesController : Controller
         if (vm.HasMaximumCapacity && vm.MaximumEventCapacity < ticketTiersCount)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Maximum capacity is less that the sum of all tiers capacity. Kindly increase capacity";
+            return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id, eventId });
+        }
+        if (vm.EndDate.HasValue && vm.EndDate.Value < vm.StartDate)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Event end date cannot be before start date";
             return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id, eventId });
         }
         entity = TicketSalesEventViewModelToEntity(vm, entity);
@@ -563,6 +573,7 @@ public class UITicketSalesController : Controller
             Currency = entity.Currency,
             RedirectUrl = entity.RedirectUrl,
             EmailBody = entity.EmailBody,
+            EndDate = entity.EndDate,
             EventType = entity.EventType,
             EmailSubject = entity.EmailSubject,
             HasMaximumCapacity = entity.HasMaximumCapacity,
