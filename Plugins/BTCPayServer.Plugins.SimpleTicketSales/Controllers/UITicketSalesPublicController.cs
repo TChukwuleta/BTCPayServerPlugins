@@ -27,6 +27,7 @@ using BTCPayServer.Plugins.SimpleTicketSales.Helper.Extensions;
 using BTCPayServer.Plugins.SimpleTicketSales;
 using BTCPayServer.Abstractions.Constants;
 using Newtonsoft.Json;
+using QRCoder;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -205,7 +206,6 @@ public class UITicketSalesPublicController : Controller
     [HttpPost("save-contact-details")]
     public async Task<IActionResult> SaveContactDetails(string storeId, string eventId, ContactInfoPageViewModel model)
     {
-        Console.WriteLine(JsonConvert.SerializeObject(model));
         var now = DateTime.UtcNow;
         decimal totalAmount = 0;
         var tickets = new List<Ticket>();
@@ -326,7 +326,8 @@ public class UITicketSalesPublicController : Controller
                 Currency = order.Currency,
                 Amount = t.Amount,
                 TicketNumber = t.TicketNumber,
-                TicketType = t.TicketTypeName
+                TicketType = t.TicketTypeName,
+                QrCodeUrl = GenerateQrCodeDataUrl(t.TicketNumber),
             }).ToList(),
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
         });
@@ -396,5 +397,14 @@ public class UITicketSalesPublicController : Controller
                 return false;
         }
         return true;
+    }
+
+    private string GenerateQrCodeDataUrl(string content)
+    {
+        QRCodeGenerator qrGenerator = new QRCodeGenerator();
+        QRCodeData qrCodeData = qrGenerator.CreateQrCode(content, QRCodeGenerator.ECCLevel.Q);
+        PngByteQRCode qrCode = new PngByteQRCode(qrCodeData);
+        byte[] qrCodeAsPngByteArr = qrCode.GetGraphic(20);
+        return $"data:image/png;base64,{Convert.ToBase64String(qrCodeAsPngByteArr)}";
     }
 }

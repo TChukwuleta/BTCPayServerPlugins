@@ -50,6 +50,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis" Version="4.10.0" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="RestSharp" Version="112.1.0" />
   </ItemGroup>
 

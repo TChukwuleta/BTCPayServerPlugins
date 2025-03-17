@@ -79,7 +79,7 @@ public class UITicketSalesController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
 
         var events = ctx.Events.Where(c => c.StoreId == CurrentStore.Id).ToList();
-        var eventTickets = ctx.Tickets.AsNoTracking().Where(t => t.StoreId == CurrentStore.Id && t.PaymentStatus == TransactionStatus.Settled.ToString()).ToList();
+        var eventTickets = ctx.Tickets.Where(t => t.StoreId == CurrentStore.Id && t.PaymentStatus == TransactionStatus.Settled.ToString()).ToList();
         var eventsViewModel = events.Select(ticketEvent =>
         {
             return new SalesTicketsEventsListViewModel
@@ -130,7 +130,7 @@ public class UITicketSalesController : Controller
         var vm = new UpdateSimpleTicketSalesEventViewModel { StoreId = CurrentStore.Id, StoreDefaultCurrency = defaultCurrency };
         if (!string.IsNullOrEmpty(eventId))
         {
-            var entity = ctx.Events.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+            var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
             if (entity == null)
             {
                 TempData[WellKnownTempData.ErrorMessage] = "Invalid event record specified for this store";
@@ -204,7 +204,7 @@ public class UITicketSalesController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var entity = ctx.Events.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Invalid event record specified for this store";
@@ -311,11 +311,11 @@ public class UITicketSalesController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var entity = ctx.Events.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
             return NotFound();
 
-        var tickets = ctx.Tickets.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id && c.EventId == eventId).ToList();
+        var tickets = ctx.Tickets.Where(c => c.StoreId == CurrentStore.Id && c.EventId == eventId).ToList();
         if (tickets.Any() && entity.StartDate > DateTime.UtcNow)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Cannot delete event as there are active tickets purchase and the event is in the future";
@@ -333,7 +333,7 @@ public class UITicketSalesController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var entity = ctx.Events.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
             return NotFound();
 
@@ -370,7 +370,7 @@ public class UITicketSalesController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var entity = ctx.Events.AsNoTracking().FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Invalid Event specified";
@@ -418,6 +418,47 @@ public class UITicketSalesController : Controller
         };
 
         return View(vm);
+    }
+
+
+    [HttpPost("{eventId}/verify")]
+    public async Task<IActionResult> TicketVerification(string storeId, string eventId, TicketVerificationViewModel vm)
+    {
+        if (CurrentStore is null)
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+
+        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        if (entity == null) return NotFound();
+
+        if (string.IsNullOrEmpty(vm.QrCodeData))
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid QR data specified";
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
+        }
+
+        // Extract ticketTxn from the QrCodeData (EVT-{eventId:D4}-{now:yyMMdd}-{ticketTxn})
+        var parts = vm.QrCodeData.Split('-');
+        if (parts.Length < 4)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid QR data specified";
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
+        }
+        string ticketTxn = parts[^1];
+
+        var ticket = ctx.Tickets.FirstOrDefault(t => t.TxnNumber.Equals(ticketTxn.Trim()) && t.EventId == eventId && t.StoreId == CurrentStore.Id);
+        if (ticket == null || entity.StartDate.Date < DateTime.Now.Date)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid or expired event ticket";
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
+        }
+        // Should we use an expiry filed.. say used at?
+        /*ticket.UsedAt = DateTime.UtcNow;
+        ctx.Tickets.Update(ticket);
+        await ctx.SaveChangesAsync();*/
+        TempData[WellKnownTempData.SuccessMessage] = $"Ticket is valid. Attendee: {ticket.FirstName} {ticket.LastName}";
+        return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
     }
 
 
