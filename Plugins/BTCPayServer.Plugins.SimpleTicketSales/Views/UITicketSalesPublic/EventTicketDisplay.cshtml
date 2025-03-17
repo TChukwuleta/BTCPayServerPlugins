@@ -3,30 +3,50 @@
 @using System.Globalization
 @model TicketViewModel
 @{
-    Layout = "_Layout";
+    Layout = "_BaseSimpleTicketPublicLayout";
 }
 
 
-<div class="container py-4">
-    <h2 class="mb-4">Your Tickets</h2>
-    <div class="row">
-        @foreach (var ticket in Model.Tickets)
-        {
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm p-3">
-                    <h4 class="text-success"><strong>@Model.EventName</strong></h4>
-                    <hr>
-                    <p><strong>@ticket.TicketType</strong></p>
-                    <p>@Model.Location</p>
-                    <p>@Model.StartDate.ToString("yyyy-MM-dd HH:mm:ss UTC") - @Model.EndDate?.ToString("yyyy-MM-dd HH:mm:ss UTC")</p>
-                    <p><strong>@ticket.Amount @ticket.Currency</strong></p>
-                    <p>Ordered by @ticket.FirstName @ticket.LastName on @Model.PurchaseDate.ToString("MMM dd, yyyy 'at' hh:mmtt")</p>
-                    <div class="qr-container" style="display: none;">
-                        <vc:qr-code data="bitcoin:@(ticket.TicketNumber)" />
-                    </div>
-                </div>
-                
-            </div>
+@section PageHeadContent {
+    <style>
+        .page-break {
+            page-break-after: always;
         }
+    </style>
+}
+
+
+@for (int i = 0; i < Model.Tickets.Count; i++)
+{
+    var ticket = Model.Tickets[i];
+    <div class="container my-4 @(i < Model.Tickets.Count - 1 ? "page-break" : "")">
+        <div class="card">
+            <div class="card-body">
+                <h1 class="card-title text-success border-bottom pb-2 mb-4">@Model.EventName</h1>
+
+                <div class="mb-4">
+                    <h2 class="fw-bold">@Model.EventName</h2>
+                </div>
+
+                <div class="mb-4">
+                    <p class="mb-1">@Model.Location</p>
+                    <p class="mb-1">@Model.StartDate.ToString("yyyy-MM-dd HH:mm:ss UTC") - @Model.EndDate?.ToString("yyyy-MM-dd HH:mm:ss UTC")</p>
+                    <p class="mb-1">@ticket.Amount @ticket.Currency</p>
+                </div>
+
+                <div class="mb-4">
+                    <p class="mb-1">@ticket.TicketId</p>
+                    <p class="mb-1">Ordered by @ticket.FirstName @ticket.LastName on @Model.PurchaseDate.ToString("MMM dd, yyyy 'at' hh:mmtt")</p>
+                </div>
+
+                <div class="text-center my-5">
+                    <img src="@ticket.QrCodeUrl" alt="QR Code" class="img-fluid" style="max-width: 200px;">
+                </div>
+
+                <div class="text-end mt-4">
+                    <small>Page @(i + 1) of @Model.Tickets.Count</small>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
+}

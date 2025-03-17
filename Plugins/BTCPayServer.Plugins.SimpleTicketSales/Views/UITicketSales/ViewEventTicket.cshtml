@@ -58,7 +58,7 @@
                         <td class="align-middle">@ticket.Quantity</td>
 
                         <td class="text-end amount-col">
-                            <a asp-action="SendReminder" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-orderId="@ticket.OrderId">Resend Ticket Confirmation Email</a>
+                            <a asp-action="SendReminder" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-orderId="@ticket.OrderId">Resend Ticket Email</a>
                         </td>
                         <td>
                             <button class="btn btn-link dropdown-toggle p-0" type="button" data-bs-toggle="collapse"
@@ -119,5 +119,6 @@ else
             });
         });
     </script>
+
 }
 

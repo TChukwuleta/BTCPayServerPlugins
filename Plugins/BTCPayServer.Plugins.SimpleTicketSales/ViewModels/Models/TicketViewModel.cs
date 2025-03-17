@@ -15,6 +15,7 @@ public class TicketViewModel : BaseSimpleTicketPublicViewModel
 
 public class TicketListViewModel
 {
+    public string TicketId { get; set; }
     public string FirstName { get; set; }
     public string LastName { get; set; }
     public string Email { get; set; }
@@ -22,4 +23,13 @@ public class TicketListViewModel
     public decimal Amount { get; set; }
     public string TicketNumber { get; set; }
     public string TicketType { get; set; }
+    public string QrCodeUrl { get; set; }
+}
+
+public class TicketVerificationViewModel
+{
+    public string EventId { get; set; }
+    public string EventTitle { get; set; }
+    public string QrCodeData { get; set; }
+    public string StoreId { get; set; }
 }
