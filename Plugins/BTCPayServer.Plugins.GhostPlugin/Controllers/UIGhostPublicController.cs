@@ -292,6 +292,20 @@ public class UIGhostPublicController : Controller
         return Content(jsFile, "text/javascript");
     }
 
+    [HttpGet("btcpay-ghost.js")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> GetBtcPayJavascript(string storeId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var userStore = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
+        if (userStore == null || !userStore.CredentialsPopulated())
+        {
+            return BadRequest("Invalid BTCPay store specified");
+        }
+        var fileContent = _emailService.GetEmbeddedResourceContent("Resources.js.btcpay_ghost.js");
+        return Content(fileContent, "text/javascript");
+    }
+
 
     [AllowAnonymous]
     [HttpGet("paywall/create-invoice")]
