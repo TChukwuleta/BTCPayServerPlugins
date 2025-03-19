@@ -130,7 +130,7 @@ public class UIGhostMemberController : Controller
         {
             TempData.SetStatusMessageModel(new StatusMessageModel()
             {
-                Html = $"Kindly <a href='{Url.Action(nameof(UIServerController.Emails), "UIServer")}' class='alert-link'>configure Email SMTP</a> in the admin settings to be able to send reminder to subscribers",
+                Html = $"Kindly <a href='{Url.Action(nameof(UIStoresController.StoreEmailSettings), "UIStores", new { storeId = CurrentStore.Id })}' class='alert-link'>configure Email SMTP</a> in the admin settings to be able to send reminder to subscribers",
                 Severity = StatusMessageModel.StatusSeverity.Info,
                 AllowDismiss = true
             });
@@ -159,8 +159,7 @@ public class UIGhostMemberController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         var member = ctx.GhostMembers.AsNoTracking().FirstOrDefault(c => c.Id == memberId && c.StoreId == CurrentStore.Id);
-        if (ghostSetting == null || member == null)
-            return NotFound();
+        if (ghostSetting == null || member == null) return NotFound();
 
         var emailSender = await _emailSenderFactory.GetEmailSender(ghostSetting.StoreId);
         var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();

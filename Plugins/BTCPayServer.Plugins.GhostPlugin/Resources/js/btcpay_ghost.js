@@ -40,7 +40,7 @@
     iframe.style.zIndex = '2000';
     // Removed, see https://github.com/btcpayserver/btcpayserver/issues/2139#issuecomment-768223263
     // iframe.setAttribute('allowtransparency', 'true');
-    
+
     // https://web.dev/async-clipboard/#permissions-policy-integration
     iframe.setAttribute('allow', 'clipboard-read; clipboard-write')
 
@@ -96,7 +96,7 @@
         readerAbortController.signal.onabort = () => {
             this.scanning = false;
         };
-        ndef.scan({ signal:readerAbortController.signal }).then(() => {
+        ndef.scan({ signal: readerAbortController.signal }).then(() => {
             ndef.onreading = event => {
                 const message = event.message;
                 const record = message.records[0];
@@ -116,7 +116,7 @@
             };
         }).catch(console.error);
     }
-    
+
     function receiveMessage(event) {
         if (!origin.startsWith(event.origin) || !showingInvoice) {
             return;
@@ -169,8 +169,6 @@
 
     window.addEventListener('message', receiveMessage, false);
     setButtonListeners();
-
-    console.log('Main modal script loaded successfully.');
 
     window.btcpay = {
         showFrame: showFrame,

@@ -139,20 +139,19 @@ public class GhostHostedService : EventHostedServiceBase
                             {
                                 email = ghostMember.Email,
                                 name = ghostMember.Name,
-                                comped = false,
                                 tiers = new List<MemberTier>
                                 {
                                     new MemberTier
                                     {
                                         id = ghostMember.TierId,
-                                        expiry_at = expirationDate
+                                        expiry_at = expirationDate.ToUniversalTime()
                                     }
                                 }
                             }
                         }
                     });
                     transaction.PeriodStart = DateTime.UtcNow;
-                    transaction.PeriodEnd = expirationDate;
+                    transaction.PeriodEnd = expirationDate.ToUniversalTime();
                     ghostMember.MemberId = response.members[0].id;
                     ghostMember.MemberUuid = response.members[0].uuid;
                     ghostMember.UnsubscribeUrl = response.members[0].unsubscribe_url;

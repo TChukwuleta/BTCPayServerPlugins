@@ -5,7 +5,6 @@ using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using BTCPayServer.Services.Stores;
 using BTCPayServer.Plugins.GhostPlugin.Services;
-using Microsoft.EntityFrameworkCore;
 using System;
 using System.Net.Http;
 using BTCPayServer.Models;
@@ -20,9 +19,7 @@ using Microsoft.AspNetCore.Cors;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Plugins.GhostPlugin.Data;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
-using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
-using BTCPayServer.Controllers.Greenfield;
 using Microsoft.AspNetCore.Routing;
 using Newtonsoft.Json;
 using System.Text;
@@ -76,13 +73,11 @@ public class UIGhostPublicController : Controller
     public async Task<IActionResult> Donate(string storeId)
     {
         var store = await _storeRepo.FindStore(storeId);
-        if (store == null)
-            return NotFound();
+        if (store == null) return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
-        if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
-            return NotFound();
+        if (ghostSetting == null || !ghostSetting.CredentialsPopulated()) return NotFound();
 
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
         var ghostSettings = await apiClient.RetrieveGhostSettings();
@@ -102,12 +97,12 @@ public class UIGhostPublicController : Controller
             },
             AdditionalSearchTerms = new[]
             {
-                    $"Ghost_{id.ToString(CultureInfo.InvariantCulture)}"
+                $"Ghost_{id.ToString(CultureInfo.InvariantCulture)}"
             }
         }, store, HttpContext.Request.GetAbsoluteRoot(), new List<string>() { $"Ghost_{id}" });
-        var url = GreenfieldInvoiceController.ToModel(invoice, _linkGenerator, HttpContext.Request).CheckoutLink;
-        return Redirect(url);
+        return RedirectToInvoiceCheckout(invoice.Id);
     }
+
 
     [HttpGet("create-member")]
     public async Task<IActionResult> CreateMember(string storeId)
@@ -136,8 +131,7 @@ public class UIGhostPublicController : Controller
     {
         await using var ctx = _dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
-        if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
-            return NotFound();
+        if (ghostSetting == null || !ghostSetting.CredentialsPopulated()) return NotFound();
 
         var storeData = await _storeRepo.FindStore(ghostSetting.StoreId);
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
@@ -149,8 +143,7 @@ public class UIGhostPublicController : Controller
         vm.StoreName = storeData?.StoreName;
         vm.ShopName = ghostSetting.ApiUrl;
         Tier tier = ghostTiers.FirstOrDefault(c => c.id == vm.TierId);
-        if (tier == null)
-            return NotFound();
+        if (tier == null) return NotFound();
 
         var member = await apiClient.RetrieveMember(vm.Email);
         if (member.Any())
@@ -158,7 +151,6 @@ public class UIGhostPublicController : Controller
             ModelState.AddModelError(nameof(vm.Email), "A member with this email already exist");
             return View(vm);
         }
-
         GhostMember entity = new GhostMember
         {
             Status = GhostSubscriptionStatus.New,
@@ -175,17 +167,7 @@ public class UIGhostPublicController : Controller
         var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
         InvoiceEntity invoice = await _ghostPluginService.CreateMemberInvoiceAsync(storeData, tier, entity, txnId, Request.GetAbsoluteRoot(), $"https://{ghostSetting.ApiUrl}/#/portal/signin");
         await GetTransaction(ctx, tier, entity, invoice, null, txnId);
-        await using var dbMain = _context.CreateContext();
-        var store = await dbMain.Stores.SingleOrDefaultAsync(a => a.Id == ghostSetting.StoreId);
-
-        return View("InitiatePayment", new GhostOrderViewModel
-        {
-            StoreId = ghostSetting.StoreId,
-            StoreName = store.StoreName,
-            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
-            BTCPayServerUrl = Request.GetAbsoluteRoot(),
-            InvoiceId = invoice.Id
-        });
+        return RedirectToInvoiceCheckout(invoice.Id);
     }
 
 
@@ -286,21 +268,6 @@ public class UIGhostPublicController : Controller
     }
 
 
-    [HttpGet("btcpay-ghost.js")]
-    [EnableCors("AllowAllOrigins")]
-    public async Task<IActionResult> GetBtcPayJavascript(string storeId)
-    {
-        await using var ctx = _dbContextFactory.CreateContext();
-        var userStore = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
-        if (userStore == null || !userStore.CredentialsPopulated())
-        {
-            return BadRequest("Invalid BTCPay store specified");
-        }
-        var fileContent = _emailService.GetEmbeddedResourceContent("Resources.js.btcpay_ghost.js");
-        return Content(fileContent, "text/javascript");
-    }
-
-
     [HttpGet("paywall/btcpay-ghost-paywall.js")]
     [EnableCors("AllowAllOrigins")]
     public async Task<IActionResult> GetBtcPayGhostPaywallJavascript(string storeId)
@@ -323,6 +290,20 @@ public class UIGhostPublicController : Controller
         combinedJavascript.Insert(0, jsVariables + Environment.NewLine);
         var jsFile = combinedJavascript.ToString();
         return Content(jsFile, "text/javascript");
+    }
+
+    [HttpGet("btcpay-ghost.js")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> GetBtcPayJavascript(string storeId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var userStore = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
+        if (userStore == null || !userStore.CredentialsPopulated())
+        {
+            return BadRequest("Invalid BTCPay store specified");
+        }
+        var fileContent = _emailService.GetEmbeddedResourceContent("Resources.js.btcpay_ghost.js");
+        return Content(fileContent, "text/javascript");
     }
 
 
@@ -361,6 +342,13 @@ public class UIGhostPublicController : Controller
         });
     }
 
+
+    private IActionResult RedirectToInvoiceCheckout(string invoiceId)
+    {
+        return RedirectToAction(nameof(UIInvoiceController.Checkout), "UIInvoice", new { invoiceId });
+    }
+
+
     private async Task GetTransaction(GhostDbContext ctx, Tier tier, GhostMember member, InvoiceEntity invoice, Data.PaymentRequestData paymentRequest, string txnId)
     {
         // Amount is in lower denomination, so divided by 100
@@ -382,6 +370,7 @@ public class UIGhostPublicController : Controller
         ctx.GhostTransactions.Add(transaction);
         await ctx.SaveChangesAsync();
     }
+
 
     private bool ValidateSignature(string payload, string signatureHeader, string webhookSecret)
     {
