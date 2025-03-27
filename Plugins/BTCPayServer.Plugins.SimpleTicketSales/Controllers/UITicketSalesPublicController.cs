@@ -149,17 +149,13 @@ public class UITicketSalesPublicController : Controller
             return NotFound();
 
         if (model.Tickets == null || !model.Tickets.Any(t => t.Quantity > 0))
-        {
             return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
-        }
+
         foreach (var ticket in model.Tickets)
         {
             var ticketType = ticketTypes.FirstOrDefault(c => c.Id == ticket.TicketTypeId);
             if (ticketType == null || (ticketType.Quantity - ticketType.QuantitySold) < ticket.Quantity)
-            {
-                ViewBag.ErrorMessage = $"Quantity specified for {ticket.TicketTypeName} is more than the number of tickets available.";
                 return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
-            }
         }
         var newOrder = new TicketOrderViewModel
         {
@@ -219,14 +215,12 @@ public class UITicketSalesPublicController : Controller
             return NotFound();
 
         if (model.ContactInfo == null || !model.ContactInfo.Any())
-        {
             return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, model.TxnId });
-        }
+
         var orderViewModel = HttpContext.Session.GetObject<TicketOrderViewModel>(eventKey);
         if (orderViewModel == null || !orderViewModel.Tickets.Any())
-        {
             return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
-        }
+
         foreach (var ticket in orderViewModel.Tickets)
         {
             var ticketType = ticketTypes.FirstOrDefault(c => c.Id == ticket.TicketTypeId);

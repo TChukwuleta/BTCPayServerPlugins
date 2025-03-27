@@ -6,14 +6,6 @@
     Layout = "_BaseSimpleTicketPublicLayout";
 }
 
-@if (!string.IsNullOrEmpty(ViewBag.ErrorMessage))
-{
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        @ViewBag.ErrorMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-}
-
 <div class="container py-4">
     <h4 class="fw-bold text-center mb-4">@Model.EventTitle</h4>
     <nav aria-label="breadcrumb" class="mt-5 mb-4 py-3 ps-4">
