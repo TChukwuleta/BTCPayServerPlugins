@@ -157,7 +157,7 @@ public class UITicketSalesPublicController : Controller
             var ticketType = ticketTypes.FirstOrDefault(c => c.Id == ticket.TicketTypeId);
             if (ticketType == null || (ticketType.Quantity - ticketType.QuantitySold) < ticket.Quantity)
             {
-                TempData[WellKnownTempData.ErrorMessage] = $"Qunaity specified for {ticket.TicketTypeName} is more than number of tickets available";
+                ViewBag.ErrorMessage = $"Quantity specified for {ticket.TicketTypeName} is more than the number of tickets available.";
                 return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
             }
         }
@@ -199,6 +199,7 @@ public class UITicketSalesPublicController : Controller
             StoreName = store.StoreName,
             Currency = ticketEvent.Currency,
             Tickets = order.Tickets,
+            EventTitle = ticketEvent.Title,
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
             ContactInfo = new List<TicketContactInfoViewModel> { new TicketContactInfoViewModel() },
         });

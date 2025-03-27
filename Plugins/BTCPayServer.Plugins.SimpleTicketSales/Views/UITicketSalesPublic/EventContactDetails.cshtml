@@ -6,14 +6,15 @@
     Layout = "_BaseSimpleTicketPublicLayout";
 }
 
-<nav aria-label="breadcrumb" class="mt-5 mb-4 py-3 ps-4">
-    <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a asp-action="EventTicket" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId">Event Ticket</a></li>
-        <li class="breadcrumb-item active" aria-current="page">CONTACT DETAILS</li>
-    </ol>
-</nav>
-
 <div class="container py-4">
+    <h4 class="fw-bold text-center mb-4">@Model.EventTitle</h4>
+    <nav aria-label="breadcrumb" class="mt-5 mb-4 py-3 ps-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a asp-action="EventTicket" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId">Event Ticket</a></li>
+            <li class="breadcrumb-item active" aria-current="page">CONTACT DETAILS</li>
+        </ol>
+    </nav>
+
     <div class="row">
         <form asp-action="SaveContactDetails" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" method="post">
             <input type="hidden" asp-for="EventId" />
@@ -62,7 +63,6 @@
                                         <label class="form-label" data-required>Email Address</label>
                                         <input type="email" class="form-control" asp-for="ContactInfo[i].Email" placeholder="Email address">
                                     </div>
-                                    <hr />
                                 </div>
                             }
 

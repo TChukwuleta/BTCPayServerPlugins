@@ -6,15 +6,24 @@
     Layout = "_BaseSimpleTicketPublicLayout";
 }
 
-<nav aria-label="breadcrumb" class="mt-5 mb-4 py-3 ps-4">
-    <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a asp-action="EventSummary" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId">Event Summary</a></li>
-        <li class="breadcrumb-item active" aria-current="page">TICKETS</li>
-    </ol>
-</nav>
-
+@if (!string.IsNullOrEmpty(ViewBag.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @ViewBag.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
 
 <div class="container py-4">
+    <h4 class="fw-bold text-center mb-4">@Model.EventTitle</h4>
+    <nav aria-label="breadcrumb" class="mt-5 mb-4 py-3 ps-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a asp-action="EventSummary" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId">Event Summary</a></li>
+            <li class="breadcrumb-item active" aria-current="page">TICKETS</li>
+        </ol>
+    </nav>
+
+
     <div class="row">
         <div class="col-md-8">
             <div class="d-flex mb-5">
@@ -42,12 +51,17 @@
 
             @foreach (var ticket in Model.TicketTypes)
             {
+                var maxQuantity = ticket.QuantityAvailable <= 10 ? ticket.QuantityAvailable : 10;
                 <div class="card mb-4 border-0 shadow-sm">
                     <div class="card-body">
                         <div class="d-flex justify-content-between mb-2">
                             <div>
                                 <h5 class="fw-bold mb-1">@ticket.Name</h5>
                                 <p class="text-success fw-bold mb-1">@Model.Currency @ticket.Price</p>
+                                @if (ticket.QuantityAvailable <= 10)
+                                {
+                                    <p class="text-muted small mb-1">Maximum number of ticket to purchase at a go: @maxQuantity</p>
+                                }
                                 <p class="text-muted small mb-1">@ticket.Description</p>
                             </div>
                             <div>
@@ -61,7 +75,7 @@
                                            data-price="@ticket.Price"
                                            data-ticket-type-id="@ticket.TicketTypeId"
                                            data-ticket-name="@ticket.Name"
-                                           min="0" max="10" value="0"
+                                           min="0" max="@maxQuantity" value="0"
                                            onchange="updateSummary()" />
                                 }
                             </div>

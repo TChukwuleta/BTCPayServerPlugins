@@ -93,10 +93,22 @@ Voila!!! You have completed your first ticket purchase. At this stage, an email 
 ![BTCPay Server SatoshiTickets img 13](./img/SatoshiTickets/SatoshiTickets_13.png)
 
 
+![BTCPay Server SatoshiTickets img 14](./img/SatoshiTickets/Event_Summary_Mobile.png)
+
+
+![BTCPay Server SatoshiTickets img 15](./img/SatoshiTickets/Event_Ticket_Mobile.png)
+
+
+![BTCPay Server SatoshiTickets img 16](./img/SatoshiTickets/Event_Contact_Mobile.png)
+
+
+![BTCPay Server SatoshiTickets img 17](./img/SatoshiTickets/Event_Payment_Mobile.png)
+
+
 As an admin, you can navigate back to your plugin, click on "View" button for easch plugin, and view all order and ticket information regarding that particular events.
 
 
-![BTCPay Server SatoshiTickets img 14](./img/SatoshiTickets/SatoshiTickets_14.png)
+![BTCPay Server SatoshiTickets img 18](./img/SatoshiTickets/SatoshiTickets_14.png)
 
 
 
