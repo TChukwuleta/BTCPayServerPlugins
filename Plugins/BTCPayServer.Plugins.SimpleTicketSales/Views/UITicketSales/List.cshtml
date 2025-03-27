@@ -53,6 +53,7 @@
                     <th>Ticket Purchase Link</th>
                     <th>Tickets Sold</th>
                     <th class="actions-col"></th>
+                    <th class="actions-col"></th>
                     <th class="w-75px"></th>
                 </tr>
             </thead>
@@ -68,7 +69,7 @@
                         <td>@ticketEvent.EventDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td>
                             <a href="@ticketEvent.EventPurchaseLink" target="_blank">Event Link</a>
-                            <button class="copy-button" onclick="copyToClipboard('@ticketEvent.EventPurchaseLink')" style="border: none; background: none; cursor: pointer;">
+                            <button class="copy-button btn p-0" onclick="copyToClipboard(this, '@ticketEvent.EventPurchaseLink')" data-bs-toggle="tooltip" data-bs-placement="top" title="Copy">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -76,6 +77,11 @@
                             </button>
                         </td>
                         <td>@ticketEvent.TicketSold</td>
+                        <td class="actions-col">
+                            <div class="d-inline-flex align-items-center gap-3">
+                                <a asp-action="List" asp-controller="UITicketType" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">Ticket Tiers</a>
+                            </div>
+                        </td>
                         <td class="actions-col">
                             @if (ticketEvent.EventDate > DateTime.UtcNow)
                             {
@@ -115,8 +121,33 @@ else
 
 @section PageFootContent {
     <script>
-            function copyToClipboard(text) {
-                navigator.clipboard.writeText(text);
+            function copyToClipboard(button, text) {
+                navigator.clipboard.writeText(text).then(() => {
+                    let tooltip = bootstrap.Tooltip.getInstance(button);
+                    if (tooltip) {
+                        tooltip.hide();
+                        tooltip.show();
+                    }
+
+                    button.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>`;
+
+                    setTimeout(() => {
+                        if (tooltip) tooltip.hide();
+                        button.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>`;
+                    }, 500);
+                });
             }
+
+            document.addEventListener("DOMContentLoaded", function () {
+                var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+                    new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+            });
     </script>
 }
