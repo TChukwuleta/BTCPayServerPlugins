@@ -40,7 +40,7 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             }
         }
 
-        public async Task<bool> ValidateGhostCredentials()
+        public async Task<(bool IsValid, bool RequiresOTP)> ValidateGhostCredentials()
         {
             var postData = new
             {
@@ -49,8 +49,46 @@ namespace BTCPayServer.Plugins.GhostPlugin.Services
             };
             var jsonContent = new StringContent(JsonConvert.SerializeObject(postData), Encoding.UTF8, "application/json");
             var sessionResponse = await _httpClient.PostAsync(sessionUrl, jsonContent);
+            var responseString = await sessionResponse.Content.ReadAsStringAsync();
+            if (responseString.Contains("2FA_TOKEN_REQUIRED"))
+            {
+                return (false, true);
+            }
+            Console.WriteLine(sessionResponse.StatusCode);
+            Console.WriteLine(responseString);
             if (sessionResponse.StatusCode != HttpStatusCode.Created)
+                return (false, false);
+
+            var sessionConnected = await SessionLogin();
+            return (sessionConnected, false);
+        }
+
+        public async Task<bool> Complete2FAAuthentication(string otpCode)
+        {
+            var postData = new
+            {
+                username = _credentials.UserName,
+                password = _credentials.Password,
+                twoFactorAuth = new
+                {
+                    code = otpCode
+                }
+            };
+            var jsonContent = new StringContent(JsonConvert.SerializeObject(postData), Encoding.UTF8, "application/json");
+            var sessionResponse = await _httpClient.PostAsync(sessionUrl, jsonContent);
+
+            Console.WriteLine(sessionResponse.StatusCode);
+            Console.WriteLine(await sessionResponse.Content.ReadAsStringAsync());
+
+            if (sessionResponse.StatusCode != HttpStatusCode.Created)
+            {
                 return false;
+            }
+            return await SessionLogin();
+        }
+
+        public async Task<bool> SessionLogin()
+        {
             var token = GenerateGhostApiToken();
             var url = $"https://{_credentials.ApiUrl}/ghost/api/admin/site";
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Ghost", token);

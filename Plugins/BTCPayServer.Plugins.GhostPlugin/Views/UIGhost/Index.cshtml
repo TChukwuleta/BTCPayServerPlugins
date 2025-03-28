@@ -30,6 +30,7 @@
 @if (Model.HasWallet)
 {
     <div class="row">
+
         <div class="col-xxl-constrain col-xl-8">
             @if (!ViewContext.ModelState.IsValid)
             {
@@ -68,6 +69,26 @@
                     <label asp-for="Password" class="form-label"></label>
                     <input asp-for="Password" class="form-control" type="password" value="@Model?.Password" readonly="@ghostCredsSet" />
                     <span asp-validation-for="Password" class="text-danger"></span>
+                </div>
+
+                <input type="hidden" asp-for="OTP" id="OtpCode" />
+
+                <div class="modal fade" id="otpModal" tabindex="-1" aria-labelledby="otpModalLabel" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="otpModalLabel">Enter OTP</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <label for="otpInput" class="form-label">Enter the OTP sent to your email:</label>
+                                <input type="text" class="form-control" id="otpInput" maxlength="6" placeholder="Enter OTP" />
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-primary" id="submitOtp">Submit OTP</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -137,3 +158,32 @@ else
     </div>
 }
 
+
+
+@section PageFootContent {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            var requiresOtp = "@Model.RequiresOTP".toLowerCase() === "true";
+            var otpValue = "@Model.OTP";
+
+            if (requiresOtp && !otpValue) {
+                var otpModal = new bootstrap.Modal(document.getElementById("otpModal"));
+                otpModal.show();
+            }
+        });
+
+        document.getElementById("submitOtp").addEventListener("click", function () {
+            var otpValue = document.getElementById("otpInput").value;
+            document.getElementById("OtpCode").value = otpValue;
+
+            var otpModal = document.getElementById("otpModal");
+            var modalInstance = bootstrap.Modal.getInstance(otpModal);
+            if (modalInstance) {
+                modalInstance.hide();
+            } else {
+                var newModalInstance = new bootstrap.Modal(otpModal);
+                newModalInstance.hide();
+            }
+        });
+    </script>
+}
