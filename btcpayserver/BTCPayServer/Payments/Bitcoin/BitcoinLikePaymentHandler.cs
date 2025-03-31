@@ -13,6 +13,7 @@ using BTCPayServer.Lightning;
 using BTCPayServer.Logging;
 using BTCPayServer.Models;
 using BTCPayServer.Models.InvoicingModels;
+using BTCPayServer.Plugins.Altcoins;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using NBitcoin;
@@ -39,7 +40,7 @@ namespace BTCPayServer.Payments.Bitcoin
         private readonly NBXplorerDashboard _dashboard;
         private readonly WalletRepository _walletRepository;
         private readonly Services.Wallets.BTCPayWalletProvider _WalletProvider;
-        
+
         public JsonSerializer Serializer { get; }
         public PaymentMethodId PaymentMethodId { get; private set; }
         public BTCPayNetwork Network => _Network;
@@ -152,7 +153,7 @@ namespace BTCPayServer.Payments.Bitcoin
             var paymentMethod = paymentContext.Prompt;
             var onchainMethod = new BitcoinPaymentPromptDetails();
             var blob = paymentContext.StoreBlob;
-
+            onchainMethod.AssetId = GetAssetId();
             onchainMethod.FeeMode = blob.NetworkFeeMode;
             onchainMethod.RecommendedFeeRate = await prepare.GetRecommendedFeeRate;
             switch (onchainMethod.FeeMode)
@@ -175,10 +176,13 @@ namespace BTCPayServer.Payments.Bitcoin
                 var txOut = _Network.NBitcoinNetwork.Consensus.ConsensusFactory.CreateTxOut();
                 txOut.ScriptPubKey =
                     new Key().GetScriptPubKey(accountDerivation.ScriptPubKeyType());
-                var dust = txOut.GetDustThreshold();
-                var amount = paymentMethod.Calculate().Due;
-                if (amount < dust.ToDecimal(MoneyUnit.BTC))
-                    throw new PaymentMethodUnavailableException("Amount below the dust threshold. For amounts of this size, it is recommended to enable an off-chain (Lightning) payment method");
+                if (Network is not ElementsBTCPayNetwork { IsNativeAsset: false })
+                {
+                    var dust = txOut.GetDustThreshold();
+                    var amount = paymentMethod.Calculate().Due;
+                    if (amount < dust.ToDecimal(MoneyUnit.BTC))
+                        throw new PaymentMethodUnavailableException("Amount below the dust threshold. For amounts of this size, it is recommended to enable an off-chain (Lightning) payment method");
+                }
             }
 
             var reserved = await prepare.ReserveAddress;
@@ -208,6 +212,11 @@ namespace BTCPayServer.Payments.Bitcoin
             paymentMethod.Details = JObject.FromObject(onchainMethod, Serializer);
         }
 
+        private uint256 GetAssetId()
+        {
+            return Network is ElementsBTCPayNetwork e ? e.AssetId : null;
+        }
+
         public static DerivationStrategyBase GetAccountDerivation(JToken activationData, BTCPayNetwork network)
         {
             if (activationData is JValue { Type: JTokenType.String, Value: string v })
@@ -225,16 +234,50 @@ namespace BTCPayServer.Payments.Bitcoin
                 return null;
             return GetAccountDerivation(value, network);
         }
+        class AlternativeConfig
+        {
+            [JsonProperty]
+            public DerivationStrategyBase DerivationScheme { get; set; }
+            [JsonProperty]
+            public string Label { get; set; }
+            [JsonProperty]
+            public RootedKeyPath AccountKeyPath { get; set; }
+
+            public DerivationSchemeSettings ToDerivationSchemeSettings(BTCPayNetwork network)
+            {
+                if (DerivationScheme is null)
+                    return null;
+                var scheme = new DerivationSchemeSettings(DerivationScheme, network);
+                scheme.AccountOriginal = DerivationScheme.ToString();
+                scheme.Label = Label;
+                if (AccountKeyPath is not null && scheme.AccountKeySettings is [{ } ak, ..])
+                {
+                    ak.RootFingerprint = AccountKeyPath.MasterFingerprint;
+                    ak.AccountKeyPath = AccountKeyPath.KeyPath;
+                }
+                return scheme;
+            }
+        }
         public Task ValidatePaymentMethodConfig(PaymentMethodConfigValidationContext validationContext)
         {
             var parser = Network.GetDerivationSchemeParser();
             DerivationSchemeSettings settings = new DerivationSchemeSettings();
-            if (parser.TryParseXpub(validationContext.Config.ToString(), ref settings))
+            if (validationContext.Config is JValue { Type: JTokenType.String, Value: string config }
+                && parser.TryParseXpub(config, ref settings))
             {
                 validationContext.Config = JToken.FromObject(settings, Serializer);
                 return Task.CompletedTask;
             }
-            var res = validationContext.Config.ToObject<DerivationSchemeSettings>(Serializer);
+            DerivationSchemeSettings res = null;
+            try
+            {
+                res = validationContext.Config.ToObject<AlternativeConfig>(Serializer)?.ToDerivationSchemeSettings(Network);
+                if (res != null)
+                    validationContext.Config = JToken.FromObject(res, Serializer);
+            }
+            catch { }
+
+            res ??= validationContext.Config.ToObject<DerivationSchemeSettings>(Serializer);
             if (res is null)
             {
                 validationContext.ModelState.AddModelError(nameof(validationContext.Config), "Invalid derivation scheme settings");
@@ -243,6 +286,18 @@ namespace BTCPayServer.Payments.Bitcoin
             if (res.AccountDerivation is null)
             {
                 validationContext.ModelState.AddModelError(nameof(res.AccountDerivation), "Invalid account derivation");
+            }
+            if (res.AccountKeySettings is null)
+            {
+                validationContext.ModelState.AddModelError(nameof(res.AccountKeySettings), "Invalid AccountKeySettings");
+            }
+            if (res.SigningKey is null)
+            {
+                validationContext.ModelState.AddModelError(nameof(res.SigningKey), "Invalid SigningKey");
+            }
+            if (res.GetSigningAccountKeySettingsOrDefault() is null)
+            {
+                validationContext.ModelState.AddModelError(nameof(res.AccountKeySettings), "AccountKeySettings doesn't include the SigningKey");
             }
             return Task.CompletedTask;
         }

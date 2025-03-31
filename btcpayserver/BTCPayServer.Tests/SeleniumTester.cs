@@ -643,7 +643,15 @@ retry:
             GoToUrl(url);
             Assert.DoesNotMatch("404 - Page not found</h", Driver.PageSource);
             if (shouldHaveAccess)
+            {
                 Assert.DoesNotMatch("- Denied</h", Driver.PageSource);
+                // check associated link is active if present
+                var sidebarLink = Driver.FindElements(By.CssSelector($"#mainNav a[href=\"{url}\"]")).FirstOrDefault();
+                if (sidebarLink != null)
+                {
+                    Assert.Contains("active", sidebarLink.GetAttribute("class"));
+                }
+            }
             else
                 Assert.Contains("- Denied</h", Driver.PageSource);
         }
@@ -670,6 +678,11 @@ retry:
             {
                 Driver.WaitForAndClick(By.Id("page-primary"));
             }
+        }
+
+        public void ClickCancel()
+        {
+            Driver.FindElement(By.Id("CancelWizard")).Click();
         }
     }
 }

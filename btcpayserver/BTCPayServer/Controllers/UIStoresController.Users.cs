@@ -9,6 +9,7 @@ using BTCPayServer.Client;
 using BTCPayServer.Data;
 using BTCPayServer.Events;
 using BTCPayServer.Models.StoreViewModels;
+using BTCPayServer.Services;
 using BTCPayServer.Services.Mails;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
@@ -39,7 +40,7 @@ public partial class UIStoresController
         var roles = await _storeRepo.GetStoreRoles(CurrentStore.Id);
         if (roles.All(role => role.Id != vm.Role))
         {
-            ModelState.AddModelError(nameof(vm.Role), "Invalid role");
+            ModelState.AddModelError(nameof(vm.Role), StringLocalizer["Invalid role"]);
             return View(vm);
         }
             
@@ -58,27 +59,18 @@ public partial class UIStoresController
                 Created = DateTimeOffset.UtcNow
             };
 
-            var result = await _userManager.CreateAsync(user);
-            if (result.Succeeded)
+            var currentUser = await _userManager.GetUserAsync(HttpContext.User);
+            if (currentUser is not null &&
+                (await _userManager.CreateAsync(user)) is { Succeeded: true } result)
             {
-                var tcs = new TaskCompletionSource<Uri>();
-                var currentUser = await _userManager.GetUserAsync(HttpContext.User);
+				var invitationEmail = await _emailSenderFactory.IsComplete();
+				var evt = await UserEvent.Invited.Create(user, currentUser, _callbackGenerator, Request, invitationEmail);
+                _eventAggregator.Publish(evt);
 
-                _eventAggregator.Publish(new UserRegisteredEvent
-                {
-                    RequestUri = Request.GetAbsoluteRootUri(),
-                    Kind = UserRegisteredEventKind.Invite,
-                    User = user,
-                    InvitedByUser = currentUser,
-                    CallbackUrlGenerated = tcs
-                });
-                    
-                var callbackUrl = await tcs.Task;
-                var settings = await _settingsRepository.GetSettingAsync<EmailSettings>() ?? new EmailSettings();
-                var info = settings.IsComplete()
-                    ? "An invitation email has been sent.<br/>You may alternatively"
+                var info = invitationEmail
+					? "An invitation email has been sent.<br/>You may alternatively"
                     : "An invitation email has not been sent, because the server does not have an email server configured.<br/> You need to";
-                successInfo = $"{info} share this link with them: <a class='alert-link' href='{callbackUrl}'>{callbackUrl}</a>";
+                successInfo = $"{info} share this link with them: <a class='alert-link' href='{evt.InvitationLink}'>{evt.InvitationLink}</a>";
             }
             else
             {
@@ -116,9 +108,9 @@ public partial class UIStoresController
         var isOwner = user.StoreRole.Id == StoreRoleId.Owner.Id;
         var isLastOwner = isOwner && storeUsers.Count(u => u.StoreRole.Id == StoreRoleId.Owner.Id) == 1;
         if (isLastOwner && roleId != StoreRoleId.Owner)
-            TempData[WellKnownTempData.ErrorMessage] = $"User {user.Email} is the last owner. Their role cannot be changed.";
+            TempData[WellKnownTempData.ErrorMessage] = StringLocalizer["User {0} is the last owner. Their role cannot be changed.", user.Email].Value;
         else if (await _storeRepo.AddOrUpdateStoreUser(storeId, userId, roleId))
-            TempData[WellKnownTempData.SuccessMessage] = $"The role of {user.Email} has been changed to {vm.Role}.";
+            TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["The role of {0} has been changed to {1}.", user.Email, vm.Role].Value;
         return RedirectToAction(nameof(StoreUsers), new { storeId, userId });
     }
 
@@ -127,9 +119,9 @@ public partial class UIStoresController
     public async Task<IActionResult> DeleteStoreUser(string storeId, string userId)
     {
         if (await _storeRepo.RemoveStoreUser(storeId, userId))
-            TempData[WellKnownTempData.SuccessMessage] = "User removed successfully.";
+            TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["User removed successfully."].Value;
         else
-            TempData[WellKnownTempData.ErrorMessage] = "Removing this user would result in the store having no owner.";
+            TempData[WellKnownTempData.ErrorMessage] = StringLocalizer["Removing this user would result in the store having no owner."].Value;
         return RedirectToAction(nameof(StoreUsers), new { storeId, userId });
     }
 

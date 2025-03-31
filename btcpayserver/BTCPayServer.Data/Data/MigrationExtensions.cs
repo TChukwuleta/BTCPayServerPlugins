@@ -126,6 +126,7 @@ namespace BTCPayServer.Data
                 { Type: "LN" } or { Type: "LNURL" } => 11,
                 { Type: "CHAIN", CryptoCode: var code } when code == "XMR" => 12,
                 { Type: "CHAIN" } => 8,
+                { Type: "LEGACY" } => 18,
                 _ => 8
             };
         }
@@ -137,9 +138,11 @@ namespace BTCPayServer.Data
             {
                 return paymentType switch
                 {
-                    "BTCLike" => $"{cryptoCode}-CHAIN",
+                    "BTCLike" or "MoneroLike" or "ZcashLike" => $"{cryptoCode}-CHAIN",
                     "LightningLike" or "LightningNetwork" => $"{cryptoCode}-LN",
                     "LNURLPAY" => $"{cryptoCode}-LNURL",
+                    "EthereumLike" => $"{cryptoCode}-LEGACY",
+                    "CHAIN" or "LNURL" or "LN" => paymentMethodId,
                     _ => throw new NotSupportedException("Unknown payment type " + paymentType)
                 };
             }
@@ -154,9 +157,10 @@ namespace BTCPayServer.Data
             {
                 return paymentType switch
                 {
-                    "BTCLike" => $"{cryptoCode}-CHAIN",
+                    "BTCLike" or "MoneroLike" or "ZcashLike" => $"{cryptoCode}-CHAIN",
                     "LightningLike" or "LightningNetwork" => $"{cryptoCode}-LN",
                     "LNURLPAY" => $"{cryptoCode}-LNURL",
+                    "EthereumLike" => $"{cryptoCode}-LEGACY",
                     _ => paymentMethodId
                 };
             }

@@ -4,13 +4,13 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">{{title}} <template v-if="fragments && fragments.length > 1">({{index+1}}/{{fragments.length}})</template></h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@StringLocalizer["Close"]">
                         <vc:icon symbol="close"/>
                     </button>
                 </div>
                 <div class="modal-body pt-0">
-                    <div class="payment-box m-0">
-                        <div class="qr-container justify-content-start">
+                    <div class="payment-box">
+                        <div class="qr-container">
                             <component v-if="currentFragment" :is="currentMode.href ? 'a': 'div'" class="qr-container d-inline-block" :href="currentMode.href">
                                 <qrcode :value="currentFragment" :options="qrOptions"></qrcode>
                             </component>

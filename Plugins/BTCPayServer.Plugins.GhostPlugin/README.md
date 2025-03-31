@@ -51,7 +51,7 @@ Before diving into the setup process, ensure you have the following:
 7. Click on "Save" to save your credentials, you can also put in a description before saving it.
 
 8. Open up your BTCPay Server instance, make sure you selected the right store and open the Ghost plugin page.
-   ![BTCPay Server Ghost img 4](./img/Ghost/Ghost_BTCPay_Credential_View.png)
+
 9. Copy your API Url (without the https://), Content API key, and Admin API Key from Ghost credential page into their respective input fields in your plugin page.
 
 10. For the username/email and password fields, enter your Ghost admin email address, and password.

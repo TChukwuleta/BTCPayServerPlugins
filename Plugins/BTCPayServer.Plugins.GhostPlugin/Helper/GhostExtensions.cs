@@ -10,9 +10,7 @@ public static class GhostExtensions
         {
             ApiUrl = ghost.ApiUrl,
             AdminApiKey = ghost.AdminApiKey,
-            ContentApiKey = ghost.ContentApiKey,
-            UserName = ghost.Username,
-            Password = ghost.Password
+            ContentApiKey = ghost.ContentApiKey
         };
     }
 }

@@ -17,7 +17,6 @@ using BTCPayServer.Services;
 using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Rates;
-using crypto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using NBitcoin;
@@ -295,7 +294,7 @@ namespace BTCPayServer.Payments
         /// </summary>
         public List<string> TrackedDestinations { get; } = new();
 
-        internal async Task BeforeFetchingRates()
+        public async Task BeforeFetchingRates()
         {
             await Handler.BeforeFetchingRates(this);
             // We need to fetch the rates necessary for the evaluation of the payment method criteria

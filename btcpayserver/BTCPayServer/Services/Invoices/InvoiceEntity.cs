@@ -267,9 +267,9 @@ namespace BTCPayServer.Services.Invoices
         }
         public const int InternalTagSupport_Version = 1;
         public const int GreenfieldInvoices_Version = 2;
-		public const int LeanInvoices_Version = 3;
-		public const int Lastest_Version = 3;
-		public int Version { get; set; }
+        public const int LeanInvoices_Version = 3;
+        public const int Lastest_Version = 3;
+        public int Version { get; set; }
         [JsonIgnore]
         public string Id { get; set; }
         [JsonIgnore]
@@ -326,7 +326,7 @@ namespace BTCPayServer.Services.Invoices
         }
         public bool TryGetRate(string currency, out decimal rate)
         {
-            return TryGetRate(new CurrencyPair(Currency, currency), out rate);
+            return TryGetRate(new CurrencyPair(currency, Currency), out rate);
         }
         public bool TryGetRate(CurrencyPair pair, out decimal rate)
         {
@@ -349,7 +349,7 @@ namespace BTCPayServer.Services.Invoices
             ArgumentNullException.ThrowIfNull(pair);
 #pragma warning disable CS0618 // Type or member is obsolete
             if (pair.Right == Currency && Rates.TryGetValue(pair.Left, out var rate)) // Fast lane
-                    return rate;
+                return rate;
 #pragma warning restore CS0618 // Type or member is obsolete
             var rule = GetRateRules().GetRuleFor(pair);
             rule.Reevaluate();
@@ -371,12 +371,52 @@ namespace BTCPayServer.Services.Invoices
             get;
             set;
         } = new Dictionary<string, decimal>();
+
+#nullable enable
+        public PaymentMethodId? GetDefaultPaymentMethodId(Data.StoreData store, BTCPayNetworkProvider networkProvider, HashSet<PaymentMethodId>? authorized = null)
+        {
+            PaymentMethodId? paymentMethodId = null;
+            PaymentMethodId? invoicePaymentId = DefaultPaymentMethod;
+            PaymentMethodId? storePaymentId = store.GetDefaultPaymentId();
+            authorized ??= GetPaymentPrompts().Select(p => p.PaymentMethodId).ToHashSet();
+            if (invoicePaymentId is not null)
+            {
+                if (authorized.Contains(invoicePaymentId))
+                    paymentMethodId = invoicePaymentId;
+            }
+            if (paymentMethodId is null && storePaymentId is not null)
+            {
+                if (authorized.Contains(storePaymentId))
+                    paymentMethodId = storePaymentId;
+            }
+            if (paymentMethodId is null && invoicePaymentId is not null)
+            {
+                paymentMethodId = invoicePaymentId.FindNearest(authorized);
+            }
+            if (paymentMethodId is null && storePaymentId is not null)
+            {
+                paymentMethodId = storePaymentId.FindNearest(authorized);
+            }
+            if (paymentMethodId is null)
+            {
+                var defaultBTC = PaymentTypes.CHAIN.GetPaymentMethodId(networkProvider.DefaultNetwork.CryptoCode);
+                var defaultLNURLPay = PaymentTypes.LNURL.GetPaymentMethodId(networkProvider.DefaultNetwork.CryptoCode);
+                paymentMethodId = authorized.FirstOrDefault(e => e == defaultBTC) ??
+                                  authorized.FirstOrDefault(e => e == defaultLNURLPay) ??
+                                  authorized.FirstOrDefault();
+            }
+
+            return paymentMethodId;
+        }
+#nullable restore
+
         public void UpdateTotals()
         {
             PaidAmount = new Amounts()
             {
                 Currency = Currency
             };
+            NetSettled = 0.0m;
             foreach (var payment in GetPayments(false))
             {
                 payment.Rate = GetInvoiceRate(payment.Currency);
@@ -386,6 +426,8 @@ namespace BTCPayServer.Services.Invoices
                 {
                     PaidAmount.Gross += payment.InvoicePaidAmount.Gross;
                     PaidAmount.Net += payment.InvoicePaidAmount.Net;
+                    if (payment.Status == PaymentStatus.Settled)
+                        NetSettled += payment.InvoicePaidAmount.Net;
                 }
             }
             NetDue = Price - PaidAmount.Net;
@@ -733,6 +775,12 @@ namespace BTCPayServer.Services.Invoices
         }
         [JsonIgnore]
         public Amounts PaidAmount { get; set; }
+
+        /// <summary>
+        /// Same as <see cref="Amounts.Net"/> of <see cref="PaidAmount"/>, but only counting payments in 'Settled' state
+        /// </summary>
+        [JsonIgnore]
+        public decimal NetSettled { get; private set; }
     }
 
     public enum InvoiceStatusLegacy
@@ -763,41 +811,40 @@ namespace BTCPayServer.Services.Invoices
     }
     public record InvoiceState(InvoiceStatus Status, InvoiceExceptionStatus ExceptionStatus)
     {
-        public InvoiceState(string status, string exceptionStatus):
+        public InvoiceState(string status, string exceptionStatus) :
             this(Enum.Parse<InvoiceStatus>(status), exceptionStatus switch { "None" or "" or null => InvoiceExceptionStatus.None, _ => Enum.Parse<InvoiceExceptionStatus>(exceptionStatus) })
         {
         }
 
-        public bool CanMarkComplete()
+        public bool CanMarkComplete() => (Status, ExceptionStatus) is
         {
-            return Status is InvoiceStatus.New or InvoiceStatus.Processing or InvoiceStatus.Expired or InvoiceStatus.Invalid ||
-                   (Status != InvoiceStatus.Settled && ExceptionStatus == InvoiceExceptionStatus.Marked);
+            Status: InvoiceStatus.New or InvoiceStatus.Processing or InvoiceStatus.Expired or InvoiceStatus.Invalid
         }
+        or
+        {
+            Status: not InvoiceStatus.Settled,
+            ExceptionStatus: InvoiceExceptionStatus.Marked
+        };
 
-        public bool CanMarkInvalid()
+        public bool CanMarkInvalid() => (Status, ExceptionStatus) is
         {
-            return Status is InvoiceStatus.New or InvoiceStatus.Processing or InvoiceStatus.Expired ||
-                   (Status != InvoiceStatus.Invalid && ExceptionStatus == InvoiceExceptionStatus.Marked);
+            Status: InvoiceStatus.New or InvoiceStatus.Processing or InvoiceStatus.Expired
         }
+        or
+        {
+            Status: not InvoiceStatus.Invalid,
+            ExceptionStatus: InvoiceExceptionStatus.Marked
+        };
 
-        public bool CanRefund()
+        public bool CanRefund() => (Status, ExceptionStatus) is
         {
-            return
-                Status == InvoiceStatus.Settled ||
-                (Status == InvoiceStatus.Expired &&
-                (ExceptionStatus == InvoiceExceptionStatus.PaidLate ||
-                ExceptionStatus == InvoiceExceptionStatus.PaidOver ||
-                ExceptionStatus == InvoiceExceptionStatus.PaidPartial)) ||
-                Status == InvoiceStatus.Invalid;
+            Status: InvoiceStatus.Settled or InvoiceStatus.Invalid
         }
-
-        public bool IsSettled()
+        or
         {
-            return
-                   Status == InvoiceStatus.Settled ||
-                   (Status == InvoiceStatus.Expired &&
-                    ExceptionStatus is InvoiceExceptionStatus.PaidLate or InvoiceExceptionStatus.PaidOver);
-        }
+            Status: InvoiceStatus.Expired,
+            ExceptionStatus: InvoiceExceptionStatus.PaidLate or InvoiceExceptionStatus.PaidOver or InvoiceExceptionStatus.PaidPartial
+        };
 
         public override string ToString()
         {
@@ -1020,13 +1067,5 @@ namespace BTCPayServer.Services.Invoices
                 Net = PaidAmount.Net * Rate
             };
         }
-    }
-    /// <summary>
-    /// A record of a payment
-    /// </summary>
-    public interface CryptoPaymentData
-    {
-
-        string GetPaymentProof();
     }
 }

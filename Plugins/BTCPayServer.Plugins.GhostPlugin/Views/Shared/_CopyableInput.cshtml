@@ -1,0 +1,10 @@
+@model string
+<div class="form-group d-flex align-items-center">
+    <input value="@Model" class="form-control me-2" readonly />
+    <button class="copy-button btn p-0" onclick="copyToClipboard(this, '@Model')" data-bs-toggle="tooltip" data-bs-placement="top" title="Copy">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+    </button>
+</div>

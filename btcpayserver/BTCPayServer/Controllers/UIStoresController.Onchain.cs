@@ -54,10 +54,9 @@ public partial class UIStoresController
             return checkResult;
         }
 
-        var (hotWallet, rpcImport) = await CanUseHotWallet();
+        var perm = await CanUseHotWallet();
         vm.Network = network;
-        vm.CanUseHotWallet = hotWallet;
-        vm.CanUseRPCImport = rpcImport;
+        vm.SetPermission(perm);
         vm.SupportTaproot = network.NBitcoinNetwork.Consensus.SupportTaproot;
         vm.SupportSegwit = network.NBitcoinNetwork.Consensus.SupportSegwit;
 
@@ -108,7 +107,7 @@ public partial class UIStoresController
 
             if (fileContent is null || !_onChainWalletParsers.TryParseWalletFile(fileContent, network, out strategy, out _))
             {
-                ModelState.AddModelError(nameof(vm.WalletFile), $"Import failed, make sure you import a compatible wallet format");
+                ModelState.AddModelError(nameof(vm.WalletFile), StringLocalizer["Import failed, make sure you import a compatible wallet format"]);
                 return View(vm.ViewName, vm);
             }
         }
@@ -116,7 +115,7 @@ public partial class UIStoresController
         {
             if (!_onChainWalletParsers.TryParseWalletFile(vm.WalletFileContent, network, out strategy, out var error))
             {
-                ModelState.AddModelError(nameof(vm.WalletFileContent), $"QR import failed: {error}");
+                ModelState.AddModelError(nameof(vm.WalletFileContent), StringLocalizer["QR import failed: {0}", error]);
                 return View(vm.ViewName, vm);
             }
         }
@@ -145,7 +144,7 @@ public partial class UIStoresController
             }
             catch (Exception ex)
             {
-                ModelState.AddModelError(nameof(vm.DerivationScheme), $"Invalid wallet format: {ex.Message}");
+                ModelState.AddModelError(nameof(vm.DerivationScheme), StringLocalizer["Invalid wallet format: {0}", ex.Message]);
                 return View(vm.ViewName, vm);
             }
         }
@@ -157,14 +156,14 @@ public partial class UIStoresController
             }
             catch
             {
-                ModelState.AddModelError(nameof(vm.Config), "Config file was not in the correct format");
+                ModelState.AddModelError(nameof(vm.Config), StringLocalizer["Config file was not in the correct format"]);
                 return View(vm.ViewName, vm);
             }
         }
 
         if (strategy is null)
         {
-            ModelState.AddModelError(nameof(vm.DerivationScheme), "Please provide your extended public key");
+            ModelState.AddModelError(nameof(vm.DerivationScheme), StringLocalizer["Please provide your extended public key"]);
             return View(vm.ViewName, vm);
         }
 
@@ -184,13 +183,13 @@ public partial class UIStoresController
             }
             catch
             {
-                ModelState.AddModelError(nameof(vm.DerivationScheme), "Invalid derivation scheme");
+                ModelState.AddModelError(nameof(vm.DerivationScheme), StringLocalizer["Invalid derivation scheme"]);
                 return View(vm.ViewName, vm);
             }
             await _storeRepo.UpdateStore(store);
             _eventAggregator.Publish(new WalletChangedEvent { WalletId = new WalletId(vm.StoreId, vm.CryptoCode) });
 
-            TempData[WellKnownTempData.SuccessMessage] = $"Wallet settings for {network.CryptoCode} have been updated.";
+            TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["Wallet settings for {0} have been updated.", network.CryptoCode].Value;
 
             // This is success case when derivation scheme is added to the store
             return RedirectToAction(nameof(WalletSettings), new { storeId = vm.StoreId, cryptoCode = vm.CryptoCode });
@@ -218,14 +217,13 @@ public partial class UIStoresController
         }
 
         var isHotWallet = vm.Method == WalletSetupMethod.HotWallet;
-        var (hotWallet, rpcImport) = await CanUseHotWallet();
-        if (isHotWallet && !hotWallet)
-        {
+        var isColdWallet = vm.Method == WalletSetupMethod.WatchOnly;
+        var perm = await CanUseHotWallet();
+        if (isHotWallet && !perm.CanCreateHotWallet)
             return NotFound();
-        }
-
-        vm.CanUseHotWallet = hotWallet;
-        vm.CanUseRPCImport = rpcImport;
+        if (isColdWallet && !perm.CanCreateColdWallet)
+            return NotFound();
+        vm.SetPermission(perm);
         vm.SupportTaproot = network.NBitcoinNetwork.Consensus.SupportTaproot;
         vm.SupportSegwit = network.NBitcoinNetwork.Consensus.SupportSegwit;
         vm.Network = network;
@@ -236,7 +234,7 @@ public partial class UIStoresController
         }
         else
         {
-            var canUsePayJoin = hotWallet && isHotWallet && network.SupportPayJoin;
+            var canUsePayJoin = perm.CanCreateHotWallet && isHotWallet && network.SupportPayJoin;
             vm.SetupRequest = new WalletSetupRequest
             {
                 SavePrivateKeys = isHotWallet,
@@ -260,8 +258,10 @@ public partial class UIStoresController
             return checkResult;
         }
 
-        var (hotWallet, rpcImport) = await CanUseHotWallet();
-        if (!hotWallet && request.SavePrivateKeys || !rpcImport && request.ImportKeysToRPC)
+        var perm = await CanUseHotWallet();
+        if ((!perm.CanCreateHotWallet && request.SavePrivateKeys) || 
+            (!perm.CanRPCImport && request.ImportKeysToRPC) ||
+            (!perm.CanCreateColdWallet && !request.SavePrivateKeys))
         {
             return NotFound();
         }
@@ -279,15 +279,13 @@ public partial class UIStoresController
             Source = isImport ? "SeedImported" : "NBXplorerGenerated",
             IsHotWallet = isImport ? request.SavePrivateKeys : method == WalletSetupMethod.HotWallet,
             DerivationSchemeFormat = "BTCPay",
-            CanUseHotWallet = hotWallet,
-            CanUseRPCImport = rpcImport,
             SupportTaproot = network.NBitcoinNetwork.Consensus.SupportTaproot,
             SupportSegwit = network.NBitcoinNetwork.Consensus.SupportSegwit
         };
-
+        vm.SetPermission(perm);
         if (isImport && string.IsNullOrEmpty(request.ExistingMnemonic))
         {
-            ModelState.AddModelError(nameof(request.ExistingMnemonic), "Please provide your existing seed");
+            ModelState.AddModelError(nameof(request.ExistingMnemonic), StringLocalizer["Please provide your existing seed"]);
             return View(vm.ViewName, vm);
         }
 
@@ -305,7 +303,7 @@ public partial class UIStoresController
             TempData.SetStatusMessageModel(new StatusMessageModel
             {
                 Severity = StatusMessageModel.StatusSeverity.Error,
-                Html = $"There was an error generating your wallet: {e.Message}"
+                Message = StringLocalizer["There was an error generating your wallet: {0}", e.Message].Value
             });
             return View(vm.ViewName, vm);
         }
@@ -343,7 +341,7 @@ public partial class UIStoresController
             TempData.SetStatusMessageModel(new StatusMessageModel
             {
                 Severity = StatusMessageModel.StatusSeverity.Success,
-                Html = "<span class='text-centered'>Your wallet has been generated.</span>"
+                Html = "<span class='text-centered'>" + StringLocalizer["Your wallet has been generated."].Value + "</span>"
             });
             var seedVm = new RecoverySeedBackupViewModel
             {
@@ -363,7 +361,7 @@ public partial class UIStoresController
         TempData.SetStatusMessageModel(new StatusMessageModel
         {
             Severity = StatusMessageModel.StatusSeverity.Warning,
-            Html = "Please check your addresses and confirm."
+            Message = StringLocalizer["Please check your addresses and confirm."].Value
         });
         return result;
     }
@@ -380,7 +378,7 @@ public partial class UIStoresController
             return checkResult;
         }
 
-        TempData[WellKnownTempData.SuccessMessage] = $"Wallet settings for {network.CryptoCode} have been updated.";
+        TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["Wallet settings for {0} have been updated.", network.CryptoCode].Value;
 
         var walletId = new WalletId(storeId, cryptoCode);
         return RedirectToAction(nameof(UIWalletsController.WalletTransactions), "UIWallets", new { walletId });
@@ -404,10 +402,11 @@ public partial class UIStoresController
 
         var storeBlob = store.GetStoreBlob();
         var excludeFilters = storeBlob.GetExcludedPaymentMethods();
-        (bool canUseHotWallet, bool rpcImport) = await CanUseHotWallet();
+        var perm = await CanUseHotWallet();
         var client = _explorerProvider.GetExplorerClient(network);
 
         var handler = _handlers.GetBitcoinHandler(cryptoCode);
+
         var vm = new WalletSettingsViewModel
         {
             StoreId = storeId,
@@ -417,18 +416,18 @@ public partial class UIStoresController
             Network = network,
             IsHotWallet = derivation.IsHotWallet,
             Source = derivation.Source,
-            RootFingerprint = derivation.GetSigningAccountKeySettings().RootFingerprint.ToString(),
-            DerivationScheme = derivation.AccountDerivation.ToString(),
+            RootFingerprint = derivation.GetSigningAccountKeySettingsOrDefault()?.RootFingerprint.ToString(),
+            DerivationScheme = derivation.AccountDerivation?.ToString(),
             DerivationSchemeInput = derivation.AccountOriginal,
-            KeyPath = derivation.GetSigningAccountKeySettings().AccountKeyPath?.ToString(),
+            KeyPath = derivation.GetSigningAccountKeySettingsOrDefault()?.AccountKeyPath?.ToString(),
             UriScheme = network.NBitcoinNetwork.UriScheme,
             Label = derivation.Label,
-            SelectedSigningKey = derivation.SigningKey.ToString(),
+            SelectedSigningKey = derivation.SigningKey?.ToString(),
             NBXSeedAvailable = derivation.IsHotWallet &&
-                               canUseHotWallet &&
+                               perm.CanCreateHotWallet &&
                                !string.IsNullOrEmpty(await client.GetMetadataAsync<string>(derivation.AccountDerivation,
                                    WellknownMetadataKeys.MasterHDKey)),
-            AccountKeys = derivation.AccountKeySettings
+            AccountKeys = (derivation.AccountKeySettings ?? [])
                 .Select(e => new WalletSettingsAccountKeyViewModel
                 {
                     AccountKey = e.AccountKey.ToString(),
@@ -437,10 +436,13 @@ public partial class UIStoresController
                 }).ToList(),
             Config = ProtectString(JToken.FromObject(derivation, handler.Serializer).ToString()),
             PayJoinEnabled = storeBlob.PayJoinEnabled,
-            CanUsePayJoin = canUseHotWallet && network.SupportPayJoin && derivation.IsHotWallet,
-            CanUseHotWallet = canUseHotWallet,
-            CanUseRPCImport = rpcImport,
-            StoreName = store.StoreName
+            CanUsePayJoin = perm.CanCreateHotWallet && network.SupportPayJoin && derivation.IsHotWallet,
+            CanUseHotWallet = perm.CanCreateHotWallet,
+            CanUseRPCImport = perm.CanRPCImport,
+            StoreName = store.StoreName,
+            CanSetupMultiSig = (derivation.AccountKeySettings ?? []).Length > 1,
+            IsMultiSigOnServer = derivation.IsMultiSigOnServer,
+            DefaultIncludeNonWitnessUtxo = derivation.DefaultIncludeNonWitnessUtxo
         };
 
         ViewData["ReplaceDescription"] = WalletReplaceWarning(derivation.IsHotWallet);
@@ -477,10 +479,14 @@ public partial class UIStoresController
         if (payjoinChanged && network.SupportPayJoin) storeBlob.PayJoinEnabled = vm.PayJoinEnabled;
         if (needUpdate) store.SetStoreBlob(storeBlob);
 
-        if (derivation.Label != vm.Label)
+        if (derivation.Label != vm.Label ||
+            derivation.IsMultiSigOnServer != vm.IsMultiSigOnServer ||
+            derivation.DefaultIncludeNonWitnessUtxo != vm.DefaultIncludeNonWitnessUtxo)
         {
             needUpdate = true;
             derivation.Label = vm.Label;
+            derivation.IsMultiSigOnServer = vm.IsMultiSigOnServer;
+            derivation.DefaultIncludeNonWitnessUtxo = vm.DefaultIncludeNonWitnessUtxo;
         }
 
         var signingKey = string.IsNullOrEmpty(vm.SelectedSigningKey)
@@ -494,16 +500,14 @@ public partial class UIStoresController
 
         for (int i = 0; i < derivation.AccountKeySettings.Length; i++)
         {
-            KeyPath accountKeyPath;
-            HDFingerprint? rootFingerprint;
-
             try
             {
-                accountKeyPath = string.IsNullOrWhiteSpace(vm.AccountKeys[i].AccountKeyPath)
-                    ? null
-                    : new KeyPath(vm.AccountKeys[i].AccountKeyPath);
+                var strKeyPath = vm.AccountKeys[i].AccountKeyPath;
+                var accountKeyPath = string.IsNullOrWhiteSpace(strKeyPath) ? null : new KeyPath(strKeyPath);
 
-                if (accountKeyPath != null && derivation.AccountKeySettings[i].AccountKeyPath != accountKeyPath)
+                bool pathsDiffer = accountKeyPath != derivation.AccountKeySettings[i].AccountKeyPath;
+
+                if (pathsDiffer)
                 {
                     needUpdate = true;
                     derivation.AccountKeySettings[i].AccountKeyPath = accountKeyPath;
@@ -516,7 +520,7 @@ public partial class UIStoresController
 
             try
             {
-                rootFingerprint = string.IsNullOrWhiteSpace(vm.AccountKeys[i].MasterFingerprint)
+                HDFingerprint? rootFingerprint = string.IsNullOrWhiteSpace(vm.AccountKeys[i].MasterFingerprint)
                     ? null
                     : new HDFingerprint(Encoders.Hex.DecodeData(vm.AccountKeys[i].MasterFingerprint));
 
@@ -583,11 +587,8 @@ public partial class UIStoresController
             return NotFound();
         }
 
-        (bool canUseHotWallet, bool _) = await CanUseHotWallet();
-        if (!canUseHotWallet)
-        {
+        if (!(await CanUseHotWallet()).CanCreateHotWallet)
             return NotFound();
-        }
 
         var client = _explorerProvider.GetExplorerClient(network);
         if (await GetSeed(client, derivation) != null)
@@ -608,7 +609,7 @@ public partial class UIStoresController
         TempData.SetStatusMessageModel(new StatusMessageModel
         {
             Severity = StatusMessageModel.StatusSeverity.Error,
-            Message = "The seed was not found"
+            Message = StringLocalizer["The seed was not found"].Value
         });
 
         return RedirectToAction(nameof(WalletSettings));
@@ -628,9 +629,9 @@ public partial class UIStoresController
 
         return View("Confirm", new ConfirmModel
         {
-            Title = $"Replace {network.CryptoCode} wallet",
+            Title = StringLocalizer["Replace {0} wallet", network.CryptoCode],
             Description = WalletReplaceWarning(derivation.IsHotWallet),
-            Action = "Setup new wallet"
+            Action = StringLocalizer["Setup new wallet"]
         });
     }
 
@@ -667,9 +668,9 @@ public partial class UIStoresController
 
         return View("Confirm", new ConfirmModel
         {
-            Title = $"Remove {network.CryptoCode} wallet",
+            Title = StringLocalizer["Remove {0} wallet", network.CryptoCode],
             Description = WalletRemoveWarning(derivation.IsHotWallet, network.CryptoCode),
-            Action = "Remove"
+            Action = StringLocalizer["Remove"]
         });
     }
 
@@ -747,7 +748,7 @@ public partial class UIStoresController
                !string.IsNullOrEmpty(seed) ? seed : null;
     }
 
-    private async Task<(bool HotWallet, bool RPCImport)> CanUseHotWallet()
+    private async Task<WalletCreationPermissions> CanUseHotWallet()
     {
         return await _authorizationService.CanUseHotWallet(_policiesSettings, User);
     }
@@ -783,7 +784,7 @@ public partial class UIStoresController
             $"The store won't be able to receive {cryptoCode} onchain payments until a new wallet is set up.");
     }
     
-    private DerivationSchemeSettings ParseDerivationStrategy(string derivationScheme, BTCPayNetwork network)
+    internal static DerivationSchemeSettings ParseDerivationStrategy(string derivationScheme, BTCPayNetwork network)
     {
         var parser = new DerivationSchemeParser(network);
         var isOD = Regex.Match(derivationScheme, @"\(.*?\)");

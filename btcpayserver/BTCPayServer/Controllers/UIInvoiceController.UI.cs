@@ -18,7 +18,6 @@ using BTCPayServer.Models.AppViewModels;
 using BTCPayServer.Models.InvoicingModels;
 using BTCPayServer.Models.PaymentRequestViewModels;
 using BTCPayServer.Payments;
-using BTCPayServer.Payments.Bitcoin;
 using BTCPayServer.Payments.Lightning;
 using BTCPayServer.Payouts;
 using BTCPayServer.Rating;
@@ -57,8 +56,8 @@ namespace BTCPayServer.Controllers
         {
             var invoice = (await _InvoiceRepository.GetInvoices(new InvoiceQuery
             {
-                InvoiceId = new[] { invoiceId },
-                UserId = GetUserId()
+                InvoiceId = [invoiceId],
+                UserId = GetUserIdForInvoiceQuery()
             })).FirstOrDefault();
             if (invoice is null)
                 return NotFound();
@@ -72,11 +71,11 @@ namespace BTCPayServer.Controllers
         [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
         public async Task<IActionResult> RedeliverWebhook(string storeId, string invoiceId, string deliveryId)
         {
-            var invoice = (await _InvoiceRepository.GetInvoices(new InvoiceQuery()
+            var invoice = (await _InvoiceRepository.GetInvoices(new InvoiceQuery
             {
-                InvoiceId = new[] { invoiceId },
-                StoreId = new[] { storeId },
-                UserId = GetUserId()
+                InvoiceId = [invoiceId],
+                StoreId = [storeId],
+                UserId = GetUserIdForInvoiceQuery()
             })).FirstOrDefault();
             if (invoice is null)
                 return NotFound();
@@ -86,7 +85,7 @@ namespace BTCPayServer.Controllers
             var newDeliveryId = await WebhookNotificationManager.Redeliver(deliveryId);
             if (newDeliveryId is null)
                 return NotFound();
-            TempData[WellKnownTempData.SuccessMessage] = "Successfully planned a redelivery";
+            TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["Successfully planned a redelivery"].Value;
             return RedirectToAction(nameof(Invoice),
                 new
                 {
@@ -101,8 +100,8 @@ namespace BTCPayServer.Controllers
         {
             var invoice = (await _InvoiceRepository.GetInvoices(new InvoiceQuery
             {
-                InvoiceId = new[] { invoiceId },
-                UserId = GetUserId(),
+                InvoiceId = [invoiceId],
+                UserId = GetUserIdForInvoiceQuery(),
                 IncludeAddresses = true,
                 IncludeArchived = true,
                 IncludeRefunds = true,
@@ -189,6 +188,7 @@ namespace BTCPayServer.Controllers
             return View(model);
         }
 
+        [XFrameOptions(null)]
         [HttpGet("i/{invoiceId}/receipt")]
         public async Task<IActionResult> InvoiceReceipt(string invoiceId, [FromQuery] bool print = false)
         {
@@ -197,6 +197,9 @@ namespace BTCPayServer.Controllers
                 return NotFound();
             var store = await _StoreRepository.GetStoreByInvoiceId(i.Id);
             if (store is null)
+                return NotFound();
+            
+            if (!await ValidateAccessForArchivedInvoice(i))
                 return NotFound();
 
             var receipt = InvoiceDataBase.ReceiptOptions.Merge(store.GetStoreBlob().ReceiptOptions, i.ReceiptOptions);
@@ -294,9 +297,9 @@ namespace BTCPayServer.Controllers
             var payoutMethodIds = _payoutHandlers.GetSupportedPayoutMethods(this.GetCurrentStore());
             if (!payoutMethodIds.Any())
             {
-                var vm = new RefundModel { Title = "No matching payment method" };
+                var vm = new RefundModel { Title = StringLocalizer["No matching payment method"] };
                 ModelState.AddModelError(nameof(vm.AvailablePaymentMethods),
-                    "There are no payment methods available to provide refunds with for this invoice.");
+                    StringLocalizer["There are no payment methods available to provide refunds with for this invoice."]);
                 return View("_RefundModal", vm);
             }
 
@@ -306,7 +309,7 @@ namespace BTCPayServer.Controllers
 
             var refund = new RefundModel
             {
-                Title = "Payment method",
+                Title = StringLocalizer["Payment method"],
                 AvailablePaymentMethods =
                     new SelectList(payoutMethodIds.Select(id => new SelectListItem(id.ToString(), id.ToString())),
                         "Value", "Text"),
@@ -339,12 +342,12 @@ namespace BTCPayServer.Controllers
             var cdCurrency = _CurrencyNameTable.GetCurrencyData(invoice.Currency, true);
             RateRules rules;
             RateResult rateResult;
-            CreatePullPayment createPullPayment;
+            CreatePullPaymentRequest createPullPayment;
 
             var pmis = _payoutHandlers.GetSupportedPayoutMethods(store);
             if (!pmis.Contains(pmi))
             {
-                ModelState.AddModelError(nameof(model.SelectedPayoutMethod), $"Invalid payout method");
+                ModelState.AddModelError(nameof(model.SelectedPayoutMethod), StringLocalizer["Invalid payout method"]);
                 return View("_RefundModal", model);
             }
 
@@ -353,7 +356,7 @@ namespace BTCPayServer.Controllers
             var paymentMethod = paymentMethodId is null ? null : invoice.GetPaymentPrompt(paymentMethodId);
             if (paymentMethod?.Currency is null)
             {
-                ModelState.AddModelError(nameof(model.SelectedPayoutMethod), $"Invalid payout method");
+                ModelState.AddModelError(nameof(model.SelectedPayoutMethod), StringLocalizer["Invalid payout method"]);
                 return View("_RefundModal", model);
             }
 
@@ -377,7 +380,7 @@ namespace BTCPayServer.Controllers
             {
                 case RefundSteps.SelectPaymentMethod:
                     model.RefundStep = RefundSteps.SelectRate;
-                    model.Title = "How much to refund?";
+                    model.Title = StringLocalizer["How much to refund?"];
 
                     var paidCurrency = Math.Round(cryptoPaid * paymentMethod.Rate, cdCurrency.Divisibility);
                     model.CryptoAmountThen = cryptoPaid.RoundToSignificant(paymentMethod.Divisibility);
@@ -390,7 +393,7 @@ namespace BTCPayServer.Controllers
                     if (rateResult.BidAsk is null)
                     {
                         ModelState.AddModelError(nameof(model.SelectedRefundOption),
-                            $"Impossible to fetch rate: {rateResult.EvaluatedRule}");
+                            StringLocalizer["Impossible to fetch rate: {0}", rateResult.EvaluatedRule]);
                         return View("_RefundModal", model);
                     }
 
@@ -411,19 +414,17 @@ namespace BTCPayServer.Controllers
                     return View("_RefundModal", model);
 
                 case RefundSteps.SelectRate:
-                    createPullPayment = new CreatePullPayment
+                    createPullPayment = new CreatePullPaymentRequest
                     {
-                        Name = $"Refund {invoice.Id}",
-                        PayoutMethods = new[] { pmi },
-                        StoreId = invoice.StoreId,
-                        BOLT11Expiration = store.GetStoreBlob().RefundBOLT11Expiration
+                        Name = StringLocalizer["Refund {0}", invoice.Id],
+                        PayoutMethods = new[] { pmi.ToString() }
                     };
                     var authorizedForAutoApprove = (await
                             _authorizationService.AuthorizeAsync(User, invoice.StoreId, Policies.CanCreatePullPayments))
                         .Succeeded;
                     if (model.SubtractPercentage is < 0 or > 100)
                     {
-                        ModelState.AddModelError(nameof(model.SubtractPercentage), "Percentage must be a numeric value between 0 and 100");
+                        ModelState.AddModelError(nameof(model.SubtractPercentage), StringLocalizer["Percentage must be a numeric value between 0 and 100"]);
                     }
                     if (!ModelState.IsValid)
                     {
@@ -457,11 +458,11 @@ namespace BTCPayServer.Controllers
 
                             if (!isPaidOver)
                             {
-                                ModelState.AddModelError(nameof(model.SelectedRefundOption), "Invoice is not overpaid");
+                                ModelState.AddModelError(nameof(model.SelectedRefundOption), StringLocalizer["Invoice is not overpaid"]);
                             }
                             if (overpaidAmount == null)
                             {
-                                ModelState.AddModelError(nameof(model.SelectedRefundOption), "Overpaid amount cannot be calculated");
+                                ModelState.AddModelError(nameof(model.SelectedRefundOption), StringLocalizer["Overpaid amount cannot be calculated"]);
                             }
                             if (!ModelState.IsValid)
                             {
@@ -474,17 +475,17 @@ namespace BTCPayServer.Controllers
                             break;
 
                         case "Custom":
-                            model.Title = "How much to refund?";
+                            model.Title = StringLocalizer["How much to refund?"];
                             model.RefundStep = RefundSteps.SelectRate;
 
                             if (model.CustomAmount <= 0)
                             {
-                                model.AddModelError(refundModel => refundModel.CustomAmount, "Amount must be greater than 0", this);
+                                model.AddModelError(refundModel => refundModel.CustomAmount, StringLocalizer["Amount must be greater than 0"], this);
                             }
                             if (string.IsNullOrEmpty(model.CustomCurrency) ||
                                 _CurrencyNameTable.GetCurrencyData(model.CustomCurrency, false) == null)
                             {
-                                ModelState.AddModelError(nameof(model.CustomCurrency), "Invalid currency");
+                                ModelState.AddModelError(nameof(model.CustomCurrency), StringLocalizer["Invalid currency"]);
                             }
                             if (!ModelState.IsValid)
                             {
@@ -500,7 +501,7 @@ namespace BTCPayServer.Controllers
                             if (rateResult.BidAsk is null)
                             {
                                 ModelState.AddModelError(nameof(model.SelectedRefundOption),
-                                    $"Impossible to fetch rate: {rateResult.EvaluatedRule}");
+                                    StringLocalizer["Impossible to fetch rate: {0}", rateResult.EvaluatedRule]);
                                 return View("_RefundModal", model);
                             }
 
@@ -510,7 +511,7 @@ namespace BTCPayServer.Controllers
                             break;
 
                         default:
-                            ModelState.AddModelError(nameof(model.SelectedRefundOption), "Please select an option before proceeding");
+                            ModelState.AddModelError(nameof(model.SelectedRefundOption), StringLocalizer["Please select an option before proceeding"]);
                             return View("_RefundModal", model);
                     }
                     break;
@@ -526,7 +527,7 @@ namespace BTCPayServer.Controllers
                 createPullPayment.Amount = Math.Round(createPullPayment.Amount - reduceByAmount, ppDivisibility);
             }
 
-            var ppId = await _paymentHostedService.CreatePullPayment(createPullPayment);
+            var ppId = await _paymentHostedService.CreatePullPayment(store, createPullPayment);
             TempData.SetStatusMessageModel(new StatusMessageModel
             {
                 Html = "Refund successfully created!<br />Share the link to this page with a customer.<br />The customer needs to enter their address and claim the refund.<br />Once a customer claims the refund, you will get a notification and would need to approve and initiate it from your Store > Payouts.",
@@ -600,18 +601,20 @@ namespace BTCPayServer.Controllers
         {
             var invoice = (await _InvoiceRepository.GetInvoices(new InvoiceQuery
             {
-                InvoiceId = new[] { invoiceId },
-                UserId = GetUserId(),
+                InvoiceId = [invoiceId],
+                UserId = GetUserIdForInvoiceQuery(),
                 IncludeAddresses = false,
                 IncludeArchived = true,
             })).FirstOrDefault();
             if (invoice == null)
                 return NotFound();
             await _InvoiceRepository.ToggleInvoiceArchival(invoiceId, !invoice.Archived);
-            TempData.SetStatusMessageModel(new StatusMessageModel()
+            TempData.SetStatusMessageModel(new StatusMessageModel
             {
                 Severity = StatusMessageModel.StatusSeverity.Success,
-                Message = invoice.Archived ? "The invoice has been unarchived and will appear in the invoice list by default again." : "The invoice has been archived and will no longer appear in the invoice list by default."
+                Message = invoice.Archived
+                    ? StringLocalizer["The invoice has been unarchived and will appear in the invoice list by default again."].Value
+                    : StringLocalizer["The invoice has been archived and will no longer appear in the invoice list by default."].Value
             });
             return RedirectToAction(nameof(invoice), new { invoiceId });
         }
@@ -626,43 +629,49 @@ namespace BTCPayServer.Controllers
                 return RedirectToAction(nameof(ListInvoices), new { storeId });
             }
             if (selectedItems.Length == 0)
-                return NotSupported("No invoice has been selected");
+                return NotSupported(StringLocalizer["No invoice has been selected"]);
 
             switch (command)
             {
                 case "archive":
                     await _InvoiceRepository.MassArchive(selectedItems);
-                    TempData[WellKnownTempData.SuccessMessage] = $"{selectedItems.Length} invoice{(selectedItems.Length == 1 ? "" : "s")} archived.";
+                    TempData[WellKnownTempData.SuccessMessage] = selectedItems.Length == 1
+                        ? StringLocalizer["{0} invoice archived.", selectedItems.Length].Value
+                        : StringLocalizer["{0} invoices archived.", selectedItems.Length].Value;
                     break;
 
                 case "unarchive":
                     await _InvoiceRepository.MassArchive(selectedItems, false);
-                    TempData[WellKnownTempData.SuccessMessage] = $"{selectedItems.Length} invoice{(selectedItems.Length == 1 ? "" : "s")} unarchived.";
+                    TempData[WellKnownTempData.SuccessMessage] = selectedItems.Length == 1
+                        ? StringLocalizer["{0} invoice unarchived.", selectedItems.Length].Value
+                        : StringLocalizer["{0} invoices unarchived.", selectedItems.Length].Value;
                     break;
                 case "cpfp" when storeId is not null:
                     var network = _NetworkProvider.DefaultNetwork;
                     var explorer = _ExplorerClients.GetExplorerClient(network);
                     if (explorer is null)
-                        return NotSupported("This feature is only available to BTC wallets");
+                        return NotSupported(StringLocalizer["This feature is only available to BTC wallets"]);
                     if (!GetCurrentStore().HasPermission(GetUserId(), Policies.CanModifyStoreSettings))
                         return Forbid();
 
-                    var derivationScheme = (this.GetCurrentStore().GetDerivationSchemeSettings(_handlers, network.CryptoCode))?.AccountDerivation;
+                    var derivationScheme = GetCurrentStore().GetDerivationSchemeSettings(_handlers, network.CryptoCode)?.AccountDerivation;
                     if (derivationScheme is null)
                         return NotSupported("This feature is only available to BTC wallets");
                     var btc = PaymentTypes.CHAIN.GetPaymentMethodId("BTC");
                     var bumpableAddresses = await GetAddresses(btc, selectedItems);
                     var utxos = await explorer.GetUTXOsAsync(derivationScheme);
                     var bumpableUTXOs = utxos.GetUnspentUTXOs().Where(u => u.Confirmations == 0 && bumpableAddresses.Contains(u.ScriptPubKey.Hash.ToString())).ToArray();
+                    if (bumpableUTXOs.Length == 0)
+                        return NotSupported("No UTXOs available for bumping the selected invoices");
                     var parameters = new MultiValueDictionary<string, string>();
                     foreach (var utxo in bumpableUTXOs)
                     {
-                        parameters.Add($"outpoints[]", utxo.Outpoint.ToString());
+                        parameters.Add("outpoints[]", utxo.Outpoint.ToString());
                     }
                     return View("PostRedirect", new PostRedirectViewModel
                     {
                         AspController = "UIWallets",
-                        AspAction = nameof(UIWalletsController.WalletCPFP),
+                        AspAction = nameof(UIWalletsController.WalletBumpFee),
                         RouteParameters = {
                             { "walletId", new WalletId(storeId, network.CryptoCode).ToString() },
                             { "returnUrl", Url.Action(nameof(ListInvoices), new { storeId }) }
@@ -721,6 +730,9 @@ namespace BTCPayServer.Controllers
             if (invoice == null)
                 return null;
 
+            if (!await ValidateAccessForArchivedInvoice(invoice))
+                return null;
+            
             var store = await _StoreRepository.FindStore(invoice.StoreId);
             if (store == null)
                 return null;
@@ -758,34 +770,7 @@ namespace BTCPayServer.Controllers
                 paymentMethodId = null;
             if (paymentMethodId is null)
             {
-                PaymentMethodId? invoicePaymentId = invoice.DefaultPaymentMethod;
-                PaymentMethodId? storePaymentId = store.GetDefaultPaymentId();
-                if (invoicePaymentId is not null)
-                {
-                    if (displayedPaymentMethods.Contains(invoicePaymentId))
-                        paymentMethodId = invoicePaymentId;
-                }
-                if (paymentMethodId is null && storePaymentId is not null)
-                {
-                    if (displayedPaymentMethods.Contains(storePaymentId))
-                        paymentMethodId = storePaymentId;
-                }
-                if (paymentMethodId is null && invoicePaymentId is not null)
-                {
-                    paymentMethodId = invoicePaymentId.FindNearest(displayedPaymentMethods);
-                }
-                if (paymentMethodId is null && storePaymentId is not null)
-                {
-                    paymentMethodId = storePaymentId.FindNearest(displayedPaymentMethods);
-                }
-                if (paymentMethodId is null)
-                {
-                    var defaultBTC = PaymentTypes.CHAIN.GetPaymentMethodId(_NetworkProvider.DefaultNetwork.CryptoCode);
-                    var defaultLNURLPay  = PaymentTypes.LNURL.GetPaymentMethodId(_NetworkProvider.DefaultNetwork.CryptoCode);
-                    paymentMethodId = displayedPaymentMethods.FirstOrDefault(e => e == defaultBTC) ??
-                                      displayedPaymentMethods.FirstOrDefault(e => e == defaultLNURLPay) ??
-                                      displayedPaymentMethods.FirstOrDefault();
-                }
+                paymentMethodId = invoice.GetDefaultPaymentMethodId(store, _NetworkProvider, displayedPaymentMethods);
                 isDefaultPaymentId = true;
             }
             if (paymentMethodId is null)
@@ -877,7 +862,7 @@ namespace BTCPayServer.Controllers
             var model = new CheckoutModel
             {
                 Activated = prompt.Activated,
-                PaymentMethodName = _prettyName.PrettyName(paymentMethodId),
+                PaymentMethodName = _prettyName.PrettyName(paymentMethodId, true),
                 PaymentMethodCurrency = prompt.Currency,
                 RootPath = Request.PathBase.Value.WithTrailingSlash(),
                 OrderId = orderId,
@@ -929,7 +914,7 @@ namespace BTCPayServer.Controllers
                                               {
                                                   Displayed = displayedPaymentMethods.Contains(kv.PaymentMethodId),
                                                   PaymentMethodId = kv.PaymentMethodId,
-                                                  PaymentMethodName = _prettyName.PrettyName(kv.PaymentMethodId),
+                                                  PaymentMethodName = _prettyName.PrettyName(kv.PaymentMethodId, true),
                                                   Order = kv.PaymentMethodId switch
                                                   {
                                                       _ when PaymentTypes.CHAIN.GetPaymentMethodId(_NetworkProvider.DefaultNetwork.CryptoCode) == kv.PaymentMethodId => 0,
@@ -958,10 +943,15 @@ namespace BTCPayServer.Controllers
             var expiration = TimeSpan.FromSeconds(model.ExpirationSeconds);
             model.TimeLeft = expiration.PrettyPrint();
 
-            if (_paymentModelExtensions.TryGetValue(paymentMethodId, out var extension) &&
-                    _handlers.TryGetValue(paymentMethodId, out var h))
+            if (_handlers.TryGetValue(paymentMethodId, out var h))
             {
-                extension.ModifyCheckoutModel(new CheckoutModelContext(model, store, storeBlob, invoice, Url, prompt, h));
+                var ctx = new CheckoutModelContext(model, store, storeBlob, invoice, Url, prompt, h);
+                if (_paymentModelExtensions.TryGetValue(paymentMethodId, out var extension))
+                {
+                    extension.ModifyCheckoutModel(ctx);
+                }
+                foreach (var global in GlobalCheckoutModelExtensions)
+                    global.ModifyCheckoutModel(ctx);
             }
             return model;
         }
@@ -1016,6 +1006,10 @@ namespace BTCPayServer.Controllers
             var invoice = await _InvoiceRepository.GetInvoice(invoiceId);
             if (invoice == null || invoice.Status == InvoiceStatus.Settled || invoice.Status == InvoiceStatus.Invalid || invoice.Status == InvoiceStatus.Expired)
                 return NotFound();
+            
+            if (!await ValidateAccessForArchivedInvoice(invoice))
+                return NotFound();
+            
             var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
             CompositeDisposable leases = new CompositeDisposable();
             try
@@ -1133,7 +1127,7 @@ namespace BTCPayServer.Controllers
             return new InvoiceQuery
             {
                 TextSearch = textSearch,
-                UserId = GetUserId(),
+                UserId = GetUserIdForInvoiceQuery(),
                 Unusual = fs.GetFilterBool("unusual"),
                 IncludeArchived = fs.GetFilterBool("includearchived") ?? false,
                 Status = fs.GetFilterArray("status"),
@@ -1154,7 +1148,7 @@ namespace BTCPayServer.Controllers
         {
             if (string.IsNullOrEmpty(model?.StoreId))
             {
-                TempData[WellKnownTempData.ErrorMessage] = "You need to select a store before creating an invoice.";
+                TempData[WellKnownTempData.ErrorMessage] = StringLocalizer["You need to select a store before creating an invoice."].Value;
                 return RedirectToAction(nameof(UIHomeController.Index), "UIHome");
             }
 
@@ -1202,7 +1196,7 @@ namespace BTCPayServer.Controllers
                 }
                 catch (Exception)
                 {
-                    ModelState.AddModelError(nameof(model.Metadata), "Metadata was not valid JSON");
+                    ModelState.AddModelError(nameof(model.Metadata), StringLocalizer["Metadata was not valid JSON"]);
                 }
             }
 
@@ -1228,7 +1222,7 @@ namespace BTCPayServer.Controllers
                     metadata.BuyerEmail = model.BuyerEmail;
                 }
 
-                var result = await CreateInvoiceCoreRaw(new CreateInvoiceRequest()
+                var result = await CreateInvoiceCoreRaw(new CreateInvoiceRequest
                 {
                     Amount = model.Amount,
                     Currency = model.Currency,
@@ -1249,14 +1243,14 @@ namespace BTCPayServer.Controllers
                     },
                     cancellationToken: cancellationToken);
 
-                TempData[WellKnownTempData.SuccessMessage] = $"Invoice {result.Id} just created!";
+                TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["Invoice {0} just created!", result.Id].Value;
                 CreatedInvoiceId = result.Id;
 
                 return RedirectToAction(nameof(Invoice), new { storeId = result.StoreId, invoiceId = result.Id });
             }
             catch (BitpayHttpException ex)
             {
-                TempData.SetStatusMessageModel(new StatusMessageModel()
+                TempData.SetStatusMessageModel(new StatusMessageModel
                 {
                     Severity = StatusMessageModel.StatusSeverity.Error,
                     Message = ex.Message
@@ -1274,8 +1268,8 @@ namespace BTCPayServer.Controllers
         {
             var invoice = (await _InvoiceRepository.GetInvoices(new InvoiceQuery
             {
-                InvoiceId = new[] { invoiceId },
-                UserId = GetUserId()
+                InvoiceId = [invoiceId],
+                UserId = GetUserIdForInvoiceQuery()
             })).FirstOrDefault();
             var model = new InvoiceStateChangeModel();
             if (invoice == null)
@@ -1309,49 +1303,8 @@ namespace BTCPayServer.Controllers
 
         private string GetUserId() => _UserManager.GetUserId(User)!;
 
-        public class PosDataParser
-        {
-            public static Dictionary<string, object> ParsePosData(JToken? posData)
-            {
-                var result = new Dictionary<string, object>();
-                if (posData is JObject jobj)
-                {
-                    foreach (var item in jobj)
-                    {
-                        ParsePosDataItem(item, ref result);
-                    }
-                }
-                return result;
-            }
-
-            static void ParsePosDataItem(KeyValuePair<string, JToken?> item, ref Dictionary<string, object> result)
-            {
-                switch (item.Value?.Type)
-                {
-                    case JTokenType.Array:
-                        var items = item.Value.AsEnumerable().ToList();
-                        var arrayResult = new List<object>();
-                        for (var i = 0; i < items.Count; i++)
-                        {
-                            arrayResult.Add(items[i] is JObject
-                                ? ParsePosData(items[i])
-                                : items[i].ToString());
-                        }
-
-                        result.TryAdd(item.Key, arrayResult);
-
-                        break;
-                    case JTokenType.Object:
-                        result.TryAdd(item.Key, ParsePosData(item.Value));
-                        break;
-                    case null:
-                        break;
-                    default:
-                        result.TryAdd(item.Key, item.Value.ToString());
-                        break;
-                }
-            }
-        }
+        // Let server admin lookup invoices from users, see #6489
+        private string? GetUserIdForInvoiceQuery() => User.IsInRole(Roles.ServerAdmin) ? null : GetUserId();
 
         private SelectList GetPaymentMethodsSelectList(StoreData store)
         {
@@ -1370,6 +1323,13 @@ namespace BTCPayServer.Controllers
                 AllowDismiss = false
             });
             return RedirectToAction(nameof(ListInvoices), new { storeId });
+        }
+        
+        private async Task<bool> ValidateAccessForArchivedInvoice(InvoiceEntity invoice)
+        {
+            if (!invoice.Archived) return true;
+            var authorizationResult = await _authorizationService.AuthorizeAsync(User, invoice.StoreId, Policies.CanViewInvoices);
+            return authorizationResult.Succeeded;
         }
     }
 }

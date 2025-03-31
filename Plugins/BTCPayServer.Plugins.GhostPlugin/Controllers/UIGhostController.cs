@@ -107,7 +107,6 @@ public class UIGhostController : Controller
         JsonConvert.SerializeObject(vm, Formatting.Indented);
         try
         {
-            Console.WriteLine(JsonConvert.SerializeObject(vm));
             await using var ctx = _dbContextFactory.CreateContext();
             var store = await _storeRepo.FindStore(CurrentStore.Id);
             switch (command)
@@ -122,51 +121,7 @@ public class UIGhostController : Controller
                             TempData[WellKnownTempData.ErrorMessage] = "Please provide valid Ghost credentials";
                             return View(vm);
                         }
-                        var apiClient = new GhostAdminApiClient(_clientFactory, entity.CreateGhsotApiCredentials());
-                        //bool isValid = false;
-                        try
-                        {
-                            var validCredentials = await apiClient.ValidateGhostCredentials();
-                            if (validCredentials.RequiresOTP)
-                            {
-                                TempData[WellKnownTempData.ErrorMessage] = $"Cannot validated credentials at the moment as the username and password requires 2 Factor Authentication. Kindly reach out to the Ghost team";
-                                vm.RequiresOTP = true;
-                                return View(vm);
-                            }
-                            //isValid = validCredentials.IsValid;
-                            if (!validCredentials.IsValid)
-                            {
-                                TempData[WellKnownTempData.ErrorMessage] = $"Invalid Ghost credentials";
-                                return View(vm);
-                            }
-                        /*if (!string.IsNullOrEmpty(vm.OTP))
-                        {
-                            var validateToken = await apiClient.Complete2FAAuthentication(vm.OTP);
-                            isValid = validateToken;
-                        }
-                        else
-                        {
-                            var validCredentials = await apiClient.ValidateGhostCredentials();
-                            if (validCredentials.RequiresOTP)
-                            {
-                                vm.RequiresOTP = true;
-                                return View(vm);
-                            }
-                            isValid = validCredentials.IsValid;
-                        }
-                        if (!isValid)
-                        {
-                            TempData[WellKnownTempData.ErrorMessage] = $"Invalid Ghost credentials";
-                            return View(vm);
-                        }*/
-                    }
-                        catch (GhostApiException err)
-                        {
-                            TempData[WellKnownTempData.ErrorMessage] = $"Invalid Ghost credentials: {err.Message}";
-                            return View(vm);
-                        }
                         entity.BaseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}";
-                        entity.IntegratedAt = DateTimeOffset.UtcNow;
                         entity.StoreId = CurrentStore.Id;
                         entity.StoreName = CurrentStore.StoreName;
                         entity.ApplicationUserId = GetUserId();

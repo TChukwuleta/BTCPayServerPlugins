@@ -8,6 +8,7 @@ using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Form;
 using BTCPayServer.Abstractions.Models;
+using BTCPayServer.Abstractions.Services;
 using BTCPayServer.Client;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Controllers;
@@ -17,16 +18,17 @@ using BTCPayServer.Forms;
 using BTCPayServer.Forms.Models;
 using BTCPayServer.Models;
 using BTCPayServer.Plugins.Crowdfund.Models;
-using BTCPayServer.Plugins.PointOfSale.Models;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Rates;
 using BTCPayServer.Services.Stores;
+using Ganss.Xss;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 using NBitpayClient;
@@ -50,7 +52,9 @@ namespace BTCPayServer.Plugins.Crowdfund.Controllers
             UIInvoiceController invoiceController,
             UserManager<ApplicationUser> userManager,
             FormDataService formDataService,
-            CrowdfundAppType app)
+            IStringLocalizer stringLocalizer,
+            CrowdfundAppType app,
+            Safe safe)
         {
             _currencies = currencies;
             _appService = appService;
@@ -62,6 +66,8 @@ namespace BTCPayServer.Plugins.Crowdfund.Controllers
             _uriResolver = uriResolver;
             _invoiceController = invoiceController;
             FormDataService = formDataService;
+            StringLocalizer = stringLocalizer;
+            _safe = safe;
         }
 
         private readonly EventAggregator _eventAggregator;
@@ -73,7 +79,10 @@ namespace BTCPayServer.Plugins.Crowdfund.Controllers
         private readonly UIInvoiceController _invoiceController;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly CrowdfundAppType _app;
+        private readonly Safe _safe;
+
         public FormDataService FormDataService { get; }
+        public IStringLocalizer StringLocalizer { get; }
 
         [HttpGet("/")]
         [HttpGet("/apps/{appId}/crowdfund")]
@@ -145,36 +154,28 @@ namespace BTCPayServer.Plugins.Crowdfund.Controllers
             decimal? price = request.Amount;
             var title = settings.Title;
             Dictionary<string, InvoiceSupportedTransactionCurrency> paymentMethods = null;
-            ViewPointOfSaleViewModel.Item choice = null;
             if (!string.IsNullOrEmpty(request.ChoiceKey))
             {
                 var choices = AppService.Parse(settings.PerksTemplate, false);
-                choice = choices?.FirstOrDefault(c => c.Id == request.ChoiceKey);
+                AppItem choice = choices.FirstOrDefault(c => c.Id == request.ChoiceKey);
                 if (choice == null)
                     return NotFound("Incorrect option provided");
                 title = choice.Title;
 
-                if (choice.PriceType == ViewPointOfSaleViewModel.ItemPriceType.Topup)
+                if (choice.PriceType == AppItemPriceType.Topup)
                 {
                     price = null;
                 }
                 else
                 {
-                    price = choice.Price.Value;
+                    if (choice.Price.HasValue)
+                        price = choice.Price.Value;
                     if (request.Amount > price)
                         price = request.Amount;
                 }
-                if (choice.Inventory.HasValue)
+                if (choice.Inventory is <= 0)
                 {
-                    if (choice.Inventory <= 0)
-                    {
-                        return NotFound("Option was out of stock");
-                    }
-                }
-                if (choice?.PaymentMethods?.Any() is true)
-                {
-                    paymentMethods = choice?.PaymentMethods.ToDictionary(s => s,
-                        s => new InvoiceSupportedTransactionCurrency() { Enabled = true });
+                    return NotFound("Option was out of stock");
                 }
             }
             else
@@ -226,8 +227,6 @@ namespace BTCPayServer.Plugins.Crowdfund.Controllers
                     }
                 }
             }
-
-            
 
             if (!isAdmin && (settings.EnforceTargetAmount && info.TargetAmount.HasValue && price >
                              (info.TargetAmount - (info.Info.CurrentAmount + info.Info.CurrentPendingAmount))))
@@ -398,8 +397,6 @@ namespace BTCPayServer.Plugins.Crowdfund.Controllers
 
             var settings = app.GetSettings<CrowdfundSettings>();
             var resetEvery = Enum.GetName(typeof(CrowdfundResetEvery), settings.ResetEvery);
-            var urll = await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), settings.MainImageUrl);
-            Console.WriteLine(urll);
 
             var vm = new UpdateCrowdfundViewModel
             {
@@ -412,6 +409,8 @@ namespace BTCPayServer.Plugins.Crowdfund.Controllers
                 Enabled = settings.Enabled,
                 EnforceTargetAmount = settings.EnforceTargetAmount,
                 StartDate = settings.StartDate,
+                HtmlMetaTags= settings.HtmlMetaTags,
+                Language = settings.HtmlLang,
                 TargetCurrency = settings.TargetCurrency,
                 MainImageUrl = settings.MainImageUrl == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), settings.MainImageUrl),
                 Description = settings.Description,
@@ -533,6 +532,8 @@ namespace BTCPayServer.Plugins.Crowdfund.Controllers
 
             app.Name = vm.AppName;
             app.Archived = vm.Archived;
+
+            bool wasHtmlModified;
             var newSettings = new CrowdfundSettings
             {
                 Title = vm.Title,
@@ -540,6 +541,8 @@ namespace BTCPayServer.Plugins.Crowdfund.Controllers
                 EnforceTargetAmount = vm.EnforceTargetAmount,
                 StartDate = vm.StartDate?.ToUniversalTime(),
                 TargetCurrency = vm.TargetCurrency,
+                HtmlMetaTags= _safe.RawMeta(vm.HtmlMetaTags, out wasHtmlModified),
+                HtmlLang = vm.Language,
                 Description = vm.Description,
                 EndDate = vm.EndDate?.ToUniversalTime(),
                 TargetAmount = vm.TargetAmount,
@@ -583,7 +586,14 @@ namespace BTCPayServer.Plugins.Crowdfund.Controllers
                 StoreId = app.StoreDataId,
                 Settings = newSettings
             });
-            TempData[WellKnownTempData.SuccessMessage] = "App updated";
+            if (wasHtmlModified)
+            {
+                TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["Only meta tags are allowed in HTML headers. Your HTML code has been cleaned up accordingly."].Value;
+            }
+            else
+            {
+                TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["App updated"].Value;
+            }
             return RedirectToAction(nameof(UpdateCrowdfund), new { appId });
         }
 

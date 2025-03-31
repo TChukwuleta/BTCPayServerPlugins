@@ -5,6 +5,7 @@ using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 using BTCPayServer.Services.Apps;
 using NBitcoin.DataEncoders;
 using NBitcoin;
+using System;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Helper;
 
@@ -51,8 +52,6 @@ public class GhostHelper
             AdminApiKey = ghostSetting.AdminApiKey,
             ApiUrl = ghostSetting.ApiUrl,
             ContentApiKey = ghostSetting.ContentApiKey,
-            Username = ghostSetting.Username,
-            Password = ghostSetting.Password,
             WebhookSecret = ghostSetting.WebhookSecret,
             StoreId = ghostSetting.StoreId,
             StoreName = ghostSetting.StoreName,
@@ -67,11 +66,10 @@ public class GhostHelper
             AdminApiKey = vm.AdminApiKey,
             ApiUrl = vm.ApiUrl,
             ContentApiKey = vm.ContentApiKey,
-            Username = vm.Username,
-            Password = vm.Password,
             StoreId = vm.StoreId,
             WebhookSecret = !string.IsNullOrEmpty(vm.WebhookSecret) ? vm.WebhookSecret : Encoders.Base58.EncodeData(RandomUtils.GetBytes(10)),
-            StoreName = vm.StoreName
+            StoreName = vm.StoreName,
+            IntegratedAt = DateTimeOffset.UtcNow
         };
     }
 }

@@ -70,6 +70,7 @@
                     <th>Created Date</th>
                     <th>Next Subscription Date</th>
                     <th class="actions-col"></th>
+                    <th class="actions-col"></th>
                     <th class="w-75px"></th>
                 </tr>
             </thead>
@@ -85,6 +86,11 @@
                         <td>@member.Frequency.ToString()</td>
                         <td>@member.CreatedDate.ToString("M/d/yy, hh:mm tt")</td>
                         <td>@member.PeriodEndDate.ToString("M/d/yy, hh:mm tt")</td>
+                        <td class="actions-col">
+                            <div class="d-inline-flex align-items-center gap-3">
+                                <a asp-action="Delete" asp-controller="UIGhostMember" asp-route-storeId="@storeId" asp-route-memberId="@member.Id" class="text-danger">Delete</a>
+                            </div>
+                        </td>
                         <td class="actions-col">
 
                             @if (storeEmailSettingsConfigured && (DateTime.UtcNow.Date >= member.PeriodEndDate.UtcDateTime.Date ||

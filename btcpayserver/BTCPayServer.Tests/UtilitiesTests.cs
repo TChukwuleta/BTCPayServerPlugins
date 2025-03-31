@@ -16,11 +16,13 @@ using BTCPayServer.Client.Models;
 using BTCPayServer.Controllers;
 using ExchangeSharp;
 using Microsoft.AspNetCore.Html;
+using Microsoft.AspNetCore.Mvc.Localization;
 using Microsoft.AspNetCore.Razor.Language;
 using Microsoft.AspNetCore.Razor.Language.Intermediate;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.Extensions.FileSystemGlobbing;
 using NBitcoin;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -349,6 +351,8 @@ retry:
                 {
                     defaultTranslatedKeys.Add(k);
                 }
+
+                AddLocalizers(defaultTranslatedKeys, txt);
             }
 
             // Go through all cshtml file, search for text-translate or ViewLocalizer usage
@@ -356,32 +360,24 @@ retry:
             {
                 await tester.StartAsync();
                 var engine = tester.PayTester.GetService<RazorProjectEngine>();
-                foreach (var file in soldir.EnumerateFiles("*.cshtml", SearchOption.AllDirectories))
+                var files = soldir.EnumerateFiles("*.cshtml", SearchOption.AllDirectories)
+                    .Union(soldir.EnumerateFiles("*.razor", SearchOption.AllDirectories));
+                foreach (var file in files)
                 {
                     var filePath = file.FullName;
                     var txt = File.ReadAllText(file.FullName);
-                    foreach (string localizer in new[] { "ViewLocalizer", "StringLocalizer" })
-                    {
-                        if (txt.Contains(localizer))
-                        {
-                            var matches = Regex.Matches(txt, localizer + "\\[\"(.*?)\"[\\],]");
-                            foreach (Match match in matches)
-                            {
-                                defaultTranslatedKeys.Add(match.Groups[1].Value);
-                            }
-                        }
-                    }
+                    AddLocalizers(defaultTranslatedKeys, txt);
 
                     filePath = filePath.Replace(Path.Combine(soldir.FullName, "BTCPayServer"), "/");
                     var item = engine.FileSystem.GetItem(filePath);
-                        
+
                     var node = (DocumentIntermediateNode)engine.Process(item).Items[typeof(DocumentIntermediateNode)];
                     var w = new TranslatedKeyNodeWalker(defaultTranslatedKeys, txt);
                     w.Visit(node);
                 }
 
             }
-            defaultTranslatedKeys = defaultTranslatedKeys.Select(d => d.Trim()).Distinct().OrderBy(o => o).ToList();
+            defaultTranslatedKeys = defaultTranslatedKeys.Select(d => d.Trim().Replace("\r\n", "\n")).Distinct().OrderBy(o => o).ToList();
             JObject obj = new JObject();
             foreach (var v in defaultTranslatedKeys)
             {
@@ -397,6 +393,24 @@ retry:
             content += defaultTranslation.Substring(endIdx);
             File.WriteAllText(path, content);
         }
+
+        private static void AddLocalizers(List<string> defaultTranslatedKeys, string txt)
+        {
+            foreach (string localizer in new[] { "ViewLocalizer", "StringLocalizer" })
+            {
+                if (txt.Contains(localizer))
+                {
+                    var matches = Regex.Matches(txt, localizer + "\\[\"(.*?)\"[\\],]");
+                    foreach (Match match in matches)
+                    {
+                        var k = match.Groups[1].Value;
+                        k = k.Replace("\\", "");
+                        defaultTranslatedKeys.Add(k);
+                    }
+                }
+            }
+        }
+
         class DisplayNameWalker : CSharpSyntaxWalker
         {
             public List<string> Keys = new List<string>();

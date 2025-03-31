@@ -3,7 +3,10 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
+using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Extensions;
+using BTCPayServer.Abstractions.Models;
+using BTCPayServer.Abstractions.Services;
 using BTCPayServer.Client;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
@@ -15,6 +18,7 @@ using BTCPayServer.Services.Rates;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
@@ -33,21 +37,27 @@ namespace BTCPayServer.Controllers.Greenfield
         private readonly StoreRepository _storeRepository;
         private readonly CurrencyNameTable _currencies;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IFileService _fileService;
+
+        public Safe Safe { get; }
 
         public GreenfieldAppsController(
             AppService appService,
             UriResolver uriResolver,
             StoreRepository storeRepository,
-            BTCPayNetworkProvider btcPayNetworkProvider,
             CurrencyNameTable currencies,
-            UserManager<ApplicationUser> userManager
+            IFileService fileService,
+            UserManager<ApplicationUser> userManager,
+            Safe safe
         )
         {
             _appService = appService;
             _uriResolver = uriResolver;
             _storeRepository = storeRepository;
             _currencies = currencies;
+            _fileService = fileService;
             _userManager = userManager;
+            Safe = safe;
         }
 
         [HttpPost("~/api/v1/stores/{storeId}/apps/crowdfund")]
@@ -190,30 +200,17 @@ namespace BTCPayServer.Controllers.Greenfield
         }
 
         [HttpGet("~/api/v1/apps/pos/{appId}")]
-        [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
         public async Task<IActionResult> GetPosApp(string appId)
         {
             var app = await _appService.GetApp(appId, PointOfSaleAppType.AppType, includeArchived: true);
-            if (app == null)
-            {
-                return AppNotFound();
-            }
-
-            return Ok(ToPointOfSaleModel(app));
+            return app == null ? AppNotFound() : Ok(ToPointOfSaleModel(app));
         }
 
         [HttpGet("~/api/v1/apps/crowdfund/{appId}")]
-        [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
         public async Task<IActionResult> GetCrowdfundApp(string appId)
         {
             var app = await _appService.GetApp(appId, CrowdfundAppType.AppType, includeArchived: true);
-            if (app == null)
-            {
-                return AppNotFound();
-            }
-
-            var model = await ToCrowdfundModel(app);
-            return Ok(model);
+            return app == null ? AppNotFound() : Ok(await ToCrowdfundModel(app));
         }
 
         [HttpDelete("~/api/v1/apps/{appId}")]
@@ -221,10 +218,7 @@ namespace BTCPayServer.Controllers.Greenfield
         public async Task<IActionResult> DeleteApp(string appId)
         {
             var app = await _appService.GetApp(appId, null, includeArchived: true);
-            if (app == null)
-            {
-                return AppNotFound();
-            }
+            if (app == null) return AppNotFound();
 
             await _appService.DeleteApp(app);
 
@@ -254,6 +248,57 @@ namespace BTCPayServer.Controllers.Greenfield
             var items = stats.GetRange(offset, max);
             return Ok(items);
         }
+
+        [HttpPost("~/api/v1/apps/{appId}/image")]
+        [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
+        public async Task<IActionResult> UploadAppItemImage(string appId, IFormFile? file)
+        {
+            var app = await _appService.GetApp(appId, null, includeArchived: true);
+            var userId = _userManager.GetUserId(User);
+            if (app == null || userId == null) return AppNotFound();
+            
+            UploadImageResultModel? upload = null;
+            if (file is null)
+                ModelState.AddModelError(nameof(file), "Invalid file");
+            else
+            {
+                upload = await _fileService.UploadImage(file, userId, 500_000);
+                if (!upload.Success)
+                    ModelState.AddModelError(nameof(file), upload.Response);
+            }
+            if (!ModelState.IsValid)
+                return this.CreateValidationError(ModelState);
+            
+            try
+            {
+                var storedFile = upload!.StoredFile!;
+                var fileData = new FileData
+                {
+                    Id = storedFile.Id,
+                    UserId = storedFile.ApplicationUserId,
+                    Url = await _fileService.GetFileUrl(Request.GetAbsoluteRootUri(), storedFile.Id),
+                    OriginalName = storedFile.FileName,
+                    StorageName = storedFile.StorageFileName,
+                    CreatedAt = storedFile.Timestamp
+                };
+                return Ok(fileData);
+            }
+            catch (Exception e)
+            {
+                return this.CreateAPIError(404, "file-upload-failed", e.Message);
+            }
+        }
+
+        [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
+        [HttpDelete("~/api/v1/apps/{appId}/image/{fileId}")]
+        public async Task<IActionResult> DeleteAppItemImage(string appId, string fileId)
+        {
+            var app = await _appService.GetApp(appId, null, includeArchived: true);
+            var userId = _userManager.GetUserId(User);
+            if (app == null || userId == null) return AppNotFound();
+            if (!string.IsNullOrEmpty(fileId)) await _fileService.RemoveFile(fileId, userId);
+            return Ok();
+        }
         
         private IActionResult AppNotFound()
         {
@@ -265,7 +310,8 @@ namespace BTCPayServer.Controllers.Greenfield
             var parsedSounds = ValidateStringArray(request.Sounds);
             var parsedColors = ValidateStringArray(request.AnimationColors);
             Enum.TryParse<BTCPayServer.Services.Apps.CrowdfundResetEvery>(request.ResetEvery.ToString(), true, out var resetEvery);
-            
+            if (request.HtmlMetaTags is not null)
+                request.HtmlMetaTags = Safe.RawMeta(request.HtmlMetaTags, out _);
             return new CrowdfundSettings
             {
                 Title = request.Title?.Trim() ?? request.AppName,
@@ -293,6 +339,8 @@ namespace BTCPayServer.Controllers.Greenfield
                 SortPerksByPopularity = request.SortPerksByPopularity ?? false,
                 Sounds = parsedSounds ?? new CrowdfundSettings().Sounds,
                 AnimationColors = parsedColors ?? new CrowdfundSettings().AnimationColors,
+                HtmlMetaTags = request.HtmlMetaTags,
+                HtmlLang  = request.HtmlLang,
                 FormId = request.FormId
             };
         }
@@ -300,6 +348,8 @@ namespace BTCPayServer.Controllers.Greenfield
         private PointOfSaleSettings ToPointOfSaleSettings(PointOfSaleAppRequest request, PointOfSaleSettings settings)
         {
             Enum.TryParse<BTCPayServer.Plugins.PointOfSale.PosViewType>(request.DefaultView.ToString(), true, out var defaultView);
+            if (request.HtmlMetaTags is not null)
+                request.HtmlMetaTags = Safe.RawMeta(request.HtmlMetaTags, out _);
 
             return new PointOfSaleSettings
             {
@@ -320,6 +370,8 @@ namespace BTCPayServer.Controllers.Greenfield
                 NotificationUrl = request.NotificationUrl,
                 RedirectUrl = request.RedirectUrl,
                 Description = request.Description,
+                HtmlLang = request.HtmlLang,
+                HtmlMetaTags = request.HtmlMetaTags,
                 RedirectAutomatically = request.RedirectAutomatically,
                 FormId = request.FormId
             };
@@ -355,6 +407,7 @@ namespace BTCPayServer.Controllers.Greenfield
         {
             var settings = appData.GetSettings<PointOfSaleSettings>();
             Enum.TryParse<PosViewType>(settings.DefaultView.ToString(), true, out var defaultView);
+            var items = AppService.Parse(settings.Template);
             
             return new PointOfSaleAppData
             {
@@ -380,18 +433,11 @@ namespace BTCPayServer.Controllers.Greenfield
                 FormId = settings.FormId,
                 NotificationUrl = settings.NotificationUrl,
                 RedirectUrl = settings.RedirectUrl,
+                HtmlLang = settings.HtmlLang,
+                HtmlMetaTags = settings.HtmlMetaTags,
                 Description = settings.Description,
                 RedirectAutomatically = settings.RedirectAutomatically,
-                Items = JsonConvert.DeserializeObject(
-                    JsonConvert.SerializeObject(
-                        AppService.Parse(settings.Template),
-                        new JsonSerializerSettings
-                        {
-                            ContractResolver =
-                                new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver()
-                        }
-                    )
-                )
+                Items = items
             };
         }
 
@@ -420,6 +466,7 @@ namespace BTCPayServer.Controllers.Greenfield
         {
             var settings = appData.GetSettings<CrowdfundSettings>();
             Enum.TryParse<CrowdfundResetEvery>(settings.ResetEvery.ToString(), true, out var resetEvery);
+            var perks = AppService.Parse(settings.PerksTemplate);
 
             return new CrowdfundAppData
             {
@@ -451,15 +498,10 @@ namespace BTCPayServer.Controllers.Greenfield
                 SortPerksByPopularity = settings.SortPerksByPopularity,
                 Sounds = settings.Sounds,
                 AnimationColors = settings.AnimationColors,
-                Perks = JsonConvert.DeserializeObject(
-                    JsonConvert.SerializeObject(
-                        AppService.Parse(settings.PerksTemplate), 
-                        new JsonSerializerSettings
-                        {
-                            ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver()
-                        }
-                    )
-                )
+                HtmlLang = settings.HtmlLang,
+                HtmlMetaTags = settings.HtmlMetaTags,
+                FormId = settings.FormId,
+                Perks = perks
             };
         }
 
