@@ -50,6 +50,7 @@ var vaultui = (function () {
         signingTransaction: new VaultFeedback("?", "Please review and confirm the transaction on your device...", "ask-signing"),
         reviewAddress: new VaultFeedback("?", "Sending... Please review the address on your device...", "ask-signing"),
         signingRejected: new VaultFeedback("failed", "The user refused to sign the transaction", "user-reject"),
+        alreadySignedPsbt: new VaultFeedback("failed", "This device already signed PSBT.", "already-signed-psbt"),
     };
 
     /**
@@ -184,13 +185,13 @@ var vaultui = (function () {
             var button = $("#vault-retry");
             return new Promise(function (resolve) {
                 button.click(function () {
-                    // Cleanup old feedback
-                    var icon = $(".vault-feedback-icon");
-                    icon.removeClass();
-                    icon.addClass("vault-feedback-icon");
-                    var content = $(".vault-feedback-content");
-                    content.html('');
-                    ///////////////////
+                    // Reset feedback statuses
+                    $(".vault-feedback").each(function () {
+                        var icon = $(this).find(".vault-feedback-icon");
+                        icon.removeClass().addClass("vault-feedback-icon d-none");
+                        $(this).find(".vault-feedback-content").html('');
+                    });
+
                     button.hide();
                     self.retryShowing = false;
                     resolve(true);

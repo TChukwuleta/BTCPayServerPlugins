@@ -1,9 +1,5 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.Diagnostics.CodeAnalysis;
-using System.IO.IsolatedStorage;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -15,7 +11,6 @@ using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
 using BTCPayServer.HostedServices;
 using BTCPayServer.NTag424;
-using BTCPayServer.Payments;
 using BTCPayServer.Payouts;
 using BTCPayServer.Security;
 using BTCPayServer.Services;
@@ -25,9 +20,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using NBitcoin.DataEncoders;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using MarkPayoutRequest = BTCPayServer.HostedServices.MarkPayoutRequest;
 
@@ -131,30 +124,27 @@ namespace BTCPayServer.Controllers.Greenfield
             {
                 ModelState.AddModelError(nameof(request.BOLT11Expiration), $"The BOLT11 expiration should be positive");
             }
-            PayoutMethodId?[]? payoutMethods = null;
-            if (request.PayoutMethods is { } payoutMethodsStr)
+
+            var supported = _payoutHandlers.GetSupportedPayoutMethods(HttpContext.GetStoreData());
+            if (request.PayoutMethods is not null)
             {
-                payoutMethods = payoutMethodsStr.Select(s =>
+                for (int i = 0; i < request.PayoutMethods.Length; i++)
                 {
-                    PayoutMethodId.TryParse(s, out var pmi);
-                    return pmi;
-                }).ToArray();
-                var supported =  _payoutHandlers.GetSupportedPayoutMethods(HttpContext.GetStoreData());
-                for (int i = 0; i < payoutMethods.Length; i++)
-                {
-                    if (!supported.Contains(payoutMethods[i]))
+                    var pmi = request.PayoutMethods[i] is string pm ? PayoutMethodId.TryParse(pm) : null;
+                    if (pmi is null || !supported.Contains(pmi))
                     {
                         request.AddModelError(paymentRequest => paymentRequest.PayoutMethods[i], "Invalid or unsupported payment method", this);
                     }
                 }
-            }
-            else
-            {
-                ModelState.AddModelError(nameof(request.PayoutMethods), "This field is required");
+                if (request.PayoutMethods.Length is 0)
+                {
+                    ModelState.AddModelError(nameof(request.PayoutMethods), "At least one payout method is required");
+                }
             }
             if (!ModelState.IsValid)
                 return this.CreateValidationError(ModelState);
-            var ppId = await _pullPaymentService.CreatePullPayment(storeId, request);
+
+            var ppId = await _pullPaymentService.CreatePullPayment(HttpContext.GetStoreData(), request);
             var pp = await _pullPaymentService.GetPullPayment(ppId, false);
             return this.Ok(CreatePullPaymentData(pp));
         }
@@ -195,6 +185,7 @@ namespace BTCPayServer.Controllers.Greenfield
             if (pp is null)
                 return PullPaymentNotFound();
             var issuerKey = await _settingsRepository.GetIssuerKey(_env);
+            BoltcardPICCData? picc = null;
 
             // LNURLW is used by deeplinks
             if (request?.LNURLW is not null)
@@ -210,11 +201,12 @@ namespace BTCPayServer.Controllers.Greenfield
                     ModelState.AddModelError(nameof(request.LNURLW), "The LNURLW should contains a 'p=' parameter");
                     return this.CreateValidationError(ModelState);
                 }
-                if (issuerKey.TryDecrypt(p) is not BoltcardPICCData picc)
+                if (issuerKey.TryDecrypt(p) is not BoltcardPICCData o)
                 {
                     ModelState.AddModelError(nameof(request.LNURLW), "The LNURLW 'p=' parameter cannot be decrypted");
                     return this.CreateValidationError(ModelState);
                 }
+                picc = o;
                 request.UID = picc.Uid;
             }
 
@@ -236,8 +228,54 @@ namespace BTCPayServer.Controllers.Greenfield
                 _ => request.OnExisting
             };
 
-            var version = await _dbContextFactory.LinkBoltcardToPullPayment(pullPaymentId, issuerKey, request.UID, request.OnExisting);
-            var keys = issuerKey.CreatePullPaymentCardKey(request.UID, version, pullPaymentId).DeriveBoltcardKeys(issuerKey);
+            BoltcardKeys keys;
+            int version;
+
+            var registration = await _dbContextFactory.GetBoltcardRegistration(issuerKey, request.UID);
+            if (request.OnExisting is OnExistingBehavior.UpdateVersion ||
+                (request.OnExisting is null && registration?.PullPaymentId is null))
+            {
+                version = await _dbContextFactory.LinkBoltcardToPullPayment(pullPaymentId, issuerKey, request.UID, request.OnExisting);
+                keys = issuerKey.CreatePullPaymentCardKey(request.UID, version, pullPaymentId).DeriveBoltcardKeys(issuerKey);
+            }
+            else
+            {
+                if (registration?.PullPaymentId is null)
+                {
+                    ModelState.AddModelError(nameof(request.UID), "This card isn't registered");
+                    return this.CreateValidationError(ModelState);
+                }
+                if (pullPaymentId != registration.PullPaymentId)
+                {
+                    ModelState.AddModelError(nameof(request.UID), "This card is registered on a different pull payment");
+                    return this.CreateValidationError(ModelState);
+                }
+                var ppId = registration.PullPaymentId;
+                version = registration.Version;
+                int retryCount = 0;
+retry:
+                keys = issuerKey.CreatePullPaymentCardKey(request!.UID, version, ppId).DeriveBoltcardKeys(issuerKey);
+
+                // The server version may be higher than the card.
+                // If that is the case, let's try a few versions until we find the right one
+                // by checking c.
+                if (request?.LNURLW is { } lnurlw &&
+                    ExtractC(lnurlw) is string c &&
+                    picc is not null)
+                {
+                    if (!keys.AuthenticationKey.CheckSunMac(c, picc))
+                    {
+                        retryCount++;
+                        version--;
+                        if (version < 0 || retryCount > 5)
+                        {
+                            ModelState.AddModelError(nameof(request.UID), "Unable to get keys of this card, it might be caused by a version mismatch");
+                            return this.CreateValidationError(ModelState);
+                        }
+                        goto retry;
+                    }
+                }
+            }
 
             var boltcardUrl = Url.Action(nameof(UIBoltcardController.GetWithdrawRequest), "UIBoltcard");
             boltcardUrl = Request.GetAbsoluteUri(boltcardUrl);
@@ -256,7 +294,7 @@ namespace BTCPayServer.Controllers.Greenfield
             return Ok(resp);
         }
 
-        private string? ExtractP(string? url)
+        public static string? Extract(string? url, string param, int size)
         {
             if (url is null || !Uri.TryCreate(url, UriKind.Absolute, out var uri))
                 return null;
@@ -264,11 +302,13 @@ namespace BTCPayServer.Controllers.Greenfield
             if (num == -1)
                 return null;
             string input = uri.AbsoluteUri.Substring(num);
-            Match match = Regex.Match(input, "p=([a-f0-9A-F]{32})");
+            Match match = Regex.Match(input, param + "=([a-f0-9A-F]{" + size + "})");
             if (!match.Success)
                 return null;
             return match.Groups[1].Value;
         }
+        public static string? ExtractP(string? url) => Extract(url, "p", 32);
+        public static string? ExtractC(string? url) => Extract(url, "c", 16);
 
         [HttpGet("~/api/v1/pull-payments/{pullPaymentId}")]
         [AllowAnonymous]
@@ -407,23 +447,29 @@ namespace BTCPayServer.Controllers.Greenfield
                 return this.CreateValidationError(ModelState);
             }
             
-            var amtError = ClaimRequest.IsPayoutAmountOk(destination.destination, request.Amount, payoutHandler.Currency, pp.Currency);
-            if (amtError.error is not null)
+            var amt = ClaimRequest.GetClaimedAmount(destination.destination, request.Amount, payoutHandler.Currency, pp.Currency);
+            if (amt is ClaimRequest.ClaimedAmountResult.Error err)
             {
-                ModelState.AddModelError(nameof(request.Amount), amtError.error );
+                ModelState.AddModelError(nameof(request.Amount), err.Message);
                 return this.CreateValidationError(ModelState);
             }
-            request.Amount = amtError.amount;
-            var result = await _pullPaymentService.Claim(new ClaimRequest()
+            else if (amt is ClaimRequest.ClaimedAmountResult.Success succ)
             {
-                Destination = destination.destination,
-                PullPaymentId = pullPaymentId,
-                Value = request.Amount,
-                PayoutMethodId = payoutMethodId,
-                StoreId = pp.StoreId
-            });
-
-            return HandleClaimResult(result);
+                request.Amount = succ.Amount;
+                var result = await _pullPaymentService.Claim(new ClaimRequest()
+                {
+                    Destination = destination.destination,
+                    PullPaymentId = pullPaymentId,
+                    ClaimedAmount = request.Amount,
+                    PayoutMethodId = payoutMethodId,
+                    StoreId = pp.StoreId
+                });
+                return HandleClaimResult(result);
+            }
+            else
+            {
+                throw new NotSupportedException($"Should never happen {amt}");
+            }
         }
 
         [HttpPost("~/api/v1/stores/{storeId}/payouts")]
@@ -456,6 +502,7 @@ namespace BTCPayServer.Controllers.Greenfield
 
 
             PullPaymentBlob? ppBlob = null;
+            string? ppCurrency = null;
             if (request?.PullPaymentId is not null)
             {
 
@@ -464,6 +511,7 @@ namespace BTCPayServer.Controllers.Greenfield
                 if (pp is null)
                     return PullPaymentNotFound();
                 ppBlob = pp.GetBlob();
+                ppCurrency = pp.Currency;
             }
             var destination = await payoutHandler.ParseAndValidateClaimDestination(request!.Destination, ppBlob, default);
             if (destination.destination is null)
@@ -472,30 +520,37 @@ namespace BTCPayServer.Controllers.Greenfield
                 return this.CreateValidationError(ModelState);
             }
 
-            var amtError = ClaimRequest.IsPayoutAmountOk(destination.destination, request.Amount);
-            if (amtError.error is not null)
+            var amt = ClaimRequest.GetClaimedAmount(destination.destination, request.Amount, payoutHandler.Currency, ppCurrency);
+            if (amt is ClaimRequest.ClaimedAmountResult.Error err)
             {
-                ModelState.AddModelError(nameof(request.Amount), amtError.error );
+                ModelState.AddModelError(nameof(request.Amount), err.Message);
                 return this.CreateValidationError(ModelState);
             }
-            request.Amount = amtError.amount;
-            if (request.Amount is { } v && (v < ppBlob?.MinimumClaim || v == 0.0m))
+            else if (amt is ClaimRequest.ClaimedAmountResult.Success succ)
             {
-                var minimumClaim = ppBlob?.MinimumClaim is decimal val ? val : 0.0m;
-                ModelState.AddModelError(nameof(request.Amount), $"Amount too small (should be at least {minimumClaim})");
-                return this.CreateValidationError(ModelState);
+                request.Amount = succ.Amount;
+                if (request.Amount is { } v && (v < ppBlob?.MinimumClaim || v == 0.0m))
+                {
+                    var minimumClaim = ppBlob?.MinimumClaim is decimal val ? val : 0.0m;
+                    ModelState.AddModelError(nameof(request.Amount), $"Amount too small (should be at least {minimumClaim})");
+                    return this.CreateValidationError(ModelState);
+                }
+                var result = await _pullPaymentService.Claim(new ClaimRequest()
+                {
+                    Destination = destination.destination,
+                    PullPaymentId = request.PullPaymentId,
+                    PreApprove = request.Approved,
+                    ClaimedAmount = request.Amount,
+                    PayoutMethodId = paymentMethodId,
+                    StoreId = storeId,
+                    Metadata = request.Metadata
+                });
+                return HandleClaimResult(result);
             }
-            var result = await _pullPaymentService.Claim(new ClaimRequest()
+            else
             {
-                Destination = destination.destination,
-                PullPaymentId = request.PullPaymentId,
-                PreApprove = request.Approved,
-                Value = request.Amount,
-                PayoutMethodId = paymentMethodId,
-                StoreId = storeId,
-                Metadata = request.Metadata
-            });
-            return HandleClaimResult(result);
+                throw new NotSupportedException($"Should never happen {amt}");
+            }
         }
 
         private IActionResult HandleClaimResult(ClaimRequest.ClaimResponse result)

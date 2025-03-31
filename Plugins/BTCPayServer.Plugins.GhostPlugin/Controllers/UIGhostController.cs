@@ -104,6 +104,7 @@ public class UIGhostController : Controller
     [HttpPost]
     public async Task<IActionResult> Index(string storeId, GhostSettingViewModel vm, string command = "")
     {
+        JsonConvert.SerializeObject(vm, Formatting.Indented);
         try
         {
             await using var ctx = _dbContextFactory.CreateContext();
@@ -120,23 +121,7 @@ public class UIGhostController : Controller
                             TempData[WellKnownTempData.ErrorMessage] = "Please provide valid Ghost credentials";
                             return View(vm);
                         }
-                        var apiClient = new GhostAdminApiClient(_clientFactory, entity.CreateGhsotApiCredentials());
-                        try
-                        {
-                            var validCredentials = await apiClient.ValidateGhostCredentials();
-                            if (!validCredentials)
-                            {
-                                TempData[WellKnownTempData.ErrorMessage] = $"Invalid Ghost credentials";
-                                return View(vm);
-                            }
-                        }
-                        catch (GhostApiException err)
-                        {
-                            TempData[WellKnownTempData.ErrorMessage] = $"Invalid Ghost credentials: {err.Message}";
-                            return View(vm);
-                        }
                         entity.BaseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}";
-                        entity.IntegratedAt = DateTimeOffset.UtcNow;
                         entity.StoreId = CurrentStore.Id;
                         entity.StoreName = CurrentStore.StoreName;
                         entity.ApplicationUserId = GetUserId();

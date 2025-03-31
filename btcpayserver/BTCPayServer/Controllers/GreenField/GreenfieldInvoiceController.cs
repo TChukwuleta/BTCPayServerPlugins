@@ -12,10 +12,8 @@ using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
 using BTCPayServer.HostedServices;
 using BTCPayServer.Payments;
-using BTCPayServer.Payments.Bitcoin;
 using BTCPayServer.Payouts;
 using BTCPayServer.Rating;
-using BTCPayServer.Security;
 using BTCPayServer.Security.Greenfield;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
@@ -25,9 +23,6 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using NBitcoin;
-using NBitpayClient;
 using Newtonsoft.Json.Linq;
 using CreateInvoiceRequest = BTCPayServer.Client.Models.CreateInvoiceRequest;
 using InvoiceData = BTCPayServer.Client.Models.InvoiceData;
@@ -51,6 +46,7 @@ namespace BTCPayServer.Controllers.Greenfield
         private readonly Dictionary<PaymentMethodId, IPaymentLinkExtension> _paymentLinkExtensions;
         private readonly PayoutMethodHandlerDictionary _payoutHandlers;
         private readonly PaymentMethodHandlerDictionary _handlers;
+        private readonly BTCPayNetworkProvider _networkProvider;
         private readonly DefaultRulesCollection _defaultRules;
 
         public LanguageService LanguageService { get; }
@@ -65,6 +61,7 @@ namespace BTCPayServer.Controllers.Greenfield
             Dictionary<PaymentMethodId, IPaymentLinkExtension> paymentLinkExtensions,
             PayoutMethodHandlerDictionary payoutHandlers,
             PaymentMethodHandlerDictionary handlers,
+            BTCPayNetworkProvider networkProvider,
             DefaultRulesCollection defaultRules)
         {
             _invoiceController = invoiceController;
@@ -79,6 +76,7 @@ namespace BTCPayServer.Controllers.Greenfield
             _paymentLinkExtensions = paymentLinkExtensions;
             _payoutHandlers = payoutHandlers;
             _handlers = handlers;
+            _networkProvider = networkProvider;
             _defaultRules = defaultRules;
             LanguageService = languageService;
         }
@@ -338,6 +336,9 @@ namespace BTCPayServer.Controllers.Greenfield
             }
             PaymentPrompt? paymentPrompt = null;
             PayoutMethodId? payoutMethodId = null;
+            if (request.PayoutMethodId is null)
+                request.PayoutMethodId = invoice.GetDefaultPaymentMethodId(store, _networkProvider)?.ToString();
+
             if (request.PayoutMethodId is not null && PayoutMethodId.TryParse(request.PayoutMethodId, out payoutMethodId))
             {
                 var supported = _payoutHandlers.GetSupportedPayoutMethods(store);
@@ -375,13 +376,11 @@ namespace BTCPayServer.Controllers.Greenfield
 				cancellationToken
             );
             var paidAmount = cryptoPaid.RoundToSignificant(paymentPrompt.Divisibility);
-            var createPullPayment = new CreatePullPayment
+            var createPullPayment = new CreatePullPaymentRequest
             {
-                BOLT11Expiration = store.GetStoreBlob().RefundBOLT11Expiration,
                 Name = request.Name ?? $"Refund {invoice.Id}",
                 Description = request.Description,
-                StoreId = storeId,
-                PayoutMethods = new[] { payoutMethodId },
+                PayoutMethods = new[] { payoutMethodId.ToString() },
             };
 
             if (request.RefundVariant != RefundVariant.Custom)
@@ -478,8 +477,8 @@ namespace BTCPayServer.Controllers.Greenfield
                 createPullPayment.Amount = Math.Round(createPullPayment.Amount - reduceByAmount, appliedDivisibility);
             }
 
-            createPullPayment.AutoApproveClaims = createPullPayment.AutoApproveClaims && (await _authorizationService.AuthorizeAsync(User, createPullPayment.StoreId ,Policies.CanCreatePullPayments)).Succeeded;
-            var ppId = await _pullPaymentService.CreatePullPayment(createPullPayment);
+            createPullPayment.AutoApproveClaims = createPullPayment.AutoApproveClaims && (await _authorizationService.AuthorizeAsync(User, storeId ,Policies.CanCreatePullPayments)).Succeeded;
+            var ppId = await _pullPaymentService.CreatePullPayment(store, createPullPayment);
 
             await using var ctx = _dbContextFactory.CreateContext();
 
@@ -594,12 +593,13 @@ namespace BTCPayServer.Controllers.Greenfield
             {
                 statuses.Add(InvoiceStatus.Settled);
             }
-
             if (state.CanMarkInvalid())
             {
                 statuses.Add(InvoiceStatus.Invalid);
             }
-            return new InvoiceData()
+            var store = request?.HttpContext.GetStoreData();
+            var receipt = store == null ? entity.ReceiptOptions : InvoiceDataBase.ReceiptOptions.Merge(store.GetStoreBlob().ReceiptOptions, entity.ReceiptOptions);
+            return new InvoiceData
             {
                 StoreId = entity.StoreId,
                 ExpirationTime = entity.ExpirationTime,
@@ -615,7 +615,7 @@ namespace BTCPayServer.Controllers.Greenfield
                 Archived = entity.Archived,
                 Metadata = entity.Metadata.ToJObject(),
                 AvailableStatusesForManualMarking = statuses.ToArray(),
-                Checkout = new CreateInvoiceRequest.CheckoutOptions()
+                Checkout = new InvoiceDataBase.CheckoutOptions
                 {
                     Expiration = entity.ExpirationTime - entity.InvoiceTime,
                     Monitoring = entity.MonitoringExpiration - entity.ExpirationTime,
@@ -628,7 +628,7 @@ namespace BTCPayServer.Controllers.Greenfield
                     RedirectAutomatically = entity.RedirectAutomatically,
                     RedirectURL = entity.RedirectURLTemplate
                 },
-                Receipt = entity.ReceiptOptions
+                Receipt = receipt
             };
         }
     }

@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Amazon.Runtime.Internal;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Extensions;
+using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
@@ -17,6 +19,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 using StoreData = BTCPayServer.Data.StoreData;
 
 namespace BTCPayServer.Controllers.Greenfield
@@ -111,30 +114,25 @@ namespace BTCPayServer.Controllers.Greenfield
         [HttpPost("~/api/v1/stores/{storeId}/logo")]
         public async Task<IActionResult> UploadStoreLogo(string storeId, IFormFile file)
         {
+            var user = await _userManager.GetUserAsync(User);
             var store = HttpContext.GetStoreData();
-            if (store == null) return StoreNotFound();
-
+            if (user == null || store == null) return StoreNotFound();
+            
+            UploadImageResultModel upload = null;
             if (file is null)
                 ModelState.AddModelError(nameof(file), "Invalid file");
-            else if (file.Length > 1_000_000)
-                ModelState.AddModelError(nameof(file), "The uploaded image file should be less than 1MB");
-            else if (!file.ContentType.StartsWith("image/", StringComparison.InvariantCulture))
-                ModelState.AddModelError(nameof(file), "The uploaded file needs to be an image");
-            else if (!file.FileName.IsValidFileName())
-                ModelState.AddModelError(nameof(file.FileName), "Invalid filename");
             else
             {
-                var formFile = await file.Bufferize();
-                if (!FileTypeDetector.IsPicture(formFile.Buffer, formFile.FileName))
-                    ModelState.AddModelError(nameof(file), "The uploaded file needs to be an image");
+                upload = await _fileService.UploadImage(file, user.Id);
+                if (!upload.Success)
+                    ModelState.AddModelError(nameof(file), upload.Response);
             }
             if (!ModelState.IsValid)
                 return this.CreateValidationError(ModelState);
-
+            
             try
             {
-                var userId = _userManager.GetUserId(User)!;
-                var storedFile = await _fileService.AddFile(file!, userId);
+                var storedFile = upload!.StoredFile!;
                 var blob = store.GetStoreBlob();
                 blob.LogoUrl = new UnresolvedUri.FileIdUri(storedFile.Id);
                 store.SetStoreBlob(blob);
@@ -178,6 +176,7 @@ namespace BTCPayServer.Controllers.Greenfield
                 Website = data.StoreWebsite,
                 Archived = data.Archived,
                 BrandColor = storeBlob.BrandColor,
+                RefundBOLT11Expiration = storeBlob.RefundBOLT11Expiration,
                 ApplyBrandColorToBackend = storeBlob.ApplyBrandColorToBackend,
                 CssUrl = storeBlob.CssUrl == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), storeBlob.CssUrl),
                 LogoUrl = storeBlob.LogoUrl == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), storeBlob.LogoUrl),
@@ -262,6 +261,7 @@ namespace BTCPayServer.Controllers.Greenfield
             blob.ApplyBrandColorToBackend = restModel.ApplyBrandColorToBackend;
             blob.LogoUrl = restModel.LogoUrl is null ? null : UnresolvedUri.Create(restModel.LogoUrl);
             blob.CssUrl = restModel.CssUrl is null ? null : UnresolvedUri.Create(restModel.CssUrl);
+            blob.RefundBOLT11Expiration = restModel.RefundBOLT11Expiration;
             blob.PaymentSoundUrl = restModel.PaymentSoundUrl is null ? null : UnresolvedUri.Create(restModel.PaymentSoundUrl);
             if (restModel.AutoDetectLanguage.HasValue)
                 blob.AutoDetectLanguage = restModel.AutoDetectLanguage.Value;
@@ -299,6 +299,9 @@ namespace BTCPayServer.Controllers.Greenfield
             {
                 ModelState.AddModelError(nameof(request.Name), "DefaultPaymentMethod is invalid");
             }
+            if (request.RefundBOLT11Expiration < TimeSpan.FromDays(0) ||
+                request.RefundBOLT11Expiration > TimeSpan.FromDays(365 * 10))
+                ModelState.AddModelError(nameof(request.RefundBOLT11Expiration), "refundBOLT11Expiration should be between 0 and 36500");
 
             if (string.IsNullOrEmpty(request.Name))
                 ModelState.AddModelError(nameof(request.Name), "Name is missing");

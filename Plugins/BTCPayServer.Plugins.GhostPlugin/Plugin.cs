@@ -1,7 +1,6 @@
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
-using BTCPayServer.HostedServices.Webhooks;
 using BTCPayServer.Plugins.GhostPlugin.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +13,7 @@ public class Plugin : BaseBTCPayServerPlugin
 {
     public override IBTCPayServerPlugin.PluginDependency[] Dependencies { get; } =
     {
-        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.0.0" }
+        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.0.7" }
     };
 
     public override void Execute(IServiceCollection services)
@@ -27,7 +26,6 @@ public class Plugin : BaseBTCPayServerPlugin
         services.AddHostedService<GhostHostedService>();
         services.AddHostedService<ApplicationPartsLogger>();
         services.AddSingleton<IHostedService, GhostPluginService>();
-        //services.AddHostedService(s => s.GetRequiredService<GhostPluginService>());
         services.AddDbContext<GhostDbContext>((provider, o) =>
         {
             var factory = provider.GetRequiredService<GhostDbContextFactory>();

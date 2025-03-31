@@ -30,6 +30,7 @@
 @if (Model.HasWallet)
 {
     <div class="row">
+
         <div class="col-xxl-constrain col-xl-8">
             @if (!ViewContext.ModelState.IsValid)
             {
@@ -46,29 +47,20 @@
                     <span asp-validation-for="ApiUrl" class="text-danger"></span>
                 </div>
 
-                <div class="form-group">
-                    <label asp-for="ContentApiKey" class="form-label"></label>
-                    <input asp-for="ContentApiKey" class="form-control" readonly="@ghostCredsSet" />
-                    <span asp-validation-for="ContentApiKey" class="text-danger"></span>
-                </div>
+                @if (!ghostCredsSet)
+                {
+                    <div class="form-group">
+                        <label asp-for="ContentApiKey" class="form-label"></label>
+                        <input asp-for="ContentApiKey" class="form-control" type="password" readonly="@ghostCredsSet" />
+                        <span asp-validation-for="ContentApiKey" class="text-danger"></span>
+                    </div>
 
-                <div class="form-group">
-                    <label asp-for="AdminApiKey" class="form-label"></label>
-                    <input asp-for="AdminApiKey" class="form-control" type="password" value="@Model?.AdminApiKey" readonly="@ghostCredsSet" />
-                    <span asp-validation-for="AdminApiKey" class="text-danger"></span>
-                </div>
-
-                <div class="form-group">
-                    <label asp-for="Username" class="form-label"></label>
-                    <input asp-for="Username" class="form-control" readonly="@ghostCredsSet" />
-                    <span asp-validation-for="Username" class="text-danger"></span>
-                </div>
-
-                <div class="form-group">
-                    <label asp-for="Password" class="form-label"></label>
-                    <input asp-for="Password" class="form-control" type="password" value="@Model?.Password" readonly="@ghostCredsSet" />
-                    <span asp-validation-for="Password" class="text-danger"></span>
-                </div>
+                    <div class="form-group">
+                        <label asp-for="AdminApiKey" class="form-label"></label>
+                        <input asp-for="AdminApiKey" class="form-control" type="password" value="@Model?.AdminApiKey" readonly="@ghostCredsSet" />
+                        <span asp-validation-for="AdminApiKey" class="text-danger"></span>
+                    </div>
+                }
 
                 <div class="form-group">
                     <label asp-for="WebhookSecret" class="form-label"></label>
@@ -84,7 +76,7 @@
 
                 <div class="form-group">
                     <label asp-for="WebhookUrl" class="form-label"></label>
-                    <input asp-for="WebhookUrl" class="form-control" readonly= />
+                    <partial name="_CopyableInput" model="Model.WebhookUrl" />
                 </div>
 
                 @if (ghostCredsSet)
@@ -92,11 +84,11 @@
                     
                     <div class="form-group">
                         <label asp-for="MemberCreationUrl" class="form-label"></label>
-                        <input asp-for="MemberCreationUrl" class="form-control" readonly />
+                        <partial name="_CopyableInput" model="Model.MemberCreationUrl" />
                     </div>
                     <div class="form-group">
                         <label asp-for="DonationUrl" class="form-label"></label>
-                        <input asp-for="DonationUrl" class="form-control" readonly />
+                        <partial name="_CopyableInput" model="Model.DonationUrl" />
                     </div>
 
                     
@@ -137,3 +129,35 @@ else
     </div>
 }
 
+@section PageFootContent {
+    <script>
+        function copyToClipboard(button, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                let tooltip = bootstrap.Tooltip.getInstance(button);
+                if (tooltip) {
+                    tooltip.hide();
+                    tooltip.show();
+                }
+
+                button.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>`;
+
+                setTimeout(() => {
+                    if (tooltip) tooltip.hide();
+                    button.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>`;
+                }, 500);
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+                new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+    </script>
+}

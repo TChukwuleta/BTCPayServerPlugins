@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using AngleSharp.Dom;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Data;
+using BTCPayServer.Migrations;
 using BTCPayServer.Services.Invoices;
 using Dapper;
 using Google.Apis.Logging;
@@ -72,9 +73,9 @@ public class InvoiceBlobMigratorHostedService : BlobMigratorHostedService<Invoic
                 }
                 pay.SetBlob(paymentEntity);
 
-                if (pay.PaymentMethodId != pay.MigratedPaymentMethodId)
+                if (pay.MigratedPaymentMethodId is not null && pay.PaymentMethodId != pay.MigratedPaymentMethodId)
                 {
-                    ctx.Entry(pay).State = EntityState.Added;
+                    ctx.Add(pay);
                     ctx.Payments.Remove(new PaymentData() { Id = pay.Id, PaymentMethodId = pay.MigratedPaymentMethodId });
                 }
             }

@@ -14,10 +14,6 @@ public class GhostSettingViewModel
 
     [Display(Name = "Content API Key")]
     public string ContentApiKey { get; set; }
-
-    [Display(Name = "Ghost Username/Email")]
-    public string Username { get; set; }
-    public string Password { get; set; }
     public string StoreId { get; set; }
     public string StoreName { get; set; }
     public bool HasWallet { get; set; } = true;

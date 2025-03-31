@@ -6,15 +6,13 @@
 #PosKeypad .alert {
     margin-top: var(--btcpay-space-xl);
 }
-
 button[data-bs-toggle] {
     position: absolute;
-    top: 1.75rem;
     z-index: 1;
+    top: 1.5rem;
+    height: 3.25em !important;
+    width: 3.25em !important;
     color: var(--btcpay-header-link);
-}
-button[data-bs-toggle]:hover {
-    color: var(--btcpay-header-link-accent);
 }
 button[data-bs-toggle] .icon {
     --icon-size: 1.75em;
@@ -59,6 +57,8 @@ button[data-bs-toggle] .icon {
     grid-template-columns: repeat(3, 1fr);
 }
 .keypad .btn {
+    --icon-size: 1.75rem;
+
     display: flex;
     align-items: center;
     justify-content: center;
@@ -66,15 +66,12 @@ button[data-bs-toggle] .icon {
     position: relative;
     border-radius: 0;
     border-color: transparent !important;
-    font-weight: var(--btcpay-font-weight-semibold);
-    font-size: 24px;
+    font-weight: var(--btcpay-font-weight-bold);
+    font-size: var(--icon-size);
     min-height: 3.5rem;
     height: 8vh;
     max-height: 6rem;
     color: var(--btcpay-body-text);
-}
-.keypad .btn[data-key="+"] {
-    font-size: 2.25em;
 }
 .btcpay-pills label,
 .btn-secondary.rounded-pill {

@@ -65,7 +65,7 @@ public class UIGhostMemberController : Controller
             return RedirectToAction(nameof(UIGhostController.Index), "UIGhost", new { storeId });
         }
 
-        var ghostMembers = ctx.GhostMembers.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id && !string.IsNullOrEmpty(c.MemberId)).ToList();
+        var ghostMembers = ctx.GhostMembers.Where(c => c.StoreId == CurrentStore.Id && !string.IsNullOrEmpty(c.MemberId)).ToList();
         var ghostTransactions = ctx.GhostTransactions.AsNoTracking().Where(t => t.StoreId == CurrentStore.Id && t.TransactionStatus == TransactionStatus.Settled).ToList();
 
         var ghostPluginSetting = ghostSetting.Setting != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) : new GhostSettingsPageViewModel();
@@ -142,6 +142,44 @@ public class UIGhostMemberController : Controller
             SoonToExpire = filter == "aboutToExpire",
             Expired = filter == "expired"
         });
+    }
+
+
+    [HttpGet("delete/{memberId}")]
+    public async Task<IActionResult> Delete(string storeId, string memberId)
+    {
+        if (CurrentStore is null)
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var entity = ctx.GhostMembers.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == memberId);
+        if (entity == null)
+            return NotFound();
+
+        return View("Confirm", new ConfirmModel($"Delete Member", $"Member ({entity.Name}) and all its transaction would also be deleted. Are you sure?", $"Delete {entity.Name}"));
+    }
+
+
+    [HttpPost("delete/{memberId}")]
+    public async Task<IActionResult> DeletePost(string storeId, string memberId)
+    {
+
+        if (CurrentStore is null)
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var entity = ctx.GhostMembers.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == memberId);
+        if (entity == null)
+            return NotFound();
+
+        var txns = ctx.GhostTransactions.Where(c => c.StoreId == CurrentStore.Id && c.MemberId == memberId).ToList();
+        if (txns.Any())
+            ctx.GhostTransactions.RemoveRange(txns);  
+        
+        ctx.GhostMembers.Remove(entity);
+        await ctx.SaveChangesAsync();
+        TempData[WellKnownTempData.SuccessMessage] = "Member deleted successfully";
+        return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
     }
 
 

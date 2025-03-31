@@ -18,7 +18,7 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("BTCPayServer.Plugins.Ghost")
-                .HasAnnotation("ProductVersion", "8.0.7")
+                .HasAnnotation("ProductVersion", "8.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -97,9 +97,6 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                     b.Property<DateTimeOffset?>("IntegratedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Password")
-                        .HasColumnType("text");
-
                     b.Property<string>("Setting")
                         .HasColumnType("text");
 
@@ -107,9 +104,6 @@ namespace BTCPayServer.Plugins.GhostPlugin.Data.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("StoreName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Username")
                         .HasColumnType("text");
 
                     b.Property<string>("WebhookSecret")

@@ -32,12 +32,14 @@ public abstract class CrowdfundBaseData : AppBaseData
     public bool? SortPerksByPopularity { get; set; }
     public string[]? Sounds { get; set; }
     public string[]? AnimationColors { get; set; }
+    public string? HtmlLang { get; set; }
+    public string? HtmlMetaTags { get; set; }
     public string? FormId { get; set; }
 }
 
 public class CrowdfundAppData : CrowdfundBaseData
 {
-    public object? Perks { get; set; }
+    public AppItem[]? Perks { get; set; }
 }
 
 public class CrowdfundAppRequest : CrowdfundBaseData, IAppRequest

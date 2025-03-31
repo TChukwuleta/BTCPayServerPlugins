@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,7 +19,6 @@ using BTCPayServer.Payments.PayJoin;
 using BTCPayServer.Payments.PayJoin.Sender;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
-using BTCPayServer.Services.Labels;
 using BTCPayServer.Services.Wallets;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
@@ -58,6 +56,7 @@ namespace BTCPayServer.Controllers.Greenfield
         private readonly IFeeProviderFactory _feeProviderFactory;
         private readonly UTXOLocker _utxoLocker;
         private readonly TransactionLinkProviders _transactionLinkProviders;
+        private readonly WalletHistogramService _walletHistogramService;
 
         public GreenfieldStoreOnChainWalletsController(
             IAuthorizationService authorizationService,
@@ -74,6 +73,7 @@ namespace BTCPayServer.Controllers.Greenfield
             WalletReceiveService walletReceiveService,
             IFeeProviderFactory feeProviderFactory,
             UTXOLocker utxoLocker,
+            WalletHistogramService walletHistogramService,
             TransactionLinkProviders transactionLinkProviders
         )
         {
@@ -91,6 +91,7 @@ namespace BTCPayServer.Controllers.Greenfield
             _walletReceiveService = walletReceiveService;
             _feeProviderFactory = feeProviderFactory;
             _utxoLocker = utxoLocker;
+            _walletHistogramService = walletHistogramService;
             _transactionLinkProviders = transactionLinkProviders;
         }
 
@@ -114,6 +115,27 @@ namespace BTCPayServer.Controllers.Greenfield
             });
         }
 
+        [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
+        [HttpGet("~/api/v1/stores/{storeId}/payment-methods/{paymentMethodId}/wallet/histogram")]
+        public async Task<IActionResult> GetOnChainWalletHistogram(string storeId, string paymentMethodId, [FromQuery] string? type = null)
+        {
+            if (IsInvalidWalletRequest(paymentMethodId, out var network, out var derivationScheme, out var actionResult))
+                return actionResult;
+
+            var walletId = new WalletId(storeId, network.CryptoCode);
+            Enum.TryParse<HistogramType>(type, true, out var histType);
+            var data = await _walletHistogramService.GetHistogram(Store, walletId, histType);
+            if (data == null) return this.CreateAPIError(404, "histogram-not-found", "The wallet histogram was not found.");
+
+            return Ok(new HistogramData
+            {
+                Type = data.Type,
+                Balance = data.Balance,
+                Series = data.Series,
+                Labels = data.Labels
+            });
+        }
+        
         [Authorize(Policy = Policies.CanViewStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
         [HttpGet("~/api/v1/stores/{storeId}/payment-methods/{paymentMethodId}/wallet/feerate")]
         public async Task<IActionResult> GetOnChainFeeRate(string storeId, string paymentMethodId, int? blockTarget = null)
@@ -149,9 +171,9 @@ namespace BTCPayServer.Controllers.Greenfield
             var allowedPayjoin = derivationScheme.IsHotWallet && Store.GetStoreBlob().PayJoinEnabled;
             if (allowedPayjoin)
             {
-                bip21.QueryParams.Add(PayjoinClient.BIP21EndpointKey,
-                    Request.GetAbsoluteUri(Url.Action(nameof(PayJoinEndpointController.Submit), "PayJoinEndpoint",
-                        new { network.CryptoCode })));
+                var endpoint = Url.ActionAbsolute(Request, nameof(PayJoinEndpointController.Submit), "PayJoinEndpoint",
+                        new { network.CryptoCode }).ToString();
+                bip21.QueryParams.Add(PayjoinClient.BIP21EndpointKey, endpoint);
             }
 
             return Ok(new OnChainWalletAddressData()
@@ -357,11 +379,11 @@ namespace BTCPayServer.Controllers.Greenfield
             if (network.ReadonlyWallet)
             {
                 return this.CreateAPIError(503, "not-available",
-                    $"{network.CryptoCode} sending services are not currently available");
+                    $"This network only support read-only features");
             }
 
             //This API is only meant for hot wallet usage for now. We can expand later when we allow PSBT manipulation.
-            if (!(await CanUseHotWallet()).HotWallet)
+            if (!(await CanUseHotWallet()).CanCreateHotWallet)
             {
                 return this.CreateAPIError(503, "not-available",
                     $"You need to allow non-admins to use hotwallets for their stores (in /server/policies)");
@@ -430,7 +452,7 @@ namespace BTCPayServer.Controllers.Greenfield
                 try
                 {
                     bip21 = new BitcoinUrlBuilder(destination.Destination, network.NBitcoinNetwork);
-                    amount ??= bip21.Amount.GetValue(network);
+                    amount ??= bip21.Amount?.GetValue(network);
                     if (bip21.Address is null)
                         request.AddModelError(transactionRequest => transactionRequest.Destinations[index],
                             "This BIP21 destination is missing a bitcoin address", this);
@@ -551,8 +573,11 @@ namespace BTCPayServer.Controllers.Greenfield
                     WellknownMetadataKeys.MasterHDKey);
             if (!derivationScheme.IsHotWallet || signingKeyStr is null)
             {
-                return this.CreateAPIError(503, "not-available",
-                    $"{network.CryptoCode} sending services are not currently available");
+                var reason = !derivationScheme.IsHotWallet ? 
+                    "You cannot send from a cold wallet" :
+                    "NBXplorer doesn't have the seed of the wallet";
+
+                return this.CreateAPIError(503, "not-available", reason);
             }
 
             var signingKey = ExtKey.Parse(signingKeyStr, network.NBitcoinNetwork);
@@ -765,19 +790,19 @@ namespace BTCPayServer.Controllers.Greenfield
             };
         }
 
-        private OnChainWalletObjectData.OnChainWalletObjectLink ToModel((string type, string id, string linkdata, string objectdata) data)
+        private OnChainWalletObjectData.OnChainWalletObjectLink ToModel((string type, string id, JObject? linkdata, JObject? objectdata) data)
         {
             return new OnChainWalletObjectData.OnChainWalletObjectLink()
             {
-                LinkData = string.IsNullOrEmpty(data.linkdata) ? null : JObject.Parse(data.linkdata),
-                ObjectData = string.IsNullOrEmpty(data.objectdata) ? null : JObject.Parse(data.objectdata),
+                LinkData = data.linkdata,
+                ObjectData = data.objectdata,
                 Type = data.type,
                 Id = data.id,
             };
         }
 
 
-        private async Task<(bool HotWallet, bool RPCImport)> CanUseHotWallet()
+        private async Task<WalletCreationPermissions> CanUseHotWallet()
         {
             return await _authorizationService.CanUseHotWallet(PoliciesSettings, User);
         }

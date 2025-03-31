@@ -1,7 +1,5 @@
 #nullable enable
 using System;
-using System.Globalization;
-using System.Linq;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Extensions;
@@ -17,9 +15,8 @@ using BTCPayServer.Models;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json.Linq;
+using Microsoft.Extensions.Localization;
 
 namespace BTCPayServer.Forms;
 
@@ -31,9 +28,11 @@ public class UIFormsController : Controller
     private readonly IAuthorizationService _authorizationService;
     private readonly StoreRepository _storeRepository;
     private FormComponentProviders FormProviders { get; }
+    private IStringLocalizer StringLocalizer { get; }
 
     public UIFormsController(FormComponentProviders formProviders, FormDataService formDataService,
         UriResolver uriResolver,
+        IStringLocalizer stringLocalizer,
         StoreRepository storeRepository, IAuthorizationService authorizationService)
     {
         FormProviders = formProviders;
@@ -41,6 +40,7 @@ public class UIFormsController : Controller
         _uriResolver = uriResolver;
         _authorizationService = authorizationService;
         _storeRepository = storeRepository;
+        StringLocalizer = stringLocalizer;
     }
 
     [HttpGet("~/stores/{storeId}/forms")]
@@ -85,8 +85,7 @@ public class UIFormsController : Controller
 
         if (!_formDataService.IsFormSchemaValid(modifyForm.FormConfig, out var form, out var error))
         {
-            ModelState.AddModelError(nameof(modifyForm.FormConfig),
-                $"Form config was invalid: {error})");
+            ModelState.AddModelError(nameof(modifyForm.FormConfig), StringLocalizer["Form config was invalid: {0}", error!]);
         }
         else
         {
@@ -113,7 +112,9 @@ public class UIFormsController : Controller
             TempData.SetStatusMessageModel(new StatusMessageModel
             {
                 Severity = StatusMessageModel.StatusSeverity.Success,
-                Message = $"Form {(isNew ? "created" : "updated")} successfully."
+                Message = isNew
+                    ? StringLocalizer["Form created successfully."].Value
+                    : StringLocalizer["Form updated successfully."].Value
             });
             if (isNew)
             {
@@ -122,7 +123,7 @@ public class UIFormsController : Controller
         }
         catch (Exception e)
         {
-            ModelState.AddModelError("", $"An error occurred while saving: {e.Message}");
+            ModelState.AddModelError("", StringLocalizer["An error occurred while saving: {0}", e.Message]);
         }
 
         return View(modifyForm);
@@ -136,7 +137,7 @@ public class UIFormsController : Controller
         TempData.SetStatusMessageModel(new StatusMessageModel
         {
             Severity = StatusMessageModel.StatusSeverity.Success,
-            Message = "Form removed"
+            Message = StringLocalizer["Form removed"].Value
         });
         return RedirectToAction("FormsList", new { storeId });
     }
@@ -212,21 +213,20 @@ public class UIFormsController : Controller
 
         try
         {
-
-        var request = _formDataService.GenerateInvoiceParametersFromForm(form);
-        var inv = await invoiceController.CreateInvoiceCoreRaw(request, store, Request.GetAbsoluteRoot());
-        if (inv.Price == 0 && inv.Type == InvoiceType.Standard && inv.ReceiptOptions?.Enabled is not false)
-        {
-            return RedirectToAction("InvoiceReceipt", "UIInvoice", new { invoiceId = inv.Id });
-        }
-        return RedirectToAction("Checkout", "UIInvoice", new { invoiceId = inv.Id });
+            var request = _formDataService.GenerateInvoiceParametersFromForm(form);
+            var inv = await invoiceController.CreateInvoiceCoreRaw(request, store, Request.GetAbsoluteRoot());
+            if (inv.Price == 0 && inv.Type == InvoiceType.Standard && inv.ReceiptOptions?.Enabled is not false)
+            {
+                return RedirectToAction("InvoiceReceipt", "UIInvoice", new { invoiceId = inv.Id });
+            }
+            return RedirectToAction("Checkout", "UIInvoice", new { invoiceId = inv.Id });
         }
         catch (Exception e)
         {
-            TempData.SetStatusMessageModel(new StatusMessageModel()
+            TempData.SetStatusMessageModel(new StatusMessageModel
             {
                 Severity = StatusMessageModel.StatusSeverity.Error,
-                Message = "Could not generate invoice: "+ e.Message
+                Message = StringLocalizer["Could not generate invoice: {0}", e.Message].Value
             });
             return await GetFormView(formData, form);
         }

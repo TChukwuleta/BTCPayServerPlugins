@@ -1,17 +1,26 @@
 @using BTCPayServer.Views.Stores
 @model BTCPayServer.Plugins.Shopify.Models.ShopifySettings
 @{
-    ViewData.SetActivePage("shopify", nameof(StoreNavPages), "Shopify", Context.GetStoreData().Id);
+    ViewData.SetActivePage("shopify", nameof(StoreNavPages), StringLocalizer["Shopify"], Context.GetStoreData().Id);
 
     var shopifyCredsSet = Model?.IntegratedAt.HasValue is true;
     var shopifyUrl = Model?.ShopifyUrl;
 }
 
+<div class="alert alert-warning alert-dismissible mb-4" role="alert">
+	<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@StringLocalizer["Close"]">
+		<vc:icon symbol="close" />
+	</button>
+	<h5 class="alert-heading" text-translate="true">Important notice</h5>
+	<p class="my-2 mb-5">This Shopify integration has been discontinued by Shopify and will no longer be supported after <strong>August 31, 2025</strong>. If you completed your BTCPay Server-Shopify setup before <strong>December 31, 2024</strong>, you may continue using it until August 31, 2025. However, we recommend transitioning to Shopify V2 for continued functionality. All new users have to use Shopify V2. <a href="https://docs.btcpayserver.org/ShopifyV2/" rel="noreferrer noopener" class="alert-link" text-translate="true">Refer to this guide to get started with Shopify V2</a></p>
+</div>
+
+
 <div class="sticky-header">
     <h2 class="my-1">
         @ViewData["Title"]
         <small>
-            <a href="https://docs.btcpayserver.org/Shopify" target="_blank" rel="noreferrer noopener" title="More information...">
+            <a href="https://docs.btcpayserver.org/Shopify" target="_blank" rel="noreferrer noopener" title="@StringLocalizer["More information..."]">
                 <vc:icon symbol="info" />
             </a>
         </small>
@@ -22,7 +31,7 @@
 
 <div class="row">
     <div class="col-xxl-constrain col-xl-8">
-        <p>Connect BTCPay Server to your Shopify checkout experience to accept Bitcoin.</p>
+        <p text-translate="true">Connect BTCPay Server to your Shopify checkout experience to accept Bitcoin.</p>
 
         @if (!ViewContext.ModelState.IsValid)
         {
@@ -62,7 +71,7 @@
             @if (shopifyCredsSet)
             {
                 <div class="alert alert-warning">
-                    <h5 class="alert-heading">In Shopify, please do the following …</h5> 
+                    <h5 class="alert-heading" text-translate="true">In Shopify, please do the following …</h5> 
                     <ul>
                         <li>
                             Add a payment method at <a href="@shopifyUrl/admin/settings/payments" class="alert-link fw-bold" target="_blank" rel="noreferrer noopener">Settings &gt; Payments &gt; Manual Payment Methods</a> with the name <strong>Bitcoin with BTCPay Server</strong>
@@ -78,13 +87,13 @@
                     Started: @Model.IntegratedAt.Value.ToBrowserDate()
                 </p>
 
-                <button name="command" type="submit" class="btn btn-danger mt-3" value="ShopifyClearCredentials">
+                <button name="command" type="submit" class="btn btn-danger mt-3" value="ShopifyClearCredentials" text-translate="true">
                     Stop Shopify calls and clear credentials
                 </button>
             }
             else
             {
-                <button name="command" type="submit" class="btn btn-primary mt-3" value="ShopifySaveCredentials">
+                <button name="command" type="submit" class="btn btn-primary mt-3" value="ShopifySaveCredentials" text-translate="true">
                     Save
                 </button>
             }

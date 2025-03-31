@@ -1,8 +1,6 @@
 #nullable enable
-using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Linq;
 
 namespace BTCPayServer.Client.Models;
 
@@ -26,12 +24,14 @@ public abstract class PointOfSaleBaseData : AppBaseData
     public string? Description { get; set; }
     public bool? RedirectAutomatically { get; set; }
     public int[]? CustomTipPercentages { get; set; }
+    public string? HtmlLang { get; set; }
+    public string? HtmlMetaTags { get; set; }
     public string? FormId { get; set; }
 }
 
 public class PointOfSaleAppData : PointOfSaleBaseData
 {
-    public object? Items { get; set; }
+    public AppItem[]? Items { get; set; }
 }
 
 public class PointOfSaleAppRequest : PointOfSaleBaseData, IAppRequest

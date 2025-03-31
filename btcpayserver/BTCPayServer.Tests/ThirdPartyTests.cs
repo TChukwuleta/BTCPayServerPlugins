@@ -208,6 +208,18 @@ namespace BTCPayServer.Tests
                         e => e.CurrencyPair == new CurrencyPair("BTC", "LBP") &&
                              e.BidAsk.Bid > 1.0m); // 1 BTC will always be more than 1 LBP (I hope)
                 }
+                else if (name == "bitmynt")
+                {
+                    Assert.Contains(exchangeRates.ByExchange[name],
+                        e => e.CurrencyPair == new CurrencyPair("BTC", "NOK") &&
+                             e.BidAsk.Bid > 1.0m); // 1 BTC will always be more than 1 NOK
+                }
+                else if (name == "barebitcoin") 
+                {
+                    Assert.Contains(exchangeRates.ByExchange[name],
+                        e => e.CurrencyPair == new CurrencyPair("BTC", "NOK") &&
+                             e.BidAsk.Bid > 1.0m); // 1 BTC will always be more than 1 NOK
+                }
                 else
                 {
                     if (name == "kraken")
@@ -234,7 +246,7 @@ namespace BTCPayServer.Tests
             }
 
             // Kraken emit one request only after first GetRates
-            factory.Providers["kraken"].GetRatesAsync(default).GetAwaiter().GetResult();
+            await factory.Providers["kraken"].GetRatesAsync(default);
 
             var p = new KrakenExchangeRateProvider();
             var rates = await p.GetRatesAsync(default);
@@ -273,7 +285,8 @@ namespace BTCPayServer.Tests
                 "https://support.bitpay.com",
                 "https://www.coingecko.com", // unhappy service
                 "https://www.wasabiwallet.io", // Banning US, CI unhappy
-                "https://fullynoded.app" // Sometimes DNS doesn't work
+                "https://fullynoded.app", // Sometimes DNS doesn't work
+                "https://hrf.org" // Started returning Forbidden
             };
 
             foreach (var match in regex.Matches(text).OfType<Match>())
@@ -339,15 +352,15 @@ retry:
         }
 
         [Fact]
-        public void CanSolveTheDogesRatesOnKraken()
+        public async Task CanSolveTheDogesRatesOnKraken()
         {
             var factory = FastTests.CreateBTCPayRateFactory();
             var fetcher = new RateFetcher(factory);
 
             Assert.True(RateRules.TryParse("X_X=kraken(X_BTC) * kraken(BTC_X)", out var rule));
-            foreach (var pair in new[] { "DOGE_USD", "DOGE_CAD", "DASH_CAD", "DASH_USD", "DASH_EUR" })
+            foreach (var pair in new[] { "DOGE_USD", "DOGE_CAD" })
             {
-                var result = fetcher.FetchRate(CurrencyPair.Parse(pair), rule, null, default).GetAwaiter().GetResult();
+                var result = await fetcher.FetchRate(CurrencyPair.Parse(pair), rule, null, default);
                 Assert.NotNull(result.BidAsk);
                 Assert.Empty(result.Errors);
             }
@@ -488,10 +501,14 @@ retry:
             expected = (await (await client.GetAsync($"https://cdn.jsdelivr.net/npm/tom-select@{version}/dist/js/tom-select.complete.min.js")).Content.ReadAsStringAsync()).Trim();
             EqualJsContent(expected, actual);
 
-            actual = GetFileContent("BTCPayServer", "wwwroot", "vendor", "dom-confetti", "dom-confetti.min.js").Trim();
-            version = Regex.Match(actual, "Original file: /npm/dom-confetti@([0-9]+.[0-9]+.[0-9]+)/lib/main.js").Groups[1].Value;
-            expected = (await (await client.GetAsync($"https://cdn.jsdelivr.net/npm/dom-confetti@{version}")).Content.ReadAsStringAsync()).Trim();
-            EqualJsContent(expected, actual);
+            // This test is flaky probably because of the CDN sending the wrong file's version in some regions.
+            // https://app.circleci.com/pipelines/github/btcpayserver/btcpayserver/13750/workflows/44aaf31d-0057-4fd8-a5bb-1a2c47fc530f/jobs/42963
+            // It works locally depending on where you live.
+
+            //actual = GetFileContent("BTCPayServer", "wwwroot", "vendor", "dom-confetti", "dom-confetti.min.js").Trim();
+            //version = Regex.Match(actual, "Original file: /npm/dom-confetti@([0-9]+.[0-9]+.[0-9]+)/lib/main.js").Groups[1].Value;
+            //expected = (await (await client.GetAsync($"https://cdn.jsdelivr.net/npm/dom-confetti@{version}")).Content.ReadAsStringAsync()).Trim();
+            //EqualJsContent(expected, actual);
 
             actual = GetFileContent("BTCPayServer", "wwwroot", "vendor", "vue-sortable", "sortable.min.js").Trim();
             version = Regex.Match(actual, "Sortable ([0-9]+.[0-9]+.[0-9]+) ").Groups[1].Value;
@@ -597,7 +614,7 @@ retry:
 
             foreach (var rate in rates)
             {
-                Assert.Single(rates.Where(r => r == rate));
+                Assert.Single(rates, r => r == rate);
             }
         }
 

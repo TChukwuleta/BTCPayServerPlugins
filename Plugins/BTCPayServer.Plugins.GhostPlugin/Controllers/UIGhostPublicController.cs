@@ -79,18 +79,13 @@ public class UIGhostPublicController : Controller
         var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated()) return NotFound();
 
-        var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
-        var ghostSettings = await apiClient.RetrieveGhostSettings();
-
-        var donationsCurrency = ghostSettings.FirstOrDefault(s => s.key == "donations_currency")?.value?.ToString();
         var storeBlob = store.GetStoreBlob();
-        donationsCurrency ??= storeBlob.DefaultCurrency;
         string id = Guid.NewGuid().ToString();
 
         InvoiceEntity invoice = await _invoiceController.CreateInvoiceCoreRaw(new CreateInvoiceRequest()
         {
             Amount = null,
-            Currency = donationsCurrency,
+            Currency = storeBlob.DefaultCurrency,
             Metadata = new JObject
             {
                 ["GhostDonationId"] = id
@@ -112,8 +107,8 @@ public class UIGhostPublicController : Controller
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
-        var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
-        var ghostTiers = await apiClient.RetrieveGhostTiers();
+        var contentApiClient = new GhostContentApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
+        var ghostTiers = await contentApiClient.RetrieveGhostTiers();
         ghostTiers = ghostTiers.Where(tier => tier.monthly_price > 0 || tier.yearly_price > 0).ToList();
         var storeData = await _storeRepo.FindStore(ghostSetting.StoreId);
         return View(new CreateMemberViewModel { 
@@ -134,8 +129,9 @@ public class UIGhostPublicController : Controller
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated()) return NotFound();
 
         var storeData = await _storeRepo.FindStore(ghostSetting.StoreId);
+        var contentApiClient = new GhostContentApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
-        var ghostTiers = await apiClient.RetrieveGhostTiers();
+        var ghostTiers = await contentApiClient.RetrieveGhostTiers();
         if (ghostTiers == null)
             return NotFound();
 
@@ -180,8 +176,8 @@ public class UIGhostPublicController : Controller
         if (member == null || ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
 
-        var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
-        var ghostTiers = await apiClient.RetrieveGhostTiers();
+        var contentApiClient = new GhostContentApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
+        var ghostTiers = await contentApiClient.RetrieveGhostTiers();
         if (ghostTiers == null)
             return NotFound();
 

@@ -3,10 +3,10 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Extensions;
+using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Configuration;
@@ -37,6 +37,7 @@ namespace BTCPayServer.Controllers.Greenfield
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly SettingsRepository _settingsRepository;
         private readonly EventAggregator _eventAggregator;
+        private readonly CallbackGenerator _callbackGenerator;
         private readonly IPasswordValidator<ApplicationUser> _passwordValidator;
         private readonly IRateLimitService _throttleService;
         private readonly BTCPayServerOptions _options;
@@ -50,6 +51,7 @@ namespace BTCPayServer.Controllers.Greenfield
             SettingsRepository settingsRepository,
             PoliciesSettings policiesSettings,
             EventAggregator eventAggregator,
+            CallbackGenerator callbackGenerator,
             IPasswordValidator<ApplicationUser> passwordValidator,
             IRateLimitService throttleService,
             BTCPayServerOptions options,
@@ -65,6 +67,7 @@ namespace BTCPayServer.Controllers.Greenfield
             _settingsRepository = settingsRepository;
             PoliciesSettings = policiesSettings;
             _eventAggregator = eventAggregator;
+            _callbackGenerator = callbackGenerator;
             _passwordValidator = passwordValidator;
             _throttleService = throttleService;
             _options = options;
@@ -111,14 +114,14 @@ namespace BTCPayServer.Controllers.Greenfield
                 return this.UserNotFound();
             }
 
-            var success = false;
             if (user.RequiresApproval)
             {
-                success = await _userService.SetUserApproval(user.Id, request.Approved, Request.GetAbsoluteRootUri());
+                var loginLink = _callbackGenerator.ForLogin(user, Request);
+                return await _userService.SetUserApproval(user.Id, request.Approved, loginLink)
+                    ? Ok()
+                    : this.CreateAPIError("invalid-state", $"User is already {(request.Approved ? "approved" : "unapproved")}");
             }
-
-            return success ? Ok() : this.CreateAPIError("invalid-state",
-                $"{(request.Approved ? "Approving" : "Unapproving")} user failed");
+            return this.CreateAPIError("invalid-state", $"{(request.Approved ? "Approving" : "Unapproving")} user failed: No approval required");
         }
 
         [Authorize(Policy = Policies.CanViewUsers, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
@@ -220,6 +223,10 @@ namespace BTCPayServer.Controllers.Greenfield
                             ModelState.AddModelError(string.Empty, error.Description);
                     }
                 }
+                else
+                {
+                    _eventAggregator.Publish(new UserEvent.Updated(user));
+                }
             }
 
             if (!ModelState.IsValid)
@@ -233,33 +240,30 @@ namespace BTCPayServer.Controllers.Greenfield
         [HttpPost("~/api/v1/users/me/picture")]
         public async Task<IActionResult> UploadCurrentUserProfilePicture(IFormFile? file)
         {
+            var user = await _userManager.GetUserAsync(User);
+            if (user is null) return this.UserNotFound();
+            
+            UploadImageResultModel? upload = null;
             if (file is null)
                 ModelState.AddModelError(nameof(file), "Invalid file");
-            else if (file.Length > 1_000_000)
-                ModelState.AddModelError(nameof(file), "The uploaded image file should be less than 1MB");
-            else if (!file.ContentType.StartsWith("image/", StringComparison.InvariantCulture))
-                ModelState.AddModelError(nameof(file), "The uploaded file needs to be an image");
-            else if (!file.FileName.IsValidFileName())
-                ModelState.AddModelError(nameof(file.FileName), "Invalid filename");
             else
             {
-                var formFile = await file.Bufferize();
-                if (!FileTypeDetector.IsPicture(formFile.Buffer, formFile.FileName))
-                    ModelState.AddModelError(nameof(file), "The uploaded file needs to be an image");
+                upload = await _fileService.UploadImage(file, user.Id);
+                if (!upload.Success)
+                    ModelState.AddModelError(nameof(file), upload.Response);
             }
             if (!ModelState.IsValid)
                 return this.CreateValidationError(ModelState);
 
             try
             {
-                var user = await _userManager.GetUserAsync(User);
-                var storedFile = await _fileService.AddFile(file!, user!.Id);
+                var storedFile = upload!.StoredFile!;
                 var blob = user.GetBlob() ?? new UserBlob();
                 var fileIdUri = new UnresolvedUri.FileIdUri(storedFile.Id);
                 blob.ImageUrl = fileIdUri.ToString();
                 user.SetBlob(blob);
                 await _userManager.UpdateAsync(user);
-
+                _eventAggregator.Publish(new UserEvent.Updated(user));
                 var model = await FromModel(user);
                 return Ok(model);
             }
@@ -274,10 +278,7 @@ namespace BTCPayServer.Controllers.Greenfield
         public async Task<IActionResult> DeleteCurrentUserProfilePicture()
         {
             var user = await _userManager.GetUserAsync(User);
-            if (user is null)
-            {
-                return this.UserNotFound();
-            }
+            if (user is null) return this.UserNotFound();
             
             var blob = user.GetBlob() ?? new UserBlob();
             if (!string.IsNullOrEmpty(blob.ImageUrl))
@@ -287,6 +288,7 @@ namespace BTCPayServer.Controllers.Greenfield
                 blob.ImageUrl = null;
                 user.SetBlob(blob);
                 await _userManager.UpdateAsync(user);
+                _eventAggregator.Publish(new UserEvent.Updated(user));
             }
             return Ok();
         }
@@ -304,14 +306,12 @@ namespace BTCPayServer.Controllers.Greenfield
         {
             if (request.Email is null)
                 ModelState.AddModelError(nameof(request.Email), "Email is missing");
-            if (!string.IsNullOrEmpty(request.Email) && !MailboxAddressValidator.IsMailboxAddress(request.Email))
-            {
+            if (!MailboxAddressValidator.IsMailboxAddress(request.Email))
                 ModelState.AddModelError(nameof(request.Email), "Invalid email");
-            }
+            
             if (!ModelState.IsValid)
-            {
                 return this.CreateValidationError(ModelState);
-            }
+            
             if (User.Identity is null)
                 throw new JsonHttpException(this.StatusCode(401));
             var anyAdmin = (await _userManager.GetUsersInRoleAsync(Roles.ServerAdmin)).Any();
@@ -355,21 +355,25 @@ namespace BTCPayServer.Controllers.Greenfield
             blob.Name = request.Name;
             blob.ImageUrl = request.ImageUrl;
             user.SetBlob(blob);
-            var passwordValidation = await this._passwordValidator.ValidateAsync(_userManager, user, request.Password);
-            if (!passwordValidation.Succeeded)
+            var hasPassword = !string.IsNullOrEmpty(request.Password);
+            if (hasPassword)
             {
-                foreach (var error in passwordValidation.Errors)
+                var passwordValidation = await _passwordValidator.ValidateAsync(_userManager, user, request.Password);
+                if (!passwordValidation.Succeeded)
                 {
-                    ModelState.AddModelError(nameof(request.Password), error.Description);
+                    foreach (var error in passwordValidation.Errors)
+                    {
+                        ModelState.AddModelError(nameof(request.Password), error.Description);
+                    }
+                    return this.CreateValidationError(ModelState);
                 }
-                return this.CreateValidationError(ModelState);
             }
             if (!isAdmin)
             {
                 if (!await _throttleService.Throttle(ZoneLimits.Register, this.HttpContext.Connection.RemoteIpAddress, cancellationToken))
                     return new TooManyRequestsResult(ZoneLimits.Register);
             }
-            var identityResult = await _userManager.CreateAsync(user, request.Password);
+            var identityResult = hasPassword ? await _userManager.CreateAsync(user, request.Password) : await _userManager.CreateAsync(user);
             if (!identityResult.Succeeded)
             {
                 foreach (var error in identityResult.Errors)
@@ -402,18 +406,11 @@ namespace BTCPayServer.Controllers.Greenfield
                     await _settingsRepository.FirstAdminRegistered(policies, _options.UpdateUrl != null, _options.DisableRegistration, Logs);
                 }
             }
-
             var currentUser = await _userManager.GetUserAsync(User);
-            var userEvent = new UserRegisteredEvent
+            var userEvent = currentUser switch
             {
-                RequestUri = Request.GetAbsoluteRootUri(),
-                Admin = isNewAdmin,
-                User = user
-            };
-            if (currentUser is not null)
-            {
-                userEvent.Kind = UserRegisteredEventKind.Invite;
-                userEvent.InvitedByUser = currentUser;
+                { } invitedBy => await UserEvent.Invited.Create(user, invitedBy, _callbackGenerator, Request, true),
+                _ => await UserEvent.Registered.Create(user, _callbackGenerator, Request)
             };
             _eventAggregator.Publish(userEvent);
 
@@ -447,6 +444,7 @@ namespace BTCPayServer.Controllers.Greenfield
 
             // Ok, this user is an admin but there are other admins as well so safe to delete
             await _userService.DeleteUserAndAssociatedData(user);
+            _eventAggregator.Publish(new UserEvent.Deleted(user));
 
             return Ok();
         }

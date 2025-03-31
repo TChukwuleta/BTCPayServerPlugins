@@ -18,10 +18,6 @@ public class GhostSetting
 
     [Display(Name = "Content API Key")]
     public string ContentApiKey { get; set; }
-
-    [Display(Name = "Ghost Username/Email")]
-    public string Username { get; set; }
-    public string Password { get; set; }
     public string StoreId { get; set; }
     public string WebhookSecret { get; set; }
     public string AppId { get; set; }
@@ -35,8 +31,7 @@ public class GhostSetting
         return
             !string.IsNullOrWhiteSpace(ApiUrl) &&
             !string.IsNullOrWhiteSpace(AdminApiKey) &&
-            !string.IsNullOrWhiteSpace(Username) &&
-            !string.IsNullOrWhiteSpace(Password);
+            !string.IsNullOrWhiteSpace(ContentApiKey);
     }
 
     internal static void OnModelCreating(ModelBuilder modelBuilder)

@@ -92,7 +92,7 @@ function initApp() {
             const srvModel = initialSrvModel;
             return {
                 srvModel,
-                audioContext: new AudioContext(),
+                audioContext: window.AudioContext ? new AudioContext() : null,
                 displayPaymentDetails: false,
                 remainingSeconds: srvModel.expirationSeconds,
                 emailAddressInput: "",
@@ -110,6 +110,7 @@ function initApp() {
                     scanning: false,
                     submitting: false,
                     errorMessage: null,
+                    warningMessage: null,
                     permissionGranted: false,
                     readerAbortController: null
                 }
@@ -184,6 +185,9 @@ function initApp() {
             },
             realPaymentMethodCurrency () {
                 return this.srvModel.paymentMethodCurrency.toLowerCase() === 'sats' ? 'BTC' : this.srvModel.paymentMethodCurrency;
+            },
+            displayedPaymentMethods: function () {
+                return this.srvModel?.availablePaymentMethods?.filter(pm => pm.displayed) ?? [];
             }
         },
         watch: {
@@ -255,6 +259,10 @@ function initApp() {
                 if (this.pmId !== id) {
                     this.paymentMethodId = id;
                     this.fetchData();
+                    // update url
+                    const url = new URL(window.location.href);
+                    url.pathname = checkoutBaseUrl + '/' + id;
+                    history.pushState({}, "", url);
                 }
             },
             changeLanguage (e) {
@@ -347,7 +355,7 @@ function initApp() {
             },
             playSound (soundName) {
                 const audioBuffer = this[soundName + 'Sound'];
-                if (!audioBuffer || this.audioContext.state === 'suspended') return;
+                if (!audioBuffer || !this.audioContext || this.audioContext.state === 'suspended') return;
                 const source = this.audioContext.createBufferSource();
                 source.buffer = audioBuffer;
                 source.connect(this.audioContext.destination);
@@ -371,6 +379,7 @@ function initApp() {
                 }
             },
             async prepareSound (url) {
+                if (!this.audioContext) return;
                 const response = await fetch(url)
                 if (!response.ok) return console.error(`Could not load payment sound, HTTP error ${response.status}`);
                 const arrayBuffer = await response.arrayBuffer();
@@ -436,9 +445,13 @@ function initApp() {
                 this.playSound('nfcRead');
                 this.$set(this.nfc, 'submitting', true);
                 this.$set(this.nfc, 'errorMessage', null);
+                this.$set(this.nfc, 'warningMessage', null);
             },
-            handleNFCResult() { // child component reports result for handling the data
+            handleNFCResult(message) { // child component reports result for handling the data
                 this.$set(this.nfc, 'submitting', false);
+                if (message) {
+                    this.$set(this.nfc, 'warningMessage', message);
+                }
             },
             handleNFCError(message) {
                 // internal or via child component reporting failure of handling the data

@@ -5,7 +5,7 @@ using BTCPayServer.Services.Labels;
 
 namespace BTCPayServer.Models.WalletViewModels
 {
-    public class WalletSendModel
+    public class WalletSendModel : IHasBackAndReturnUrl
     {
         public enum ThreeStateBool
         {
@@ -69,6 +69,7 @@ namespace BTCPayServer.Models.WalletViewModels
 
         public string BackUrl { get; set; }
         public string ReturnUrl { get; set; }
+        public bool IsMultiSigOnServer { get; set; }
 
         public class InputSelectionOption
         {
