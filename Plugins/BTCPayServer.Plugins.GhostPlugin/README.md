@@ -69,6 +69,13 @@ Before diving into the setup process, ensure you have the following:
  
 ![BTCPay Server Ghost img 60](./img/Ghost/GhostPluginWithScript.png)
 
+14. Head over to your Ghost admin portal, Settings >> Code Injection >> Add custom code, click on the "Open" button.
+   ![BTCPay Server Ghost img 36](./img/Ghost/Code_Injection_Setting_View.png)   
+
+15. Under the site header paste the script url, click on "save" and close the modal.
+   ![BTCPay Server Ghost img 37](./img/Ghost/Code_Injection_Script_view.png)   
+
+
 If you got here without any hassle, congratulations on successfully installing the plugin. 
 
 In case you encountered any issue you can report them [here](https://github.com/TChukwuleta/BTCPayServerPlugins/issues) (prefix "Ghost" to title of the issue)

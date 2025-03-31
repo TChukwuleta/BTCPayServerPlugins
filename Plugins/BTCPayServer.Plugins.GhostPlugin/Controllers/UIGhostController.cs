@@ -17,7 +17,6 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Net.Http;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
-using BTCPayServer.Plugins.GhostPlugin;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 using BTCPayServer.Services.Mails;
 using Microsoft.AspNetCore.Routing;
