@@ -1,34 +1,34 @@
 ﻿# Accept Bitcoin on Your Ghost Blog Today 
 
-Tired of relying on Stripe for your Ghost platform and want to try something new? Do you want to receive payment from your Ghost blog in Bitcoin, of course without an 
-fees and third party?
+Introducing BTCPay Server for Ghost – a simple way to accept payments from your customers via Bitcoin directly on your [Ghost blog](https://ghost.org/) with zero fees.
 
-Introducing BTCPay Server for Ghost – a plugin that allows you accept bitcoin payments directly on your blog from customers with no fee.
-
-Monetizing your content should be simple, and free from third-party fees. Our integration with Ghost allows you to connect your self-hosted BTCPay Server with your 
-[Ghost blog](https://ghost.org/), enabling you accept Bitcoin payments swiftly and securely, while keeping you in full control of your funds.
-
-Whether you’re receiving donations, selling tiered memberships or use it to make a paywall and accept micropayments, this integration ensures seamless Bitcoin payments without third-party fees.
+Monetizing your content just got easier. With this integration, you have full control over your earnings—no middlemen, no extra charges.
 
 
-🔹 Seamless Integration – Connect your Ghost blog to BTCPay Server in just a few clicks.
-
-🔹 Zero Fees, Full Control – No third-party processing, just direct Bitcoin payments to your wallet.
-
-🔹 Perfect for Creators – Monetize your blog with Bitcoin-based memberships and content access.
-
-💡 Ready to power your blog with Bitcoin? Set up your BTCPay Server and start accepting payments
+✨ Why use BTCPay with Ghost?
+✔ Easy Setup – Connect your Ghost blog to BTCPay Server in just a few clicks.
+✔ No Middlemen, No Fees – Accept payments directly to your wallet with no extra charges.
+✔ Built for Creators – Monetize your content your way, with full flexibility.
 
 
+## 🎯 What can I do with the BTCPay-Ghost integration?
+
+1. Accept Donations – Allow readers support your work with donations in Bitcoin.
+
+2. Paywall Content – Restrict access to premium articles, videos, or other content, unlocking it through Bitcoin payments.
+
+3. Tiered Membership Creation and Subscriptions - Offer exclusive content to members and subscribers in a tier.
+
+
+Ready to take your blog to the next level? Set up BTCPay Server and start accepting Bitcoin payments today 🚀
 
 ## Prerequisites:
 
 Before diving into the setup process, ensure you have the following:
 
 - [A Ghost account](https://ghost.org/) or [self-hosted Ghost instance](https://ghost.org/docs/install/).
-- BTCPay Server - [self-hosted](Deployment.md) or run by a [third-party host](/Deployment/ThirdPartyHosting.md) v2.0.0 or later.
+- BTCPay Server - [self-hosted](Deployment.md) or run by a [third-party host](/Deployment/ThirdPartyHosting.md) v2.0.7 or later.
 - [Created BTCPay Server store](CreateStore.md) with [wallet set up](WalletSetup.md)
-
 
 
 ## Setting up BTCPay Server with Ghost
@@ -37,15 +37,17 @@ Before diving into the setup process, ensure you have the following:
 
 2. Search for and install BTCPay Server plugin for Ghost
 
-3. Once installed you should see Ghost, included in the side nav, under plugins
+3. Once installed you should see Ghost, included in the side nav of your instance under plugins section
 
 4. Log in to your Ghost Admin Panel on a new tab
 
 5. Navigate to Settings (cogwheel at the bottom), in section "Advanced" click on "Integrations". Click "Add custom integration" and name it e.g "BTCPay Server"
+   
    ![BTCPay Server Ghost img 1](./img/Ghost/Add_Custom_Integration_View.png)   
    ![BTCPay Server Ghost img 2](./img/Ghost/Custom_Integration_Name.png)   
 
 6. A modal will show the required Ghost credentials needed by the plugin
+   
    ![BTCPay Server Ghost img 3](./img/Ghost/Custom_Integration_Credentials.png)
 
 7. Click on "Save" to save your credentials, you can also put in a description before saving it.
@@ -54,58 +56,33 @@ Before diving into the setup process, ensure you have the following:
 
 9. Copy your API Url (without the https://), Content API key, and Admin API Key from Ghost credential page into their respective input fields in your plugin page.
 
-10. For the username/email and password fields, enter your Ghost admin email address, and password.
+10. For the Webhook Secret you can enter a secret on your own or if left empty it will auto-generate one. This will only be used for the membership functionality.
 
-11. For the Webhook Secret you can enter a secret on your own or if left empty it will auto-generate one. This will only be used for the membership functionality.
-
-12. Now save the credentials details on BTCPay Server Ghost Plugin. If all data is correct, it should save successfully.
+11. Now save the credentials details on BTCPay Server Ghost Plugin.
 
 ![BTCPay Server Ghost img 5](./img/Ghost/Ghost_BTCPay_Credential_Saved_1.png)   
 
 ![BTCPay Server Ghost img 6](./img/Ghost/Ghost_BTCPay_Credential_Saved_2.png)
 
-13. On BTCPay, go to your Ghost plugin page, copy the script snippet from the bottom of the page. Open your Ghost admin portal: Settings >> Code Injection, open code injection and under site header paste the script url, save and close
- 
+12. While on the plugin page, copy the script snippet from the bottom of the page. Open your Ghost admin portal: Settings >> Code Injection, open code injection and under site header paste the script url, save and close
  
 ![BTCPay Server Ghost img 60](./img/Ghost/GhostPluginWithScript.png)
 
-14. Head over to your Ghost admin portal, Settings >> Code Injection >> Add custom code, click on the "Open" button.
-   ![BTCPay Server Ghost img 36](./img/Ghost/Code_Injection_Setting_View.png)   
+![BTCPay Server Ghost img 36](./img/Ghost/Code_Injection_Setting_View.png)   
 
-15. Under the site header paste the script url, click on "save" and close the modal.
-   ![BTCPay Server Ghost img 37](./img/Ghost/Code_Injection_Script_view.png)   
-
-
-If you got here without any hassle, congratulations on successfully installing the plugin. 
+Congratulations on successfully installing the plugin. 
 
 In case you encountered any issue you can report them [here](https://github.com/TChukwuleta/BTCPayServerPlugins/issues) (prefix "Ghost" to title of the issue)
 
-### Uninstalling
-You can discontinue the plugin by clicking on the "Stop Ghost calls and clear credentials" button, and also deleting the custom integration that you created.
 
-## 🎯 What can I do with the BTCPay-Ghost plugin?
-
-Congratulations once again on installing your plugin successfully. Whether you’re a blogger, a business owner, or an event organizer, 
-
-the Ghost - BTCPay Server plugin unlocks new revenue streams.
-
-1. Accept Donations – Allow readers support your work with donations in Bitcoin.
-
-2. Paywall Content – Restrict access to premium articles, videos, or other content, unlocking it through Bitcoin payments.
-
-3. Tiered Membership Creation and Subscriptions - Offer exclusive content to members and subscribers in a tier.
-
-Each use case comes with an easy setup guide to help you get started quickly. Let’s dive into the details.
-
-
-### Receiving Donations on Ghost through BTCPay Server
+## Receiving Donations on Ghost through BTCPay Server
 
 With BTCPay Server, you can accept Bitcoin donations directly on your Ghost blog — no intermediaries, no processing fees, just a seamless way for your audience to support your work.
 
 Whether you're a blogger, journalist, or content creator, adding a Bitcoin donation option gives your supporters an easy way to contribute, while ensuring you maintain full control over your funds.
 
 
-#### Steps on how to receive donations on Ghost via BTCPay Server.
+### Steps on how to receive donations on Ghost via BTCPay Server.
 
 1. Go to your BTCPay Server Ghost plugin, scroll down the page, you'd see "Donation Url", copy the URL.
 
@@ -135,7 +112,7 @@ Whether you're a blogger, journalist, or content creator, adding a Bitcoin donat
 
 
 
-### Membership and subscription BTCPay Server
+## Membership and subscription BTCPay Server
 
 
 Beyond accepting donations, if you are looking to monetize your content, community, or services with Bitcoin, this plugin also offers you the opportunity to do so. Following the steps below, you should be able to now accept Bitcoin for membership creation and subscriptions.
@@ -147,7 +124,7 @@ Why does this matter? While BTCPay Server can handle subscriptions and send noti
 This means subscription management remains the admin’s responsibility. However, you can configure the Ghost plugin to send automated notifications to the customer when a subscription is nearing expiration, allowing for timely action.
 
 
-#### Setting up membership subscription via BTCPay Server
+### Setting up membership subscription via BTCPay Server
 
 
 1. Head to your BTCPay Server Ghost plugin, scroll down on the page, copy the 'Membership subscription Url'.
@@ -181,7 +158,7 @@ This means subscription management remains the admin’s responsibility. However
 10. Once you can confirm that both your webhooks has been populated, click on 'Save' and close the modal.
 	![BTCPay Server Ghost img 27](./img/Ghost/Member_Credentials_Webhook_View.png)
 
-#### Testing the membership subscription
+### Testing the membership subscription
 
 1. Users can then proceed to create membership and pay via BTCPay Server. When a user clicks on the link, he is redirected to a page where he can select his tier.
    ![Membership_signup.png](./img/Ghost/Membership_signup.png)
@@ -194,7 +171,7 @@ This means subscription management remains the admin’s responsibility. However
 4. Once the invoice has been paid, a member account is created by the user on the Ghost platform, the user can then proceed to log in.
 
 
-#### Managing Members and Subscriptions
+### Managing Members and Subscriptions
 
 1. The admin can view all subscribed members by heading over to the BTCPay Server >> Ghost plugin >> Ghost members.
    ![BTCPay Server Ghost img 29](./img/Ghost/Ghost_Members_List.png)   
@@ -214,7 +191,7 @@ This means subscription management remains the admin’s responsibility. However
 6. The admin can also view all payments a particular associated with the membership by clicking on the "View" link.
    ![Ghost_Members_Payments_List.png](./img/Ghost/Ghost_Members_Payments_List.png)
 
-#### Ghost plugin settings
+### Ghost plugin settings
 
 As earlier mentioned, an admin can configure settings for his Ghost plugin. 
 
@@ -227,7 +204,7 @@ Congratulations, you have completed the setup.
 
 
 
-### Payment Paywall on Ghost
+## Payment Paywall on Ghost
 
 With BTCPay Server - Ghost plugin, you can now hide premium content on your blog post until the user makes a successful payment. This guide explains how to implement a Bitcoin paywall using BTCPay Server. 
 
@@ -287,6 +264,10 @@ Once done, save your page/post, open the url to the post and proceed to make a p
 ![BTCPay Server Ghost img 44](./img/Ghost/Paywall_View_Five.png)
 
 One final note, this content would be available to the user, while his browser data is still on, and would stop being once the data is cleared. It would be good to inform users to save the content once revealed.
+
+
+## Uninstalling
+You can discontinue the plugin by clicking on the "Stop Ghost calls and clear credentials" button, and also deleting the custom integration that you created.
 
 
 ## Contribute
