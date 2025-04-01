@@ -1,6 +1,6 @@
 ﻿# Accept Bitcoin on Your Ghost Blog Today 
 
-Introducing BTCPay Server for Ghost – a simple way to accept payments from your customers via Bitcoin directly on your [Ghost blog](https://ghost.org/) with zero fees.
+Introducing BTCPay Server for Ghost – a simple way to accept payments from your customers via Bitcoin directly on your [Ghost blog](https://ghost.org/).
 Monetizing your content just got easier. With this integration, you have full control over your earnings—no middlemen, no extra charges.
 
 
