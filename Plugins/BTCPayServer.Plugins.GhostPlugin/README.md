@@ -1,17 +1,14 @@
 ﻿# Accept Bitcoin on Your Ghost Blog Today 
 
 Introducing BTCPay Server for Ghost – a simple way to accept payments from your customers via Bitcoin directly on your [Ghost blog](https://ghost.org/) with zero fees.
-
 Monetizing your content just got easier. With this integration, you have full control over your earnings—no middlemen, no extra charges.
 
 
-✨ Why use BTCPay with Ghost?
+Why use BTCPay with Ghost?
 
-✔ Easy Setup – Connect your Ghost blog to BTCPay Server in just a few clicks.
-
-✔ No Middlemen, No Fees – Accept payments directly to your wallet with no extra charges.
-
-✔ Built for Creators – Monetize your content your way, with full flexibility.
+- Easy Setup – Connect your Ghost blog to BTCPay Server in just a few clicks.
+- No Middlemen, No Fees – Accept payments directly to your wallet with no extra charges.
+- Built for Creators – Monetize your content your way, with full flexibility.
 
 
 ## 🎯 What can I do with the BTCPay-Ghost integration?
@@ -80,13 +77,6 @@ In case you encountered any issue you can report them [here](https://github.com/
 
 ## Receiving Donations on Ghost through BTCPay Server
 
-With BTCPay Server, you can accept Bitcoin donations directly on your Ghost blog — no intermediaries, no processing fees, just a seamless way for your audience to support your work.
-
-Whether you're a blogger, journalist, or content creator, adding a Bitcoin donation option gives your supporters an easy way to contribute, while ensuring you maintain full control over your funds.
-
-
-### Steps on how to receive donations on Ghost via BTCPay Server.
-
 1. Go to your BTCPay Server Ghost plugin, scroll down the page, you'd see "Donation Url", copy the URL.
 
 2. Open your ghost admin page where you want to receive donations. You may be open to receiving donations on every content page of your Ghost blog, or on a single page dedicated to donations. Which ever you choose, 
@@ -112,6 +102,70 @@ Whether you're a blogger, journalist, or content creator, adding a Bitcoin donat
 
 
 ![BTCPay Server Ghost img 11](./img/Ghost/Paid_Donation.png)
+
+
+
+## Payment Paywall on Ghost
+
+With BTCPay Server - Ghost plugin, you can now hide premium content on your blog post until the user makes a successful payment. This guide explains how to implement a Bitcoin paywall using BTCPay Server. 
+
+Please note that this is not fully protecting your content but just hiding it until payment is made. Technical users can bypass this paywall by inspecting the page source.
+
+1. Ensure you have copied the script url into the site header. If you haven't, go to your BTCPay Server Ghost plugin, scroll down the page, copy the paywall script url.  
+
+2. Head over to your Ghost admin portal, Settings >> Code Injection >> Add custom code, click on the "Open" button.
+   ![BTCPay Server Ghost img 36](./img/Ghost/Code_Injection_Setting_View.png)   
+
+3. Under the site header paste the script url, click on "save" and close the modal.
+   ![BTCPay Server Ghost img 37](./img/Ghost/Code_Injection_Script_view.png)   
+
+4. Now that you have the script injected, head over to the post/page editor where you want to include your paywall. Click on the plus icon to add an item, select HTML, and in the input field paste the following code
+   ![BTCPay Server Ghost img 38](./img/Ghost/Add_Html_To_Post.png)
+```
+    <div class="paywall-section">
+        <div id="paywall-config" data-price="2"></div>
+        <div id="paywall-content" style="display: none;">
+            <h2>Premium Content</h2>
+            <p>This content is only available after payment.</p>
+        </div>
+        <div id="paywall-overlay">
+            <button id="payButton">Pay with Bitcoin to unlock content</button>
+        </div>
+    </div>
+```
+
+These are HTML tags. For customization, you can replace the button text with whatever you want the button text to be i.e replace `Pay with Bitcoin to unlock content` with `Any text you choose`
+
+You can also replace the h2 tag with any header/description text that you want to give to your premium item i.e replace `Premium Content` with `Any description/header of choice`
+
+Replace the p tag with the actual premium item which can be a link to download a book, or a text or anything at all i.e replace `This content is only available after payment.` with `My hidden item`
+
+Finally replace the `data-price` value from 2 to whatever amount you want to sell your content for i.e. replace the 2 in `data-price="2"` with any amount.
+
+P.S.: The currency associated with the amount is the default currency set for your BTCPay Server store
+
+P.P.S: Do not change the `id` of the tags i.e `paywall-config`, `paywall-content`, `paywall-overlay`. These are the tags that the script would be looking for.
+
+If you are a technical person and good with styling and customization, further customization can be done to the elements. 
+
+![BTCPay Server Ghost img 39](./img/Ghost/Html_Content.png)
+
+
+Once done, save your page/post, open the url to the post and proceed to make a payment.
+
+![BTCPay Server Ghost img 40](./img/Ghost/Paywall_View_One.png)
+
+
+![BTCPay Server Ghost img 41](./img/Ghost/Paywall_View_Two.png)
+
+![BTCPay Server Ghost img 42](./img/Ghost/Paywall_View_Three.png)
+
+![BTCPay Server Ghost img 43](./img/Ghost/Paywall_View_Four.png)
+
+![BTCPay Server Ghost img 44](./img/Ghost/Paywall_View_Five.png)
+
+One final note, this content would be available to the user, while his browser data is still on, and would stop being once the data is cleared. It would be good to inform users to save the content once revealed.
+
 
 
 
@@ -205,68 +259,6 @@ As earlier mentioned, an admin can configure settings for his Ghost plugin.
 
 Congratulations, you have completed the setup.
 
-
-
-## Payment Paywall on Ghost
-
-With BTCPay Server - Ghost plugin, you can now hide premium content on your blog post until the user makes a successful payment. This guide explains how to implement a Bitcoin paywall using BTCPay Server. 
-
-Please note that this is not fully protecting your content but just hiding it until payment is made. Technical users can easily bypass this paywall by inspecting the page source.
-
-1. Ensure you have copied the script url into the site header. If you haven't, go to your BTCPay Server Ghost plugin, scroll down the page, copy the paywall script url.  
-
-2. Head over to your Ghost admin portal, Settings >> Code Injection >> Add custom code, click on the "Open" button.
-   ![BTCPay Server Ghost img 36](./img/Ghost/Code_Injection_Setting_View.png)   
-
-3. Under the site header paste the script url, click on "save" and close the modal.
-   ![BTCPay Server Ghost img 37](./img/Ghost/Code_Injection_Script_view.png)   
-
-4. Now that you have the script injected, head over to the post/page editor where you want to include your paywall. Click on the plus icon to add an item, select HTML, and in the input field paste the following code
-   ![BTCPay Server Ghost img 38](./img/Ghost/Add_Html_To_Post.png)
-```
-    <div class="paywall-section">
-        <div id="paywall-config" data-price="2"></div>
-        <div id="paywall-content" style="display: none;">
-            <h2>Premium Content</h2>
-            <p>This content is only available after payment.</p>
-        </div>
-        <div id="paywall-overlay">
-            <button id="payButton">Pay with Bitcoin to unlock content</button>
-        </div>
-    </div>
-```
-
-These are HTML tags. For customization, you can replace the button text with whatever you want the button text to be i.e replace `Pay with Bitcoin to unlock content` with `Any text you choose`
-
-You can also replace the h2 tag with any header/description text that you want to give to your premium item i.e replace `Premium Content` with `Any description/header of choice`
-
-Replace the p tag with the actual premium item which can be a link to download a book, or a text or anything at all i.e replace `This content is only available after payment.` with `My hidden item`
-
-Finally replace the `data-price` value from 2 to whatever amount you want to sell your content for i.e. replace the 2 in `data-price="2"` with any amount.
-
-P.S.: The currency associated with the amount is the default currency set for your BTCPay Server store
-
-P.P.S: Do not change the `id` of the tags i.e `paywall-config`, `paywall-content`, `paywall-overlay`. These are the tags that the script would be looking for.
-
-If you are a technical person and good with styling and customization, further customization can be done to the elements. 
-
-![BTCPay Server Ghost img 39](./img/Ghost/Html_Content.png)
-
-
-Once done, save your page/post, open the url to the post and proceed to make a payment.
-
-![BTCPay Server Ghost img 40](./img/Ghost/Paywall_View_One.png)
-
-
-![BTCPay Server Ghost img 41](./img/Ghost/Paywall_View_Two.png)
-
-![BTCPay Server Ghost img 42](./img/Ghost/Paywall_View_Three.png)
-
-![BTCPay Server Ghost img 43](./img/Ghost/Paywall_View_Four.png)
-
-![BTCPay Server Ghost img 44](./img/Ghost/Paywall_View_Five.png)
-
-One final note, this content would be available to the user, while his browser data is still on, and would stop being once the data is cleared. It would be good to inform users to save the content once revealed.
 
 
 ## Uninstalling
