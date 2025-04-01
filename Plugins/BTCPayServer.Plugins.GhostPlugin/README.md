@@ -160,12 +160,7 @@ Once done, save your page/post, open the url to the post and proceed to make a p
 One final note, this content would be available to the user, while his browser data is still on, and would stop being once the data is cleared. It would be good to inform users to save the content once revealed.
 
 
-
-
 ## Membership and subscription BTCPay Server
-
-
-Beyond accepting donations, if you are looking to monetize your content, community, or services with Bitcoin, this plugin also offers you the opportunity to do so. Following the steps below, you should be able to now accept Bitcoin for membership creation and subscriptions.
 
 Ghost doesn’t provide a direct way to integrate custom payment providers. Instead, it relies on a private API for payment processing, which is currently built around Stripe as the default processor.
 
@@ -248,10 +243,6 @@ As earlier mentioned, an admin can configure settings for his Ghost plugin.
 - The admin can enable or disable automated email reminders for expiring and expired subscriptions. This would require the admin to have configured email SMTP in admin settings.
 - The admin can also set the time frame to begin notification for member subscription.
 ![BTCPay Server Ghost img 34](./img/Ghost/Ghost_Settings.png)
-
-
-Congratulations, you have completed the setup.
-
 
 
 ## Uninstalling
