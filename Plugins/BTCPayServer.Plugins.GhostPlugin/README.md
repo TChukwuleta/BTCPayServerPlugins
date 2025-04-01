@@ -6,8 +6,11 @@ Monetizing your content just got easier. With this integration, you have full co
 
 
 ✨ Why use BTCPay with Ghost?
+
 ✔ Easy Setup – Connect your Ghost blog to BTCPay Server in just a few clicks.
+
 ✔ No Middlemen, No Fees – Accept payments directly to your wallet with no extra charges.
+
 ✔ Built for Creators – Monetize your content your way, with full flexibility.
 
 
