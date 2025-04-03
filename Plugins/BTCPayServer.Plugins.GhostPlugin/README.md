@@ -114,34 +114,31 @@ Please note that this is not fully protecting your content but just hiding it un
 
 4. Now that you have the script injected, head over to the post/page editor where you want to include your paywall. Click on the plus icon to add an item, select HTML, and in the input field paste the following code
    ![BTCPay Server Ghost img 38](./img/Ghost/Add_Html_To_Post.png)
+
 ```
-    <div class="paywall-section">
-        <div id="paywall-config" data-price="2"></div>
-        <div id="paywall-content" style="display: none;">
-            <h2>Premium Content</h2>
-            <p>This content is only available after payment.</p>
-        </div>
-        <div id="paywall-overlay">
-            <button id="payButton">Pay with Bitcoin to unlock content</button>
-        </div>
-    </div>
+    <btcpay-gated-content data-price="0">
+        <h2>Exclusive Content 🎉</h2>
+        <p>You have unlocked this premium content </p>
+        <button>Enjoy!</button>
+    </btcpay-gated-content>
 ```
 
-These are HTML tags. For customization, you can replace the button text with whatever you want the button text to be i.e replace `Pay with Bitcoin to unlock content` with `Any text you choose`
+These is a custom HTML tag. You can customize your premium content using HTML tags, just ensure it is wrapped inside the custom custom tag (<btcpay-gated-content data-price="4"></btcpay-gated-content>)
 
-You can also replace the h2 tag with any header/description text that you want to give to your premium item i.e replace `Premium Content` with `Any description/header of choice`
-
-Replace the p tag with the actual premium item which can be a link to download a book, or a text or anything at all i.e replace `This content is only available after payment.` with `My hidden item`
-
-Finally replace the `data-price` value from 2 to whatever amount you want to sell your content for i.e. replace the 2 in `data-price="2"` with any amount.
+Finally replace the `data-price` value from 0 to whatever amount you want to sell your content for i.e. replace the 0 in `data-price="2"` with any amount.
 
 P.S.: The currency associated with the amount is the default currency set for your BTCPay Server store
 
-P.P.S: Do not change the `id` of the tags i.e `paywall-config`, `paywall-content`, `paywall-overlay`. These are the tags that the script would be looking for.
+P.S: Also note that as for now, you can only customize one paywall per page.
 
 If you are a technical person and good with styling and customization, further customization can be done to the elements. 
 
 ![BTCPay Server Ghost img 39](./img/Ghost/Html_Content.png)
+
+
+![BTCPay Server Ghost img 39a](./img/Ghost/Html_Content1.png)
+
+In your editor the premium content isn't hidden, allowing full display of your page. Not to worry as it is hidden in the post/page URL.
 
 
 Once done, save your page/post, open the url to the post and proceed to make a payment.
