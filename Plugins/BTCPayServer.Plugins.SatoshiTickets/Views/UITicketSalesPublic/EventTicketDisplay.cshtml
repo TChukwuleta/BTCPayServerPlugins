@@ -25,10 +25,6 @@
                 <h1 class="card-title text-success border-bottom pb-2 mb-4">@Model.EventName</h1>
 
                 <div class="mb-4">
-                    <h2 class="fw-bold">@Model.EventName</h2>
-                </div>
-
-                <div class="mb-4">
                     <p class="mb-1">@Model.Location</p>
                     <p class="mb-1">@Model.StartDate.ToString("yyyy-MM-dd HH:mm:ss UTC") - @Model.EndDate?.ToString("yyyy-MM-dd HH:mm:ss UTC")</p>
                     <p class="mb-1">@ticket.Amount @ticket.Currency</p>
@@ -36,15 +32,16 @@
 
                 <div class="mb-4">
                     <p class="mb-1">@ticket.TicketId</p>
-                    <p class="mb-1">Ordered by @ticket.FirstName @ticket.LastName on @Model.PurchaseDate.ToString("MMM dd, yyyy 'at' hh:mmtt")</p>
+                    <p class="mb-1">Ordered by <strong>@ticket.FirstName @ticket.LastName</strong> on @Model.PurchaseDate.ToString("MMM dd, yyyy 'at' hh:mmtt")</p>
                 </div>
 
                 <div class="text-center my-5">
                     <img src="@ticket.QrCodeUrl" alt="QR Code" class="img-fluid" style="max-width: 200px;">
+                    <p class="mb-1">@ticket.TxnNumber</p>
                 </div>
 
                 <div class="text-end mt-4">
-                    <small>Page @(i + 1) of @Model.Tickets.Count</small>
+                    <small>Ticket @(i + 1) of @Model.Tickets.Count</small>
                 </div>
             </div>
         </div>
