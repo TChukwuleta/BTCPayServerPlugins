@@ -1,0 +1,57 @@
+@using BTCPayServer.Plugins.SatoshiTickets.Data
+@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@using System.Globalization
+@model EventSummaryViewModel
+@{
+    Layout = "_BaseSimpleTicketPublicLayout";
+}
+
+<div class="container py-4">
+
+    <div class="row mt-3">
+        <div class="col-md-6 mb-4">
+            <div class="card border-0">
+                <img src="@Model.EventImageUrl" class="img-fluid rounded">
+                <div class="text-white mt-3">
+                    <a asp-action="EventTicket" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" class="btn btn-success w-100 fw-bold shadow-none">Get a Ticket</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <h1 class="display-6 fw-bold mb-4">@Model.EventTitle.ToUpper()</h1>
+            <div class="d-flex align-items-center mb-3">
+                <div class="me-2">
+                    <i class="bi bi-calendar-event fs-5"></i>
+                </div>
+                <div>Date: @Model.FormattedEventDate, @Model.FormattedEventTime</div>
+            </div>
+            @if (Model.EndDate.HasValue)
+            {
+                <div class="d-flex align-items-center mb-3">
+                    <div class="me-2">
+                        <i class="bi bi-calendar-event fs-5"></i>
+                    </div>
+                    <div>End Date: @Model.FormattedEventEndDate, @Model.FormattedEventEndTime</div>
+                </div>
+            }
+
+            <div class="bg-light p-3 rounded mb-4">
+                @if (Model.EventType == EventType.Virtual)
+                {
+                    <p>This is an online event. Access details will be sent to your email once purchase is complete.</p>
+                }
+                @if (Model.EventType == EventType.Physical)
+                {
+                    <p>This is a physical event. QR code tickets will be sent to your email once purchase is complete.</p>
+                }
+            </div>
+
+            <hr class="my-4">
+
+            <h2 class="h4 fw-bold mb-3">About this event</h2>
+
+            <p>@Model.Description</p>
+        </div>
+    </div>
+</div>
