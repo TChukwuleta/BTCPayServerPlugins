@@ -20,6 +20,6 @@ public class Ticket
     public bool EmailSent { get; set; }
     public string QRCodeLink { get; set; }
     public string PaymentStatus { get; set; }
-    /*public DateTimeOffset? UsedAt { get; set; }*/
+    public DateTimeOffset? UsedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }

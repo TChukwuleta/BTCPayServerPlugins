@@ -422,12 +422,42 @@ public class UITicketSalesController : Controller
                     TicketTypeId = t.TicketTypeId,
                     TicketNumber = t.TxnNumber,
                     Currency = o.Currency,
+                    CheckedIn = t.UsedAt.HasValue,
                     TicketTypeName = t.TicketTypeName,
                 }).ToList(),
             }).ToList()
         };
 
         return View(vm);
+    }
+
+    [HttpGet("{eventId}/tickets/{ticketId}/check-in")]
+    public async Task<IActionResult> CheckinTicketAttendee(string storeId, string eventId, string ticketId)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+
+        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+        if (entity == null)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid Event specified";
+            return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+        }
+
+        var ticket = ctx.Tickets.FirstOrDefault(c => c.Id == ticketId && c.EventId == entity.Id);
+        if (ticket == null)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid ticket id specified";
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
+        }
+        ticket.UsedAt = DateTime.UtcNow;
+        ctx.Tickets.Update(ticket);
+        await ctx.SaveChangesAsync();
+
+        TempData[WellKnownTempData.SuccessMessage] = "Ticket checked-in successfully";
+        return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
     }
 
 
@@ -529,7 +559,8 @@ public class UITicketSalesController : Controller
                 t.Email,
                 t.TicketTypeName,
                 t.Amount,
-                o.Currency
+                o.Currency,
+                t.UsedAt
             })).ToList();
         if (ticketEvent == null || ordersWithTickets == null || !ordersWithTickets.Any())
             return NotFound();
@@ -538,10 +569,10 @@ public class UITicketSalesController : Controller
         var fileName = $"{ticketEvent.Title}_Tickets-{DateTime.Now:yyyy_MM_dd-HH_mm_ss}.csv";
 
         var csvData = new StringBuilder();
-        csvData.AppendLine("Event Name,Event Id,Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency");
+        csvData.AppendLine("Event Name,Event Id,Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency,Attended Event");
         foreach (var ticket in ordersWithTickets)
         {
-            csvData.AppendLine($"{ticketEvent.Title},{ticketEvent.Id},{ticket.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{ticket.Currency}");
+            csvData.AppendLine($"{ticketEvent.Title},{ticketEvent.Id},{ticket.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{ticket.Currency},{ticket.UsedAt.HasValue}");
         }
         byte[] fileBytes = Encoding.UTF8.GetBytes(csvData.ToString());
         return File(fileBytes, "text/csv", fileName);
