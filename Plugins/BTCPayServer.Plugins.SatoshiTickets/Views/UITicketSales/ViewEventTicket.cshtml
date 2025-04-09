@@ -77,7 +77,9 @@
                                                 <th>Ticket Number</th>
                                                 <th>Ticket Tier</th>
                                                 <th>Currency</th>
-                                                <th class="text-end">Amount</th>
+                                                <th>Amount</th>
+                                                <th>Checkin Attendee</th>
+                                                <th class="text-end">Checked-In</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -87,7 +89,14 @@
                                                     <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">@ticketVm.TicketNumber</td>
                                                     <td>@ticketVm.TicketTypeName</td>
                                                     <td>@ticketVm.Currency</td>
-                                                    <td class="text-end text-success">@ticketVm.Amount</td>
+                                                    <td>@ticketVm.Amount</td>
+                                                    <td>
+                                                        @if (!ticketVm.CheckedIn)
+                                                        {
+                                                            <a asp-action="CheckinTicketAttendee" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticketVm.Id">Check In</a>
+                                                        }
+                                                    </td>
+                                                    <td class="text-end text-success">@ticketVm.CheckedIn</td>
                                                 </tr>
                                             }
                                         </tbody>

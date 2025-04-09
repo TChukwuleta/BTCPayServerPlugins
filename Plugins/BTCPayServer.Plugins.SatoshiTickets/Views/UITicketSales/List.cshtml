@@ -100,7 +100,7 @@
                             <div class="d-inline-flex align-items-center gap-3">
                                 @if (ticketEvent.TicketSold > 0)
                                 {
-                                    <a asp-action="ViewEventTicket" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">View</a>
+                                    <a asp-action="ViewEventTicket" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">Tickets</a>
                                 }
                                 @if (ticketEvent.TicketSold <= 0 || ticketEvent.EventDate <= DateTime.UtcNow)
                                 {

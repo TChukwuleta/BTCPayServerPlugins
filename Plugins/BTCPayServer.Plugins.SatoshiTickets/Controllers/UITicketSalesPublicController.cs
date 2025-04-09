@@ -224,7 +224,7 @@ public class UITicketSalesPublicController : Controller
             var ticketType = ticketTypes.FirstOrDefault(c => c.Id == ticket.TicketTypeId);
             if (ticketType == null || (ticketType.Quantity - ticketType.QuantitySold) < ticket.Quantity)
             {
-                TempData[WellKnownTempData.ErrorMessage] = $"Qunaity specified for {ticket.TicketTypeName} is more than number of tickets available";
+                TempData[WellKnownTempData.ErrorMessage] = $"Quanity specified for {ticket.TicketTypeName} is more than number of tickets available";
                 return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
             }
         }
@@ -254,7 +254,6 @@ public class UITicketSalesPublicController : Controller
         {
             var ticketType = ticketTypes.FirstOrDefault(c => c.Id == ticketRequest.TicketTypeId);
             totalAmount += (ticketType.Price * ticketRequest.Quantity);
-            ticketType.QuantitySold += ticketRequest.Quantity;
 
             for (int i = 0; i < ticketRequest.Quantity; i++)
             {
@@ -265,7 +264,7 @@ public class UITicketSalesPublicController : Controller
                     EventId = eventId,
                     TicketTypeId = ticketType.Id,
                     Amount = ticketType.Price,
-                    QRCodeLink = Url.Action("EventTicketDisplay", "UITicketSalesPublic", new { storeId, eventId, orderId = order.Id }, Request.Scheme),
+                    QRCodeLink = Url.Action(nameof(EventTicketDisplay), "UITicketSalesPublic", new { storeId, eventId, orderId = order.Id }, Request.Scheme),
                     FirstName = model.ContactInfo.First().FirstName.Trim(),
                     LastName = model.ContactInfo.First().LastName.Trim(),
                     Email = model.ContactInfo.First().Email.Trim(),
@@ -284,7 +283,6 @@ public class UITicketSalesPublicController : Controller
         var invoice = await CreateInvoiceAsync(store, order, ticketEvent.Currency, Request.GetAbsoluteRoot(), ticketEvent.RedirectUrl ?? string.Empty);
         order.InvoiceId = invoice.Id;
         order.InvoiceStatus = invoice.Status.ToString();
-        ctx.TicketTypes.UpdateRange(ticketTypes);
         ctx.Orders.Update(order);
         await ctx.SaveChangesAsync();
         return RedirectToAction(nameof(UIInvoiceController.Checkout), "UIInvoice", new { invoiceId = invoice.Id });
@@ -321,7 +319,7 @@ public class UITicketSalesPublicController : Controller
                 Amount = t.Amount,
                 TicketNumber = t.TicketNumber,
                 TicketType = t.TicketTypeName,
-                QrCodeUrl = GenerateQrCodeDataUrl(t.TicketNumber),
+                QrCodeUrl = GenerateQrCodeDataUrl(t.TxnNumber),
             }).ToList(),
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
         });

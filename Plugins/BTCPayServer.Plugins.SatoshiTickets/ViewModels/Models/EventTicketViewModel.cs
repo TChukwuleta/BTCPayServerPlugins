@@ -33,6 +33,7 @@ public class EventContactPersonTicketVm
     public string TicketTypeName { get; set; }
     public string TicketNumber { get; set; }
     public string Currency { get; set; }
+    public bool CheckedIn { get; set; }
     public DateTimeOffset CreatedDate { get; set; }
 
 }

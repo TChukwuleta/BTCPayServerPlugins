@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Services.Mails;
 using BTCPayServer.Client.Models;
+using Microsoft.Extensions.Logging;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Services;
 
@@ -92,10 +93,23 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
         order.Tickets.ToList().ForEach(c => c.PaymentStatus = success ? Data.TransactionStatus.Settled.ToString() : Data.TransactionStatus.Expired.ToString());
         result.Write($"New ticket payment completed for Event: {ticketEvent?.Title}, Order Id: {order.Id}, Order Txn Id: {order.TxnId}", InvoiceEventData.EventSeverity.Success);
 
+        if (success)
+        {
+            var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == order.EventId).ToList();
+            var ticketCounts = order.Tickets.GroupBy(t => t.TicketTypeId).ToDictionary(g => g.Key, g => g.Count());
+            foreach (var ticketType in ticketTypes)
+            {
+                if (ticketCounts.TryGetValue(ticketType.Id, out var count))
+                {
+                    ticketType.QuantitySold += count;
+                }
+            }
+            ctx.TicketTypes.UpdateRange(ticketTypes);
+        }
+
         var emailSender = await _emailSenderFactory.GetEmailSender(invoice.StoreId);
         var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
-        Console.WriteLine(isEmailSettingsConfigured);
-        if (isEmailSettingsConfigured)
+        if (success && isEmailSettingsConfigured)
         {
             try
             {

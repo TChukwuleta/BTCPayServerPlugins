@@ -56,7 +56,6 @@ public class UITicketTypeController : Controller
                 IsDefault = x.IsDefault,
             };
         }).ToList();
-        Console.WriteLine(JsonConvert.SerializeObject(tickets));
         return View(new TicketTypeListViewModel { TicketTypes = tickets, EventId = eventId });
     }
 
@@ -176,7 +175,6 @@ public class UITicketTypeController : Controller
         entity.Price = vm.Price;
         entity.Quantity = vm.Quantity;
         entity.Description = vm.Description;
-        entity.QuantitySold = vm.QuantitySold;
         entity.IsDefault = vm.IsDefault;
 
         if (!entity.IsDefault)
