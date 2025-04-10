@@ -67,20 +67,31 @@ public class EmailService
                             .Replace("@Model.SubscriptionUrl", model.SubscriptionUrl)
                             .Replace("@Model.StoreName", model.StoreName)
                             .Replace("@Model.ApiUrl", $"https://{model.ApiUrl}");
+
         var client = await settings.CreateSmtpClient();
-        var clientMessage = new MimeMessage
-        {
-            Subject = "Your Ghost Subscription is Expiring Soon!",
-            Body = new BodyBuilder
+        try
+        {   
+            var clientMessage = new MimeMessage
             {
-                HtmlBody = emailBody,
-                TextBody = StripHtml(emailBody)
-            }.ToMessageBody()
-        };
-        clientMessage.From.Add(MailboxAddress.Parse(settings.From));
-        clientMessage.To.Add(InternetAddress.Parse(model.MemberEmail));
-        await client.SendAsync(clientMessage);
-        await client.DisconnectAsync(true);
+                Subject = "Your Ghost Subscription is Expiring Soon!",
+                Body = new BodyBuilder
+                {
+                    HtmlBody = emailBody,
+                    TextBody = StripHtml(emailBody)
+                }.ToMessageBody()
+            };
+            clientMessage.From.Add(MailboxAddress.Parse(settings.From));
+            clientMessage.To.Add(InternetAddress.Parse(model.MemberEmail));
+            await client.SendAsync(clientMessage);
+        }
+        catch (Exception ex)
+        {
+            _logs.PayServer.LogError(ex, $"Error sending email to: {model.MemberEmail}");
+        }
+        finally
+        {
+            await client.DisconnectAsync(true);
+        }
     }
 
 
@@ -105,7 +116,6 @@ public class EmailService
         var emailRecipients = new List<EmailRecipient> { recipient };
         await SendBulkEmail(model.StoreId, emailRecipients);
     }
-
 
     public string GetEmbeddedResourceContent(string resourceName)
     {

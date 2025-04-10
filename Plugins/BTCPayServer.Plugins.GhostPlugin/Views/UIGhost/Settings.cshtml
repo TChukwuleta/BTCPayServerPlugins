@@ -46,6 +46,7 @@
 
             <div class="form-group d-flex align-items-center">
                 <input asp-for="SendReminderEmailsToAdmin" type="checkbox" class="btcpay-toggle me-3" id="emailToggle" disabled="@(storeEmailSettingsConfigured ? null : "disabled")" />
+                <label asp-for="SendReminderEmailsToAdmin" class="form-check-label"></label>
             </div>
 
             <div id="emailTemplateGroup" style="display: none;">
