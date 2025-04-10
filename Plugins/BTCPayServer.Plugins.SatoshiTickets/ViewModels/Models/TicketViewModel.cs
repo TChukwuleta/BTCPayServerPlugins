@@ -23,6 +23,7 @@ public class TicketListViewModel
     public decimal Amount { get; set; }
     public string TicketNumber { get; set; }
     public string TicketType { get; set; }
+    public string TxnNumber { get; set; }
     public string QrCodeUrl { get; set; }
 }
 

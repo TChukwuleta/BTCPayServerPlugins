@@ -318,6 +318,7 @@ public class UITicketSalesPublicController : Controller
                 Currency = order.Currency,
                 Amount = t.Amount,
                 TicketNumber = t.TicketNumber,
+                TxnNumber = t.TxnNumber,
                 TicketType = t.TicketTypeName,
                 QrCodeUrl = GenerateQrCodeDataUrl(t.TxnNumber),
             }).ToList(),
