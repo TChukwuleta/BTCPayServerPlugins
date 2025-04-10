@@ -8,7 +8,6 @@ using System.Reflection;
 using System.Linq;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
-using BTCPayServer.Plugins.GhostPlugin.Data;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
@@ -82,6 +81,29 @@ public class EmailService
         clientMessage.To.Add(InternetAddress.Parse(model.MemberEmail));
         await client.SendAsync(clientMessage);
         await client.DisconnectAsync(true);
+    }
+
+
+    public async Task SendMembershipReminderToAdmin(EmailRequest model, string subject, string body, string recipientEmail)
+    {
+        var settings = await (await _emailSender.GetEmailSender(model.StoreId)).GetEmailSettings();
+        if (!settings.IsComplete())
+            return;
+
+        var recipient = new EmailRecipient
+        {
+            Address = InternetAddress.Parse(recipientEmail),
+            Subject = subject,
+            MessageText = body
+                .Replace("{Name}", model.StoreName)
+                .Replace("{MemberName}", model.MemberName)
+                .Replace("{MemberEmail}", model.MemberEmail)
+                .Replace("{EndDate}", model.ExpirationDate.ToString("MMM dd, yyyy h:mm tt zzz"))
+
+                .Replace("{StoreName}", model.StoreName)
+        };
+        var emailRecipients = new List<EmailRecipient> { recipient };
+        await SendBulkEmail(model.StoreId, emailRecipients);
     }
 
 

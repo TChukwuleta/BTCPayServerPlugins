@@ -176,6 +176,7 @@ public class GhostPluginService : EventHostedServiceBase
                     {
                         case GhostSubscriptionStatus.New:
                             var firstTransaction = ctx.GhostTransactions.AsNoTracking().First(c => c.MemberId == member.Id && c.TransactionStatus == TransactionStatus.Settled);
+                            emailRequest.ExpirationDate = firstTransaction.PeriodEnd;
                             var noticeFrame = firstTransaction.PeriodEnd - now;
                             if (noticeFrame.TotalDays <= reminderDay)
                             {
@@ -196,6 +197,7 @@ public class GhostPluginService : EventHostedServiceBase
                                 return;
 
                             var noticePeriod = currentPeriod.PeriodEnd - now;
+                            emailRequest.ExpirationDate = currentPeriod.PeriodEnd;
                             if (noticePeriod.TotalDays <= reminderDay)
                             {
                                 await SendReminderEmail(ghostSetting, member, currentPeriod.PeriodEnd, emailRequest);
@@ -363,14 +365,28 @@ public class GhostPluginService : EventHostedServiceBase
         emailRequest.SubscriptionUrl = url;
         emailRequest.ExpirationDate = expirationDate;
         await _emailService.SendMembershipSubscriptionReminderEmail(emailRequest);
+
+        var settingJson = JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) ?? new GhostSettingsPageViewModel();
+        if (settingJson.SendReminderEmailsToAdmin)
+        {
+            var storeUser = await _storeRepo.GetStoreUser(ghostSetting.StoreId, ghostSetting.ApplicationUserId);
+            var storeUserDetails = await _userManager.FindByIdAsync(storeUser.ApplicationUserId);
+            await _emailService.SendMembershipReminderToAdmin(emailRequest, Defaults.AdminMembershipReminderEmailSubject, Defaults.AdminMembershipReminderEmailBody, storeUserDetails.Email);
+        }
     }
 
-    public async Task SendMembershipReminderToStoreOwner(GhostSetting ghostSetting, GhostMember member, EmailRequest emailRequest)
+    public record Defaults
     {
-        var storeUser = await _storeRepo.GetStoreUser(ghostSetting.StoreId, ghostSetting.ApplicationUserId);
-        Console.WriteLine(JsonConvert.SerializeObject(storeUser, Formatting.Indented));
-        var user = await _userManager.FindByIdAsync(ghostSetting.ApplicationUserId);
-        Console.WriteLine(JsonConvert.SerializeObject(user, Formatting.Indented));
-        await _emailService.SendMembershipSubscriptionReminderEmail(emailRequest);
+        public const string AdminMembershipReminderEmailSubject = @"Your invoice has been paid";
+
+        public const string AdminMembershipReminderEmailBody = @"Hello {Name},
+
+This is to inform you that a ghost subscriber with name {MemberName} and email {MemberEmail} subscription ends on {EndDate}.
+
+Kindly proceed with further action. 
+
+Thank you,
+{StoreName} - Ghost Plugin";
+
     }
 }
