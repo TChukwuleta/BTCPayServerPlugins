@@ -162,7 +162,7 @@ public class UIGhostPublicController : Controller
         await ctx.SaveChangesAsync();
         var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
         InvoiceEntity invoice = await _ghostPluginService.CreateMemberInvoiceAsync(storeData, tier, entity, txnId, Request.GetAbsoluteRoot(), $"https://{ghostSetting.ApiUrl}/#/portal/signin");
-        await GetTransaction(ctx, tier, entity, invoice, null, txnId);
+        await SaveTransaction(ctx, tier, entity, invoice, null, txnId);
         return RedirectToInvoiceCheckout(invoice.Id);
     }
 
@@ -192,7 +192,7 @@ public class UIGhostPublicController : Controller
         var endDate = DateTime.UtcNow.Date > latestTransaction.PeriodEnd.Date ? DateTime.UtcNow.Date.AddDays(1) : latestTransaction.PeriodEnd.AddHours(1);
         var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
         var pr = await _ghostPluginService.CreatePaymentRequest(member, tier, ghostSetting.AppId, endDate);
-        await GetTransaction(ctx, tier, member, null, pr, txnId);
+        await SaveTransaction(ctx, tier, member, null, pr, txnId);
         return RedirectToAction("ViewPaymentRequest", "UIPaymentRequest", new { payReqId = pr.Id });
     }
 
@@ -345,7 +345,7 @@ public class UIGhostPublicController : Controller
     }
 
 
-    private async Task GetTransaction(GhostDbContext ctx, Tier tier, GhostMember member, InvoiceEntity invoice, Data.PaymentRequestData paymentRequest, string txnId)
+    private async Task SaveTransaction(GhostDbContext ctx, Tier tier, GhostMember member, InvoiceEntity invoice, PaymentRequestData paymentRequest, string txnId)
     {
         // Amount is in lower denomination, so divided by 100
         var price = Convert.ToDecimal(member.Frequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price) / 100;

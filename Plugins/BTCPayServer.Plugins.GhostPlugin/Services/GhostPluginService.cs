@@ -23,22 +23,27 @@ using Newtonsoft.Json;
 using static BTCPayServer.Plugins.GhostPlugin.Services.EmailService;
 using BTCPayServer.Services.Mails;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
+using BTCPayServer.Services.Stores;
+using Microsoft.AspNetCore.Identity;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
 public class GhostPluginService : EventHostedServiceBase
 {
     private readonly AppService _appService;
+    private readonly StoreRepository _storeRepo;
     private readonly EmailService _emailService;
     private readonly IHttpClientFactory _clientFactory;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly EmailSenderFactory _emailSenderFactory;
     private readonly UIInvoiceController _invoiceController;
     private readonly GhostDbContextFactory _dbContextFactory;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly PaymentRequestRepository _paymentRequestRepository;
 
     public GhostPluginService(
         AppService appService,
+        StoreRepository storeRepo,
         EmailService emailService,
         EventAggregator eventAggregator,
         IHttpClientFactory clientFactory,
@@ -47,9 +52,12 @@ public class GhostPluginService : EventHostedServiceBase
         EmailSenderFactory emailSenderFactory,
         UIInvoiceController invoiceController,
         GhostDbContextFactory dbContextFactory,
+        UserManager<ApplicationUser> userManager,
         PaymentRequestRepository paymentRequestRepository) : base(eventAggregator, logger)
     {
+        _storeRepo = storeRepo;
         _appService = appService;
+        _userManager = userManager;
         _emailService = emailService;
         _clientFactory = clientFactory;
         _dbContextFactory = dbContextFactory;
@@ -234,34 +242,26 @@ public class GhostPluginService : EventHostedServiceBase
     }
 
 
-    public async Task<BTCPayServer.Data.PaymentRequestData> CreatePaymentRequest(GhostMember member, Tier tier, string appId, DateTimeOffset expiryDate)
+    public async Task<PaymentRequestData> CreatePaymentRequest(GhostMember member, Tier tier, string appId, DateTimeOffset expiryDate)
     {
         // Amount is in lower denomination, so divide by 100
         var price = Convert.ToDecimal(member.Frequency == TierSubscriptionFrequency.Monthly ? tier.monthly_price : tier.yearly_price) / 100;
-        var pr = new BTCPayServer.Data.PaymentRequestData()
+        var pr = new PaymentRequestData()
         {
             StoreDataId = member.StoreId,
             Archived = false,
             Created = DateTimeOffset.UtcNow,
-            Status = Client.Models.PaymentRequestData.PaymentRequestStatus.Pending
-        };
-        pr.SetBlob(new CreatePaymentRequestRequest()
-        {
-            StoreId = member.StoreId,
-            Amount = price,
+            Expiry = expiryDate,
             Currency = tier.currency,
-            ExpiryDate = expiryDate,
+            Amount = price,
+            Status = PaymentRequestStatus.Pending
+        };
+        pr.SetBlob(new PaymentRequestBlob()
+        {
             Description = $"{member.Name} Ghost membership renewal",
             Title = $"{member.Name} Ghost Subscription",
             Email = member.Email,
-            AllowCustomPaymentAmounts = false,
-            AdditionalData = new Dictionary<string, JToken>()
-            {
-                {"source", JToken.FromObject(GhostApp.AppName)},
-                {"memberId", JToken.FromObject(member.Id)},
-                {"storeId", JToken.FromObject(member.StoreId)},
-                {"appId", JToken.FromObject(appId)}
-            }
+            AllowCustomPaymentAmounts = false
         });
         pr = await _paymentRequestRepository.CreateOrUpdatePaymentRequest(pr);
         return pr;
@@ -362,6 +362,15 @@ public class GhostPluginService : EventHostedServiceBase
         var url = $"{ghostSetting.BaseUrl}/plugins/{ghostSetting.StoreId}/ghost/public/subscription/{member.Id}/subscribe";
         emailRequest.SubscriptionUrl = url;
         emailRequest.ExpirationDate = expirationDate;
+        await _emailService.SendMembershipSubscriptionReminderEmail(emailRequest);
+    }
+
+    public async Task SendMembershipReminderToStoreOwner(GhostSetting ghostSetting, GhostMember member, EmailRequest emailRequest)
+    {
+        var storeUser = await _storeRepo.GetStoreUser(ghostSetting.StoreId, ghostSetting.ApplicationUserId);
+        Console.WriteLine(JsonConvert.SerializeObject(storeUser, Formatting.Indented));
+        var user = await _userManager.FindByIdAsync(ghostSetting.ApplicationUserId);
+        Console.WriteLine(JsonConvert.SerializeObject(user, Formatting.Indented));
         await _emailService.SendMembershipSubscriptionReminderEmail(emailRequest);
     }
 }

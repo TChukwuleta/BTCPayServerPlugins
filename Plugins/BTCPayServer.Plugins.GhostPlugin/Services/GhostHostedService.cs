@@ -80,16 +80,17 @@ public class GhostHostedService : EventHostedServiceBase
                     break;
                 }
 
-            case PaymentRequestEvent { Type: PaymentRequestEvent.StatusChanged, Data.Status: Client.Models.PaymentRequestData.PaymentRequestStatus.Completed } paymentRequestStatusUpdated:
+            case PaymentRequestEvent { Type: PaymentRequestEvent.StatusChanged, Data.Status: PaymentRequestStatus.Completed } paymentRequestStatusUpdated:
                 {
                     var prBlob = paymentRequestStatusUpdated.Data.GetBlob();
-                    if (!prBlob.AdditionalData.TryGetValue(GhostApp.PaymentRequestSourceKey, out var src) ||
-                        src?.Value<string>() != GhostApp.AppName || !prBlob.AdditionalData.TryGetValue(GhostApp.MemberIdKey, out var memberIdToken))
-                    {
-                        return;
-                    }
-                    var memberId = memberIdToken.Value<string>();
-                    await _ghostPluginService.HandlePaidMembershipSubscription(memberId, paymentRequestStatusUpdated.Data.Id, prBlob.Email);
+
+                    await using var ctx = _dbContextFactory.CreateContext();
+                    var paymentRequestTransaction = ctx.GhostTransactions.FirstOrDefault(c => c.StoreId == paymentRequestStatusUpdated.Data.StoreDataId 
+                        && c.PaymentRequestId == paymentRequestStatusUpdated.Data.Id);
+
+                    if (paymentRequestTransaction == null) return;
+
+                    await _ghostPluginService.HandlePaidMembershipSubscription(paymentRequestTransaction.MemberId, paymentRequestStatusUpdated.Data.Id, prBlob.Email);
                     break;
                 }
 

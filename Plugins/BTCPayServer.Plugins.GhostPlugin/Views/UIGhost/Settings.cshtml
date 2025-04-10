@@ -43,6 +43,11 @@
                     }
                 </div>
             </div>
+
+            @* <div class="form-group d-flex align-items-center">
+                <input asp-for="SendReminderEmailsToAdmin" type="checkbox" class="btcpay-toggle me-3" id="emailToggle" disabled="@(storeEmailSettingsConfigured ? null : "disabled")" />
+            </div> *@
+
             <div id="emailTemplateGroup" style="display: none;">
                 <div class="form-group">
                     <label asp-for="ReminderStartDaysBeforeExpiration" class="form-label"></label>
