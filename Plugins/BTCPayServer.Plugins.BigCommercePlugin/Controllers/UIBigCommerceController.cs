@@ -25,7 +25,9 @@ using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Net.Http;
 using BTCPayServer.Filters;
-using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using Microsoft.EntityFrameworkCore;
+using Google.Apis.Auth.OAuth2;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
@@ -106,7 +108,7 @@ public class UIBigCommerceController : Controller
                 StoreId = CurrentStore.Id,
                 StoreName = CurrentStore.StoreName,
                 ApplicationUserId = GetUserId(),
-                RedirectUrl = Url.Action("Install", "UIBigCommerce", null, Request.Scheme)
+                RedirectUrl = Url.Action(nameof(Install), "UIBigCommerce", null, Request.Scheme)
             };
             ctx.Add(bigCommerceStore);
             await ctx.SaveChangesAsync();
@@ -115,10 +117,10 @@ public class UIBigCommerceController : Controller
         {
             ClientId = bigCommerceStore.ClientId,
             ClientSecret = bigCommerceStore.ClientSecret,
-            AuthCallBackUrl = Url.Action("Install", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
-            LoadCallbackUrl = Url.Action("Load", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
-            UninstallCallbackUrl = Url.Action("Uninstall", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
-            CheckoutScriptUrl = Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
+            AuthCallBackUrl = Url.Action(nameof(Install), "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
+            LoadCallbackUrl = Url.Action(nameof(Load), "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
+            UninstallCallbackUrl = Url.Action(nameof(Uninstall), "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
+            CheckoutScriptUrl = Url.Action(nameof(GetBtcPayJavascript), "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
             StoreName = bigCommerceStore.StoreName
         });
     }
@@ -131,14 +133,13 @@ public class UIBigCommerceController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
         var userStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
-        if (userStore is null)
-            return NotFound();
-        var hasConflictingStore = ctx.BigCommerceStores
-        .Where(store => store.StoreId != CurrentStore.Id)
-        .Any(store => store.ClientId == model.ClientId || store.ClientSecret == model.ClientSecret);
+        if (userStore is null) return NotFound();
+
+        var hasConflictingStore = ctx.BigCommerceStores.Where(store => store.StoreId != CurrentStore.Id)
+            .Any(store => store.ClientId == model.ClientId || store.ClientSecret == model.ClientSecret);
         if (hasConflictingStore)
         {
-            TempData[WellKnownTempData.ErrorMessage] = "Cannot create BigCommerce store as a store with the same Client ID or Client Secret already exists";
+            TempData[WellKnownTempData.ErrorMessage] = "Cannot create BigCommerce store. A different store is using the client credentials";
             return RedirectToAction(nameof(Index), "UIBigCommerce", new { storeId = CurrentStore.Id });
         }
         userStore.ClientId = model.ClientId;
@@ -160,27 +161,25 @@ public class UIBigCommerceController : Controller
             code = HttpUtility.UrlDecode(code);
             context = HttpUtility.UrlDecode(context);
             scope = HttpUtility.UrlDecode(scope);
-
             await using var ctx = _dbContextFactory.CreateContext();
             var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
             if (bigCommerceStore == null)
             {
-                return BadRequest("Invalid request. Kindly confirm that your client Id and secret are configured on your BTCPay instance");
+                return BadRequest("Invalid request. Kindly confirm that your Client Id and secret are configured on your BTCPay instance");
             }
             if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(context) || string.IsNullOrEmpty(scope))
             {
                 return BadRequest("Missing required query parameters");
             }
-            var installRequest = new InstallBigCommerceApplicationRequestModel
+            var responseCall = await _bigCommerceService.InstallApplication(new InstallBigCommerceApplicationRequestModel
             {
                 ClientId = bigCommerceStore.ClientId,
                 ClientSecret = bigCommerceStore.ClientSecret,
                 Code = code,
-                RedirectUrl = Url.Action("Install", "UIBigCommerce", new { storeId }, Request.Scheme),
+                RedirectUrl = Url.Action(nameof(Install), "UIBigCommerce", new { storeId }, Request.Scheme),
                 Context = context,
                 Scope = scope
-            };
-            var responseCall = await _bigCommerceService.InstallApplication(installRequest);
+            });
             if (!responseCall.Success)
             {
                 _logger.LogError($"{responseCall.Content}");
@@ -194,7 +193,7 @@ public class UIBigCommerceController : Controller
             bigCommerceStore.BigCommerceUserId = bigCommerceStoreDetails.user.id.ToString();
             ctx.Update(bigCommerceStore);
             await ctx.SaveChangesAsync();
-            bigCommerceStore = await helper.UploadCheckoutScript(bigCommerceStore, Url.Action("GetBtcPayJavascript", "UIBigCommerce", new { storeId }, Request.Scheme));
+            bigCommerceStore = await helper.UploadCheckoutScript(bigCommerceStore, Url.Action(nameof(GetBtcPayJavascript), "UIBigCommerce", new { storeId }, Request.Scheme));
             ctx.Update(bigCommerceStore);
             await ctx.SaveChangesAsync();
             return Content(BigCommerceIframeResponse(bigCommerceStore), "text/html");
@@ -241,10 +240,8 @@ public class UIBigCommerceController : Controller
         }
         await using var ctx = _dbContextFactory.CreateContext();
         var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
-        if (bigCommerceStore == null)
-        {
-            return BadRequest("Invalid request");
-        }
+        if (bigCommerceStore == null) return BadRequest("Invalid request");
+
         var claims = helper.DecodeJwtPayload(signed_payload_jwt);
         if (!helper.ValidateClaims(bigCommerceStore, claims))
         {
@@ -280,7 +277,6 @@ public class UIBigCommerceController : Controller
                 OrderId = bgOrderId,
                 BuyerEmail = requestModel.email
             };
-
             var store = await _storeRepo.FindStore(exisitngStore.StoreId);
             var result = await _invoiceController.CreateInvoiceCoreRaw(new Client.Models.CreateInvoiceRequest()
             {
@@ -318,12 +314,17 @@ public class UIBigCommerceController : Controller
     [HttpGet("~/stores/{storeId}/plugins/bigcommerce/btcpay-bc.js")]
     public async Task<IActionResult> GetBtcPayJavascript(string storeId)
     {
-        var jsFile = await helper.GetCustomJavascript(storeId, Request.GetAbsoluteRoot());
-        if (!jsFile.Success)
-        {
-            return BadRequest(jsFile.Content);
-        }
-        return Content(jsFile.Content, "text/javascript");
+        await using var ctx = _dbContextFactory.CreateContext();
+        var bcStore = await ctx.BigCommerceStores.FirstOrDefaultAsync(c => c.StoreId == storeId);
+        if (bcStore == null) return BadRequest("Invalid store Id specified");
+
+        StringBuilder combinedJavascript = new StringBuilder();
+        var fileContent = helper.GetEmbeddedResourceContent("Resources.js.btcpay-bc.js");
+        combinedJavascript.AppendLine(fileContent);
+        string jsVariables = $"var BTCPAYSERVER_URL = '{Request.GetAbsoluteRoot()}'; var BTCPAYSERVER_STORE_ID = '{storeId}'; var STORE_HASH = '{bcStore.StoreHash}';";
+        combinedJavascript.Insert(0, jsVariables + Environment.NewLine);
+        var jsFile = combinedJavascript.ToString();
+        return Content(jsFile, "text/javascript");
     }
 
 
@@ -331,12 +332,15 @@ public class UIBigCommerceController : Controller
     [HttpGet("~/stores/{storeId}/plugins/bigcommerce/modal/btcpay.js")]
     public async Task<IActionResult> GetBtcPayModalJavascript(string storeId)
     {
-        var jsFile = await helper.GetBtcpayCustomJavascriptModal(storeId);
-        if (!jsFile.Success)
-        {
-            return BadRequest(jsFile.Content);
-        }
-        return Content(jsFile.Content, "text/javascript");
+        await using var ctx = _dbContextFactory.CreateContext();
+        var bcStore = await ctx.BigCommerceStores.FirstOrDefaultAsync(c => c.StoreId == storeId);
+        if (bcStore == null) return BadRequest("Invalid store Id specified");
+
+        StringBuilder combinedJavascript = new StringBuilder();
+        var fileContent = helper.GetEmbeddedResourceContent("Resources.js.btcpay.js");
+        combinedJavascript.AppendLine(fileContent);
+        var jsFile = combinedJavascript.ToString();
+        return Content(jsFile, "text/javascript");
     }
 
     private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(StoreData storeData, bool onlyEnabled = false)
