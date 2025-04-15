@@ -27,7 +27,6 @@ using System.Net.Http;
 using BTCPayServer.Filters;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
-using Google.Apis.Auth.OAuth2;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
