@@ -1,13 +1,12 @@
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
-using BTCPayServer.Plugins.BigCommercePlugin.Services;
+using BTCPayServer.Plugins.Salesforce.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using System;
 
-namespace BTCPayServer.Plugins.BigCommercePlugin;
+namespace BTCPayServer.Plugins.Salesforce;
 
 public class Plugin : BaseBTCPayServerPlugin
 {
@@ -18,14 +17,14 @@ public class Plugin : BaseBTCPayServerPlugin
 
     public override void Execute(IServiceCollection services)
     {
-        services.AddSingleton<IUIExtension>(new UIExtension("BigCommercePluginHeaderNav", "header-nav"));
-        services.AddSingleton<IHostedService, BigCommerceInvoicesPaidHostedService>();
+        services.AddSingleton<IUIExtension>(new UIExtension("SalesforcePluginHeaderNav", "header-nav"));
+        services.AddSingleton<SalesforceHostedService>();
+        services.AddHostedService<SalesforceHostedService>();
         services.AddHostedService<ApplicationPartsLogger>();
-        services.AddSingleton<BigCommerceService>();
-        services.AddSingleton<BigCommerceDbContextFactory>();
-        services.AddDbContext<BigCommerceDbContext>((provider, o) =>
+        services.AddSingleton<SalesforceDbContextFactory>();
+        services.AddDbContext<SalesforceDbContext>((provider, o) =>
         {
-            var factory = provider.GetRequiredService<BigCommerceDbContextFactory>();
+            var factory = provider.GetRequiredService<SalesforceDbContextFactory>();
             factory.ConfigureBuilder(o);
         });
         services.AddHostedService<PluginMigrationRunner>();
@@ -43,10 +42,7 @@ public class Plugin : BaseBTCPayServerPlugin
 
     public override void Execute(IApplicationBuilder applicationBuilder, IServiceProvider applicationBuilderApplicationServices)
     {
-
-        //applicationBuilder.UseMiddleware<CorsMiddleware>();
         applicationBuilder.UseCors("AllowAllOrigins");
-
         base.Execute(applicationBuilder, applicationBuilderApplicationServices);
     }
 }

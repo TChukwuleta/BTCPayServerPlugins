@@ -31,7 +31,6 @@ const observePaymentOptions = () => {
 
 const handleBitcoinPayment = (event) => {
     event.preventDefault();
-    const checkoutForm = document.querySelector('.checkout-form');
     event.target.textContent = 'Processing ...';
     clearInterval(pollInterval);
 
@@ -56,7 +55,7 @@ const handleBitcoinPayment = (event) => {
         .then(data => {
             console.warn('Payment initiation successful:', data);
             if (data.id) {
-                showBTCPayModal(data, checkoutForm);
+                showBTCPayModal(data);
             }
         })
         .catch(error => {
@@ -89,7 +88,7 @@ const getCart = () => {
 }
 
 // Show BTCPay modal.
-const showBTCPayModal = function(data, checkoutForm) {
+const showBTCPayModal = function(data) {
     console.log('Triggered showBTCPayModal()');
 
     if (data.id == undefined) {

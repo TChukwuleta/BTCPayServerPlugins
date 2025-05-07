@@ -1,0 +1,94 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Services
+@using BTCPayServer.Client
+@using BTCPayServer.Controllers
+@using BTCPayServer.Data
+@using BTCPayServer.Plugins.Salesforce.Data
+@using BTCPayServer.Plugins.Salesforce.Views
+@using Microsoft.AspNetCore.Routing
+@model SalesforceSetting
+@{
+    ViewData.SetActivePage(PluginNavPages.Index, "Salesforce");
+    var shopifyCredsSet = Model?.IntegratedAt.HasValue is true;
+}
+
+<div class="sticky-header">
+    <h2 class="my-1">
+        @ViewData["Title"]
+        <small>
+            <a href="https://docs.btcpayserver.org/Shopify" target="_blank" rel="noreferrer noopener" title="More information...">
+                <vc:icon symbol="info" />
+            </a>
+        </small>
+    </h2>
+</div>
+
+<partial name="_StatusMessage" />
+
+@if (Model.HasWallet)
+{
+    <div class="row">
+        <div class="col-xxl-constrain col-xl-8">
+            <p>Connect BTCPay Server to your Shopify checkout experience to accept Bitcoin.</p>
+
+            @if (!ViewContext.ModelState.IsValid)
+            {
+                <div asp-validation-summary="All"></div>
+            }
+
+            <form method="post" id="shopifyForm">
+
+                <div class="form-group">
+                    <label asp-for="ConsumerKey" class="form-label"></label>
+                    <input asp-for="ConsumerKey" class="form-control" readonly="@shopifyCredsSet" />
+                    <span asp-validation-for="ConsumerKey" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="ConsumerSecret" class="form-label"></label>
+                    <input asp-for="ConsumerSecret" class="form-control" type="password" value="@Model?.Password" readonly="@shopifyCredsSet" />
+                    <span asp-validation-for="ConsumerSecret" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Username" class="form-label"></label>
+                    <input asp-for="Username" class="form-control" type="password" value="@Model?.Password" readonly="@shopifyCredsSet" />
+                    <span asp-validation-for="Username" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Password" class="form-label"></label>
+                    <input asp-for="Password" class="form-control" type="password" value="@Model?.Password" readonly="@shopifyCredsSet" />
+                    <span asp-validation-for="Password" class="text-danger"></span>
+                </div>
+
+                @if (shopifyCredsSet)
+                {
+
+                    <button name="command" type="submit" class="btn btn-danger mt-3" value="SalesforceClearCredentials">
+                        Stop Salesforce calls and clear credentials
+                    </button>
+                }
+                else
+                {
+                    <button name="command" type="submit" class="btn btn-primary mt-3" value="SalseforceSaveCredentials">
+                        Save
+                    </button>
+                }
+            </form>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-warning alert-dismissible mb-4" role="alert">
+        <p class="mb-0" style="font-size: 0.9rem;">
+            To proceed with Shopify plugin on this store, you need to
+            <a href="@Url.Action(nameof(UIStoresController.SetupWallet), "UIStores", new { cryptoCode = Model.CryptoCode, storeId = Model.StoreId })" class="alert-link">
+                set up a wallet
+            </a>
+            first.
+        </p>
+    </div>
+}
+

@@ -51,7 +51,6 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
         {
             var invoice = invoiceEvent.Invoice;
             await using var ctx = _contextFactory.CreateContext();
-
             var bigCommerceStoreTransaction = await ctx.Transactions.AsNoTracking()
                 .FirstOrDefaultAsync(c => c.InvoiceId == invoice.Id && c.TransactionStatus == Data.TransactionStatus.Pending);
 
@@ -78,7 +77,7 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
 
     private async Task HandleSuccessfulInvoice(BigCommerceDbContext ctx, InvoiceEntity invoice, Transaction bigCommerceStoreTransaction, InvoiceLogs result)
     {
-        var bigCommerceStore = await ctx.BigCommerceStores.AsNoTracking().FirstOrDefaultAsync(c => c.StoreId == bigCommerceStoreTransaction.StoreId);
+        var bigCommerceStore = await ctx.BigCommerceStores.FirstOrDefaultAsync(c => c.StoreId == bigCommerceStoreTransaction.StoreId);
         if (bigCommerceStore == null)
         {
             result.Write("BigCommerce store not found.", InvoiceEventData.EventSeverity.Error);
@@ -108,17 +107,16 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
 
     private bool IsSuccessfulInvoice(InvoiceEntity invoice)
     {
-        var successfulStatuses = new[] { "complete", "confirmed", "paid", "settled" };
-        var invoiceStatus = invoice.Status.ToString();
+        var isSuccessfulStatus = invoice.Status is InvoiceStatus.Settled;
         var isPaidLateOrOver = invoice.ExceptionStatus is InvoiceExceptionStatus.PaidLate or InvoiceExceptionStatus.PaidOver;
-        return successfulStatuses.Contains(invoiceStatus, StringComparer.OrdinalIgnoreCase) ||
-               (invoiceStatus.Equals("expired", StringComparison.OrdinalIgnoreCase) && isPaidLateOrOver);
+        return isSuccessfulStatus || (invoice.Status == InvoiceStatus.Expired && isPaidLateOrOver);
     }
 
     private bool IsFailedInvoice(InvoiceEntity invoice)
     {
-        var failedStatuses = new[] { "invalid", "expired" };
-        return failedStatuses.Contains(invoice.GetInvoiceState().Status.ToString(), StringComparer.OrdinalIgnoreCase) &&
-               invoice.ExceptionStatus != InvoiceExceptionStatus.None;
+        var status = invoice.GetInvoiceState().Status;
+        var isFailedStatus = status is InvoiceStatus.Invalid or InvoiceStatus.Expired;
+        var hasException = invoice.ExceptionStatus != InvoiceExceptionStatus.None;
+        return isFailedStatus && hasException;
     }
 }
