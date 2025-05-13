@@ -1,0 +1,124 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Services
+@using BTCPayServer.Client
+@using BTCPayServer.Data
+@using BTCPayServer.Plugins.MassStoreGenerator.Views
+@model BTCPayServer.Plugins.MassStoreGenerator.ViewModels.CreateStoreViewModel
+@{
+    ViewData.SetActivePage(PluginNavPages.Index, "Plugin Template");
+}
+
+<h1>Create Stores</h1>
+
+
+@if (Model.HasStoreCreationPermission)
+{
+    <div class="container mt-5">
+        <form id="input-form" method="post" asp-action="Create">
+            <div class="d-flex justify-content-end mb-2">
+                <button type="submit" class="btn btn-primary" id="Create">Create</button>
+            </div>
+
+
+            <div class="row g-1 align-items-center mb-3">
+                <div class="col"><strong>Store Name</strong></div>
+                <div class="col"><strong>Currency</strong></div>
+                <div class="col"><strong>Exchange</strong></div>
+            </div>
+
+            <div class="row g-1 align-items-center mb-3 storelist">
+                <div class="col">
+                    <input name="model[0].Name" class="form-control w-300px" required />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+
+                <div class="col">
+                    <input id="DefaultCurrency" name="model[0].DefaultCurrency" class="form-control w-300px" currency-selection value="@Model.DefaultCurrency" />
+                    <span asp-validation-for="DefaultCurrency" class="text-danger"></span>
+                </div>
+
+                <div class="col">
+                    <select id="PreferredExchange" name="model[0].PreferredExchange" asp-items="Model.Exchanges" class="form-select w-300px">
+                        <option value="">Select an exchange</option>
+                        @foreach (var exchange in Model.Exchanges)
+                        {
+                            <option value="@exchange.Value">@exchange.Text</option>
+                        }
+                    </select>
+                    <span asp-validation-for="PreferredExchange" class="text-danger"></span>
+                </div>
+
+                <div class="col-auto">
+                    <button type="button" class="btn btn-outline-danger btn-remove">Remove</button>
+                </div>
+            </div>
+
+            <div class="row g-2 align-items-center mb-3">
+                <div class="col">
+                    <button type="button" class="btn btn-outline-primary btn-add">Add New</button>
+                </div>
+            </div>
+        </form>
+    </div>
+}
+else
+{
+    <p>You do not have permission to create stores.</p>
+}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const defaultCurrency = '@Model.DefaultCurrency';
+        const exchanges = @Html.Raw(Json.Serialize(Model.RecommendedExchanges));
+
+        document.getElementById('input-form').addEventListener('click', function (e) {
+            if (e.target && e.target.closest('.btn-add')) {
+                e.preventDefault();
+
+                var currentEntry = document.querySelector('.storelist');
+                var newEntry = currentEntry.cloneNode(true);
+                newEntry.querySelectorAll('input').forEach(input => input.value = '');
+                newEntry.querySelector("input[name*='DefaultCurrency']").value = defaultCurrency;
+                const source = exchanges[defaultCurrency] || 'coingecko';
+                newEntry.querySelector("select[name*='PreferredExchange']").value = source;
+
+                var inputIndex = document.querySelectorAll('.storelist').length;
+                newEntry.querySelectorAll('input, select').forEach(function (input) {
+                    var name = input.getAttribute('name');
+                    if (name) {
+                        var newName = name.replace(/\[\d+\]/, '[' + inputIndex + ']');
+                        input.setAttribute('name', newName);
+                    }
+                });
+                document.getElementById('input-form').insertBefore(newEntry, document.querySelector('.btn-add').closest('.row'));
+            }
+
+            if (e.target && e.target.closest('.btn-remove')) {
+                e.preventDefault();
+                if (document.querySelectorAll('.storelist').length > 1) {
+                    e.target.closest('.storelist').remove();
+                }
+            }
+        });
+
+        const updateRecommended = currency => {
+            const source = exchanges[currency] || 'coingecko';
+            const recommended = document.querySelector("#PreferredExchange");
+
+            for (let i = 0; i < recommended.options.length; i++) {
+                if (recommended.options[i].value === source) {
+                    recommended.selectedIndex = i;
+                    break;
+                }
+            }
+        };
+        updateRecommended(defaultCurrency);
+
+        const defaultCurrencyInput = document.querySelector("#DefaultCurrency");
+        defaultCurrencyInput.addEventListener('change', function (e) {
+            updateRecommended(e.target.value);
+        });
+    });
+
+</script>
+
