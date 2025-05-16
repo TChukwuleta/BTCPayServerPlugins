@@ -1,3 +1,4 @@
+@using BTCPayServer.Abstractions.Constants
 @using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models
 @model CreateMemberViewModel
 @{
@@ -11,6 +12,13 @@
             <h1 class="fw-bold">@Model.ShopName</h1>
         </div>
         <div class="card shadow p-4">
+            @if (TempData[WellKnownTempData.ErrorMessage] is string errorMessage && !string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    @errorMessage
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
             <form id="subscription-form" method="POST">
 
                 <div class="form-group">
