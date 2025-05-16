@@ -118,7 +118,7 @@ public class UIGhostPublicController : Controller
         }
         catch (Exception ex)
         {
-            TempData[WellKnownTempData.ErrorMessage] = $"An error occured. {ex.Message}";
+            ViewBag.ErrorMessage = $"An error occured. {ex.Message}";
         }
         return View(new CreateMemberViewModel
         {
@@ -179,7 +179,7 @@ public class UIGhostPublicController : Controller
         }
         catch (Exception ex)
         {
-            TempData[WellKnownTempData.ErrorMessage] = $"An error occured. {ex.Message}";
+            ViewBag.ErrorMessage = $"An error occured. {ex.Message}";
             return View(vm);
         }
     }
