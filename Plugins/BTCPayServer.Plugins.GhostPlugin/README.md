@@ -47,7 +47,7 @@ Before diving into the setup process, ensure you have the following:
 
 8. Open up your BTCPay Server instance, make sure you selected the right store and open the Ghost plugin page.
 
-9. Copy your API Url (without the https://), Content API key, and Admin API Key from Ghost credential page into their respective input fields in your plugin page.
+9. Copy your API Url which is the same as your site domain URL (without the https://), Content API key, and Admin API Key from Ghost credential page into their respective input fields in your plugin page.
 
 10. For the Webhook Secret you can enter a secret on your own or if left empty it will auto-generate one. This will only be used for the membership functionality.
 
