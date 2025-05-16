@@ -153,10 +153,9 @@ public class UIGhostPublicController : Controller
             Tier tier = ghostTiers.FirstOrDefault(c => c.id == vm.TierId);
             if (tier == null) return NotFound();
 
-            var member = await apiClient.RetrieveMember(vm.Email);
-            if (member.Any())
+            if ((await apiClient.RetrieveMember(vm.Email))?.Any() == true)
             {
-                ModelState.AddModelError(nameof(vm.Email), "A member with this email already exist");
+                ModelState.AddModelError(nameof(vm.Email), "A member with this email already exists");
                 return View(vm);
             }
             GhostMember entity = new GhostMember
@@ -174,6 +173,11 @@ public class UIGhostPublicController : Controller
             await ctx.SaveChangesAsync();
             var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
             InvoiceEntity invoice = await _ghostPluginService.CreateMemberInvoiceAsync(storeData, tier, entity, txnId, Request.GetAbsoluteRoot(), $"https://{ghostSetting.ApiUrl}/#/portal/signin");
+            if (invoice == null)
+            {
+                ViewBag.ErrorMessage = "Unable to create invoice";
+                return View(vm);
+            }
             await SaveTransaction(ctx, tier, entity, invoice, null, txnId);
             return RedirectToInvoiceCheckout(invoice.Id);
         }
