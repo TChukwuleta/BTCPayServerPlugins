@@ -18,6 +18,7 @@ using BTCPayServer.Services.PaymentRequests;
 using Newtonsoft.Json.Linq;
 using BTCPayServer.Client.Models;
 using TransactionStatus = BTCPayServer.Plugins.GhostPlugin.Data.TransactionStatus;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
@@ -151,6 +152,11 @@ public class GhostHostedService : EventHostedServiceBase
                             }
                         }
                     });
+                    if (response == null || response.members == null || response.members.Count == 0 || response.members[0] == null)
+                    {
+                        result.Write($"Ghost response was null or empty when trying to create member", InvoiceEventData.EventSeverity.Error);
+                        return;
+                    }
                     transaction.PeriodStart = DateTime.UtcNow;
                     transaction.PeriodEnd = expirationDate.ToUniversalTime();
                     ghostMember.MemberId = response.members[0].id;
@@ -161,11 +167,11 @@ public class GhostHostedService : EventHostedServiceBase
                 }
                 catch (Exception ex)
                 {
+                    result.Write($"Ghost error while trying to create member on Ghost platform. {ex.Message}", InvoiceEventData.EventSeverity.Error);
                     Logs.PayServer.LogError(ex,
                         $"Ghost error while trying to create member on Ghost platform. {ex.Message}" +
                         $"Triggered by invoiceId: {invoice.Id}");
                 }
-
             }
             ctx.UpdateRange(transaction);
             await ctx.SaveChangesAsync();

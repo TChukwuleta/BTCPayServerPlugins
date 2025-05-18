@@ -10,6 +10,7 @@ using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using System.Collections.Generic;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
+using Newtonsoft.Json.Linq;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
@@ -38,7 +39,40 @@ public class GhostAdminApiClient
         var req = CreateRequest(HttpMethod.Post, "members");
         req.Content = new StringContent(postJson, Encoding.UTF8, "application/json");
         var response = await SendRequest(req);
-        return JsonConvert.DeserializeObject<CreateMemberResponseModel>(response);
+        if (string.IsNullOrEmpty(response))
+            throw new Exception("Empty response received from Ghost API");
+
+        var result = JsonConvert.DeserializeObject<CreateMemberResponseModel>(response, new JsonSerializerSettings
+        {
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            NullValueHandling = NullValueHandling.Include
+        });
+        if (result == null)
+            result = new CreateMemberResponseModel();
+
+        if (result.members == null || result.members.Count == 0)
+        {
+            try
+            {
+                var jObject = JObject.Parse(response);
+                var membersArray = jObject["members"] as JArray;
+                if (membersArray != null && membersArray.Count > 0)
+                {
+                    result.members = new List<MemberCreationResponse>();
+                    foreach (var member in membersArray)
+                    {
+                        result.members.Add(new MemberCreationResponse
+                        {
+                            id = member["id"]?.ToString(),
+                            uuid = member["uuid"]?.ToString(),
+                            unsubscribe_url = member["unsubscribe_url"]?.ToString()
+                        });
+                    }
+                }
+            }
+            catch {}
+        }
+        return result;
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string relativeUrl)
