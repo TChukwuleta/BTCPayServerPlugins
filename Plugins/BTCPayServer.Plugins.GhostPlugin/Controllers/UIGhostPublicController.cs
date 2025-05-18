@@ -29,6 +29,7 @@ using NBitcoin.DataEncoders;
 using NBitcoin;
 using System.Security.Cryptography;
 using BTCPayServer.Abstractions.Constants;
+using System.ComponentModel.DataAnnotations;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -138,6 +139,11 @@ public class UIGhostPublicController : Controller
         var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated()) return NotFound();
 
+        var emailAttr = new EmailAddressAttribute();
+        if (!emailAttr.IsValid(vm.Email))
+        {
+            return BadRequest("Invalid email address.");
+        }
         var storeData = await _storeRepo.FindStore(ghostSetting.StoreId);
         var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
         var contentApiClient = new GhostContentApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
