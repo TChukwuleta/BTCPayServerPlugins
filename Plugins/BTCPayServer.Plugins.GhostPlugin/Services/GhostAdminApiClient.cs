@@ -36,7 +36,7 @@ public class GhostAdminApiClient
     public async Task<CreateMemberResponseModel> CreateGhostMember(CreateGhostMemberRequest requestModel)
     {
         var postJson = JsonConvert.SerializeObject(requestModel);
-        var req = CreateRequest(HttpMethod.Post, "members");
+        var req = CreateRequest(HttpMethod.Post, "members/");
         req.Content = new StringContent(postJson, Encoding.UTF8, "application/json");
         var response = await SendRequest(req);
         if (string.IsNullOrEmpty(response))
