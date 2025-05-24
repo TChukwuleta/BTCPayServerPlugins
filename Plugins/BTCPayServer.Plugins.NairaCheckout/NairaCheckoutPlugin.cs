@@ -1,13 +1,12 @@
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
-using BTCPayServer.Abstractions.Services;
 using BTCPayServer.Hosting;
 using BTCPayServer.Payments;
 using BTCPayServer.Plugins.Mavapay.PaymentHandlers;
-using BTCPayServer.Plugins.Template.Services;
+using BTCPayServer.Plugins.NairaCheckout.PaymentHandlers;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace BTCPayServer.Plugins.Template;
+namespace BTCPayServer.Plugins.NairaCheckout;
 
 public class NairaCheckoutPlugin : BaseBTCPayServerPlugin
 {
@@ -28,49 +27,15 @@ public class NairaCheckoutPlugin : BaseBTCPayServerPlugin
         services.AddTransactionLinkProvider(NairaPmid, new NairaTransactionLinkProvider("naira"));
 
         services.AddSingleton(provider =>
-            (IPaymentMethodHandler)ActivatorUtilities.CreateInstance(provider, typeof(CashPaymentMethodHandler)));
-        services.AddSingleton(provider =>
-            (ICheckoutModelExtension)ActivatorUtilities.CreateInstance(provider, typeof(CashCheckoutModelExtension)));
+            (IPaymentMethodHandler)ActivatorUtilities.CreateInstance(provider, typeof(NairaPaymentMethodHandler)));
+        //services.AddSingleton(provider =>
+        //    (ICheckoutModelExtension)ActivatorUtilities.CreateInstance(provider, typeof(NairaPaymentMethodHandler)));
 
-        services.AddDefaultPrettyName(CashPmid, CashDisplayName);
+        services.AddDefaultPrettyName(NairaPmid, NairaDisplayName);
 
-        //
-        services.AddSingleton<CashStatusProvider>();
-
-        //
-        services.AddUIExtension("store-wallets-nav", "CashStoreNav");
-        services.AddUIExtension("checkout-payment", "CashLikeMethodCheckout");
-
+        services.AddSingleton<NairaStatusProvider>();
+        services.AddUIExtension("store-wallets-nav", "NairaStoreNav");
+        //services.AddUIExtension("checkout-payment", "NairaLikeMethodCheckout");
         base.Execute(services);
     }
-
-
-    public override void Execute(IServiceCollection services)
-    {
-        services.AddTransactionLinkProvider(NairaPmid, new CashTransactionLinkProvider("cash"));
-
-        services.AddSingleton(provider =>
-            (IPaymentMethodHandler)ActivatorUtilities.CreateInstance(provider, typeof(CashPaymentMethodHandler)));
-        services.AddSingleton(provider =>
-            (ICheckoutModelExtension)ActivatorUtilities.CreateInstance(provider, typeof(CashCheckoutModelExtension))); 
-
-        services.AddDefaultPrettyName(CashPmid, CashDisplayName);
-
-
-
-    public override void Execute(IServiceCollection services)
-    {
-        services.AddSingleton<IUIExtension>(new UIExtension("MassStoreGeneratorPluginHeaderNav", "header-nav"));
-        services.AddHostedService<ApplicationPartsLogger>();
-    }
-
-
-    //
-    services.AddSingleton<CashStatusProvider>();
-
-        //
-        services.AddUIExtension("store-wallets-nav", "CashStoreNav");
-        services.AddUIExtension("checkout-payment", "CashLikeMethodCheckout");
-
-        base.NairaCheckoutPlugin(services);
-    }
+}

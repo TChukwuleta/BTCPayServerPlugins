@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using BTCPayServer.Data;
 using BTCPayServer.Payments;
+using BTCPayServer.Plugins.Template;
 using BTCPayServer.Services.Rates;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -10,7 +11,7 @@ namespace BTCPayServer.Plugins.NairaCheckout.PaymentHandlers;
 
 public class NairaPaymentMethodHandler(CurrencyNameTable currencyNameTable) : IPaymentMethodHandler
 {
-    public PaymentMethodId PaymentMethodId => CashCheckoutPlugin.CashPmid;
+    public PaymentMethodId PaymentMethodId => NairaCheckoutPlugin.NairaPmid;
 
     public Task ConfigurePrompt(PaymentMethodContext context)
     {
@@ -37,13 +38,13 @@ public class NairaPaymentMethodHandler(CurrencyNameTable currencyNameTable) : IP
     public object ParsePaymentMethodConfig(JToken config)
     {
         return config.ToObject<CashPaymentMethodConfig>(Serializer) ??
-               throw new FormatException($"Invalid {nameof(CashPaymentMethodHandler)}");
+               throw new FormatException($"Invalid {nameof(NairaPaymentMethodHandler)}");
     }
 
     public object ParsePaymentDetails(JToken details)
     {
         return details.ToObject<CashPaymentData>(Serializer) ??
-               throw new FormatException($"Invalid {nameof(CashPaymentMethodHandler)}");
+               throw new FormatException($"Invalid {nameof(NairaPaymentMethodHandler)}");
     }
 }
 
