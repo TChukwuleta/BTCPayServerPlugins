@@ -1,6 +1,5 @@
 ﻿using System.Threading.Tasks;
 using BTCPayServer.Data;
-using BTCPayServer.Plugins.Template;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
 
@@ -22,12 +21,8 @@ public class NairaStatusProvider(
 
             var excludeFilters = storeData.GetStoreBlob().GetExcludedPaymentMethods();
             var enabled = !excludeFilters.Match(NairaCheckoutPlugin.NairaPmid);
-
             return enabled;
         }
-        catch
-        {
-            return false;
-        }
+        catch{ return false; }
     }
 }

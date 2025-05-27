@@ -4,6 +4,8 @@ using BTCPayServer.Hosting;
 using BTCPayServer.Payments;
 using BTCPayServer.Plugins.Mavapay.PaymentHandlers;
 using BTCPayServer.Plugins.NairaCheckout.PaymentHandlers;
+using BTCPayServer.Plugins.NairaCheckout.Services;
+using BTCPayServer.Plugins.Template.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BTCPayServer.Plugins.NairaCheckout;
@@ -24,8 +26,18 @@ public class NairaCheckoutPlugin : BaseBTCPayServerPlugin
 
     public override void Execute(IServiceCollection services)
     {
+        services.AddSingleton<MavapayApiClientService>();
+        services.AddHostedService<PluginMigrationRunner>();
+        services.AddSingleton<NairaCheckoutHostedService>();
+        services.AddHostedService<ApplicationPartsLogger>();
+        services.AddHostedService<NairaCheckoutHostedService>();
+        services.AddSingleton<NairaCheckoutDbContextFactory>();
+        services.AddDbContext<NairaCheckoutDbContext>((provider, o) =>
+        {
+            var factory = provider.GetRequiredService<NairaCheckoutDbContextFactory>();
+            factory.ConfigureBuilder(o);
+        });
         services.AddTransactionLinkProvider(NairaPmid, new NairaTransactionLinkProvider("naira"));
-
         services.AddSingleton(provider =>
             (IPaymentMethodHandler)ActivatorUtilities.CreateInstance(provider, typeof(NairaPaymentMethodHandler)));
         //services.AddSingleton(provider =>
