@@ -1,0 +1,28 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Data
+@using BTCPayServer.Plugins.MassStoreGenerator.Views
+@using BTCPayServer.Plugins.NairaCheckout.PaymentHandlers
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Mvc.TagHelpers
+@inject IScopeProvider ScopeProvider
+@inject SignInManager<ApplicationUser> SignInManager;
+@inject NairaStatusProvider NairaStatusProvider
+@{
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+@if (SignInManager.IsSignedIn(User) && !string.IsNullOrEmpty(storeId))
+{
+    var isEnabled = await NairaStatusProvider.NairaEnabled(storeId);
+    //var isActive = Context.Request.Path.Value?.Contains("/cash?") == true;
+    // <a class="nav-link @(isActive ? "active" : "")"
+    <li class="nav-item">
+        <a class="nav-link"
+           asp-route-storeId="@storeId"
+           asp-action="StoreConfig"
+           asp-controller="UINaira">
+            <span class="me-2 btcpay-status btcpay-status--@(isEnabled ? "enabled" : "pending")"></span>
+            <span>Naira (Mavapay)</span>
+        </a>
+    </li>
+}
