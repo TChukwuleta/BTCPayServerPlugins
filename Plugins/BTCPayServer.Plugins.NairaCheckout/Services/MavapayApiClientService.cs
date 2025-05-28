@@ -24,7 +24,11 @@ public class MavapayApiClientService
         var req = CreateRequest(HttpMethod.Post, "quote");
         req.Content = new StringContent(postJson, Encoding.UTF8, "application/json");
         var response = await SendRequest(req, apiKey);
-        var responseModel = JsonConvert.DeserializeObject<EntityVm<CreateQuoteResponseVm>>(response);
+        var responseModel = JsonConvert.DeserializeObject<EntityVm<CreateQuoteResponseVm>>(response, new JsonSerializerSettings
+        {
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            NullValueHandling = NullValueHandling.Include
+        });
         return responseModel.data;
     }
 
@@ -36,7 +40,11 @@ public class MavapayApiClientService
         var req = CreateRequest(HttpMethod.Post, "webhook/register");
         req.Content = new StringContent(postJson, Encoding.UTF8, "application/json");
         var response = await SendRequest(req, apiKey);
-        var responseModel = JsonConvert.DeserializeObject<EntityVm<CreateWebhookResponseVm>>(response);
+        var responseModel = JsonConvert.DeserializeObject<EntityVm<CreateWebhookResponseVm>>(response, new JsonSerializerSettings
+        {
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            NullValueHandling = NullValueHandling.Include
+        });
         return responseModel.status.ToLower().Trim() == "success";
     }
 
@@ -47,7 +55,11 @@ public class MavapayApiClientService
         var req = CreateRequest(HttpMethod.Put, "webhook");
         req.Content = new StringContent(postJson, Encoding.UTF8, "application/json");
         var response = await SendRequest(req, apiKey);
-        var responseModel = JsonConvert.DeserializeObject<EntityVm<CreateWebhookResponseVm>>(response);
+        var responseModel = JsonConvert.DeserializeObject<EntityVm<CreateWebhookResponseVm>>(response, new JsonSerializerSettings
+        {
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            NullValueHandling = NullValueHandling.Include
+        });
         return responseModel.status.ToLower().Trim() == "success";
     }
 
@@ -68,10 +80,13 @@ public class MavapayApiClientService
         var queryString = queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : string.Empty;
         var req = CreateRequest(HttpMethod.Get, $"transaction/{queryString}");
         var response = await SendRequest(req, apiKey);
-        var responseModel = JsonConvert.DeserializeObject<EntityVm<TransactionResponseVm>>(response);
+        var responseModel = JsonConvert.DeserializeObject<EntityVm<TransactionResponseVm>>(response, new JsonSerializerSettings
+        {
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            NullValueHandling = NullValueHandling.Include
+        });
         return responseModel.data;
     }
-
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string relativeUrl) => new HttpRequestMessage(method, $"{ApiUrl}/{relativeUrl}");
 

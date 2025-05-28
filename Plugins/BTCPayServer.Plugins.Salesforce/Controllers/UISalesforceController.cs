@@ -67,7 +67,6 @@ public class UISalesforceController : Controller
         _invoiceController = invoiceController;
         _logger = logger;
     }
-    private const string SHOPIFY_ORDER_ID_PREFIX = "shopify-";
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
     [Route("~/plugins/stores/{storeId}/salesforce")]
@@ -100,7 +99,7 @@ public class UISalesforceController : Controller
         try
         {
             await using var ctx = _dbContextFactory.CreateContext();
-            var shopifySetting = ctx.SalesforceSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+            var salesforceSetting = ctx.SalesforceSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
             switch (command)
             {
                 case "SalseforceSaveCredentials":
@@ -115,21 +114,15 @@ public class UISalesforceController : Controller
                         try
                         {
                             var authResponse = await apiClient.Authenticate(vm);
-                            await apiClient.CreateBTCInvoiceIdField(authResponse);
+                            /*await apiClient.CreateBTCInvoiceIdField(authResponse);
                             await apiClient.CreateBTCPaymentUrlField(authResponse);
-                            await apiClient.CreatePaymentStatusField(authResponse);
+                            await apiClient.CreatePaymentStatusField(authResponse);*/
                         }
                         catch (SalesforceApiException err)
                         {
                             TempData[WellKnownTempData.ErrorMessage] = $"Invalid Salesforce credentials: {err.Message}";
                             return View(vm);
                         }
-                        /*var scopesGranted = await apiClient.CheckScopes();
-                        if (!scopesGranted.Contains("read_orders") || !scopesGranted.Contains("write_orders"))
-                        {
-                            TempData[WellKnownTempData.ErrorMessage] = "Please grant the private app permissions for read_orders, write_orders.";
-                            return View(vm);
-                        }*/
                         vm.IntegratedAt = DateTimeOffset.UtcNow;
                         vm.StoreId = CurrentStore.Id;
                         vm.ApplicationUserId = GetUserId();
@@ -141,9 +134,9 @@ public class UISalesforceController : Controller
                     }
                 case "SalesforceClearCredentials":
                     {
-                        if (shopifySetting != null)
+                        if (salesforceSetting != null)
                         {
-                            ctx.Remove(shopifySetting);
+                            ctx.Remove(salesforceSetting);
                             await ctx.SaveChangesAsync();
                         }
                         TempData[WellKnownTempData.SuccessMessage] = "Salesforce plugin credentials cleared";
@@ -190,3 +183,32 @@ public class UISalesforceController : Controller
 
     private string GetUserId() => _userManager.GetUserId(User);
 }
+
+
+/*[HttpPost("btcpay")]
+    public async Task<IActionResult> HandleBTCPayWebhook([FromBody] JsonElement payload)
+    {
+        try
+        {
+            _logger.LogInformation("Received BTCPay webhook");
+
+            var invoiceId = payload.GetProperty("invoiceId").GetString();
+            var type = payload.GetProperty("type").GetString();
+
+            if (type == "InvoiceSettled" || type == "InvoiceProcessing" || type == "InvoiceExpired")
+            {
+                // Get full invoice details
+                var invoice = await _btcpayService.GetInvoiceAsync(invoiceId!);
+
+                // Update Salesforce
+                await _salesforceService.UpdateTransactionStatusAsync(invoiceId!, invoice.Status.ToString());
+            }
+
+            return Ok(new { status = "success" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing BTCPay webhook");
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }*/
