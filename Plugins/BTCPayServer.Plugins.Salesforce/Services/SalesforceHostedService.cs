@@ -5,7 +5,6 @@ using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
 using BTCPayServer.Plugins.Salesforce.Helper;
 using BTCPayServer.Services.Invoices;
-using BTCPayServer.Services.Rates;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System;
@@ -17,26 +16,22 @@ namespace BTCPayServer.Plugins.Salesforce.Services;
 
 public class SalesforceHostedService : EventHostedServiceBase
 {
-    private readonly CurrencyNameTable _currencyNameTable;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly SalesforceApiClient _salesforceApiClient;
     private readonly SalesforceDbContextFactory _dbContextFactory;
 
     public SalesforceHostedService(EventAggregator eventAggregator,
         InvoiceRepository invoiceRepository,
-        CurrencyNameTable currencyNameTable,
         SalesforceApiClient salesforceApiClient,
         SalesforceDbContextFactory dbContextFactory,
         Logs logs) : base(eventAggregator, logs)
     {
         _dbContextFactory = dbContextFactory;
-        _currencyNameTable = currencyNameTable;
         _invoiceRepository = invoiceRepository;
         _salesforceApiClient = salesforceApiClient;
     }
 
     public const string SALESFORCE_ORDER_ID_PREFIX = "salesforce-";
-
     protected override void SubscribeToEvents()
     {
         Subscribe<InvoiceEvent>();
@@ -58,26 +53,25 @@ public class SalesforceHostedService : EventHostedServiceBase
                     Status:
                     InvoiceStatus.Settled or
                     InvoiceStatus.Invalid or
+                    InvoiceStatus.Processing or
                     InvoiceStatus.Expired
                 } invoice
-            } && invoice.GetSalesforceOrderId() is { } shopifyOrderId)
+            } && invoice.GetSalesforceOrderId() is { } salesforceOrderId)
         {
             try
             {
-                var resp = await Process(shopifyOrderId, invoice);
+                var resp = await Process(salesforceOrderId, invoice);
                 await _invoiceRepository.AddInvoiceLogs(invoice.Id, resp);
             }
             catch (Exception ex)
             {
                 Logs.PayServer.LogError(ex,
-                    $"Shopify error while trying to register order transaction. " +
-                    $"Triggered by invoiceId: {invoice.Id}, Shopify orderId: {shopifyOrderId}");
+                    $"Salesforce error while trying to register order status. " +
+                    $"Triggered by invoiceId: {invoice.Id}, Shopify orderId: {salesforceOrderId}");
             }
         }
 
     }
-
-
 
     async Task<InvoiceLogs> Process(long shopifyOrderId, InvoiceEntity invoice)
     {
@@ -87,19 +81,9 @@ public class SalesforceHostedService : EventHostedServiceBase
         if (salesforceSettings == null) 
             return logs;
 
-        var salesforceOrderId = invoice.GetSalesforceOrderId();
-        // An api call to verify orderId from salesforce
-        decimal? btcpayPaid = invoice switch
-        {
-            { Status: InvoiceStatus.Settled } => invoice.Price,
-            { Status: InvoiceStatus.Expired, ExceptionStatus: InvoiceExceptionStatus.PaidPartial } => NetSettled(invoice),
-            { Status: InvoiceStatus.Invalid, ExceptionStatus: InvoiceExceptionStatus.Marked } => 0.0m,
-            { Status: InvoiceStatus.Invalid } => NetSettled(invoice),
-            _ => null
-        };
         try
         {
-            await _salesforceApiClient.UpdateSalesforceOrder(salesforceSettings, salesforceOrderId.ToString(), invoice.Status.ToString());
+            await _salesforceApiClient.UpdateTransactionStatus(salesforceSettings, invoice.Id, invoice.Status.ToString());
             logs.Write(
                 $"Successfully captured the order on Salesforce. ({invoice.Currency})",
                 InvoiceEventData.EventSeverity.Info);
@@ -110,16 +94,5 @@ public class SalesforceHostedService : EventHostedServiceBase
                 InvoiceEventData.EventSeverity.Error);
         }
         return logs;
-    }
-
-
-    private decimal NetSettled(InvoiceEntity invoice)
-    {
-        decimal netSettled = netSettled = invoice.GetPayments(true)
-                        .Where(payment => payment.Status == PaymentStatus.Settled)
-                        .Sum(payment => payment.InvoicePaidAmount.Net);
-        // Later we can just use this instead of calculating ourselves
-        // decimal netSettled = invoice.NetSettled;
-        return Math.Round(netSettled, _currencyNameTable.GetNumberFormatInfo(invoice.Currency)?.CurrencyDecimalDigits ?? 2);
     }
 }

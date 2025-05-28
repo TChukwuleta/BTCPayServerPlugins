@@ -29,9 +29,6 @@ namespace BTCPayServer.Plugins.Salesforce.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text");
 
-                    b.Property<string>("ApiUrl")
-                        .HasColumnType("text");
-
                     b.Property<string>("ApplicationUserId")
                         .HasColumnType("text");
 
@@ -45,6 +42,9 @@ namespace BTCPayServer.Plugins.Salesforce.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Password")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SecurityToken")
                         .HasColumnType("text");
 
                     b.Property<string>("StoreId")

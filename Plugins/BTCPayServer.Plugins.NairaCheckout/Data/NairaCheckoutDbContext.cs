@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using BTCPayServer.Plugins.NairaCheckout.Data;
+﻿using BTCPayServer.Plugins.NairaCheckout.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.NairaCheckout;

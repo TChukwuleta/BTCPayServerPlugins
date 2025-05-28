@@ -9,7 +9,7 @@
 @model SalesforceSetting
 @{
     ViewData.SetActivePage(PluginNavPages.Index, "Salesforce");
-    var shopifyCredsSet = Model?.IntegratedAt.HasValue is true;
+    var credSet = Model?.IntegratedAt.HasValue is true;
 }
 
 <div class="sticky-header">
@@ -39,41 +39,44 @@
             <form method="post" id="shopifyForm">
 
                 <div class="form-group">
-                    <label asp-for="ConsumerKey" class="form-label"></label>
-                    <input asp-for="ConsumerKey" class="form-control" readonly="@shopifyCredsSet" />
-                    <span asp-validation-for="ConsumerKey" class="text-danger"></span>
-                </div>
-
-                <div class="form-group">
-                    <label asp-for="ConsumerSecret" class="form-label"></label>
-                    <input asp-for="ConsumerSecret" class="form-control" type="password" value="@Model?.Password" readonly="@shopifyCredsSet" />
-                    <span asp-validation-for="ConsumerSecret" class="text-danger"></span>
-                </div>
-
-                <div class="form-group">
                     <label asp-for="Username" class="form-label"></label>
-                    <input asp-for="Username" class="form-control" type="password" value="@Model?.Password" readonly="@shopifyCredsSet" />
+                    <input asp-for="Username" class="form-control" value="@Model?.Username" readonly="@credSet" />
                     <span asp-validation-for="Username" class="text-danger"></span>
                 </div>
 
                 <div class="form-group">
                     <label asp-for="Password" class="form-label"></label>
-                    <input asp-for="Password" class="form-control" type="password" value="@Model?.Password" readonly="@shopifyCredsSet" />
+                    <input asp-for="Password" class="form-control" type="password" value="@Model?.Password" readonly="@credSet" />
                     <span asp-validation-for="Password" class="text-danger"></span>
                 </div>
 
-                @if (shopifyCredsSet)
-                {
+                <div class="form-group">
+                    <label asp-for="SecurityToken" class="form-label"></label>
+                    <input asp-for="SecurityToken" class="form-control" type="password" value="@Model?.SecurityToken" readonly="@credSet" />
+                    <span asp-validation-for="SecurityToken" class="text-danger"></span>
+                </div>
 
+                <div class="form-group">
+                    <label asp-for="ConsumerKey" class="form-label"></label>
+                    <input asp-for="ConsumerKey" class="form-control" value="@Model?.ConsumerKey" readonly="@credSet" />
+                    <span asp-validation-for="ConsumerKey" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="ConsumerSecret" class="form-label"></label>
+                    <input asp-for="ConsumerSecret" class="form-control" type="password" value="@Model?.ConsumerSecret" readonly="@credSet" />
+                    <span asp-validation-for="ConsumerSecret" class="text-danger"></span>
+                </div>
+
+                @if (credSet)
+                {
                     <button name="command" type="submit" class="btn btn-danger mt-3" value="SalesforceClearCredentials">
                         Stop Salesforce calls and clear credentials
                     </button>
                 }
                 else
                 {
-                    <button name="command" type="submit" class="btn btn-primary mt-3" value="SalseforceSaveCredentials">
-                        Save
-                    </button>
+                    <button name="command" type="submit" class="btn btn-primary mt-3" value="SalseforceSaveCredentials">Save</button>
                 }
             </form>
         </div>

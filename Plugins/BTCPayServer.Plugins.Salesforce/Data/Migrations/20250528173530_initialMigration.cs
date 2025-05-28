@@ -20,9 +20,9 @@ namespace BTCPayServer.Plugins.Salesforce.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "text", nullable: false),
-                    ApiUrl = table.Column<string>(type: "text", nullable: true),
                     ConsumerKey = table.Column<string>(type: "text", nullable: true),
                     ConsumerSecret = table.Column<string>(type: "text", nullable: true),
+                    SecurityToken = table.Column<string>(type: "text", nullable: true),
                     Username = table.Column<string>(type: "text", nullable: true),
                     Password = table.Column<string>(type: "text", nullable: true),
                     StoreId = table.Column<string>(type: "text", nullable: true),
