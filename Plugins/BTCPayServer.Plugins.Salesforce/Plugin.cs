@@ -18,6 +18,7 @@ public class Plugin : BaseBTCPayServerPlugin
     public override void Execute(IServiceCollection services)
     {
         services.AddSingleton<IUIExtension>(new UIExtension("SalesforcePluginHeaderNav", "header-nav"));
+        services.AddSingleton<SalesforceApiClient>();
         services.AddSingleton<SalesforceHostedService>();
         services.AddHostedService<SalesforceHostedService>();
         services.AddHostedService<ApplicationPartsLogger>();

@@ -13,10 +13,8 @@ namespace BTCPayServer.Plugins.Salesforce.Services;
 public class SalesforceApiClient
 {
     private readonly HttpClient _httpClient;
-    private readonly SalesforceApiClientCredentials _credentials;
-    public SalesforceApiClient(IHttpClientFactory httpClientFactory, SalesforceApiClientCredentials credentials)
+    public SalesforceApiClient(IHttpClientFactory httpClientFactory)
     {
-        _credentials = credentials;
         _httpClient = httpClientFactory != null ? httpClientFactory.CreateClient(nameof(SalesforceApiClient)) : new HttpClient();
     }
 
@@ -29,7 +27,7 @@ public class SalesforceApiClient
                 {"client_id", salesforceSetting.ConsumerKey},
                 {"client_secret", salesforceSetting.ConsumerSecret},
                 {"username", salesforceSetting.Username},
-                {"password", salesforceSetting.Password}
+                {"password", $"{salesforceSetting.Password}{salesforceSetting.SecurityToken}"}
             });
         var response = await _httpClient.PostAsync($"{loginUrl}/services/oauth2/token", formContent);
         if (!response.IsSuccessStatusCode)
@@ -38,6 +36,7 @@ public class SalesforceApiClient
             throw new Exception($"Authentication failed: {errorContent}");
         }
         var jsonResponse = await response.Content.ReadAsStringAsync();
+        Console.WriteLine(jsonResponse);
         var authResponse = JsonConvert.DeserializeObject<AuthResponse>(jsonResponse);
         authResponse.instance_url?.TrimEnd('/');
         return authResponse;

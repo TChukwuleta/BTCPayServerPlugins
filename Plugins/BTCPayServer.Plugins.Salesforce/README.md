@@ -60,3 +60,22 @@ force-app/main/default/
 │
 └── staticresources/
     └── btcpay_icons.resource-meta.xml
+
+
+
+    You need to create a Connected App in Salesforce to enable API access:
+
+In Salesforce Setup:
+
+Go to App Manager → New Connected App
+Enable OAuth Settings
+Add scopes: api, refresh_token, offline_access
+1. Access Lightning applications (lightning)
+2. Perform requests at any time (refresh_token, offline_access)
+1. Manage user data via APIs (api)
+Enable "Client Credentials Flow" for server-to-server integration
+
+
+Security token:
+
+- Profile (top right) -> Settings -> Reset my security token

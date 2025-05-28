@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BTCPayServer.Plugins.Salesforce.Data;
@@ -7,9 +8,13 @@ public class SalesforceSetting
 {
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public string Id { get; set; }
-    public string ApiUrl { get; set; }
+    [Display(Name = "Consumer Key")]
     public string ConsumerKey { get; set; }
+    [Display(Name = "Consumer Secret")]
     public string ConsumerSecret { get; set; }
+
+    [Display(Name = "Salesforce security token")]
+    public string SecurityToken { get; set; }
     public string Username { get; set; }
     public string Password { get; set; }
     public string StoreId { get; set; }

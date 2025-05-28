@@ -110,7 +110,7 @@ public class UISalesforceController : Controller
                             TempData[WellKnownTempData.ErrorMessage] = "Please provide valid Salesforce credentials";
                             return View(vm);
                         }
-                        var apiClient = new SalesforceApiClient(_clientFactory, vm.CreateSalesforceApiCredentials());
+                        var apiClient = new SalesforceApiClient(_clientFactory);
                         try
                         {
                             var authResponse = await apiClient.Authenticate(vm);
