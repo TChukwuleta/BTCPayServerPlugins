@@ -12,6 +12,7 @@ public class MavapayApiClientService
 {
     private readonly HttpClient _httpClient;
     public readonly string ApiUrl = "https://staging.api.mavapay.co/api/v1";
+    private readonly List<string> validStatuses = new List<string> { "success", "ok" };
     public MavapayApiClientService(IHttpClientFactory httpClientFactory)
     {
         _httpClient = httpClientFactory?.CreateClient(nameof(MavapayApiClientService)) ?? new HttpClient();
@@ -45,7 +46,7 @@ public class MavapayApiClientService
             MissingMemberHandling = MissingMemberHandling.Ignore,
             NullValueHandling = NullValueHandling.Include
         });
-        return responseModel.status.ToLower().Trim() == "success";
+        return validStatuses.Contains(responseModel.status?.ToLower().Trim());
     }
 
     public async Task<bool> UpdateWebhook(string apiKey, string url, string secret)
@@ -60,7 +61,7 @@ public class MavapayApiClientService
             MissingMemberHandling = MissingMemberHandling.Ignore,
             NullValueHandling = NullValueHandling.Include
         });
-        return responseModel.status.ToLower().Trim() == "success";
+        return validStatuses.Contains(responseModel.status?.ToLower().Trim());
     }
 
 
@@ -93,12 +94,8 @@ public class MavapayApiClientService
     private async Task<string> SendRequest(HttpRequestMessage req, string apiKey)
     {
         _httpClient.DefaultRequestHeaders.Add("X-API-KEY", apiKey);
-        Console.WriteLine(apiKey);
         var response = await _httpClient.SendAsync(req);
         var responseContent = await response.Content.ReadAsStringAsync();
-        var requestBody = await req.Content.ReadAsStringAsync();
-        Console.WriteLine(JsonConvert.SerializeObject(requestBody));
-        Console.WriteLine(responseContent);
         return responseContent;
     }
 }

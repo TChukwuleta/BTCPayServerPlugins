@@ -22,10 +22,9 @@ public class UINairaPublicController : Controller
 
     private StoreData StoreData => HttpContext.GetStoreData();
 
-    [HttpGet("webhook")]
+    [HttpPost("webhook")]
     public async Task<IActionResult> ReceiveWebhook()
     {
-        var model = new NairaStoreViewModel { Enabled = await _nairaStatusProvider.NairaEnabled(StoreData.Id) };
-        return Ok(model);
+        return Ok();
     }
 }
