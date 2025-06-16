@@ -51,9 +51,6 @@ public class UINairaController : Controller
         _dbContextFactory = dbContextFactory;
         _nairaStatusProvider = nairaStatusProvider;
     }
-    public StoreData CurrentStore => HttpContext.GetStoreData();
-
-
     private StoreData StoreData => HttpContext.GetStoreData();
 
     [HttpGet]
@@ -77,7 +74,7 @@ public class UINairaController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var apiClient = new MavapayApiClientService(_clientFactory);
         var webhookSecret = !string.IsNullOrEmpty(viewModel.WebhookSecret) ? viewModel.WebhookSecret : Encoders.Base58.EncodeData(RandomUtils.GetBytes(10));
-        var url = Url.Action("ReceiveWebhook", "UINairaPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
+        var url = Url.Action("ReceiveWebhook", "UINairaPublic", new { storeId = StoreData.Id }, Request.Scheme);
         var entity = ctx.NairaCheckoutSettings.FirstOrDefault(c => c.Enabled) ?? new NairaCheckoutSetting { WalletName = Wallet.Mavapay.ToString() };
         bool successfulCalls = false;
         if (viewModel.Enabled)

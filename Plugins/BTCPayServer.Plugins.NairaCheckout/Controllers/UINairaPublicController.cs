@@ -2,7 +2,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using BTCPayServer.Data;
-using BTCPayServer.Plugins.NairaCheckout.ViewModels;
 using BTCPayServer.Plugins.NairaCheckout.PaymentHandlers;
 
 namespace BTCPayServer.Plugins.Template;

@@ -2,7 +2,7 @@
 
 public class CreateQuoteRequestVm
 {
-    public string amount { get; set; }
+    public decimal amount { get; set; }
     public int customerInternalFee { get; set; }
     public string sourceCurrency { get; set; }
     public string targetCurrency { get; set; }

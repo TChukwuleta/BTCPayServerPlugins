@@ -1,5 +1,6 @@
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
+using BTCPayServer.Abstractions.Services;
 using BTCPayServer.Hosting;
 using BTCPayServer.Payments;
 using BTCPayServer.Plugins.Mavapay.PaymentHandlers;
@@ -32,6 +33,7 @@ public class NairaCheckoutPlugin : BaseBTCPayServerPlugin
         services.AddHostedService<ApplicationPartsLogger>();
         services.AddHostedService<NairaCheckoutHostedService>();
         services.AddSingleton<NairaCheckoutDbContextFactory>();
+        services.AddScoped<Safe>();
         services.AddDbContext<NairaCheckoutDbContext>((provider, o) =>
         {
             var factory = provider.GetRequiredService<NairaCheckoutDbContextFactory>();
@@ -40,14 +42,14 @@ public class NairaCheckoutPlugin : BaseBTCPayServerPlugin
         services.AddTransactionLinkProvider(NairaPmid, new NairaTransactionLinkProvider("naira"));
         services.AddSingleton(provider =>
             (IPaymentMethodHandler)ActivatorUtilities.CreateInstance(provider, typeof(NairaPaymentMethodHandler)));
-        //services.AddSingleton(provider =>
-        //    (ICheckoutModelExtension)ActivatorUtilities.CreateInstance(provider, typeof(NairaPaymentMethodHandler)));
+        services.AddSingleton(provider =>
+            (ICheckoutModelExtension)ActivatorUtilities.CreateInstance(provider, typeof(NairaCheckoutModelExtension)));
 
         services.AddDefaultPrettyName(NairaPmid, NairaDisplayName);
 
         services.AddSingleton<NairaStatusProvider>();
-        services.AddUIExtension("store-wallets-nav", "NairaStoreNav");
-        //services.AddUIExtension("checkout-payment", "NairaLikeMethodCheckout");
+        services.AddUIExtension("store-wallets-nav", "NairaStoreNav"); 
+        services.AddUIExtension("checkout-payment", "NairaLikeMethodCheckout");
         base.Execute(services);
     }
 }

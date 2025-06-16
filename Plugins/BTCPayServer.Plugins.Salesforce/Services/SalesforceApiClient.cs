@@ -62,7 +62,6 @@ public class SalesforceApiClient
             var body = await response.Content.ReadAsStringAsync();
             throw new Exception($"Salesforce update failed: {response.StatusCode} - {body}");
         }
-        Console.WriteLine($"Updated order {orderId} status to {status}");
     }
 
     public async Task CreatePaymentStatusField(AuthResponse authResponse)
@@ -149,6 +148,16 @@ public class SalesforceApiClient
         }
     }
 
+
+    public async Task RegisterBTCPayStoreInSalesforce(SalesforceSetting salesforceSetting, string serverUrl, string storeId)
+    {
+        var authResponse = await Authenticate(salesforceSetting);
+        var payload = new { serverUrl, storeId };
+        var json = JsonConvert.SerializeObject(payload);
+        var req = new HttpRequestMessage(HttpMethod.Post, $"{authResponse.instance_url}/services/apexrest/btcpay/register");
+        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        var response = await SendRequest(req, authResponse.access_token);
+    }
 
     public async Task UpdateTransactionStatus(SalesforceSetting salesforceSetting, string invoiceId, string status)
     {

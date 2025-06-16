@@ -18,6 +18,27 @@ public class MavapayApiClientService
         _httpClient = httpClientFactory?.CreateClient(nameof(MavapayApiClientService)) ?? new HttpClient();
     }
 
+    public async Task<NairaCheckoutResponseViewModel> NairaCheckout(string apikey, decimal amount, string invoice)
+    {
+        try
+        {
+            var createQuote = await CreateQuote(new CreateQuoteRequestVm
+            {
+                amount = amount,
+                customerInternalFee = 0,
+                sourceCurrency = "NGNKOBO",
+                targetCurrency = "BTCSAT",
+                paymentMethod = "BankTransfer",
+                beneficiary = new MavapayBeneficiaryVm { lnInvoice = invoice }
+            }, apikey);
+            return new NairaCheckoutResponseViewModel { BankName = createQuote.bankName, AccountNumber = createQuote.ngnBankAccountNumber, AccountName = createQuote.ngnAccountName };
+        }
+        catch (Exception ex)
+        {
+            return new NairaCheckoutResponseViewModel { ErrorMessage = $"An error occured: {ex.Message}" };
+        }
+    }
+
     // Quote
     public async Task<CreateQuoteResponseVm> CreateQuote(CreateQuoteRequestVm requestModel, string apiKey)
     {

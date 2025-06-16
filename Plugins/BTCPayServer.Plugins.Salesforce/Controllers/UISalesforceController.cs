@@ -114,6 +114,9 @@ public class UISalesforceController : Controller
                         try
                         {
                             var authResponse = await apiClient.Authenticate(vm);
+                            var request = HttpContext.Request;
+                            string baseUrl = $"{request.Scheme}://{request.Host}".TrimEnd('/');
+                            await apiClient.RegisterBTCPayStoreInSalesforce(vm, baseUrl, CurrentStore.Id);
                             /*await apiClient.CreateBTCInvoiceIdField(authResponse);
                             await apiClient.CreateBTCPaymentUrlField(authResponse);
                             await apiClient.CreatePaymentStatusField(authResponse);*/
