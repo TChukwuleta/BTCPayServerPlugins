@@ -115,7 +115,7 @@ public class UIGhostPublicController : Controller
             GhostTiers = ghostTiers, 
             StoreId = ghostSetting.StoreId, 
             StoreName = storeData?.StoreName, 
-            ShopName = ghostSetting.StoreName,
+            ShopName = ghostSetting.ApiUrl,
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, storeData?.GetStoreBlob()),
         });
     }
