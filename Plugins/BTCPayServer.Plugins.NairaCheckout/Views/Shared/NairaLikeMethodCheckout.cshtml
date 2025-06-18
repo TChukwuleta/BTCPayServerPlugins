@@ -1,24 +1,86 @@
 @using BTCPayServer.Abstractions.Services
 @using BTCPayServer.Plugins.NairaCheckout.PaymentHandlers
+@using BTCPayServer.Plugins.NairaCheckout.Services
+@using System.Globalization
+@inject Safe safe
+@inject MavapayApiClientService mavapayClient;
+@inject NairaCheckoutDbContextFactory dbContextFactory;
 @model BTCPayServer.Models.InvoicingModels.CheckoutModel
+@{
+    string errorMessage = string.Empty;
+    string accountName = string.Empty;
+    string bankName = string.Empty;
+    string accountNumber = string.Empty;
+    if (Model.InvoiceCurrency != "NGN")
+    {
+        errorMessage = "Checkout is available for only naira";
+    }
+    await using var ctx = dbContextFactory.CreateContext();
+    var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == Model.StoreId);
+    var apiKey = mavapaySetting?.ApiKey;
+    // Find way to pass lnurl
+    string invoice = "lnurl";
+    if (string.IsNullOrEmpty(errorMessage))
+    {
+        var createQuoteResponse = await mavapayClient.NairaCheckout(apiKey, Model.OrderAmount, invoice, Model.InvoiceId, Model.StoreId);
+        if (!string.IsNullOrEmpty(createQuoteResponse.ErrorMessage))
+        {
+            errorMessage = createQuoteResponse.ErrorMessage;
+        }
+        bankName = createQuoteResponse.BankName;
+        accountName = createQuoteResponse.AccountName;
+        accountNumber = createQuoteResponse.AccountNumber;
+    }
+}
 
 <template id="@NairaCheckoutModelExtension.CheckoutBodyComponentName">
-    <div>
-        <a class="btn btn-primary rounded-pill w-100 mt-4" id="cash-payment"
-           :href="model.invoiceBitcoinUrl" title="Mark Settled">Mark Settled</a>
+    <div class="text-center mt-4">
+        <template v-if="!errorMessage">
+            <h5 class="fw-bold text-primary mb-3">Pay with Bank Transfer</h5>
+            <p class="mb-4 text-muted">
+                To complete your payment, kindly make a transfer to the following bank account:
+            </p>
+
+            <div class="card border-0 shadow-sm p-4 bg-light mx-auto" style="max-width: 400px;">
+                <p class="mb-2">
+                    <strong class="text-dark">Bank Name:</strong><br>
+                    <span class="fs-5 text-secondary">{{ bankName }}</span>
+                </p>
+                <p class="mb-2">
+                    <strong class="text-dark">Account Name:</strong><br>
+                    <span class="fs-5 text-secondary">{{ accountName }}</span>
+                </p>
+                <p class="mb-0">
+                    <strong class="text-dark">Account Number:</strong><br>
+                    <span class="fs-5 text-secondary">{{ accountNumber }}</span>
+                </p>
+            </div>
+        </template>
+
+        <template v-else>
+            <div class="alert alert-danger fw-bold" role="alert">
+                {{ errorMessage }}
+            </div>
+        </template>
     </div>
 </template>
 
-@* <script>
-    Vue.component(@Safe.Json(NairaCheckoutModelExtension.CheckoutBodyComponentName), {
+<script>
+    Vue.component(@safe.Json(NairaCheckoutModelExtension.CheckoutBodyComponentName), {
         props: ['model', 'nfcSupported', 'nfcScanning', 'nfcErrorMessage', 'nfcWarningMessage'],
-        template: @Safe.Json("#" + NairaCheckoutModelExtension.CheckoutBodyComponentName),
+        template: @safe.Json("#" + NairaCheckoutModelExtension.CheckoutBodyComponentName),
         components: {
             qrcode: VueQrcode
         },
         data() {
             // currentTab is needed for backwards-compatibility with old plugin versions
-            return {currentTab: undefined};
+            return {
+                currentTab: undefined,
+                bankName: @safe.Json(bankName),
+                accountName: @safe.Json(accountName),
+                accountNumber: @safe.Json(accountNumber),
+                errorMessage: @safe.Json(errorMessage)
+            };
         }
     });
-</script> *@
+</script>

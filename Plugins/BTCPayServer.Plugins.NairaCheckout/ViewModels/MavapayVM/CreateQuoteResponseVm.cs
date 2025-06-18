@@ -26,3 +26,11 @@ public class CreateQuoteResponseVm
     public int estimatedRoutingFee { get; set; }
     public string orderId { get; set; }
 }
+
+public class NairaCheckoutResponseViewModel
+{
+    public string BankName { get; set; }
+    public string AccountNumber { get; set; }
+    public string AccountName { get; set; }
+    public string ErrorMessage { get; set; }
+}

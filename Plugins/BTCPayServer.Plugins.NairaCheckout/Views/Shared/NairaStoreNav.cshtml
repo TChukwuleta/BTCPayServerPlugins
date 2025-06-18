@@ -14,8 +14,6 @@
 @if (SignInManager.IsSignedIn(User) && !string.IsNullOrEmpty(storeId))
 {
     var isEnabled = await NairaStatusProvider.NairaEnabled(storeId);
-    //var isActive = Context.Request.Path.Value?.Contains("/cash?") == true;
-    // <a class="nav-link @(isActive ? "active" : "")"
     <li class="nav-item">
         <a class="nav-link"
            asp-route-storeId="@storeId"

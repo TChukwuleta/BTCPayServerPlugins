@@ -20,6 +20,7 @@ using NBitcoin.DataEncoders;
 using NBitcoin;
 using System.Net.Http;
 using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace BTCPayServer.Plugins.Template;
 
@@ -51,14 +52,15 @@ public class UINairaController : Controller
         _dbContextFactory = dbContextFactory;
         _nairaStatusProvider = nairaStatusProvider;
     }
-    public StoreData CurrentStore => HttpContext.GetStoreData();
-
-
+    private readonly List<string> lightningPaymentMethods = new List<string> { "BTC-LN", "BTC-LNURL" };
     private StoreData StoreData => HttpContext.GetStoreData();
 
     [HttpGet]
     public async Task<IActionResult> StoreConfig()
     {
+        var paymentMethods = StoreData.GetPaymentMethodConfigs(_handler, onlyEnabled: true);
+        var hasLightningPaymentMethod = paymentMethods.Keys.Any(key => lightningPaymentMethods.Contains(key.ToString()));
+        Console.WriteLine(hasLightningPaymentMethod);
         await using var ctx = _dbContextFactory.CreateContext();
         var existingSetting = ctx.MavapaySettings.FirstOrDefault(m => m.StoreId == StoreData.Id);
         var model = new NairaStoreViewModel { Enabled = await _nairaStatusProvider.NairaEnabled(StoreData.Id), WebhookSecret = existingSetting?.WebhookSecret, ApiKey = existingSetting?.ApiKey };
@@ -69,15 +71,20 @@ public class UINairaController : Controller
     [HttpPost]
     public async Task<IActionResult> StoreConfig(NairaStoreViewModel viewModel)
     {
-        // Check for lightning wallet available.. first
-
         var store = StoreData;
         var blob = StoreData.GetStoreBlob();
         var paymentMethodId = NairaCheckoutPlugin.NairaPmid;
+        var paymentMethods = StoreData.GetPaymentMethodConfigs(_handler, onlyEnabled: true);
+        var hasLightningPaymentMethod = paymentMethods.Keys.Any(key => lightningPaymentMethods.Contains(key.ToString()));
+        if (!hasLightningPaymentMethod)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "You need to enable lightning payment to use this plugin";
+            return RedirectToAction(nameof(StoreConfig), new { storeId = store.Id, paymentMethodId });
+        }
         await using var ctx = _dbContextFactory.CreateContext();
-        var apiClient = new MavapayApiClientService(_clientFactory);
+        var apiClient = new MavapayApiClientService(_clientFactory, _dbContextFactory);
         var webhookSecret = !string.IsNullOrEmpty(viewModel.WebhookSecret) ? viewModel.WebhookSecret : Encoders.Base58.EncodeData(RandomUtils.GetBytes(10));
-        var url = Url.Action("ReceiveWebhook", "UINairaPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
+        var url = Url.Action("ReceiveMavapayWebhook", "UINairaPublic", new { storeId = StoreData.Id }, Request.Scheme);
         var entity = ctx.NairaCheckoutSettings.FirstOrDefault(c => c.Enabled) ?? new NairaCheckoutSetting { WalletName = Wallet.Mavapay.ToString() };
         bool successfulCalls = false;
         if (viewModel.Enabled)

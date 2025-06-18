@@ -1,11 +1,12 @@
-﻿using BTCPayServer.Payments;
-using BTCPayServer.Plugins.Template;
+﻿using System;
+using BTCPayServer.Payments;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.NairaCheckout.PaymentHandlers;
 
 public class NairaCheckoutModelExtension : ICheckoutModelExtension
 {
-    public const string CheckoutBodyComponentName = "CASHCheckout";
+    public const string CheckoutBodyComponentName = "NAIRACheckout";
 
     public PaymentMethodId PaymentMethodId => NairaCheckoutPlugin.NairaPmid;
     public string Image => "";
@@ -26,5 +27,6 @@ public class NairaCheckoutModelExtension : ICheckoutModelExtension
                                           $"invoiceId={context.Model.InvoiceId}&" +
                                           $"returnUrl=/i/{context.Model.InvoiceId}";
         context.Model.ShowPayInWalletButton = true;
+        Console.WriteLine(JsonConvert.SerializeObject(context.Model));
     }
 }

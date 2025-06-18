@@ -30,13 +30,29 @@
 
             <div class="form-group">
                 <label asp-for="ApiKey" class="form-label"></label>
-                <input asp-for="ApiKey" class="form-control" type="password" value="@Model?.ApiKey" />
+                <div class="input-group">
+                    <input asp-for="ApiKey" class="form-control" type="password" value="@Model?.ApiKey" id="apiKeyInput" />
+                    <button type="button" class="btn btn-outline-secondary" onclick="toggleVisibility('apiKeyInput', this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="eye-icon" viewBox="0 0 16 16">
+                            <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8z" />
+                            <path d="M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" />
+                        </svg>
+                    </button>
+                </div>
                 <span asp-validation-for="ApiKey" class="text-danger"></span>
             </div>
 
             <div class="form-group">
                 <label asp-for="WebhookSecret" class="form-label"></label>
-                <input asp-for="WebhookSecret" class="form-control" type="password" value="@Model?.WebhookSecret" />
+                <div class="input-group">
+                    <input asp-for="WebhookSecret" class="form-control" type="password" value="@Model?.WebhookSecret" id="webhookSecretInput" />
+                    <button type="button" class="btn btn-outline-secondary" onclick="toggleVisibility('webhookSecretInput', this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="eye-icon" viewBox="0 0 16 16">
+                            <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8z" />
+                            <path d="M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" />
+                        </svg>
+                    </button>
+                </div>
                 <span asp-validation-for="WebhookSecret" class="text-danger"></span>
             </div>
         </div>
@@ -44,3 +60,26 @@
 
 </form>
 
+
+@section PageFootContent {
+    <script>
+        const eyeIcon = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="eye-icon" viewBox="0 0 16 16">
+                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8z"/>
+                <path d="M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/>
+            </svg>`;
+
+        const eyeSlashIcon = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="eye-slash-icon" viewBox="0 0 16 16">
+                <path d="M13.359 11.238C14.238 10.287 15 9.15 15 8c0-1.61-3.134-5.5-7-5.5a7.248 7.248 0 0 0-2.508.465l.843.843A6.267 6.267 0 0 1 8 3.5C11.134 3.5 14 7.027 14 8c0 .52-.467 1.26-1.131 1.962l.49.49z"/>
+                <path d="M2.354 1.646a.5.5 0 1 0-.708.708l1.671 1.671C2.384 5.013 1 6.726 1 8c0 1.61 3.134 5.5 7 5.5a7.268 7.268 0 0 0 2.38-.393l1.965 1.966a.5.5 0 0 0 .708-.708l-12-12zM4.798 4.09l1.035 1.035A3.5 3.5 0 0 0 8 11a3.48 3.48 0 0 0 1.875-.537l.857.857A4.5 4.5 0 0 1 3.5 8c0-.364.507-1.172 1.298-1.91z"/>
+            </svg>`;
+
+        function toggleVisibility(inputId, button) {
+            const input = document.getElementById(inputId);
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            button.innerHTML = isPassword ? eyeSlashIcon : eyeIcon;
+        }
+    </script>
+}
