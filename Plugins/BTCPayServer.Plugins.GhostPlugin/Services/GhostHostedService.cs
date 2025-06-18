@@ -15,7 +15,6 @@ using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using System.Collections.Generic;
 using BTCPayServer.Services.PaymentRequests;
-using Newtonsoft.Json.Linq;
 using BTCPayServer.Client.Models;
 using TransactionStatus = BTCPayServer.Plugins.GhostPlugin.Data.TransactionStatus;
 

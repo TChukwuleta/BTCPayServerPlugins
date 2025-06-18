@@ -4,6 +4,7 @@
 @using System.Globalization
 @inject Safe safe
 @inject MavapayApiClientService mavapayClient;
+@inject NairaCheckoutDbContextFactory dbContextFactory;
 @model BTCPayServer.Models.InvoicingModels.CheckoutModel
 @{
     string errorMessage = string.Empty;
@@ -14,12 +15,14 @@
     {
         errorMessage = "Checkout is available for only naira";
     }
-    decimal.TryParse(Model.OrderAmount, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal amount);
-    var apiKey = "ss";
+    await using var ctx = dbContextFactory.CreateContext();
+    var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == Model.StoreId);
+    var apiKey = mavapaySetting?.ApiKey;
+    // Find way to pass lnurl
     string invoice = "lnurl";
     if (string.IsNullOrEmpty(errorMessage))
     {
-        var createQuoteResponse = await mavapayClient.NairaCheckout(apiKey, amount, invoice);
+        var createQuoteResponse = await mavapayClient.NairaCheckout(apiKey, Model.OrderAmount, invoice, Model.InvoiceId, Model.StoreId);
         if (!string.IsNullOrEmpty(createQuoteResponse.ErrorMessage))
         {
             errorMessage = createQuoteResponse.ErrorMessage;
@@ -61,7 +64,6 @@
         </template>
     </div>
 </template>
-
 
 <script>
     Vue.component(@safe.Json(NairaCheckoutModelExtension.CheckoutBodyComponentName), {

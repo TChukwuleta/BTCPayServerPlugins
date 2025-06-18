@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using BTCPayServer.Plugins.NairaCheckout.ViewModels;
 using Newtonsoft.Json;
+using BTCPayServer.Plugins.NairaCheckout.Data;
 
 namespace BTCPayServer.Plugins.NairaCheckout.Services;
 
@@ -13,30 +14,47 @@ public class MavapayApiClientService
     private readonly HttpClient _httpClient;
     public readonly string ApiUrl = "https://staging.api.mavapay.co/api/v1";
     private readonly List<string> validStatuses = new List<string> { "success", "ok" };
-    public MavapayApiClientService(IHttpClientFactory httpClientFactory)
+    private readonly NairaCheckoutDbContextFactory _dbContextFactory;
+    public MavapayApiClientService(IHttpClientFactory httpClientFactory, NairaCheckoutDbContextFactory dbContextFactory)
     {
+        _dbContextFactory = dbContextFactory;
         _httpClient = httpClientFactory?.CreateClient(nameof(MavapayApiClientService)) ?? new HttpClient();
     }
 
-    public async Task<NairaCheckoutResponseViewModel> NairaCheckout(string apikey, decimal amount, string invoice)
+    public async Task<NairaCheckoutResponseViewModel> NairaCheckout(string apikey, string amount, string lnInvoice, string invoiceId, string storeId)
     {
         try
         {
             var createQuote = await CreateQuote(new CreateQuoteRequestVm
             {
-                amount = amount,
+                amount = ConvertToLowestDenomination(amount),
                 customerInternalFee = 0,
                 sourceCurrency = "NGNKOBO",
                 targetCurrency = "BTCSAT",
                 paymentMethod = "BankTransfer",
-                beneficiary = new MavapayBeneficiaryVm { lnInvoice = invoice }
+                beneficiary = new MavapayBeneficiaryVm { lnInvoice = lnInvoice }
             }, apikey);
+            if (createQuote == null || string.IsNullOrEmpty(createQuote.id))
+            {
+                return new NairaCheckoutResponseViewModel { ErrorMessage = "An error occured while creating record via Mavapay. Please contact the merchant" };
+            }
+            await CreateOrderRecord(createQuote, invoiceId, amount, storeId);
             return new NairaCheckoutResponseViewModel { BankName = createQuote.bankName, AccountNumber = createQuote.ngnBankAccountNumber, AccountName = createQuote.ngnAccountName };
         }
         catch (Exception ex)
         {
-            return new NairaCheckoutResponseViewModel { ErrorMessage = $"An error occured: {ex.Message}" };
+            return new NairaCheckoutResponseViewModel { ErrorMessage = $"An error occured: {ex.Message}. Please contact the merchant" };
         }
+    }
+
+    public int ConvertToLowestDenomination(string amountString, int multiplier = 100)
+    {
+        if (decimal.TryParse(amountString, out var amount))
+        {
+            return (int)Math.Round(amount * multiplier, MidpointRounding.AwayFromZero);
+        }
+
+        throw new ArgumentException("Invalid amount format.");
     }
 
     // Quote
@@ -108,6 +126,25 @@ public class MavapayApiClientService
             NullValueHandling = NullValueHandling.Include
         });
         return responseModel.data;
+    }
+
+    private async Task CreateOrderRecord(CreateQuoteResponseVm quoteResponse, string invoiceId, string amount, string storeId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        ctx.NairaCheckoutOrders.Add(new NairaCheckoutOrder
+        {
+            StoreId = storeId,
+            Amount = amount,
+            InvoiceId = invoiceId,
+            ExternalHash = quoteResponse.hash,
+            ExternalReference = quoteResponse.id,
+            BTCPayMarkedPaid = false,
+            InvoiceStatus = "New",
+            ThirdPartyStatus = "New",
+            ThirdPartyMarkedPaid = false,
+            CreatedDate = DateTime.UtcNow,
+        });
+        await ctx.SaveChangesAsync();
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string relativeUrl) => new HttpRequestMessage(method, $"{ApiUrl}/{relativeUrl}");
