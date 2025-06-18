@@ -126,7 +126,7 @@ public class UIGhostPublicController : Controller
             GhostTiers = ghostTiers,
             StoreId = ghostSetting.StoreId,
             StoreName = storeData?.StoreName,
-            ShopName = ghostSetting.ApiUrl,
+            ShopName = ghostSetting.StoreName,
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, storeData?.GetStoreBlob()),
         });
     }
@@ -155,7 +155,7 @@ public class UIGhostPublicController : Controller
 
             vm.GhostTiers = ghostTiers;
             vm.StoreName = storeData?.StoreName;
-            vm.ShopName = ghostSetting.ApiUrl;
+            vm.ShopName = ghostSetting.StoreName;
             Tier tier = ghostTiers.FirstOrDefault(c => c.id == vm.TierId);
             if (tier == null) return NotFound();
 
