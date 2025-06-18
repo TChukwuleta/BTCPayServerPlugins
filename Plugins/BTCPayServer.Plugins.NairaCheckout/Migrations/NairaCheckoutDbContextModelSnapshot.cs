@@ -3,20 +3,17 @@ using System;
 using BTCPayServer.Plugins.NairaCheckout;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace BTCPayServer.Plugins.NairaCheckout.Data.Migrations
+namespace BTCPayServer.Plugins.NairaCheckout.Migrations
 {
     [DbContext(typeof(NairaCheckoutDbContext))]
-    [Migration("20250527132132_initialMigration")]
-    partial class initialMigration
+    partial class NairaCheckoutDbContextModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -52,6 +49,50 @@ namespace BTCPayServer.Plugins.NairaCheckout.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("MavapaySettings");
+                });
+
+            modelBuilder.Entity("BTCPayServer.Plugins.NairaCheckout.Data.NairaCheckoutOrder", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Amount")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("BTCPayMarkedPaid")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalHash")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExternalReference")
+                        .HasColumnType("text");
+
+                    b.Property<string>("InvoiceId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("InvoiceStatus")
+                        .HasColumnType("text");
+
+                    b.Property<string>("StoreId")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("ThirdPartyMarkedPaid")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ThirdPartyStatus")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("NairaCheckoutOrders");
                 });
 
             modelBuilder.Entity("BTCPayServer.Plugins.NairaCheckout.Data.NairaCheckoutSetting", b =>

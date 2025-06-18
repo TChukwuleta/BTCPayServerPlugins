@@ -41,7 +41,7 @@ public class UINairaPublicController : Controller
                 return BadRequest("Empty request body");
 
             // Find out from mavapay what is in the header
-            if (!Request.Headers.TryGetValue("X-Ghost-Signature", out var signatureHeaderValues) ||
+            if (!Request.Headers.TryGetValue("x-webhook-Signature", out var signatureHeaderValues) ||
                     string.IsNullOrEmpty(signatureHeaderValues.FirstOrDefault()))
             {
                 return BadRequest("Missing signature header");
@@ -83,28 +83,12 @@ public class UINairaPublicController : Controller
         }
     }
 
-
-    private bool ValidateSignature(string payload, string signatureHeader, string webhookSecret)
+    private bool ValidateSignature(string payload, string signature, string webhookSecret)
     {
-        // Parse the signature header which has format: "sha256=SIGNATURE, t=TIMESTAMP"
-        var headerParts = signatureHeader.Split(',');
-        if (headerParts.Length != 2) return false;
-
-        var signaturePart = headerParts[0].Trim();
-        var signatureParts = signaturePart.Split('=');
-        if (signatureParts.Length != 2 || signatureParts[0] != "sha256") return false;
-        var providedSignature = signatureParts[1];
-
-        var timestampPart = headerParts[1].Trim();
-        var timestampParts = timestampPart.Split('=');
-        if (timestampParts.Length != 2 || timestampParts[0] != "t") return false;
-        var timestamp = timestampParts[1];
-
-        string dataToSign = payload + timestamp;
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(webhookSecret));
-        var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(dataToSign));
-        var computedSignature = BitConverter.ToString(computedHash).Replace("-", "").ToLower();
-        return SecureCompare(providedSignature, computedSignature);
+        var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
+        var expectedSignature = BitConverter.ToString(computedHash).Replace("-", "").ToLower();
+        return SecureCompare(signature, expectedSignature);
     }
 
     private bool SecureCompare(string a, string b)
