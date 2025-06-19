@@ -6,28 +6,33 @@ using System.Threading.Tasks;
 using BTCPayServer.Plugins.NairaCheckout.ViewModels;
 using Newtonsoft.Json;
 using BTCPayServer.Plugins.NairaCheckout.Data;
+using BTCPayServer.Services.Invoices;
+using System.Linq;
 
 namespace BTCPayServer.Plugins.NairaCheckout.Services;
 
 public class MavapayApiClientService
 {
     private readonly HttpClient _httpClient;
+    private readonly InvoiceRepository _invoiceRepository;
+    private readonly NairaCheckoutDbContextFactory _dbContextFactory;
     public readonly string ApiUrl = "https://staging.api.mavapay.co/api/v1";
     private readonly List<string> validStatuses = new List<string> { "success", "ok" };
-    private readonly NairaCheckoutDbContextFactory _dbContextFactory;
-    public MavapayApiClientService(IHttpClientFactory httpClientFactory, NairaCheckoutDbContextFactory dbContextFactory)
+
+    public MavapayApiClientService(IHttpClientFactory httpClientFactory, NairaCheckoutDbContextFactory dbContextFactory, InvoiceRepository invoiceRepository)
     {
         _dbContextFactory = dbContextFactory;
+        _invoiceRepository = invoiceRepository;
         _httpClient = httpClientFactory?.CreateClient(nameof(MavapayApiClientService)) ?? new HttpClient();
     }
 
-    public async Task<NairaCheckoutResponseViewModel> NairaCheckout(string apikey, string amount, string lnInvoice, string invoiceId, string storeId)
-    {
+    public async Task<NairaCheckoutResponseViewModel> NairaCheckout(string apikey, decimal amount, string lnInvoice, string invoiceId, string storeId)
+    { 
         try
         {
             var createQuote = await CreateQuote(new CreateQuoteRequestVm
             {
-                amount = ConvertToLowestDenomination(amount),
+                amount = amount,
                 customerInternalFee = 0,
                 sourceCurrency = "NGNKOBO",
                 targetCurrency = "BTCSAT",
@@ -38,8 +43,9 @@ public class MavapayApiClientService
             {
                 return new NairaCheckoutResponseViewModel { ErrorMessage = "An error occured while creating record via Mavapay. Please contact the merchant" };
             }
+            var thirdPartyAmount = createQuote.amountInSourceCurrency / 100; // display to user amount in source currency.. amount is usually in Kobo
             await CreateOrderRecord(createQuote, invoiceId, amount, storeId);
-            return new NairaCheckoutResponseViewModel { BankName = createQuote.bankName, AccountNumber = createQuote.ngnBankAccountNumber, AccountName = createQuote.ngnAccountName };
+            return new NairaCheckoutResponseViewModel { BankName = createQuote.bankName, AccountNumber = createQuote.ngnBankAccountNumber, AccountName = createQuote.ngnAccountName, Amount = thirdPartyAmount };
         }
         catch (Exception ex)
         {
@@ -47,14 +53,15 @@ public class MavapayApiClientService
         }
     }
 
-    public int ConvertToLowestDenomination(string amountString, int multiplier = 100)
+    public async Task<(decimal amount, string lnInvoice)> GetLightningPaymentLink(string invoiceId)
     {
-        if (decimal.TryParse(amountString, out var amount))
-        {
-            return (int)Math.Round(amount * multiplier, MidpointRounding.AwayFromZero);
-        }
+        var entity = await _invoiceRepository.GetInvoice(invoiceId, true);
+        var prompt = entity.GetPaymentPrompts().FirstOrDefault(p => p.PaymentMethodId.ToString() == "BTC-LN");
+        if (prompt is null || !prompt.Activated)
+            return (0, string.Empty);
 
-        throw new ArgumentException("Invalid amount format.");
+        var accounting = prompt.Currency is not null ? prompt.Calculate() : null;
+        return (accounting?.TotalDue ?? 0m, prompt.Destination);
     }
 
     // Quote
@@ -128,13 +135,13 @@ public class MavapayApiClientService
         return responseModel.data;
     }
 
-    private async Task CreateOrderRecord(CreateQuoteResponseVm quoteResponse, string invoiceId, string amount, string storeId)
+    private async Task CreateOrderRecord(CreateQuoteResponseVm quoteResponse, string invoiceId, decimal amount, string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
         ctx.NairaCheckoutOrders.Add(new NairaCheckoutOrder
         {
             StoreId = storeId,
-            Amount = amount,
+            Amount = amount.ToString(),
             InvoiceId = invoiceId,
             ExternalHash = quoteResponse.hash,
             ExternalReference = quoteResponse.id,

@@ -11,18 +11,19 @@
     string accountName = string.Empty;
     string bankName = string.Empty;
     string accountNumber = string.Empty;
-    if (Model.InvoiceCurrency != "NGN")
+    decimal amount = 0;
+
+    var lightningDetails = await mavapayClient.GetLightningPaymentLink(Model.InvoiceId);
+    if (string.IsNullOrEmpty(lightningDetails.lnInvoice) || lightningDetails.amount == 0)
     {
-        errorMessage = "Checkout is available for only naira";
+        errorMessage = "Cannot retrieve a lightning invoice at the moment. Please contact the merchant";
     }
     await using var ctx = dbContextFactory.CreateContext();
     var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == Model.StoreId);
     var apiKey = mavapaySetting?.ApiKey;
-    // Find way to pass lnurl
-    string invoice = "lnurl";
     if (string.IsNullOrEmpty(errorMessage))
     {
-        var createQuoteResponse = await mavapayClient.NairaCheckout(apiKey, Model.OrderAmount, invoice, Model.InvoiceId, Model.StoreId);
+        var createQuoteResponse = await mavapayClient.NairaCheckout(apiKey, lightningDetails.amount, lightningDetails.lnInvoice, Model.InvoiceId, Model.StoreId);
         if (!string.IsNullOrEmpty(createQuoteResponse.ErrorMessage))
         {
             errorMessage = createQuoteResponse.ErrorMessage;
@@ -54,6 +55,10 @@
                     <strong class="text-dark">Account Number:</strong><br>
                     <span class="fs-5 text-secondary">{{ accountNumber }}</span>
                 </p>
+                <p class="mb-0">
+                    <strong class="text-dark">Amount:</strong><br>
+                    <span class="fs-5 text-secondary">{{ amount }}</span>
+                </p>
             </div>
         </template>
 
@@ -79,7 +84,8 @@
                 bankName: @safe.Json(bankName),
                 accountName: @safe.Json(accountName),
                 accountNumber: @safe.Json(accountNumber),
-                errorMessage: @safe.Json(errorMessage)
+                errorMessage: @safe.Json(errorMessage),
+                amount: @safe.Json(amount)
             };
         }
     });

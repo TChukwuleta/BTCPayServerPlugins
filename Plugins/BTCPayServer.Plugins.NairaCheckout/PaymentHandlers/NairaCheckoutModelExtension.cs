@@ -1,6 +1,4 @@
-﻿using System;
-using BTCPayServer.Payments;
-using Newtonsoft.Json;
+﻿using BTCPayServer.Payments;
 
 namespace BTCPayServer.Plugins.NairaCheckout.PaymentHandlers;
 
@@ -27,6 +25,5 @@ public class NairaCheckoutModelExtension : ICheckoutModelExtension
                                           $"invoiceId={context.Model.InvoiceId}&" +
                                           $"returnUrl=/i/{context.Model.InvoiceId}";
         context.Model.ShowPayInWalletButton = true;
-        Console.WriteLine(JsonConvert.SerializeObject(context.Model));
     }
 }

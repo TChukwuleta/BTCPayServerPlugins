@@ -31,6 +31,8 @@ public class NairaCheckoutResponseViewModel
 {
     public string BankName { get; set; }
     public string AccountNumber { get; set; }
+    public decimal Amount { get; set; }
+    public string LightningInvoice { get; set; }
     public string AccountName { get; set; }
     public string ErrorMessage { get; set; }
 }

@@ -19,7 +19,6 @@ using BTCPayServer.Plugins.NairaCheckout.Data;
 using NBitcoin.DataEncoders;
 using NBitcoin;
 using System.Net.Http;
-using Newtonsoft.Json;
 using System.Collections.Generic;
 
 namespace BTCPayServer.Plugins.Template;
@@ -31,6 +30,7 @@ public class UINairaController : Controller
     private readonly RateFetcher _rateFactory;
     private readonly StoreRepository _storeRepository;
     private readonly IHttpClientFactory _clientFactory;
+    private readonly InvoiceRepository _invoiceRepository;
     private readonly PaymentMethodHandlerDictionary _handler;
     private readonly NairaStatusProvider _nairaStatusProvider;
     private readonly UserManager<ApplicationUser> _userManager;
@@ -39,6 +39,7 @@ public class UINairaController : Controller
         (RateFetcher rateFactory,
         StoreRepository storeRepository,
         IHttpClientFactory clientFactory,
+        InvoiceRepository invoiceRepository,
         PaymentMethodHandlerDictionary handler,
         NairaStatusProvider nairaStatusProvider,
         UserManager<ApplicationUser> userManager,
@@ -50,9 +51,10 @@ public class UINairaController : Controller
         _clientFactory = clientFactory;
         _storeRepository = storeRepository;
         _dbContextFactory = dbContextFactory;
+        _invoiceRepository = invoiceRepository;
         _nairaStatusProvider = nairaStatusProvider;
     }
-    private readonly List<string> lightningPaymentMethods = new List<string> { "BTC-LN", "BTC-LNURL" };
+    private readonly List<string> lightningPaymentMethods = new List<string> { "BTC-LN" }; // "BTC-LNURL" Mavapay doeas not support LNURL yet
     private StoreData StoreData => HttpContext.GetStoreData();
 
     [HttpGet]
@@ -60,7 +62,6 @@ public class UINairaController : Controller
     {
         var paymentMethods = StoreData.GetPaymentMethodConfigs(_handler, onlyEnabled: true);
         var hasLightningPaymentMethod = paymentMethods.Keys.Any(key => lightningPaymentMethods.Contains(key.ToString()));
-        Console.WriteLine(hasLightningPaymentMethod);
         await using var ctx = _dbContextFactory.CreateContext();
         var existingSetting = ctx.MavapaySettings.FirstOrDefault(m => m.StoreId == StoreData.Id);
         var model = new NairaStoreViewModel { Enabled = await _nairaStatusProvider.NairaEnabled(StoreData.Id), WebhookSecret = existingSetting?.WebhookSecret, ApiKey = existingSetting?.ApiKey };
@@ -82,7 +83,7 @@ public class UINairaController : Controller
             return RedirectToAction(nameof(StoreConfig), new { storeId = store.Id, paymentMethodId });
         }
         await using var ctx = _dbContextFactory.CreateContext();
-        var apiClient = new MavapayApiClientService(_clientFactory, _dbContextFactory);
+        var apiClient = new MavapayApiClientService(_clientFactory, _dbContextFactory, _invoiceRepository);
         var webhookSecret = !string.IsNullOrEmpty(viewModel.WebhookSecret) ? viewModel.WebhookSecret : Encoders.Base58.EncodeData(RandomUtils.GetBytes(10));
         var url = Url.Action("ReceiveMavapayWebhook", "UINairaPublic", new { storeId = StoreData.Id }, Request.Scheme);
         var entity = ctx.NairaCheckoutSettings.FirstOrDefault(c => c.Enabled) ?? new NairaCheckoutSetting { WalletName = Wallet.Mavapay.ToString() };
@@ -90,7 +91,6 @@ public class UINairaController : Controller
         if (viewModel.Enabled)
         {
             var existingSetting = ctx.MavapaySettings.FirstOrDefault(m => m.StoreId == StoreData.Id);
-            Console.WriteLine(JsonConvert.SerializeObject(existingSetting));
             bool needsUpdate = existingSetting == null || existingSetting.WebhookSecret != webhookSecret;
             bool webhookSuccess = !needsUpdate || await apiClient.UpdateWebhook(viewModel.ApiKey, url, webhookSecret);
             successfulCalls = webhookSuccess;
