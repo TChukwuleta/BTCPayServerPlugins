@@ -43,9 +43,9 @@ public class MavapayApiClientService
             {
                 return new NairaCheckoutResponseViewModel { ErrorMessage = "An error occured while creating record via Mavapay. Please contact the merchant" };
             }
-            var thirdPartyAmount = createQuote.amountInSourceCurrency / 100; // display to user amount in source currency.. amount is usually in Kobo
+            var amountInNaira = createQuote.amountInSourceCurrency / 100m; // display to user amount in source currency.. amount is usually in Kobo
             await CreateOrderRecord(createQuote, invoiceId, amount, storeId);
-            return new NairaCheckoutResponseViewModel { BankName = createQuote.bankName, AccountNumber = createQuote.ngnBankAccountNumber, AccountName = createQuote.ngnAccountName, Amount = thirdPartyAmount };
+            return new NairaCheckoutResponseViewModel { BankName = createQuote.bankName, AccountNumber = createQuote.ngnBankAccountNumber, AccountName = createQuote.ngnAccountName, Amount = amountInNaira };
         }
         catch (Exception ex)
         {
@@ -161,6 +161,7 @@ public class MavapayApiClientService
         _httpClient.DefaultRequestHeaders.Add("X-API-KEY", apiKey);
         var response = await _httpClient.SendAsync(req);
         var responseContent = await response.Content.ReadAsStringAsync();
+        Console.WriteLine(responseContent);
         return responseContent;
     }
 }

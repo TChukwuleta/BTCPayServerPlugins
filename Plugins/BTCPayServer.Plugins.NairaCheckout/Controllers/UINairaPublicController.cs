@@ -29,18 +29,22 @@ public class UINairaPublicController : Controller
     {
         try
         {
+            using var reader = new StreamReader(Request.Body, Encoding.UTF8);
+            var requestBody = await reader.ReadToEndAsync();
+            if (string.IsNullOrEmpty(requestBody))
+                return BadRequest("Empty request body");
+
+            var basePayload = JsonConvert.DeserializeObject<MavapayWebhookResponseVm>(requestBody);
+            if (basePayload?.@event == "ping")
+            {
+                return Ok(new { message = "Ping event received. Webhook is active." });
+            }
+
             await using var ctx = _dbContextFactory.CreateContext();
             var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(m => m.StoreId == storeId);
             if (mavapaySetting == null)
                 return BadRequest();
 
-            using var reader = new StreamReader(Request.Body, Encoding.UTF8);
-            var requestBody = await reader.ReadToEndAsync();
-
-            if (string.IsNullOrEmpty(requestBody))
-                return BadRequest("Empty request body");
-
-            // Find out from mavapay what is in the header
             if (!Request.Headers.TryGetValue("x-webhook-Signature", out var signatureHeaderValues) ||
                     string.IsNullOrEmpty(signatureHeaderValues.FirstOrDefault()))
             {
