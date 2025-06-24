@@ -5,7 +5,7 @@
 
   <!-- Plugin specific properties -->
   <PropertyGroup>
-    <Product>BTCPay Server - Mavapay</Product>
+    <Product>Naira Checkout - Mavapay</Product>
     <Description>Expand your customers reach by allowing users pay with naira (NGN) while you receive in Bitcoin</Description>
     <Version>1.0.0</Version>
   </PropertyGroup>
