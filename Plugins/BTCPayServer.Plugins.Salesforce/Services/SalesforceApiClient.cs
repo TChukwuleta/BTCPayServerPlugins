@@ -7,8 +7,6 @@ using System.Net.Http.Headers;
 using System.Collections.Generic;
 using BTCPayServer.Plugins.Salesforce.Data;
 using System.Linq;
-using NBitpayClient;
-using System.Security.AccessControl;
 
 namespace BTCPayServer.Plugins.Salesforce.Services;
 
@@ -21,7 +19,6 @@ public class SalesforceApiClient
     {
         _httpClient = httpClientFactory != null ? httpClientFactory.CreateClient(nameof(SalesforceApiClient)) : new HttpClient();
     }
-
 
     public async Task<AuthResponse> Authenticate(SalesforceSetting salesforceSetting, string loginUrl = "https://login.salesforce.com")
     {
@@ -55,7 +52,7 @@ public class SalesforceApiClient
             Fullname = "BTCPayServerGatewayProvider",
             Metadata = new
             {
-                fullName = "BTCPayServer",
+                fullName = "BTCPayServerGatewayProvider",
                 apexAdapter = "BTCPayServerGatewayProvider",
                 idempotencySupported = "Yes",
                 comments = "BTCPay Server-Salesforce gateway provider",
@@ -177,8 +174,7 @@ public class SalesforceApiClient
 
     public async Task WebhookNotification(SalesforceSetting salesforceSetting, string invoiceId, string status, string storeId, string amount)
     {
-        var soql = $"SELECT Id FROM PaymentGatewayProvider WHERE DeveloperName = 'BTCPayServer'";
-        var paymentGatewayProvider = await FetchIdUsingSoqlQuery(salesforceSetting, soql);
+        var authResponse = await Authenticate(salesforceSetting);
         var payload = new
         {
             invoiceId,
@@ -187,11 +183,17 @@ public class SalesforceApiClient
             amountPaid = amount,
         };
         var json = JsonConvert.SerializeObject(payload);
-        var req = new HttpRequestMessage(HttpMethod.Post, $"{paymentGatewayProvider.response.instance_url}/solutions/services/data/v58.0/commerce/payments/notify?provider={paymentGatewayProvider.id}");
+        var req = new HttpRequestMessage(HttpMethod.Post, $"{authResponse.instance_url}/solutions/services/data/v58.0/commerce/payments/notify?provider={salesforceSetting.PaymentGatewayProvider}");
         req.Content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await SendRequest(req, paymentGatewayProvider.response.access_token);
+        var response = await SendRequest(req, authResponse.access_token);
     }
 
+    public async Task FetchPaymentGatewayProviderId(SalesforceSetting salesforceSetting)
+    {
+        var soql = $"SELECT Id FROM PaymentGatewayProvider WHERE DeveloperName = 'BTCPayServerTest'"; // replace with BTCPayServerGatewayProvider
+        var soqlQuery = await FetchIdUsingSoqlQuery(salesforceSetting, soql);
+        salesforceSetting.PaymentGatewayProvider = soqlQuery.id;
+    }
 
     public async Task<(AuthResponse response, string id)> FetchIdUsingSoqlQuery(SalesforceSetting salesforceSetting, string soql)
     {
@@ -199,16 +201,17 @@ public class SalesforceApiClient
         var authResponse = await Authenticate(salesforceSetting);
         try
         {
-            var req = new HttpRequestMessage(HttpMethod.Get, $"{authResponse.instance_url}/{$"/services/data/v62.0/query/?q={Uri.EscapeDataString(soql)}"}");
+            var req = new HttpRequestMessage(HttpMethod.Get, $"{authResponse.instance_url}/{$"services/data/v62.0/query/?q={Uri.EscapeDataString(soql)}"}");
             var response = await SendRequest(req, authResponse.access_token);
-            Console.WriteLine(response.responseContent);
-            if (!response.isSuccess)
+            if (response.isSuccess)
             {
+                Console.WriteLine("hey");
                 var responseModel = JsonConvert.DeserializeObject<SalesforceQueryResponse<SalesforceRecord>>(response.responseContent, new JsonSerializerSettings
                 {
                     MissingMemberHandling = MissingMemberHandling.Ignore,
                     NullValueHandling = NullValueHandling.Include
                 });
+                Console.WriteLine(JsonConvert.SerializeObject(responseModel));
                 id = responseModel.records?.FirstOrDefault()?.Id;
             }
         }
@@ -260,8 +263,6 @@ public class SalesforceApiClient
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         var response = await _httpClient.SendAsync(req);
         var responseContent = await response.Content.ReadAsStringAsync();
-        var requestBody = await req.Content.ReadAsStringAsync();
-        Console.WriteLine(JsonConvert.SerializeObject(requestBody));
         Console.WriteLine(responseContent);
         return (responseContent, response.IsSuccessStatusCode);
     }
@@ -314,7 +315,7 @@ public class SalesforceApiClient
     public class SalesforceRecord
     {
         public string Id { get; set; } = string.Empty;
-        public Dictionary<string, object> attributes { get; set; } = new();
+        public object attributes { get; set; } = new();
     }
 
     public class SalesforceQueryResponse

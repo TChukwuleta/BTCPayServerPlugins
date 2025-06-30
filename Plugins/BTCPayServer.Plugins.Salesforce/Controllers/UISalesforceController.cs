@@ -87,6 +87,7 @@ public class UISalesforceController : Controller
         }
         await using var ctx = _dbContextFactory.CreateContext();
         var userStore = ctx.SalesforceSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new SalesforceSetting();
+        var apiClient = new SalesforceApiClient(_clientFactory);
         return View(userStore);
     }
 
@@ -179,32 +180,3 @@ public class UISalesforceController : Controller
 
     private string GetUserId() => _userManager.GetUserId(User);
 }
-
-
-/*[HttpPost("btcpay")]
-    public async Task<IActionResult> HandleBTCPayWebhook([FromBody] JsonElement payload)
-    {
-        try
-        {
-            _logger.LogInformation("Received BTCPay webhook");
-
-            var invoiceId = payload.GetProperty("invoiceId").GetString();
-            var type = payload.GetProperty("type").GetString();
-
-            if (type == "InvoiceSettled" || type == "InvoiceProcessing" || type == "InvoiceExpired")
-            {
-                // Get full invoice details
-                var invoice = await _btcpayService.GetInvoiceAsync(invoiceId!);
-
-                // Update Salesforce
-                await _salesforceService.UpdateTransactionStatusAsync(invoiceId!, invoice.Status.ToString());
-            }
-
-            return Ok(new { status = "success" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing BTCPay webhook");
-            return StatusCode(500, new { error = ex.Message });
-        }
-    }*/
