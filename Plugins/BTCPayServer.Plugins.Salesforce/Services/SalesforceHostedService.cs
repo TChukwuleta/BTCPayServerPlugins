@@ -83,7 +83,7 @@ public class SalesforceHostedService : EventHostedServiceBase
 
         try
         {
-            await _salesforceApiClient.UpdateTransactionStatus(salesforceSettings, invoice.Id, invoice.Status.ToString());
+            await _salesforceApiClient.WebhookNotification(salesforceSettings, invoice.Id, invoice.Status.ToString(), invoice.StoreId, "12");
             logs.Write(
                 $"Successfully captured the order on Salesforce. ({invoice.Currency})",
                 InvoiceEventData.EventSeverity.Info);

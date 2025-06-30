@@ -20,6 +20,7 @@ public class SalesforceSetting
     public string StoreId { get; set; }
     public string StoreName { get; set; }
     public string ApplicationUserId { get; set; }
+    public string PaymentGatewayProvider { get; set; }
     public bool CredentialsPopulated()
     {
         return

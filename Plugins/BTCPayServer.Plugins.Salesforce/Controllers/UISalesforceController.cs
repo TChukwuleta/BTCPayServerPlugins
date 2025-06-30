@@ -23,7 +23,6 @@ using StoreData = BTCPayServer.Data.StoreData;
 using BTCPayServer.Services;
 using BTCPayServer.Plugins.Salesforce.Services;
 using BTCPayServer.Plugins.Salesforce.Data;
-using BTCPayServer.Plugins.Salesforce.Helper;
 
 namespace BTCPayServer.Plugins.Salesforce;
 
@@ -96,7 +95,7 @@ public class UISalesforceController : Controller
     public async Task<IActionResult> Index(string storeId,
             SalesforceSetting vm, string command = "")
     {
-        try
+        try 
         {
             await using var ctx = _dbContextFactory.CreateContext();
             var salesforceSetting = ctx.SalesforceSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
@@ -110,16 +109,10 @@ public class UISalesforceController : Controller
                             TempData[WellKnownTempData.ErrorMessage] = "Please provide valid Salesforce credentials";
                             return View(vm);
                         }
-                        var apiClient = new SalesforceApiClient(_clientFactory);
                         try
                         {
-                            var authResponse = await apiClient.Authenticate(vm);
-                            var request = HttpContext.Request;
-                            string baseUrl = $"{request.Scheme}://{request.Host}".TrimEnd('/');
-                            await apiClient.RegisterBTCPayStoreInSalesforce(vm, baseUrl, CurrentStore.Id);
-                            /*await apiClient.CreateBTCInvoiceIdField(authResponse);
-                            await apiClient.CreateBTCPaymentUrlField(authResponse);
-                            await apiClient.CreatePaymentStatusField(authResponse);*/
+                            var apiClient = new SalesforceApiClient(_clientFactory);
+                            await apiClient.Authenticate(vm);
                         }
                         catch (SalesforceApiException err)
                         {
