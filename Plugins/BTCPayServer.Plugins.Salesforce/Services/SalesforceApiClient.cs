@@ -45,8 +45,6 @@ public class SalesforceApiClient
     public async Task<bool> CreatePaymentGatewayProvider(SalesforceSetting salesforceSetting)
     {
         var authResponse = await Authenticate(salesforceSetting);
-        Console.WriteLine(authResponse.instance_url);
-        Console.WriteLine(authResponse.access_token);
         var payload = new
         {
             Fullname = "BTCPayServerGatewayProvider",
@@ -132,7 +130,6 @@ public class SalesforceApiClient
         var content = new StringContent(JsonConvert.SerializeObject(fieldDefinition), Encoding.UTF8, "application/json");
         var response = await _httpClient.PostAsync(url, content);
         var responseContent = await response.Content.ReadAsStringAsync();
-        Console.WriteLine($"Field created successfully: {responseContent}");
         return response.IsSuccessStatusCode;
     }
 
@@ -144,32 +141,6 @@ public class SalesforceApiClient
         var req = new HttpRequestMessage(HttpMethod.Post, $"{authResponse.instance_url}/services/apexrest/btcpay/register");
         req.Content = new StringContent(json, Encoding.UTF8, "application/json");
         var response = await SendRequest(req, authResponse.access_token);
-    }
-
-    public async Task UpdateTransactionStatus(SalesforceSetting salesforceSetting, string invoiceId, string status)
-    {
-        try
-        {
-            var authResponse = await Authenticate(salesforceSetting);
-            var soql = $"SELECT Id FROM BTCPay_Transaction__c WHERE Invoice_ID__c = '{invoiceId}' LIMIT 1";
-            var req = new HttpRequestMessage(HttpMethod.Get, $"{authResponse.instance_url}/{$"/services/data/v58.0/query/?q={Uri.EscapeDataString(soql)}"}");
-            var response = await SendRequest(req, authResponse.access_token);
-            if (response.isSuccess)
-            {
-                var responseModel = JsonConvert.DeserializeObject<SalesforceQueryResponse<SalesforceRecord>>(response.responseContent, new JsonSerializerSettings
-                {
-                    MissingMemberHandling = MissingMemberHandling.Ignore,
-                    NullValueHandling = NullValueHandling.Include
-                });
-                if (responseModel.records?.Any() == true)
-                {
-                    var transactionId = responseModel.records.First().Id;
-                    var updateData = new { Status__c = MapBTCPayStatusToSalesforce(status) };
-                    await UpdateRecordAsync("BTCPay_Transaction__c", transactionId, updateData, authResponse);
-                }
-            }
-        }
-        catch (Exception){}
     }
 
     public async Task WebhookNotification(SalesforceSetting salesforceSetting, string invoiceId, string status, string storeId, string amount)
@@ -188,11 +159,11 @@ public class SalesforceApiClient
         var response = await SendRequest(req, authResponse.access_token);
     }
 
-    public async Task FetchPaymentGatewayProviderId(SalesforceSetting salesforceSetting)
+    public async Task<string> FetchPaymentGatewayProviderId(SalesforceSetting salesforceSetting)
     {
-        var soql = $"SELECT Id FROM PaymentGatewayProvider WHERE DeveloperName = 'BTCPayServerTest'"; // replace with BTCPayServerGatewayProvider
+        var soql = $"SELECT Id FROM PaymentGatewayProvider WHERE DeveloperName = 'BTCPayServerGatewayProvider'";
         var soqlQuery = await FetchIdUsingSoqlQuery(salesforceSetting, soql);
-        salesforceSetting.PaymentGatewayProvider = soqlQuery.id;
+        return soqlQuery.id;
     }
 
     public async Task<(AuthResponse response, string id)> FetchIdUsingSoqlQuery(SalesforceSetting salesforceSetting, string soql)
@@ -205,13 +176,11 @@ public class SalesforceApiClient
             var response = await SendRequest(req, authResponse.access_token);
             if (response.isSuccess)
             {
-                Console.WriteLine("hey");
                 var responseModel = JsonConvert.DeserializeObject<SalesforceQueryResponse<SalesforceRecord>>(response.responseContent, new JsonSerializerSettings
                 {
                     MissingMemberHandling = MissingMemberHandling.Ignore,
                     NullValueHandling = NullValueHandling.Include
                 });
-                Console.WriteLine(JsonConvert.SerializeObject(responseModel));
                 id = responseModel.records?.FirstOrDefault()?.Id;
             }
         }
@@ -263,21 +232,7 @@ public class SalesforceApiClient
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         var response = await _httpClient.SendAsync(req);
         var responseContent = await response.Content.ReadAsStringAsync();
-        Console.WriteLine(responseContent);
         return (responseContent, response.IsSuccessStatusCode);
-    }
-
-    private string MapBTCPayStatusToSalesforce(string btcpayStatus)
-    {
-        return btcpayStatus.ToLower() switch
-        {
-            "new" => "New",
-            "processing" => "Processing",
-            "settled" => "Settled",
-            "invalid" => "Invalid",
-            "expired" => "Expired",
-            _ => "New"
-        };
     }
 
     public class AuthResponse

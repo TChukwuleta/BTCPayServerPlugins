@@ -87,7 +87,6 @@ public class UISalesforceController : Controller
         }
         await using var ctx = _dbContextFactory.CreateContext();
         var userStore = ctx.SalesforceSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new SalesforceSetting();
-        var apiClient = new SalesforceApiClient(_clientFactory);
         return View(userStore);
     }
 
@@ -103,6 +102,30 @@ public class UISalesforceController : Controller
             switch (command)
             {
                 case "SalseforceSaveCredentials":
+                    {
+                        var validCreds = vm?.CredentialsPopulated() == true;
+                        if (!validCreds)
+                        {
+                            TempData[WellKnownTempData.ErrorMessage] = "Please provide valid Salesforce credentials";
+                            return View(vm);
+                        }
+                        try
+                        {
+                            var apiClient = new SalesforceApiClient(_clientFactory);
+                            var paymentGatewayId = await apiClient.FetchPaymentGatewayProviderId(vm);
+                            vm.PaymentGatewayProvider = paymentGatewayId;
+                        }
+                        catch (SalesforceApiException err)
+                        {
+                            TempData[WellKnownTempData.ErrorMessage] = $"Unable to retrieve payment gateway: {err.Message}";
+                            return View(vm);
+                        }
+                        ctx.Update(vm);
+                        await ctx.SaveChangesAsync();
+                        TempData[WellKnownTempData.SuccessMessage] = "Salesforce payment gateway saved successfully";
+                        break;
+                    }
+                case "SaveSalseforcePaymentGatewayProvider":
                     {
                         var validCreds = vm?.CredentialsPopulated() == true;
                         if (!validCreds)
