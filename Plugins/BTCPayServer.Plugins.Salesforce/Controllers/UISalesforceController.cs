@@ -87,7 +87,12 @@ public class UISalesforceController : Controller
         }
         await using var ctx = _dbContextFactory.CreateContext();
         var userStore = ctx.SalesforceSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new SalesforceSetting();
+        var apiClient = new SalesforceApiClient(_clientFactory);
+        var auth = await apiClient.Authenticate(userStore);
+        await apiClient.CreateAlternativePaymentMethod(auth, userStore, "012gL000001P4JBQA0");
         return View(userStore);
+
+        
     }
 
 
@@ -101,7 +106,7 @@ public class UISalesforceController : Controller
             var salesforceSetting = ctx.SalesforceSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
             switch (command)
             {
-                case "SalseforceSaveCredentials":
+                case "SaveSalseforcePaymentGatewayProvider":
                     {
                         var validCreds = vm?.CredentialsPopulated() == true;
                         if (!validCreds)
@@ -111,8 +116,11 @@ public class UISalesforceController : Controller
                         }
                         try
                         {
+                            var request = HttpContext.Request;
+                            string baseUrl = $"{request.Scheme}://{request.Host}".TrimEnd('/');
                             var apiClient = new SalesforceApiClient(_clientFactory);
                             var paymentGatewayId = await apiClient.FetchPaymentGatewayProviderId(vm);
+                            await apiClient.SetupCustomObject(vm, baseUrl, storeId);
                             vm.PaymentGatewayProvider = paymentGatewayId;
                         }
                         catch (SalesforceApiException err)
@@ -125,7 +133,7 @@ public class UISalesforceController : Controller
                         TempData[WellKnownTempData.SuccessMessage] = "Salesforce payment gateway saved successfully";
                         break;
                     }
-                case "SaveSalseforcePaymentGatewayProvider":
+                case "SalseforceSaveCredentials":
                     {
                         var validCreds = vm?.CredentialsPopulated() == true;
                         if (!validCreds)
@@ -136,7 +144,11 @@ public class UISalesforceController : Controller
                         try
                         {
                             var apiClient = new SalesforceApiClient(_clientFactory);
-                            await apiClient.Authenticate(vm);
+                            var request = HttpContext.Request;
+                            string baseUrl = $"{request.Scheme}://{request.Host}".TrimEnd('/');
+                            await apiClient.SetupCustomObject(vm, baseUrl, storeId);
+                            var paymentGatewayId = await apiClient.FetchPaymentGatewayProviderId(vm);
+                            vm.PaymentGatewayProvider = paymentGatewayId;
                         }
                         catch (SalesforceApiException err)
                         {
