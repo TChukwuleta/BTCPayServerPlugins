@@ -32,7 +32,8 @@ public class MavapayApiClientService
         {
             var createQuote = await CreateQuote(new CreateQuoteRequestVm
             {
-                amount = amount,
+                amount = amount * 100000000m,
+                autopayout = true,
                 customerInternalFee = 0,
                 sourceCurrency = "NGNKOBO",
                 targetCurrency = "BTCSAT",
