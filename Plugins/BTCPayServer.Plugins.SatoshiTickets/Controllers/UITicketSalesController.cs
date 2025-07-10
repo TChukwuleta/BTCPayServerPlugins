@@ -40,6 +40,7 @@ public class UITicketSalesController : Controller
     private readonly StoreRepository _storeRepo;
     private readonly EmailService _emailService;
     private readonly IHttpClientFactory _clientFactory;
+    private readonly TicketService _ticketService;
     private readonly EmailSenderFactory _emailSenderFactory;
     private readonly BTCPayNetworkProvider _networkProvider;
     private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
@@ -50,6 +51,7 @@ public class UITicketSalesController : Controller
         IFileService fileService,
         StoreRepository storeRepo,
         EmailService emailService,
+        TicketService ticketService,
         IHttpClientFactory clientFactory,
         EmailSenderFactory emailSenderFactory,
         BTCPayNetworkProvider networkProvider,
@@ -62,6 +64,7 @@ public class UITicketSalesController : Controller
         _fileService = fileService;
         _emailService = emailService;
         _userManager = userManager;
+        _ticketService = ticketService;
         _clientFactory = clientFactory;
         _networkProvider = networkProvider;
         _dbContextFactory = dbContextFactory;
@@ -175,7 +178,7 @@ public class UITicketSalesController : Controller
             return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
         }
         var entity = TicketSalesEventViewModelToEntity(vm, null);
-        entity.EventState = SatoshiTickets.Data.EntityState.Disabled;
+        entity.EventState = Data.EntityState.Disabled;
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
         {
@@ -298,12 +301,12 @@ public class UITicketSalesController : Controller
         }
         switch (ticketEvent.EventState)
         {
-            case SatoshiTickets.Data.EntityState.Active:
+            case Data.EntityState.Active:
             default:
-                ticketEvent.EventState = SatoshiTickets.Data.EntityState.Disabled;
+                ticketEvent.EventState = Data.EntityState.Disabled;
                 break;
-            case SatoshiTickets.Data.EntityState.Disabled:
-                ticketEvent.EventState = SatoshiTickets.Data.EntityState.Active;
+            case Data.EntityState.Disabled:
+                ticketEvent.EventState = Data.EntityState.Active;
                 break;
         }
         ctx.Events.Update(ticketEvent);
@@ -390,17 +393,21 @@ public class UITicketSalesController : Controller
         var ordersQuery = ctx.Orders.AsNoTracking().Include(c => c.Tickets)
             .Where(c => c.EventId == eventId && c.StoreId == CurrentStore.Id && c.PaymentStatus == TransactionStatus.Settled.ToString());
 
+        int ticketsBought = ordersQuery.SelectMany(c => c.Tickets).Count();
+        int ticketsChecked = ordersQuery.SelectMany(c => c.Tickets).Count(c => c.UsedAt.HasValue);
         if (!string.IsNullOrEmpty(searchText))
         {
             ordersQuery = ordersQuery.Where(o =>
                 o.InvoiceId.Contains(searchText) ||
                 o.Tickets.Any(t => t.TxnNumber.Contains(searchText) || t.FirstName.Contains(searchText) ||  t.LastName.Contains(searchText) || t.Email.Contains(searchText)
                 ));
-        }
+        }  
         var orders = ordersQuery.ToList();
 
         var vm = new EventTicketViewModel
         {
+            TicketsCount = ticketsBought,
+            CheckedInTicketsCount = ticketsChecked,
             StoreId = storeId,
             EventId = eventId,
             EventTitle = entity.Title,
@@ -437,25 +444,12 @@ public class UITicketSalesController : Controller
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
-
-        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
-        if (entity == null)
+        var checkinTicket = await _ticketService.CheckinTicket(eventId, ticketId, CurrentStore.Id);
+        if (!checkinTicket.Success)
         {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid Event specified";
-            return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
-        }
-
-        var ticket = ctx.Tickets.FirstOrDefault(c => c.Id == ticketId && c.EventId == entity.Id);
-        if (ticket == null)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid ticket id specified";
+            TempData[WellKnownTempData.ErrorMessage] = checkinTicket.ErrorMessage;
             return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
         }
-        ticket.UsedAt = DateTime.UtcNow;
-        ctx.Tickets.Update(ticket);
-        await ctx.SaveChangesAsync();
-
         TempData[WellKnownTempData.SuccessMessage] = "Ticket checked-in successfully";
         return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
     }

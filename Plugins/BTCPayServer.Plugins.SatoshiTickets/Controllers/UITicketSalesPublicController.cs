@@ -326,6 +326,18 @@ public class UITicketSalesPublicController : Controller
         });
     }
 
+
+    [HttpGet("{eventId}/tickets/ticket-checkin")]
+    public async Task<IActionResult> TicketCheckin(string storeId, string eventId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+
+        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == storeId);
+        if (entity == null) return NotFound();
+
+        return View(new TicketScannerViewModel { EventId = entity.Id });
+    }
+
     private async Task<InvoiceEntity> CreateInvoiceAsync(BTCPayServer.Data.StoreData store, Order order, string currency, string url, string redirectUrl)
     {
         var ticketSalesSearchTerm = $"{SimpleTicketSalesHostedService.TICKET_SALES_PREFIX}{order.TxnId}";
