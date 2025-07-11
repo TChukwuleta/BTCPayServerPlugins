@@ -11,8 +11,6 @@ using StoreData = BTCPayServer.Data.StoreData;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels;
-using System;
-using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.SatoshiTickets;
 
@@ -126,7 +124,6 @@ public class UITicketTypeController : Controller
         var entity = TicketTypeViewModelToEntity(vm);
         entity.EventId = eventId;
         entity.TicketTypeState = EntityState.Active;
-
         var existingDefaultTicketType = ctx.TicketTypes.FirstOrDefault(c => c.EventId == entity.EventId && c.IsDefault);
         if (existingDefaultTicketType != null)
         {
@@ -182,7 +179,6 @@ public class UITicketTypeController : Controller
         entity.Quantity = vm.Quantity;
         entity.Description = vm.Description;
         entity.IsDefault = vm.IsDefault;
-
         if (!entity.IsDefault)
         {
             var existingDefaultTicketType = ctx.TicketTypes.FirstOrDefault(c => c.EventId == entity.EventId && c.IsDefault);

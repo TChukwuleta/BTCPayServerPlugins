@@ -191,7 +191,7 @@ public class UITicketSalesPublicController : Controller
         if (store == null) return NotFound();
 
         var order = HttpContext.Session.GetObject<TicketOrderViewModel>(eventKey);
-        if (order == null || !order.Tickets.Any())
+        if (order == null || order.Tickets == null || !order.Tickets.Any())
             return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
 
         return View(new ContactInfoPageViewModel
@@ -211,6 +211,9 @@ public class UITicketSalesPublicController : Controller
     [HttpPost("save-contact-details")]
     public async Task<IActionResult> SaveContactDetails(string storeId, string eventId, ContactInfoPageViewModel model)
     {
+        if (model == null)
+            return NotFound();
+
         var now = DateTime.UtcNow;
         decimal totalAmount = 0;
         var tickets = new List<Ticket>();
@@ -433,7 +436,7 @@ public class UITicketSalesPublicController : Controller
     {
         var now = DateTime.UtcNow;
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
-        if (ticketEvent == null || ticketEvent.EventState == SatoshiTickets.Data.EntityState.Disabled 
+        if (ticketEvent == null || ticketEvent.EventState == Data.EntityState.Disabled 
             || ticketEvent.StartDate.Date < now.Date || (ticketEvent.EndDate.HasValue && ticketEvent.EndDate.Value.Date < now.Date))
             return false;
 
