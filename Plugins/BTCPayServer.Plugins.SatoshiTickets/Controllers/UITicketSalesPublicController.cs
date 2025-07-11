@@ -26,6 +26,9 @@ using NBitcoin.DataEncoders;
 using BTCPayServer.Plugins.SatoshiTickets.Helper.Extensions;
 using BTCPayServer.Abstractions.Constants;
 using QRCoder;
+using Newtonsoft.Json;
+using Microsoft.AspNetCore.Cors;
+using System.Text;
 
 namespace BTCPayServer.Plugins.SatoshiTickets;
 
@@ -36,6 +39,8 @@ public class UITicketSalesPublicController : Controller
     private readonly UriResolver _uriResolver;
     private readonly IFileService _fileService;
     private readonly StoreRepository _storeRepo;
+    private readonly TicketService _ticketService;
+    private readonly EmailService _emailService;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly ApplicationDbContextFactory _context;
     private readonly UIInvoiceController _invoiceController;
@@ -45,6 +50,8 @@ public class UITicketSalesPublicController : Controller
         (UriResolver uriResolver,
         IFileService fileService,
         StoreRepository storeRepo,
+        EmailService emailService,
+        TicketService ticketService,
         ApplicationDbContextFactory context,
         InvoiceRepository invoiceRepository,
         UIInvoiceController invoiceController,
@@ -54,6 +61,8 @@ public class UITicketSalesPublicController : Controller
         _storeRepo = storeRepo;
         _uriResolver = uriResolver;
         _fileService = fileService;
+        _emailService = emailService;
+        _ticketService = ticketService;
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
         _invoiceController = invoiceController;
@@ -182,7 +191,7 @@ public class UITicketSalesPublicController : Controller
         if (store == null) return NotFound();
 
         var order = HttpContext.Session.GetObject<TicketOrderViewModel>(eventKey);
-        if (order == null || !order.Tickets.Any())
+        if (order == null || order.Tickets == null || !order.Tickets.Any())
             return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
 
         return View(new ContactInfoPageViewModel
@@ -202,6 +211,9 @@ public class UITicketSalesPublicController : Controller
     [HttpPost("save-contact-details")]
     public async Task<IActionResult> SaveContactDetails(string storeId, string eventId, ContactInfoPageViewModel model)
     {
+        if (model == null)
+            return NotFound();
+
         var now = DateTime.UtcNow;
         decimal totalAmount = 0;
         var tickets = new List<Ticket>();
@@ -279,7 +291,6 @@ public class UITicketSalesPublicController : Controller
         }
         order.Tickets = tickets;
         order.TotalAmount = totalAmount;
-
         var invoice = await CreateInvoiceAsync(store, order, ticketEvent.Currency, Request.GetAbsoluteRoot(), ticketEvent.RedirectUrl ?? string.Empty);
         order.InvoiceId = invoice.Id;
         order.InvoiceStatus = invoice.Status.ToString();
@@ -297,7 +308,7 @@ public class UITicketSalesPublicController : Controller
             return NotFound();
 
         await using var dbMain = _context.CreateContext();
-        var store = await dbMain.Stores.AsNoTracking().FirstOrDefaultAsync(a => a.Id == storeId);
+        var store = await dbMain.Stores.FirstOrDefaultAsync(a => a.Id == storeId);
         if (store == null) return NotFound();
 
         var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets).FirstOrDefault(o => o.StoreId == storeId && o.EventId == eventId && o.Id == orderId);
@@ -320,11 +331,60 @@ public class UITicketSalesPublicController : Controller
                 TicketNumber = t.TicketNumber,
                 TxnNumber = t.TxnNumber,
                 TicketType = t.TicketTypeName,
-                QrCodeUrl = GenerateQrCodeDataUrl(t.TxnNumber),
+                QrCodeUrl = GenerateQrCodeDataUrl(t.TicketNumber),
             }).ToList(),
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
         });
     }
+
+
+    [HttpGet("{eventId}/tickets/ticket-checkin")]
+    public async Task<IActionResult> TicketCheckin(string storeId, string eventId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        await using var dbMain = _context.CreateContext();
+        var store = await dbMain.Stores.FirstOrDefaultAsync(a => a.Id == storeId);
+        if (store == null) return NotFound();
+
+        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == storeId);
+        if (entity == null) return NotFound();
+
+        return View(new TicketScannerViewModel { 
+            EventName = entity.Title,
+            EventId = entity.Id, 
+            StoreId = storeId,
+            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()) 
+        });
+    }
+
+
+    [HttpPost("{eventId}/tickets/check-in")]
+    public async Task<IActionResult> Checkin(string storeId, string eventId, string ticketNumber)
+    {
+        var checkinTicket = await _ticketService.CheckinTicket(eventId, ticketNumber, storeId);
+        if (checkinTicket.Success)
+        {
+            TempData["CheckInSuccessMessage"] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} checked-in successfully";
+        }
+        else
+        {
+            TempData["CheckInErrorMessage"] = checkinTicket.ErrorMessage;
+        }
+        return RedirectToAction(nameof(TicketCheckin), new { storeId, eventId });
+    }
+
+
+    [HttpGet("satoshiticket/jsqr_min.js")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> GetQRScannerJs(string storeId)
+    {
+        var store = await _storeRepo.FindStore(storeId);
+        if (store == null)
+            return NotFound();
+
+        return Content(_emailService.GetEmbeddedResourceContent("Resources.js.jsqr_min.js"), "text/javascript");
+    }
+
 
     private async Task<InvoiceEntity> CreateInvoiceAsync(BTCPayServer.Data.StoreData store, Order order, string currency, string url, string redirectUrl)
     {
@@ -376,7 +436,7 @@ public class UITicketSalesPublicController : Controller
     {
         var now = DateTime.UtcNow;
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
-        if (ticketEvent == null || ticketEvent.EventState == SatoshiTickets.Data.EntityState.Disabled 
+        if (ticketEvent == null || ticketEvent.EventState == Data.EntityState.Disabled 
             || ticketEvent.StartDate.Date < now.Date || (ticketEvent.EndDate.HasValue && ticketEvent.EndDate.Value.Date < now.Date))
             return false;
 

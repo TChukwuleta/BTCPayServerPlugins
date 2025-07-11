@@ -12,6 +12,7 @@
     ViewData.SetActivePage(PluginNavPages.Index, $"{Model.EventTitle}");
     var canUpload = await FileService.IsAvailable();
     var storeId = ScopeProvider.GetCurrentStoreId();
+    string checkInUrl = Url.Action("TicketCheckin", "UITicketSalesPublic", new { storeId, eventId = Model.EventId }, protocol: Context.Request.Scheme);
 }
 
 <div class="sticky-header">
@@ -19,11 +20,34 @@
     <div class="d-flex gap-3 mt-3 mt-sm-0">
         <a asp-action="List" asp-route-storeId="@storeId" class="btn btn-secondary">Go Back</a>
         <a asp-action="ExportTickets" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-success">Export Ticket Sales</a>
+        <div class="d-flex align-items-center gap-2">
+            <a id="ticket-checkin-link"
+               asp-controller="UITicketSalesPublic" asp-action="TicketCheckin" 
+               asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId"
+               class="btn btn-success" target="_blank" rel="noopener noreferrer">Ticket Check-in</a>
+            <button type="button" class="btn btn-link d-flex p-0 clipboard-button" data-bs-toggle="Copy Ticket check-in link" data-clipboard="@checkInUrl">
+                <vc:icon symbol="actions-copy" />
+            </button>
+        </div>
     </div>
 </div>
 
 <partial name="_StatusMessage" />
 
+<div class="row g-3 mb-4 col-xxl-8">
+    <div class="col-md-6">
+        <div class="p-3 bg-light border rounded shadow-sm h-100">
+            <h6 class="mb-1 text-muted">Total Tickets</h6>
+            <h3 class="mb-0">@Model.TicketsCount</h3>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="p-3 bg-light border rounded shadow-sm h-100">
+            <h6 class="mb-1 text-muted">Checked-in Tickets</h6>
+            <h3 class="mb-0">@Model.CheckedInTicketsCount</h3>
+        </div>
+    </div>
+</div>
 
 <form class="d-flex flex-wrap flex-sm-nowrap align-items-center gap-3 mb-4 col-xxl-8" asp-action="ViewEventTicket"
       asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" method="get">
@@ -93,7 +117,7 @@
                                                     <td>
                                                         @if (!ticketVm.CheckedIn)
                                                         {
-                                                            <a asp-action="CheckinTicketAttendee" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticketVm.Id">Check In</a>
+                                                            <a asp-action="CheckinTicketAttendee" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketNumber="@ticketVm.TicketNumber">Check In</a>
                                                         }
                                                     </td>
                                                     <td class="text-end text-success">@ticketVm.CheckedIn</td>

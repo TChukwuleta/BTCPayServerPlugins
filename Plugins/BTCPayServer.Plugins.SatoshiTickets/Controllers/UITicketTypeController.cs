@@ -11,8 +11,6 @@ using StoreData = BTCPayServer.Data.StoreData;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels;
-using System;
-using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.SatoshiTickets;
 
@@ -30,7 +28,7 @@ public class UITicketTypeController : Controller
 
 
     [HttpGet("list")]
-    public async Task<IActionResult> List(string storeId, string eventId)
+    public async Task<IActionResult> List(string storeId, string eventId, string sortBy = "Name", string sortDir = "asc")
     {
         if (CurrentStore is null)
             return NotFound();
@@ -40,8 +38,14 @@ public class UITicketTypeController : Controller
         if (ticketEvent == null)
             return NotFound();
 
-        var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == ticketEvent.Id).ToList();
-        var tickets = ticketTypes.Select(x =>
+        var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == ticketEvent.Id);
+        ticketTypes = sortBy switch
+        {
+            "Price" => sortDir == "desc" ? ticketTypes.OrderByDescending(t => t.Price) : ticketTypes.OrderBy(t => t.Price),
+            "Name" => sortDir == "desc" ? ticketTypes.OrderByDescending(t => t.Name) : ticketTypes.OrderBy(t => t.Name),
+            _ => ticketTypes.OrderBy(t => t.Name)
+        };
+        var tickets = ticketTypes.ToList().Select(x =>
         {
             return new TicketTypeViewModel
             {
@@ -56,7 +60,7 @@ public class UITicketTypeController : Controller
                 IsDefault = x.IsDefault,
             };
         }).ToList();
-        return View(new TicketTypeListViewModel { TicketTypes = tickets, EventId = eventId });
+        return View(new TicketTypeListViewModel { SortBy = sortBy, SortDir = sortDir, TicketTypes = tickets, EventId = eventId });
     }
 
 
@@ -120,7 +124,6 @@ public class UITicketTypeController : Controller
         var entity = TicketTypeViewModelToEntity(vm);
         entity.EventId = eventId;
         entity.TicketTypeState = EntityState.Active;
-
         var existingDefaultTicketType = ctx.TicketTypes.FirstOrDefault(c => c.EventId == entity.EventId && c.IsDefault);
         if (existingDefaultTicketType != null)
         {
@@ -176,7 +179,6 @@ public class UITicketTypeController : Controller
         entity.Quantity = vm.Quantity;
         entity.Description = vm.Description;
         entity.IsDefault = vm.IsDefault;
-
         if (!entity.IsDefault)
         {
             var existingDefaultTicketType = ctx.TicketTypes.FirstOrDefault(c => c.EventId == entity.EventId && c.IsDefault);

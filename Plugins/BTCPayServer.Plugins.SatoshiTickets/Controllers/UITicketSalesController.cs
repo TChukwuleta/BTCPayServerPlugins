@@ -40,6 +40,7 @@ public class UITicketSalesController : Controller
     private readonly StoreRepository _storeRepo;
     private readonly EmailService _emailService;
     private readonly IHttpClientFactory _clientFactory;
+    private readonly TicketService _ticketService;
     private readonly EmailSenderFactory _emailSenderFactory;
     private readonly BTCPayNetworkProvider _networkProvider;
     private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
@@ -50,6 +51,7 @@ public class UITicketSalesController : Controller
         IFileService fileService,
         StoreRepository storeRepo,
         EmailService emailService,
+        TicketService ticketService,
         IHttpClientFactory clientFactory,
         EmailSenderFactory emailSenderFactory,
         BTCPayNetworkProvider networkProvider,
@@ -62,6 +64,7 @@ public class UITicketSalesController : Controller
         _fileService = fileService;
         _emailService = emailService;
         _userManager = userManager;
+        _ticketService = ticketService;
         _clientFactory = clientFactory;
         _networkProvider = networkProvider;
         _dbContextFactory = dbContextFactory;
@@ -175,7 +178,7 @@ public class UITicketSalesController : Controller
             return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
         }
         var entity = TicketSalesEventViewModelToEntity(vm, null);
-        entity.EventState = SatoshiTickets.Data.EntityState.Disabled;
+        entity.EventState = Data.EntityState.Disabled;
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
         {
@@ -255,7 +258,6 @@ public class UITicketSalesController : Controller
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
     }
 
-
     [HttpGet("toggle/{eventId}")]
     public async Task<IActionResult> ToggleTicketEventStatus(string storeId, string eventId, bool enable)
     {
@@ -298,12 +300,12 @@ public class UITicketSalesController : Controller
         }
         switch (ticketEvent.EventState)
         {
-            case SatoshiTickets.Data.EntityState.Active:
+            case Data.EntityState.Active:
             default:
-                ticketEvent.EventState = SatoshiTickets.Data.EntityState.Disabled;
+                ticketEvent.EventState = Data.EntityState.Disabled;
                 break;
-            case SatoshiTickets.Data.EntityState.Disabled:
-                ticketEvent.EventState = SatoshiTickets.Data.EntityState.Active;
+            case Data.EntityState.Disabled:
+                ticketEvent.EventState = Data.EntityState.Active;
                 break;
         }
         ctx.Events.Update(ticketEvent);
@@ -311,7 +313,6 @@ public class UITicketSalesController : Controller
         TempData[WellKnownTempData.SuccessMessage] = $"Event {(enable ? "activated" : "disabled")} successfully";
         return RedirectToAction(nameof(List), new { storeId });
     }
-
 
     [HttpGet("delete/{eventId}")]
     public async Task<IActionResult> DeleteEvent(string storeId, string eventId)
@@ -371,7 +372,6 @@ public class UITicketSalesController : Controller
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
     }
 
-
     [HttpGet("{eventId}/tickets")]
     public async Task<IActionResult> ViewEventTicket(string storeId, string eventId, string searchText)
     {
@@ -390,17 +390,21 @@ public class UITicketSalesController : Controller
         var ordersQuery = ctx.Orders.AsNoTracking().Include(c => c.Tickets)
             .Where(c => c.EventId == eventId && c.StoreId == CurrentStore.Id && c.PaymentStatus == TransactionStatus.Settled.ToString());
 
+        int ticketsBought = ordersQuery.SelectMany(c => c.Tickets).Count();
+        int ticketsChecked = ordersQuery.SelectMany(c => c.Tickets).Count(c => c.UsedAt.HasValue);
         if (!string.IsNullOrEmpty(searchText))
         {
             ordersQuery = ordersQuery.Where(o =>
                 o.InvoiceId.Contains(searchText) ||
                 o.Tickets.Any(t => t.TxnNumber.Contains(searchText) || t.FirstName.Contains(searchText) ||  t.LastName.Contains(searchText) || t.Email.Contains(searchText)
                 ));
-        }
+        }  
         var orders = ordersQuery.ToList();
 
         var vm = new EventTicketViewModel
         {
+            TicketsCount = ticketsBought,
+            CheckedInTicketsCount = ticketsChecked,
             StoreId = storeId,
             EventId = eventId,
             EventTitle = entity.Title,
@@ -431,76 +435,23 @@ public class UITicketSalesController : Controller
         return View(vm);
     }
 
-    [HttpGet("{eventId}/tickets/{ticketId}/check-in")]
-    public async Task<IActionResult> CheckinTicketAttendee(string storeId, string eventId, string ticketId)
+    [HttpGet("{eventId}/tickets/{ticketNumber}/check-in")]
+    public async Task<IActionResult> CheckinTicketAttendee(string storeId, string eventId, string ticketNumber)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
-
-        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
-        if (entity == null)
+        var checkinTicket = await _ticketService.CheckinTicket(eventId, ticketNumber, CurrentStore.Id);
+        if (checkinTicket.Success)
         {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid Event specified";
-            return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+            TempData[WellKnownTempData.SuccessMessage] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} checked-in successfully";
         }
-
-        var ticket = ctx.Tickets.FirstOrDefault(c => c.Id == ticketId && c.EventId == entity.Id);
-        if (ticket == null)
+        else
         {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid ticket id specified";
-            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
+            TempData[WellKnownTempData.ErrorMessage] = checkinTicket.ErrorMessage;
         }
-        ticket.UsedAt = DateTime.UtcNow;
-        ctx.Tickets.Update(ticket);
-        await ctx.SaveChangesAsync();
-
-        TempData[WellKnownTempData.SuccessMessage] = "Ticket checked-in successfully";
         return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
     }
-
-
-    [HttpPost("{eventId}/verify")]
-    public async Task<IActionResult> TicketVerification(string storeId, string eventId, TicketVerificationViewModel vm)
-    {
-        if (CurrentStore is null)
-            return NotFound();
-
-        await using var ctx = _dbContextFactory.CreateContext();
-
-        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
-        if (entity == null) return NotFound();
-
-        if (string.IsNullOrEmpty(vm.QrCodeData))
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid QR data specified";
-            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
-        }
-
-        // Extract ticketTxn from the QrCodeData (EVT-{eventId:D4}-{now:yyMMdd}-{ticketTxn})
-        var parts = vm.QrCodeData.Split('-');
-        if (parts.Length < 4)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid QR data specified";
-            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
-        }
-        string ticketTxn = parts[^1];
-
-        var ticket = ctx.Tickets.FirstOrDefault(t => t.TxnNumber.Equals(ticketTxn.Trim()) && t.EventId == eventId && t.StoreId == CurrentStore.Id);
-        if (ticket == null || entity.StartDate.Date < DateTime.Now.Date)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid or expired event ticket";
-            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
-        }
-        // Should we use an expiry filed.. say used at?
-        /*ticket.UsedAt = DateTime.UtcNow;
-        ctx.Tickets.Update(ticket);
-        await ctx.SaveChangesAsync();*/
-        TempData[WellKnownTempData.SuccessMessage] = $"Ticket is valid. Attendee: {ticket.FirstName} {ticket.LastName}";
-        return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
-    }
-
 
     [HttpGet("{eventId}/send-reminder/{orderId}")]
     public async Task<IActionResult> SendReminder(string storeId, string eventId, string orderId)
@@ -547,9 +498,9 @@ public class UITicketSalesController : Controller
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id.Equals(eventId) && c.StoreId.Equals(CurrentStore.Id));
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == storeId);
         var ordersWithTickets = ctx.Orders.AsNoTracking()
-            .Where(o => o.StoreId == CurrentStore.Id && o.EventId == eventId)
+            .Where(o => o.StoreId == storeId && o.EventId == eventId && o.PaymentStatus == TransactionStatus.Settled.ToString())
             .SelectMany(o => o.Tickets.Select(t => new
             {
                 o.PurchaseDate,
@@ -565,19 +516,16 @@ public class UITicketSalesController : Controller
         if (ticketEvent == null || ordersWithTickets == null || !ordersWithTickets.Any())
             return NotFound();
 
-
         var fileName = $"{ticketEvent.Title}_Tickets-{DateTime.Now:yyyy_MM_dd-HH_mm_ss}.csv";
-
         var csvData = new StringBuilder();
-        csvData.AppendLine("Event Name,Event Id,Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency,Attended Event");
+        csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency,Attended Event");
         foreach (var ticket in ordersWithTickets)
         {
-            csvData.AppendLine($"{ticketEvent.Title},{ticketEvent.Id},{ticket.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{ticket.Currency},{ticket.UsedAt.HasValue}");
+            csvData.AppendLine($"{ticket.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{ticket.Currency},{ticket.UsedAt.HasValue}");
         }
         byte[] fileBytes = Encoding.UTF8.GetBytes(csvData.ToString());
         return File(fileBytes, "text/csv", fileName);
     }
-
 
     private async Task<string> GetStoreDefaultCurrentIfEmpty(string storeId, string currency)
     {

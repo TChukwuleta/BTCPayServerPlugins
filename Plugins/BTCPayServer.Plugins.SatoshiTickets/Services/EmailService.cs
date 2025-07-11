@@ -6,6 +6,9 @@ using MimeKit;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
+using System.IO;
+using System.Reflection;
+using System.Linq;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Services;
 
@@ -79,6 +82,21 @@ Click the link to view your tickets: {ticket.QRCodeLink}";
             MessageText = emailBody
         });
         return await SendBulkEmail(storeId, emailRecipients);
+    }
+
+    public string GetEmbeddedResourceContent(string resourceName)
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var fullResourceName = assembly.GetManifestResourceNames()
+                                       .FirstOrDefault(r => r.EndsWith(resourceName, StringComparison.OrdinalIgnoreCase));
+
+        if (fullResourceName == null)
+        {
+            throw new FileNotFoundException($"Resource '{resourceName}' not found in assembly.");
+        }
+        using var stream = assembly.GetManifestResourceStream(fullResourceName);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 
     public class EmailRecipient

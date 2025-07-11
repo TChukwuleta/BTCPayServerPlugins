@@ -19,6 +19,7 @@ public class Plugin : BaseBTCPayServerPlugin
     {
         services.AddSingleton<IUIExtension>(new UIExtension("SimpleTicketSalesPluginHeaderNav", "header-nav"));
         services.AddSingleton<EmailService>();
+        services.AddSingleton<TicketService>();
         services.AddSingleton<SimpleTicketSalesHostedService>();
         services.AddSingleton<SimpleTicketSalesDbContextFactory>();
         services.AddHostedService<SimpleTicketSalesHostedService>();

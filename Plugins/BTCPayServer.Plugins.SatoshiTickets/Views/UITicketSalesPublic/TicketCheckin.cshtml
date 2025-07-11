@@ -1,0 +1,137 @@
+﻿@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@model TicketScannerViewModel
+@{
+    Layout = "_BaseSimpleTicketPublicLayout";
+    var successMessage = TempData["CheckInSuccessMessage"] as string;
+    var errorMessage = TempData["CheckInErrorMessage"] as string;
+    var alertMessage = successMessage ?? errorMessage;
+    var alertType = successMessage != null ? "success" : errorMessage != null ? "danger" : null;
+}
+
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fa fa-qrcode"></i> Check-In Ticket: @Model.EventName</h2>
+            </div>
+            @if (!string.IsNullOrEmpty(alertMessage) && alertType != null)
+            {
+                <div class="alert alert-@alertType alert-dismissible fade show" role="alert">
+                    @alertMessage
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            <div class="container mt-5 text-center">
+                <button id="start-scanner-btn" class="btn btn-success mb-3">Start Scanning</button>
+
+                <div id="scanner-container" style="display: none;">
+                    <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto;"></div>
+                    <button id="stop-scanner-btn" class="btn btn-outline-danger mt-3">Stop Scanning</button>
+                </div>
+            </div>
+
+            <div id="scanner-app" class="p-4 rounded shadow-sm" style="border-bottom: none;">
+                <form asp-action="Checkin" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" method="post" class="row justify-content-center">
+                    <div class="col-md-6">
+                        <div class="input-group mb-3">
+                            <input type="text" name="ticketNumber" class="form-control" placeholder="Enter ticket code manually" required />
+                            <button type="submit" class="btn btn-outline-primary">
+                                <i class="fa fa-check"></i> Check In
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section PageFootContent {
+    <style>
+        #reader {
+            margin: 0 auto !important;
+            text-align: center;
+        }
+
+        #reader__scan_region {
+            margin: 0 auto !important;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+            #reader__scan_region video {
+                border-radius: 10px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            }
+
+        #reader__dashboard_section {
+            text-align: center;
+            margin: 15px auto;
+        }
+
+            #reader__dashboard_section button {
+                margin: 0 5px;
+            }
+
+        #reader__header_message {
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        #reader {
+            margin-bottom: 20px;
+        }
+    </style>
+    <script src="~/plugins/@Model.StoreId/ticket/public/satoshiticket/jsqr_min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            let html5QrcodeScanner;
+            const startBtn = document.getElementById('start-scanner-btn');
+            const stopBtn = document.getElementById('stop-scanner-btn');
+            const scannerContainer = document.getElementById('scanner-container');
+
+            function showScanner() {
+                scannerContainer.style.display = 'block';
+                startBtn.style.display = 'none';
+            }
+
+            function hideScanner() {
+                scannerContainer.style.display = 'none';
+                startBtn.style.display = 'inline-block';
+            }
+
+            function onScanSuccess(decodedText, decodedResult) {
+                const input = document.querySelector('input[name="ticketNumber"]');
+                input.value = decodedText;
+                html5QrcodeScanner.clear().then(() => {
+                    hideScanner();
+                    const form = input.closest('form');
+                    form.submit();
+                });
+            }
+
+            startBtn.addEventListener('click', () => {
+                showScanner();
+                html5QrcodeScanner = new Html5QrcodeScanner(
+                    "reader",
+                    { fps: 10, qrbox: 250 },
+                    false
+                );
+                html5QrcodeScanner.render(onScanSuccess);
+            });
+
+            stopBtn.addEventListener('click', () => {
+                if (html5QrcodeScanner) {
+                    html5QrcodeScanner.clear().then(() => {
+                        hideScanner();
+                    });
+                }
+            });
+        });
+    </script>
+}
+

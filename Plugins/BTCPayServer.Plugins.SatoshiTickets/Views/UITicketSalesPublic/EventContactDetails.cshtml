@@ -51,36 +51,20 @@
                                 <div class="contact-group">
                                     <div class="mb-3">
                                         <label class="form-label" data-required>First name</label>
-                                        <input type="text" class="form-control" asp-for="ContactInfo[i].FirstName" placeholder="First name" required>
+                                        <input type="text" class="form-control contact-required" asp-for="ContactInfo[i].FirstName" placeholder="First name" required>
                                     </div>
 
                                     <div class="mb-3">
                                         <label class="form-label" data-required>Last name</label>
-                                        <input type="text" class="form-control" asp-for="ContactInfo[i].LastName" placeholder="Last name" required>
+                                        <input type="text" class="form-control contact-required" asp-for="ContactInfo[i].LastName" placeholder="Last name" required>
                                     </div>
 
                                     <div class="mb-3">
                                         <label class="form-label" data-required>Email Address</label>
-                                        <input type="email" class="form-control" asp-for="ContactInfo[i].Email" placeholder="Email address" required>
+                                        <input type="email" class="form-control contact-required" asp-for="ContactInfo[i].Email" placeholder="Email address" required>
                                     </div>
                                 </div>
                             }
-
-                            @* <div class="mb-3">
-                                <label class="form-label fw-bold">Want to send ticket to different email addresses?</label>
-                                <div class="d-flex align-items-center mb-2">
-                                    <i class="bi bi-info-circle text-muted me-2"></i>
-                                    <i class="bi bi-info-circle text-muted me-2"></i>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="ticketEmail" id="sameEmail" value="no">
-                                    <label class="form-check-label" for="sameEmail">Yes</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="ticketEmail" id="differentEmail" value="yes" checked>
-                                    <label class="form-check-label" for="differentEmail">No</label>
-                                </div>
-                            </div> *@
                         </div>
                     </div>
                 </div>
@@ -90,9 +74,7 @@
                     <div class="card border-0 shadow-sm">
                         <div class="card-body">
                             <h5 class="fw-bold mb-4">Summary <span class="text-muted small">(in @Model.Currency)</span></h5>
-
                             <h6 class="text-center fw-bold mb-4">@Model.EventTitle</h6>
-
                             @foreach (var ticket in Model.Tickets)
                             {
                                 <div class="d-flex justify-content-between mb-3">
@@ -101,19 +83,16 @@
                                 </div>
                             }
                             <hr>
-
                             <div class="d-flex justify-content-between mb-3">
                                 <span>Subtotal</span>
                                 <span>@Model.Tickets.Sum(t => t.Quantity * t.Price).ToString("N0")</span>
                             </div>
                             <hr>
-
                             <div class="d-flex justify-content-between mb-4">
                                 <span class="fw-bold">Total</span>
                                 <span class="fw-bold">@Model.Tickets.Sum(t => t.Quantity * t.Price).ToString("N0")</span>
                             </div>
-
-                            <button type="submit" class="btn btn-success w-100 py-3">Complete Payment</button>
+                            <button id="complete-payment-btn" type="submit" class="btn btn-success w-100 py-3" disabled>Complete Payment</button>
                         </div>
                     </div>
                 </div>
@@ -121,3 +100,21 @@
         </form>
     </div>
 </div>
+
+
+@section PageFootContent {
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const requiredInputs = document.querySelectorAll('.contact-required');
+            const submitButton = document.getElementById('complete-payment-btn');
+            function checkFields() {
+                const allFilled = Array.from(requiredInputs).every(input => input.value.trim() !== '');
+                submitButton.disabled = !allFilled;
+            }
+            requiredInputs.forEach(input => {
+                input.addEventListener('input', checkFields);
+            });
+            checkFields();
+        });
+    </script>
+}
