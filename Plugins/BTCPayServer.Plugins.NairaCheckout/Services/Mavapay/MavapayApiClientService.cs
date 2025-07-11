@@ -159,7 +159,12 @@ public class MavapayApiClientService
 
     private async Task<string> SendRequest(HttpRequestMessage req, string apiKey)
     {
-        _httpClient.DefaultRequestHeaders.Add("X-API-KEY", apiKey);
+        const string headerKey = "X-API-KEY";
+        if (_httpClient.DefaultRequestHeaders.Contains(headerKey))
+            _httpClient.DefaultRequestHeaders.Remove(headerKey);
+
+        _httpClient.DefaultRequestHeaders.Add(headerKey, apiKey);
+
         var response = await _httpClient.SendAsync(req);
         var responseContent = await response.Content.ReadAsStringAsync();
         Console.WriteLine(responseContent);
