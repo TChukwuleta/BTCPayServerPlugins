@@ -27,8 +27,26 @@
         <table class="table table-hover">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Price</th>
+                    <th>
+                        <a asp-action="List"
+                           asp-route-storeId="@storeId"
+                           asp-route-eventId="@Model.EventId"
+                           asp-route-sortBy="Name"
+                           asp-route-sortDir="@(Model.SortBy == "Name" && Model.SortDir == "asc" ? "desc" : "asc")">
+                            Name
+                            <vc:icon symbol="@(Model.SortDir == "asc" ? "actions-sort-alpha-asc" : "actions-sort-alpha-desc")" />
+                        </a>
+                    </th>
+                    <th>
+                        <a asp-action="List"
+                           asp-route-storeId="@storeId"
+                           asp-route-eventId="@Model.EventId"
+                           asp-route-sortBy="Price"
+                           asp-route-sortDir="@(Model.SortBy == "Price" && Model.SortDir == "asc" ? "desc" : "asc")">
+                            Price
+                            <vc:icon symbol="@(Model.SortDir == "asc" ? "actions-sort-alpha-asc" : "actions-sort-alpha-desc")" />
+                        </a>
+                    </th>
                     <th>Total Quantity</th>
                     <th>Quantity Sold</th>
                     <th class="w-75px"></th>

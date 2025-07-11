@@ -30,7 +30,7 @@ public class UITicketTypeController : Controller
 
 
     [HttpGet("list")]
-    public async Task<IActionResult> List(string storeId, string eventId)
+    public async Task<IActionResult> List(string storeId, string eventId, string sortBy = "Name", string sortDir = "asc")
     {
         if (CurrentStore is null)
             return NotFound();
@@ -40,8 +40,14 @@ public class UITicketTypeController : Controller
         if (ticketEvent == null)
             return NotFound();
 
-        var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == ticketEvent.Id).ToList();
-        var tickets = ticketTypes.Select(x =>
+        var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == ticketEvent.Id);
+        ticketTypes = sortBy switch
+        {
+            "Price" => sortDir == "desc" ? ticketTypes.OrderByDescending(t => t.Price) : ticketTypes.OrderBy(t => t.Price),
+            "Name" => sortDir == "desc" ? ticketTypes.OrderByDescending(t => t.Name) : ticketTypes.OrderBy(t => t.Name),
+            _ => ticketTypes.OrderBy(t => t.Name)
+        };
+        var tickets = ticketTypes.ToList().Select(x =>
         {
             return new TicketTypeViewModel
             {
@@ -56,7 +62,7 @@ public class UITicketTypeController : Controller
                 IsDefault = x.IsDefault,
             };
         }).ToList();
-        return View(new TicketTypeListViewModel { TicketTypes = tickets, EventId = eventId });
+        return View(new TicketTypeListViewModel { SortBy = sortBy, SortDir = sortDir, TicketTypes = tickets, EventId = eventId });
     }
 
 
