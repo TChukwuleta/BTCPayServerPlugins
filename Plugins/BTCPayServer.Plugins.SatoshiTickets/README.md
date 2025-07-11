@@ -23,6 +23,8 @@ Automated QR Code Generation: Each ticket is linked to a unique QR code for seam
 
 **Email Notifications:** Buyers receive confirmation emails with their QR-coded tickets.
 
+**Ticket Scanner:** For physical events, events managers can now scan events to grant entry to attendee
+
 
 ## Prerequisites:
 
@@ -88,19 +90,9 @@ Congratulations, everything is set up and ticket purchasing is working.
 3. In the ticket list, tickets can be searched by the ticket ID, name or email. By clicking on "Check-in"
    ![Ticket list, checking in](./img/SatoshiTickets/SatoshiTickets_tickets_list_checkin.png)   
 
+   ![Ticket list, checking in](./img/SatoshiTickets/ticket_checkin_1.png)   
 
-### Mobile screens
-
-A few impressions of the mobile screens. The plugin is responsive and works well on mobile devices.
-
-![BTCPay Server SatoshiTickets img 14](./img/SatoshiTickets/Event_Summary_Mobile.png)
-
-![BTCPay Server SatoshiTickets img 15](./img/SatoshiTickets/Event_Ticket_Mobile.png)
-
-![BTCPay Server SatoshiTickets img 16](./img/SatoshiTickets/Event_Contact_Mobile.png)
-
-![BTCPay Server SatoshiTickets img 17](./img/SatoshiTickets/Event_Payment_Mobile.png)
-
+   ![Ticket list, checking in](./img/SatoshiTickets/ticket_checkin_2.png)   
 
 
 ## Contribute
