@@ -442,7 +442,14 @@ public class UITicketSalesController : Controller
             return NotFound();
 
         var checkinTicket = await _ticketService.CheckinTicket(eventId, ticketNumber, CurrentStore.Id);
-        TempData[WellKnownTempData.ErrorMessage] = checkinTicket.Success ? $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} checked-in successfully" : checkinTicket.ErrorMessage;
+        if (checkinTicket.Success)
+        {
+            TempData[WellKnownTempData.SuccessMessage] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} checked-in successfully";
+        }
+        else
+        {
+            TempData[WellKnownTempData.ErrorMessage] = checkinTicket.ErrorMessage;
+        }
         return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
     }
 
@@ -491,9 +498,9 @@ public class UITicketSalesController : Controller
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id.Equals(eventId) && c.StoreId.Equals(CurrentStore.Id));
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == storeId);
         var ordersWithTickets = ctx.Orders.AsNoTracking()
-            .Where(o => o.StoreId == CurrentStore.Id && o.EventId == eventId)
+            .Where(o => o.StoreId == storeId && o.EventId == eventId && o.PaymentStatus == TransactionStatus.Settled.ToString())
             .SelectMany(o => o.Tickets.Select(t => new
             {
                 o.PurchaseDate,
@@ -511,10 +518,10 @@ public class UITicketSalesController : Controller
 
         var fileName = $"{ticketEvent.Title}_Tickets-{DateTime.Now:yyyy_MM_dd-HH_mm_ss}.csv";
         var csvData = new StringBuilder();
-        csvData.AppendLine("Event Name,Event Id,Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency,Attended Event");
+        csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency,Attended Event");
         foreach (var ticket in ordersWithTickets)
         {
-            csvData.AppendLine($"{ticketEvent.Title},{ticketEvent.Id},{ticket.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{ticket.Currency},{ticket.UsedAt.HasValue}");
+            csvData.AppendLine($"{ticket.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{ticket.Currency},{ticket.UsedAt.HasValue}");
         }
         byte[] fileBytes = Encoding.UTF8.GetBytes(csvData.ToString());
         return File(fileBytes, "text/csv", fileName);
