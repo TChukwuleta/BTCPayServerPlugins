@@ -1,52 +1,46 @@
 ﻿@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
 @model TicketScannerViewModel
+@{
+    Layout = "_BaseSimpleTicketPublicLayout";
+    var successMessage = TempData["CheckInSuccessMessage"] as string;
+    var errorMessage = TempData["CheckInErrorMessage"] as string;
+    var alertMessage = successMessage ?? errorMessage;
+    var alertType = successMessage != null ? "success" : errorMessage != null ? "danger" : null;
+}
 
-<div class="container-fluid">
+<div class="container mt-5">
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2>
-                    <i class="fa fa-qrcode"></i>
-                    Check-In Ticket
-                </h2>
+                <h2><i class="fa fa-qrcode"></i> Check-In Ticket: @Model.EventName</h2>
+            </div>
+            @if (!string.IsNullOrEmpty(alertMessage) && alertType != null)
+            {
+                <div class="alert alert-@alertType alert-dismissible fade show" role="alert">
+                    @alertMessage
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            <div class="container mt-5 text-center">
+                <button id="start-scanner-btn" class="btn btn-success mb-3">Start Scanning</button>
+
+                <div id="scanner-container" style="display: none;">
+                    <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto;"></div>
+                    <button id="stop-scanner-btn" class="btn btn-outline-danger mt-3">Stop Scanning</button>
+                </div>
             </div>
 
-            <div id="scanner-app" class="p-4 rounded shadow-sm">
-                <div class="text-center mb-4">
-                    <button id="start-scanner" class="btn btn-primary btn-lg">
-                        <i class="fa fa-camera"></i> Start Scanner
-                    </button>
-                    <button id="stop-scanner" class="btn btn-danger btn-lg" style="display: none;">
-                        <i class="fa fa-stop"></i> Stop Scanner
-                    </button>
-                </div>
-
-                <div id="video-container" class="text-center mb-4" style="display: none;">
-                    <video id="scanner-video" width="100%" height="400" style="max-width: 500px; border-radius: 10px;"></video>
-                </div>
-
-                <form asp-action="ManualCheckin"
-                      asp-controller="UITicketSalesPublic"
-                      asp-route-storeId="@Model.StoreId"
-                      asp-route-eventId="@Model.EventId"
-                      method="post"
-                      class="row justify-content-center">
+            <div id="scanner-app" class="p-4 rounded shadow-sm" style="border-bottom: none;">
+                <form asp-action="Checkin" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" method="post" class="row justify-content-center">
                     <div class="col-md-6">
                         <div class="input-group mb-3">
-                            <input type="text" name="TicketCode" class="form-control" placeholder="Enter ticket code manually" required />
+                            <input type="text" name="ticketNumber" class="form-control" placeholder="Enter ticket code manually" required />
                             <button type="submit" class="btn btn-outline-primary">
                                 <i class="fa fa-check"></i> Check In
                             </button>
                         </div>
                     </div>
                 </form>
-
-                <div id="status-messages"></div>
-
-                <div id="ticket-details" class="mt-4 p-3 bg-white border rounded shadow-sm" style="display: none;">
-                    <h5 class="mb-3">Ticket Details</h5>
-                    <div id="ticket-info"></div>
-                </div>
             </div>
         </div>
     </div>
@@ -54,148 +48,89 @@
 
 
 @section PageFootContent {
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
-    <script>
-        class BTCPayTicketScanner {
-            constructor() {
-                this.video = document.getElementById('scanner-video');
-                this.canvas = document.createElement('canvas');
-                this.context = this.canvas.getContext('2d');
-                this.scanning = false;
-                this.stream = null;
-                this.initializeEventListeners();
-            }
-
-            initializeEventListeners() {
-                document.getElementById('start-scanner').addEventListener('click', () => this.startScanning());
-                document.getElementById('stop-scanner').addEventListener('click', () => this.stopScanning());
-            }
-
-            async startScanning() {
-                try {
-                    this.stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'environment' }
-                    });
-
-                    this.video.srcObject = this.stream;
-                    this.video.play();
-
-                    document.getElementById('video-container').style.display = 'block';
-                    document.getElementById('start-scanner').style.display = 'none';
-                    document.getElementById('stop-scanner').style.display = 'inline-block';
-
-                    this.scanning = true;
-                    this.scanForQRCode();
-                } catch (error) {
-                    console.error('Error accessing camera:', error);
-                    this.showMessage('error', 'Cannot access camera. Please check permissions.');
-                }
-            }
-
-            stopScanning() {
-                this.scanning = false;
-
-                if (this.stream) {
-                    this.stream.getTracks().forEach(track => track.stop());
-                    this.stream = null;
-                }
-
-                document.getElementById('video-container').style.display = 'none';
-                document.getElementById('start-scanner').style.display = 'inline-block';
-                document.getElementById('stop-scanner').style.display = 'none';
-            }
-
-            scanForQRCode() {
-                if (!this.scanning) return;
-
-                if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
-                    this.canvas.width = this.video.videoWidth;
-                    this.canvas.height = this.video.videoHeight;
-                    this.context.drawImage(this.video, 0, 0);
-
-                    const imageData = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-                    if (code) {
-                        // this.processTicketCode(code.data);
-                    }
-                }
-
-                requestAnimationFrame(() => this.scanForQRCode());
-            }
-
-            // async processTicketCode(code) {
-            //     try {
-            //         const validateResponse = await fetch('/api/satoshi-tickets/validate', {
-            //             method: 'POST',
-            //             headers: {
-            //                 'Content-Type': 'application/json',
-            //             },
-            //             body: JSON.stringify(code)
-            //         });
-
-            //         const validateResult = await validateResponse.json();
-
-            //         if (!validateResult.isValid) {
-            //             this.showMessage('error', validateResult.message);
-            //             return;
-            //         }
-
-            //         if (validateResult.alreadyCheckedIn) {
-            //             this.showMessage('warning', 'Ticket already checked in!');
-            //             return;
-            //         }
-
-            //         const checkinResponse = await fetch('/api/satoshi-tickets/checkin', {
-            //             method: 'POST',
-            //             headers: {
-            //                 'Content-Type': 'application/json',
-            //             },
-            //             body: JSON.stringify({
-            //                 ticketCode: code,
-            //                 checkinTime: new Date().toISOString(),
-            //                 checkinLocation: 'Main Entrance'
-            //             })
-            //         });
-
-            //         const checkinResult = await checkinResponse.json();
-
-            //         if (checkinResult.success) {
-            //             this.showMessage('success', 'Check-in successful!');
-            //         } else {
-            //             this.showMessage('error', checkinResult.message);
-            //         }
-
-            //     } catch (error) {
-            //         console.error('Error processing ticket:', error);
-            //         this.showMessage('error', 'Error processing ticket. Please try again.');
-            //     }
-            // }
-
-            showMessage(type, message) {
-                const alertClass = type === 'success' ? 'alert-success' :
-                                 type === 'warning' ? 'alert-warning' : 'alert-danger';
-
-                const html = `
-                    <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
-                        ${message}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                `;
-
-                document.getElementById('status-messages').innerHTML = html;
-
-                setTimeout(() => {
-                    const alert = document.querySelector('#status-messages .alert');
-                    if (alert) {
-                        alert.remove();
-                    }
-                }, 3000);
-            }
+    <style>
+        #reader {
+            margin: 0 auto !important;
+            text-align: center;
         }
 
+        #reader__scan_region {
+            margin: 0 auto !important;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+            #reader__scan_region video {
+                border-radius: 10px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            }
+
+        #reader__dashboard_section {
+            text-align: center;
+            margin: 15px auto;
+        }
+
+            #reader__dashboard_section button {
+                margin: 0 5px;
+            }
+
+        #reader__header_message {
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        #reader {
+            margin-bottom: 20px;
+        }
+    </style>
+    <script src="~/plugins/@Model.StoreId/ticket/public/satoshiticket/jsqr_min.js"></script>
+    <script>
         document.addEventListener('DOMContentLoaded', () => {
-            new BTCPayTicketScanner();
+            let html5QrcodeScanner;
+            const startBtn = document.getElementById('start-scanner-btn');
+            const stopBtn = document.getElementById('stop-scanner-btn');
+            const scannerContainer = document.getElementById('scanner-container');
+
+            function showScanner() {
+                scannerContainer.style.display = 'block';
+                startBtn.style.display = 'none';
+            }
+
+            function hideScanner() {
+                scannerContainer.style.display = 'none';
+                startBtn.style.display = 'inline-block';
+            }
+
+            function onScanSuccess(decodedText, decodedResult) {
+                const input = document.querySelector('input[name="ticketNumber"]');
+                input.value = decodedText;
+                html5QrcodeScanner.clear().then(() => {
+                    hideScanner();
+                    const form = input.closest('form');
+                    form.submit();
+                });
+            }
+
+            startBtn.addEventListener('click', () => {
+                showScanner();
+                html5QrcodeScanner = new Html5QrcodeScanner(
+                    "reader",
+                    { fps: 10, qrbox: 250 },
+                    false
+                );
+                html5QrcodeScanner.render(onScanSuccess);
+            });
+
+            stopBtn.addEventListener('click', () => {
+                if (html5QrcodeScanner) {
+                    html5QrcodeScanner.clear().then(() => {
+                        hideScanner();
+                    });
+                }
+            });
         });
     </script>
 }

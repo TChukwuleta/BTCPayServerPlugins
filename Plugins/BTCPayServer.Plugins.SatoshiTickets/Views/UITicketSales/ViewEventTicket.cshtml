@@ -117,7 +117,7 @@
                                                     <td>
                                                         @if (!ticketVm.CheckedIn)
                                                         {
-                                                            <a asp-action="CheckinTicketAttendee" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticketVm.Id">Check In</a>
+                                                            <a asp-action="CheckinTicketAttendee" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketNumber="@ticketVm.TicketNumber">Check In</a>
                                                         }
                                                     </td>
                                                     <td class="text-end text-success">@ticketVm.CheckedIn</td>

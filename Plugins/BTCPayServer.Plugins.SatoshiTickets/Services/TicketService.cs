@@ -13,13 +13,13 @@ public class TicketService
         _dbContextFactory = dbContextFactory;
     }
 
-    public async Task<TicketCheckinResponse> CheckinTicket(string eventId, string ticketId, string storeId)
+    public async Task<TicketCheckinResponse> CheckinTicket(string eventId, string ticketNumber, string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
         var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == storeId);
         if (entity == null) return new() { ErrorMessage = "Invalid Event specified", Success = false };
 
-        var ticket = ctx.Tickets.FirstOrDefault(c => c.Id == ticketId && c.EventId == entity.Id);
+        var ticket = ctx.Tickets.FirstOrDefault(c => (c.TicketNumber == ticketNumber || c.TxnNumber == ticketNumber) && c.EventId == entity.Id);
         if (ticket == null) return new() { ErrorMessage = "Invalid ticket record specified", Success = false };
 
         if (ticket.UsedAt.HasValue) return new() { ErrorMessage = $"Ticket previously checked in by {ticket.UsedAt.Value:f}", Success = false, Ticket = ticket };

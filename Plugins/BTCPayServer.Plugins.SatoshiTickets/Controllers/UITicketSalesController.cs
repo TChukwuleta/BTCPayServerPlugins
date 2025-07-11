@@ -258,7 +258,6 @@ public class UITicketSalesController : Controller
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
     }
 
-
     [HttpGet("toggle/{eventId}")]
     public async Task<IActionResult> ToggleTicketEventStatus(string storeId, string eventId, bool enable)
     {
@@ -314,7 +313,6 @@ public class UITicketSalesController : Controller
         TempData[WellKnownTempData.SuccessMessage] = $"Event {(enable ? "activated" : "disabled")} successfully";
         return RedirectToAction(nameof(List), new { storeId });
     }
-
 
     [HttpGet("delete/{eventId}")]
     public async Task<IActionResult> DeleteEvent(string storeId, string eventId)
@@ -373,7 +371,6 @@ public class UITicketSalesController : Controller
         TempData[WellKnownTempData.SuccessMessage] = "Event deleted successfully";
         return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
     }
-
 
     [HttpGet("{eventId}/tickets")]
     public async Task<IActionResult> ViewEventTicket(string storeId, string eventId, string searchText)
@@ -438,63 +435,16 @@ public class UITicketSalesController : Controller
         return View(vm);
     }
 
-    [HttpGet("{eventId}/tickets/{ticketId}/check-in")]
-    public async Task<IActionResult> CheckinTicketAttendee(string storeId, string eventId, string ticketId)
+    [HttpGet("{eventId}/tickets/{ticketNumber}/check-in")]
+    public async Task<IActionResult> CheckinTicketAttendee(string storeId, string eventId, string ticketNumber)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
-        var checkinTicket = await _ticketService.CheckinTicket(eventId, ticketId, CurrentStore.Id);
-        if (!checkinTicket.Success)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = checkinTicket.ErrorMessage;
-            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
-        }
-        TempData[WellKnownTempData.SuccessMessage] = "Ticket checked-in successfully";
+        var checkinTicket = await _ticketService.CheckinTicket(eventId, ticketNumber, CurrentStore.Id);
+        TempData[WellKnownTempData.ErrorMessage] = checkinTicket.Success ? $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} checked-in successfully" : checkinTicket.ErrorMessage;
         return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
     }
-
-
-    [HttpPost("{eventId}/verify")]
-    public async Task<IActionResult> TicketVerification(string storeId, string eventId, TicketVerificationViewModel vm)
-    {
-        if (CurrentStore is null)
-            return NotFound();
-
-        await using var ctx = _dbContextFactory.CreateContext();
-
-        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
-        if (entity == null) return NotFound();
-
-        if (string.IsNullOrEmpty(vm.QrCodeData))
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid QR data specified";
-            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
-        }
-
-        // Extract ticketTxn from the QrCodeData (EVT-{eventId:D4}-{now:yyMMdd}-{ticketTxn})
-        var parts = vm.QrCodeData.Split('-');
-        if (parts.Length < 4)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid QR data specified";
-            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
-        }
-        string ticketTxn = parts[^1];
-
-        var ticket = ctx.Tickets.FirstOrDefault(t => t.TxnNumber.Equals(ticketTxn.Trim()) && t.EventId == eventId && t.StoreId == CurrentStore.Id);
-        if (ticket == null || entity.StartDate.Date < DateTime.Now.Date)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Invalid or expired event ticket";
-            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
-        }
-        // Should we use an expiry filed.. say used at?
-        /*ticket.UsedAt = DateTime.UtcNow;
-        ctx.Tickets.Update(ticket);
-        await ctx.SaveChangesAsync();*/
-        TempData[WellKnownTempData.SuccessMessage] = $"Ticket is valid. Attendee: {ticket.FirstName} {ticket.LastName}";
-        return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
-    }
-
 
     [HttpGet("{eventId}/send-reminder/{orderId}")]
     public async Task<IActionResult> SendReminder(string storeId, string eventId, string orderId)
@@ -559,9 +509,7 @@ public class UITicketSalesController : Controller
         if (ticketEvent == null || ordersWithTickets == null || !ordersWithTickets.Any())
             return NotFound();
 
-
         var fileName = $"{ticketEvent.Title}_Tickets-{DateTime.Now:yyyy_MM_dd-HH_mm_ss}.csv";
-
         var csvData = new StringBuilder();
         csvData.AppendLine("Event Name,Event Id,Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency,Attended Event");
         foreach (var ticket in ordersWithTickets)
@@ -571,7 +519,6 @@ public class UITicketSalesController : Controller
         byte[] fileBytes = Encoding.UTF8.GetBytes(csvData.ToString());
         return File(fileBytes, "text/csv", fileName);
     }
-
 
     private async Task<string> GetStoreDefaultCurrentIfEmpty(string storeId, string currency)
     {
