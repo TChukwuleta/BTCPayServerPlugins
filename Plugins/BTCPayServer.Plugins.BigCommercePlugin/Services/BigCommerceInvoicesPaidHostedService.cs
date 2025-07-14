@@ -40,20 +40,18 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
 
     protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
     {
-        if (evt is InvoiceEvent invoiceEvent && !new[]
+        if (evt is InvoiceEvent invoiceEvent && new[]
         {
-                InvoiceEvent.MarkedCompleted,
-                InvoiceEvent.MarkedInvalid,
-                InvoiceEvent.Expired,
-                InvoiceEvent.Confirmed,
-                InvoiceEvent.Completed
-            }.Contains(invoiceEvent.Name))
+            InvoiceEvent.MarkedCompleted,
+            InvoiceEvent.MarkedInvalid,
+            InvoiceEvent.Expired,
+            InvoiceEvent.Confirmed,
+            InvoiceEvent.Completed
+        }.Contains(invoiceEvent.Name))
         {
             var invoice = invoiceEvent.Invoice;
             await using var ctx = _contextFactory.CreateContext();
-            var bigCommerceStoreTransaction = await ctx.Transactions.AsNoTracking()
-                .FirstOrDefaultAsync(c => c.InvoiceId == invoice.Id && c.TransactionStatus == Data.TransactionStatus.Pending);
-
+            var bigCommerceStoreTransaction = ctx.Transactions.FirstOrDefault(c => c.InvoiceId == invoice.Id && c.TransactionStatus == Data.TransactionStatus.Pending);
             if (bigCommerceStoreTransaction != null)
             {
                 var result = new InvoiceLogs();
@@ -96,7 +94,7 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
         if (confirmOrder)
         {
             result.Write("Order successfully confirmed on BigCommerce.", InvoiceEventData.EventSeverity.Success);
-            await _bigCommerceService.UpdateOrderStatusAsync(orderId, BigCommerceOrderState.COMPLETED, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+            await _bigCommerceService.UpdateOrderStatusAsync(orderId, BigCommerceOrderState.AWAITING_FULFILLMENT, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
             result.Write("Order status successfully updated on BigCommerce.", InvoiceEventData.EventSeverity.Success);
         }
         else
