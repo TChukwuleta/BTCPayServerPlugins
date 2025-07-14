@@ -63,29 +63,34 @@ const handleBitcoinPayment = (event) => {
         });
 }
 
-
-// Function to get the cart data
 const getCart = () => {
-    // Return the fetch promise
-    return fetch('/api/storefront/carts', {
-        credentials: 'include'
-    })
-        .then(response => response.json())
-        .then(myJson => {
-            console.log(myJson);
-            const cart = {
-                id: myJson[0].id,
-                currency: myJson[0].currency.code,
-                amount: myJson[0].cartAmount,
-                customerEmail: myJson[0].email
-            };
-            return cart;
+    return fetch('/api/storefront/carts', { credentials: 'include' })
+        .then(res => res.json())
+        .then(carts => {
+            if (!Array.isArray(carts) || !carts.length) {
+                throw new Error('No cart found');
+            }
+            const cart = carts[0];
+            return fetch(`/api/storefront/checkouts/${cart.id}`, { credentials: 'include' })
+                .then(res => {
+                    if (!res.ok) throw new Error(`Checkout fetch failed`);
+                    return res.json();
+                })
+                .then(checkout => {
+                    const result = {
+                        id: cart.id,
+                        currency: cart.currency.code,
+                        amount: checkout.grandTotal,
+                        customerEmail: cart.email
+                    };
+                    return result;
+                });
         })
         .catch(error => {
-            console.error('Error fetching cart:', error);
+            console.error('Error fetching full cart details:', error);
             throw error;
         });
-}
+};
 
 // Show BTCPay modal.
 const showBTCPayModal = function(data) {
