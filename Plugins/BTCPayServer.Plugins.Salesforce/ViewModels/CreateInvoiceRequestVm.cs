@@ -3,9 +3,8 @@
 public class CreateInvoiceRequestVm
 {
     public decimal amount { get; set; }
-    public string currency { get; set; } = "USD";
+    public string currency { get; set; }
     public string orderId { get; set; }
-    public string buyerEmail { get; set; }
-    public string orderType { get; set; }
-    public string redirectUrl { get; set; }
+    public string paymentMethodId { get; set; }
+    public object metadata { get; set; }
 }
