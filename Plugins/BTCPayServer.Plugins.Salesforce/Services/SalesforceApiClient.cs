@@ -24,6 +24,7 @@ public class SalesforceApiClient
 
     public async Task<AuthResponse> Authenticate(SalesforceSetting salesforceSetting, string loginUrl = "https://login.salesforce.com")
     {
+        Console.WriteLine(JsonConvert.SerializeObject(salesforceSetting, Formatting.Indented));
         var formContent = new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 {"grant_type", "password"},
@@ -32,6 +33,7 @@ public class SalesforceApiClient
                 {"username", salesforceSetting.Username},
                 {"password", $"{salesforceSetting.Password}{salesforceSetting.SecurityToken}"}
             });
+        Console.WriteLine(JsonConvert.SerializeObject(formContent.Headers, Formatting.Indented));
         var response = await _httpClient.PostAsync($"{loginUrl}/services/oauth2/token", formContent);
         if (!response.IsSuccessStatusCode)
         {
@@ -44,6 +46,20 @@ public class SalesforceApiClient
         return authResponse;
     }
 
+
+
+
+
+    // Step 6
+    public async Task<string> FetchPaymentGatewayProviderId(SalesforceSetting salesforceSetting)
+    {
+        var soql = $"SELECT Id FROM PaymentGatewayProvider WHERE DeveloperName = 'BTCPayServerTest'"; // 'BTCPayServerGatewayProvider'";
+        var soqlQuery = await FetchIdUsingSoqlQuery(salesforceSetting, soql);
+        return soqlQuery.id;
+    }
+
+
+    // Step 4.. 
     public async Task<bool> CreatePaymentGatewayProvider(SalesforceSetting salesforceSetting)
     {
         var authResponse = await Authenticate(salesforceSetting);
@@ -63,8 +79,69 @@ public class SalesforceApiClient
         var req = new HttpRequestMessage(HttpMethod.Post, $"{authResponse.instance_url}/services/data/${salesforceVersion}/tooling/sobjects/PaymentGatewayProvider");
         req.Content = new StringContent(json, Encoding.UTF8, "application/json");
         var response = await SendRequest(req, authResponse.access_token);
+
+        //{
+        //    "id": "0cJgL00000002TFUAY",
+        //      "success": true,
+        //      "errors": [],
+        //      "warnings": [],
+        //      "infos": []
+        //}
+        // Save the Id..
         return response.isSuccess;
     }
+
+    public async Task CreateAlternativePaymentRecordType(AuthResponse authResponse, SalesforceSetting salesforceSetting)
+    {
+        var payload = new
+        {
+            Name = "BTCPay Server",
+            DeveloperName = developerName,
+            SobjectType = "AlternativePaymentMethod"
+        };
+        var json = JsonConvert.SerializeObject(payload);
+        var req = new HttpRequestMessage(HttpMethod.Post, $"{authResponse.instance_url}/services/data/{salesforceVersion}/sobjects/RecordType");
+        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        var response = await SendRequest(req, authResponse.access_token);
+        dynamic result = JsonConvert.DeserializeObject<dynamic>(response.responseContent);
+        //{
+        //    "id": "012gL000001bGq3QAE",
+        //  "success": true,
+        //  "errors": []
+        //}
+        await CreateGtwyProvPaymentMethodType(authResponse, salesforceSetting, result.id);
+    }
+
+
+    public async Task CreateGtwyProvPaymentMethodType(AuthResponse authResponse, SalesforceSetting salesforceSetting, string recordTypeId)
+    {
+        var payload = new
+        {
+            PaymentGatewayProviderId = salesforceSetting.PaymentGatewayProvider,
+            PaymentMethodType = "AlternativePaymentMethod",
+            GtwyProviderPaymentMethodType = "PM_BTCPAY",
+            DeveloperName = "Tobses BTCPay Server",
+            MasterLabel = "MasterLabel",
+            RecordTypeId = recordTypeId
+        };
+        var json = JsonConvert.SerializeObject(payload);
+        var req = new HttpRequestMessage(HttpMethod.Post, $"{authResponse.instance_url}/services/data/{salesforceVersion}/sobjects/GtwyProvPaymentMethodType");
+        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        var response = await SendRequest(req, authResponse.access_token);
+        //{
+        //    "id": "1gpgL00000000CvQAI",
+        //  "success": true,
+        //  "errors": []
+        //}
+        Console.WriteLine(response.responseContent);
+    }
+
+
+
+
+
+
+
 
     public async Task SetupCustomObject(SalesforceSetting salesforceSetting, string serverUrl, string storeId)
     {
@@ -74,20 +151,24 @@ public class SalesforceApiClient
         await InsertBTCPaySettingsData(authResponse, serverUrl, storeId);
     }
 
-    private async Task<bool> CreateBTCPaySettingsObject(AuthResponse authResponse)
+    public async Task<bool> CreateBTCPaySettingsObject(SalesforceSetting salesforceSetting)
     {
+        var authResponse = await Authenticate(salesforceSetting);
         string url = $"{authResponse.instance_url}/services/data/{salesforceVersion}/tooling/sobjects/CustomObject/";
         var payload = new
         {
-            DeveloperName = customObjectName,
-            PluralLabel = $"{customObjectLabel}s",
+            FullName = "ToyNamCustomObject__c",
+            Label = "Toy Name Custom Object",
+            PluralLabel = "Toy Nam Custom Objects",
+            //DeveloperName = customObjectName,
+            //PluralLabel = $"{customObjectLabel}s",
             NameField = new
             {
                 Type = "Text",
                 Label = "Name"
             },
             DeploymentStatus = "Deployed",
-            Description = "BTCPay Server configuration for each org",
+            Description = "Toy|Nam configuration for each org",
             SharingModel = "ReadWrite",
             CustomSettingsType = "Hierarchy",
             EnableFeeds = false
@@ -126,60 +207,6 @@ public class SalesforceApiClient
         return response.isSuccess;
     }
 
-    public async Task CreateAlternativePaymentRecordType(AuthResponse authResponse, SalesforceSetting salesforceSetting)
-    {
-        var payload = new
-        {
-            Name = "BTCPay Server",
-            DeveloperName = developerName,
-            SobjectType = "AlternativePaymentMethod"
-        };
-        var json = JsonConvert.SerializeObject(payload);
-        var req = new HttpRequestMessage(HttpMethod.Post, $"{authResponse.instance_url}/services/data/{salesforceVersion}/sobjects/RecordType");
-        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await SendRequest(req, authResponse.access_token);
-        dynamic result = JsonConvert.DeserializeObject<dynamic>(response.responseContent);
-        await CreateAlternativePaymentMethod(authResponse, salesforceSetting, result.id);
-        await CreateGtwyProvPaymentMethodType(authResponse, salesforceSetting, result.id);
-    }
-
-    public async Task CreateAlternativePaymentMethod(AuthResponse authResponse, SalesforceSetting salesforceSetting, string recordTypeId)
-    {
-        // 012gL000001P4JBQA0
-        Console.WriteLine($"{authResponse.instance_url}/services/data/{salesforceVersion}/sobjects/AlternativePaymentMethod");
-        Console.WriteLine(authResponse.access_token);
-        var payload = new
-        {
-            ProcessingMode = "External",
-            status = "Active",
-            GatewayToken = salesforceSetting.Id,
-            NickName = "BTCPay Server",
-            RecordTypeId = recordTypeId
-        };
-        var json = JsonConvert.SerializeObject(payload);
-        var req = new HttpRequestMessage(HttpMethod.Post, $"{authResponse.instance_url}/services/data/{salesforceVersion}/sobjects/AlternativePaymentMethod");
-        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await SendRequest(req, authResponse.access_token);
-        Console.WriteLine(response.responseContent);
-    }
-
-    public async Task CreateGtwyProvPaymentMethodType(AuthResponse authResponse, SalesforceSetting salesforceSetting, string recordTypeId)
-    {
-        var payload = new
-        {
-            PaymentGatewayProviderId = salesforceSetting.PaymentGatewayProvider,
-            PaymentMethodType = "AlternativePaymentMethod",
-            GtwyProviderPaymentMethodType = "PM_BTCPAY",
-            DeveloperName = "Tobses BTCPay Server",
-            MasterLabel = "MasterLabel",
-            RecordTypeId = recordTypeId
-        };
-        var json = JsonConvert.SerializeObject(payload);
-        var req = new HttpRequestMessage(HttpMethod.Post, $"{authResponse.instance_url}/services/data/{salesforceVersion}/sobjects/GtwyProvPaymentMethodType");
-        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await SendRequest(req, authResponse.access_token);
-        Console.WriteLine(response.responseContent);
-    }
 
 
     private async Task<bool> CreateCustomData(object fieldDefinition, AuthResponse authResponse, string url)
@@ -188,6 +215,7 @@ public class SalesforceApiClient
         var content = new StringContent(JsonConvert.SerializeObject(fieldDefinition), Encoding.UTF8, "application/json");
         var response = await _httpClient.PostAsync(url, content);
         var responseContent = await response.Content.ReadAsStringAsync();
+        Console.WriteLine(responseContent);
         return response.IsSuccessStatusCode;
     }
 
@@ -206,14 +234,6 @@ public class SalesforceApiClient
         req.Content = new StringContent(json, Encoding.UTF8, "application/json");
         var response = await SendRequest(req, authResponse.access_token);
     }
-
-    public async Task<string> FetchPaymentGatewayProviderId(SalesforceSetting salesforceSetting)
-    {
-        var soql = $"SELECT Id FROM PaymentGatewayProvider WHERE DeveloperName = 'BTCPayServerTest'"; // 'BTCPayServerGatewayProvider'";
-        var soqlQuery = await FetchIdUsingSoqlQuery(salesforceSetting, soql);
-        return soqlQuery.id;
-    }
-
     public async Task<bool> UpdateRecordAsync(string objectName, string recordId, object updateData, AuthResponse authResponse)
     {
         try
