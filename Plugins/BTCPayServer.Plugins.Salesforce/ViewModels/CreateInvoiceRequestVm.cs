@@ -2,9 +2,10 @@
 
 public class CreateInvoiceRequestVm
 {
-    public decimal amount { get; set; }
+    public string amount { get; set; }
     public string currency { get; set; }
     public string orderId { get; set; }
-    public string paymentMethodId { get; set; }
-    public object metadata { get; set; }
+    public string checkoutId { get; set; }
+    public string cartId { get; set; }
+    public string webstoreId { get; set; }
 }

@@ -13,39 +13,55 @@ namespace BTCPayServer.Plugins.Salesforce.Services;
 public class SalesforceApiClient
 {
     private readonly HttpClient _httpClient;
-    private readonly string customObjectName = "BTCPay_Server_Settings";
+    private readonly string salesforceVersion = "v62.0";
+    private readonly string customObjectName = "BlaBlab"; // "BTCPay_Server_Settings";
+    private readonly string PaymentGatewayProvider = "BTCPayServerGatewayProvider";
+
     private readonly string customObjectLabel = "BTCPay Server Settings";
     private readonly string developerName = "BTCPayServer";
-    private readonly string salesforceVersion = "v62.0";
     public SalesforceApiClient(IHttpClientFactory httpClientFactory)
     {
         _httpClient = httpClientFactory != null ? httpClientFactory.CreateClient(nameof(SalesforceApiClient)) : new HttpClient();
     }
 
-    public async Task<AuthResponse> Authenticate(SalesforceSetting salesforceSetting, string loginUrl = "https://login.salesforce.com")
+    public async Task SetupCustomObject(SalesforceSetting salesforceSetting, string serverUrl, string storeId)
     {
-        Console.WriteLine(JsonConvert.SerializeObject(salesforceSetting, Formatting.Indented));
-        var formContent = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                {"grant_type", "password"},
-                {"client_id", salesforceSetting.ConsumerKey},
-                {"client_secret", salesforceSetting.ConsumerSecret},
-                {"username", salesforceSetting.Username},
-                {"password", $"{salesforceSetting.Password}{salesforceSetting.SecurityToken}"}
-            });
-        Console.WriteLine(JsonConvert.SerializeObject(formContent.Headers, Formatting.Indented));
-        var response = await _httpClient.PostAsync($"{loginUrl}/services/oauth2/token", formContent);
-        if (!response.IsSuccessStatusCode)
-        {
-            var errorContent = await response.Content.ReadAsStringAsync();
-            throw new Exception($"Authentication failed: {errorContent}");
-        }
-        var jsonResponse = await response.Content.ReadAsStringAsync();
-        var authResponse = JsonConvert.DeserializeObject<AuthResponse>(jsonResponse);
-        authResponse.instance_url?.TrimEnd('/');
-        return authResponse;
+        var authResponse = await Authenticate(salesforceSetting);
+        await CreateBTCPaySettingsField(authResponse, "Server_URL", "Server URL");
+        await CreateBTCPaySettingsField(authResponse, "Store_ID", "Store ID");
+        await InsertBTCPaySettingsData(authResponse, serverUrl, storeId);
     }
 
+    private async Task<bool> CreateBTCPaySettingsField(AuthResponse authResponse, string fieldName, string label)
+    {
+        string url = $"{authResponse.instance_url}/services/data/{salesforceVersion}/tooling/sobjects/CustomField/";
+        var payload = new
+        {
+            FullName = $"{customObjectName}__c.{fieldName}__c",
+            Metadata = new
+            {
+                type = "Text",
+                label,
+                length = 255
+            }
+        };
+        return await CreateCustomData(payload, authResponse, url);
+    }
+
+    private async Task<bool> InsertBTCPaySettingsData(AuthResponse authResponse, string serverUrl, string storeId)
+    {
+        var payload = new
+        {
+            Name = "Default",
+            Server_URL__c = serverUrl,
+            Store_ID__c = storeId
+        };
+        var json = JsonConvert.SerializeObject(payload);
+        var req = new HttpRequestMessage(HttpMethod.Post, $"{authResponse.instance_url}/services/data/{salesforceVersion}/sobjects/{customObjectName}__c");
+        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        var response = await SendRequest(req, authResponse.access_token);
+        return response.isSuccess;
+    }
 
 
 
@@ -53,7 +69,7 @@ public class SalesforceApiClient
     // Step 6
     public async Task<string> FetchPaymentGatewayProviderId(SalesforceSetting salesforceSetting)
     {
-        var soql = $"SELECT Id FROM PaymentGatewayProvider WHERE DeveloperName = 'BTCPayServerTest'"; // 'BTCPayServerGatewayProvider'";
+        var soql = $"SELECT Id FROM PaymentGatewayProvider WHERE DeveloperName = '{PaymentGatewayProvider}'"; // 'BTCPayServerGatewayProvider'";
         var soqlQuery = await FetchIdUsingSoqlQuery(salesforceSetting, soql);
         return soqlQuery.id;
     }
@@ -65,11 +81,11 @@ public class SalesforceApiClient
         var authResponse = await Authenticate(salesforceSetting);
         var payload = new
         {
-            Fullname = "BTCPayServerGatewayProvider",
+            Fullname = PaymentGatewayProvider,
             Metadata = new
             {
-                fullName = "BTCPayServerGatewayProvider",
-                apexAdapter = "BTCPayServerGatewayProvider",
+                fullName = PaymentGatewayProvider,
+                apexAdapter = PaymentGatewayProvider,
                 idempotencySupported = "Yes",
                 comments = "BTCPay Server-Salesforce gateway provider",
                 masterLabel = "BTCPay Payment Gateway Provider"
@@ -133,7 +149,6 @@ public class SalesforceApiClient
         //  "success": true,
         //  "errors": []
         //}
-        Console.WriteLine(response.responseContent);
     }
 
 
@@ -142,14 +157,82 @@ public class SalesforceApiClient
 
 
 
-
-    public async Task SetupCustomObject(SalesforceSetting salesforceSetting, string serverUrl, string storeId)
+    private async Task<AuthResponse> Authenticate(SalesforceSetting salesforceSetting, string loginUrl = "https://login.salesforce.com")
     {
-        var authResponse = await Authenticate(salesforceSetting);
-        await CreateBTCPaySettingsField(authResponse, "Server_URL", "Server URL");
-        await CreateBTCPaySettingsField(authResponse, "Store_ID", "Store ID");
-        await InsertBTCPaySettingsData(authResponse, serverUrl, storeId);
+        var formContent = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                {"grant_type", "password"},
+                {"client_id", salesforceSetting.ConsumerKey},
+                {"client_secret", salesforceSetting.ConsumerSecret},
+                {"username", salesforceSetting.Username},
+                {"password", $"{salesforceSetting.Password}{salesforceSetting.SecurityToken}"}
+            });
+        var response = await _httpClient.PostAsync($"{loginUrl}/services/oauth2/token", formContent);
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Authentication failed: {errorContent}");
+        }
+        var jsonResponse = await response.Content.ReadAsStringAsync();
+        var authResponse = JsonConvert.DeserializeObject<AuthResponse>(jsonResponse);
+        authResponse.instance_url?.TrimEnd('/');
+        return authResponse;
     }
+
+    private async Task<(string responseContent, bool isSuccess)> SendRequest(HttpRequestMessage req, string accessToken)
+    {
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        var response = await _httpClient.SendAsync(req);
+        var responseContent = await response.Content.ReadAsStringAsync();
+        return (responseContent, response.IsSuccessStatusCode);
+    }
+
+    public class AuthResponse
+    {
+        public string access_token { get; set; }
+        public string instance_url { get; set; }
+        public string id { get; set; }
+        public string token_type { get; set; }
+        public string issued_at { get; set; }
+        public string signature { get; set; }
+    }
+
+    public class SalesforceApiClientCredentials
+    {
+        public string ConsumerKey { get; set; }
+        public string ConsumerSecret { get; set; }
+        public string Username { get; set; }
+        public string Password { get; set; }
+    }
+
+    public class SalesforceQueryResponse<T>
+    {
+        public int totalSize { get; set; }
+        public bool done { get; set; }
+        public List<T> records { get; set; } = new();
+        public string? nextRecordsUrl { get; set; }
+    }
+
+    public class SalesforceRecord
+    {
+        public string Id { get; set; } = string.Empty;
+        public object attributes { get; set; } = new();
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     public async Task<bool> CreateBTCPaySettingsObject(SalesforceSetting salesforceSetting)
     {
@@ -176,37 +259,6 @@ public class SalesforceApiClient
         return await CreateCustomData(payload, authResponse, url);
     }
 
-    private async Task<bool> CreateBTCPaySettingsField(AuthResponse authResponse, string fieldName, string label)
-    {
-        string url = $"{authResponse.instance_url}/services/data/{salesforceVersion}/tooling/sobjects/CustomField/";
-        var payload = new
-        {
-            FullName = $"{customObjectName}__c.{fieldName}__c",
-            Metadata = new
-            {
-                type = "Text",
-                label,
-                length = 255
-            }
-        };
-        return await CreateCustomData(payload, authResponse, url);
-    }
-
-    private async Task<bool> InsertBTCPaySettingsData(AuthResponse authResponse, string serverUrl, string storeId)
-    {
-        var payload = new
-        {
-            Name = "Default",
-            Server_URL__c = serverUrl,
-            Store_ID__c = storeId
-        };
-        var json = JsonConvert.SerializeObject(payload);
-        var req = new HttpRequestMessage(HttpMethod.Post, $"{authResponse.instance_url}/services/data/{salesforceVersion}/sobjects/{customObjectName}__c");
-        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await SendRequest(req, authResponse.access_token);
-        return response.isSuccess;
-    }
-
 
 
     private async Task<bool> CreateCustomData(object fieldDefinition, AuthResponse authResponse, string url)
@@ -218,6 +270,7 @@ public class SalesforceApiClient
         Console.WriteLine(responseContent);
         return response.IsSuccessStatusCode;
     }
+
 
     public async Task WebhookNotification(SalesforceSetting salesforceSetting, string invoiceId, string status, string storeId, string amount)
     {
@@ -234,44 +287,7 @@ public class SalesforceApiClient
         req.Content = new StringContent(json, Encoding.UTF8, "application/json");
         var response = await SendRequest(req, authResponse.access_token);
     }
-    public async Task<bool> UpdateRecordAsync(string objectName, string recordId, object updateData, AuthResponse authResponse)
-    {
-        try
-        {
-            var json = JsonConvert.SerializeObject(updateData);
-            var req = new HttpRequestMessage(HttpMethod.Patch, $"{authResponse.instance_url}/services/data/{salesforceVersion}/sobjects/{objectName}/{recordId}");
-            req.Content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await SendRequest(req, authResponse.access_token);
-            return response.isSuccess;
-        }
-        catch (Exception) { return false; }
-    }
-
-    public async Task<string> CreateRecordAsync(SalesforceSetting salesforceSetting, string objectName, object recordData)
-    {
-        try
-        {
-            var authResponse = await Authenticate(salesforceSetting);
-            var json = JsonConvert.SerializeObject(recordData);
-            var req = new HttpRequestMessage(HttpMethod.Post, $"{authResponse.instance_url}/services/data/{salesforceVersion}/sobjects/{objectName}/");
-            req.Content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await SendRequest(req, authResponse.access_token);
-            if (response.isSuccess)
-            {
-                var responseModel = JsonConvert.DeserializeObject<SalesforceCreateResponse>(response.responseContent, new JsonSerializerSettings
-                {
-                    MissingMemberHandling = MissingMemberHandling.Ignore,
-                    NullValueHandling = NullValueHandling.Include
-                });
-                return responseModel.id;
-            }
-            else
-            {
-                return null;
-            }
-        }
-        catch (Exception){ return null; }
-    }
+    
 
     public async Task<(AuthResponse response, string id)> FetchIdUsingSoqlQuery(SalesforceSetting salesforceSetting, string soql)
     {
@@ -295,50 +311,12 @@ public class SalesforceApiClient
         return (authResponse, id);
     }
 
-    private async Task<(string responseContent, bool isSuccess)> SendRequest(HttpRequestMessage req, string accessToken)
-    {
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        var response = await _httpClient.SendAsync(req);
-        var responseContent = await response.Content.ReadAsStringAsync();
-        return (responseContent, response.IsSuccessStatusCode);
-    }
-
-    public class AuthResponse
-    {
-        public string access_token { get; set; }
-        public string instance_url { get; set; }
-        public string id { get; set; }
-        public string token_type { get; set; }
-        public string issued_at { get; set; }
-        public string signature { get; set; }
-    }
-    public class SalesforceApiClientCredentials
-    {
-        public string ConsumerKey { get; set; }
-        public string ConsumerSecret { get; set; }
-        public string Username { get; set; }
-        public string Password { get; set; }
-    }
 
     public class SalesforceCreateResponse
     {
         public string id { get; set; } = string.Empty;
         public bool success { get; set; }
         public List<SalesforceError> errors { get; set; } = new();
-    }
-
-    public class SalesforceQueryResponse<T>
-    {
-        public int totalSize { get; set; }
-        public bool done { get; set; }
-        public List<T> records { get; set; } = new();
-        public string? nextRecordsUrl { get; set; }
-    }
-
-    public class SalesforceRecord
-    {
-        public string Id { get; set; } = string.Empty;
-        public object attributes { get; set; } = new();
     }
 
     public class SalesforceQueryResponse

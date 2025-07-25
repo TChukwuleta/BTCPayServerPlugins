@@ -38,9 +38,10 @@ public class UIPublicSalesforceController : Controller
         _invoiceController = invoiceController;
     }
 
-    [HttpPost("invoices")]
-    public async Task<IActionResult> CreateInvoice(string storeId, CreateInvoiceRequestVm model)
+    [HttpPost("create-invoice")]
+    public async Task<IActionResult> CreateInvoice([FromRoute] string storeId, [FromBody] CreateInvoiceRequestVm model)
     {
+        Console.WriteLine(JsonConvert.SerializeObject(model, Formatting.Indented));
         await using var ctx = _dbContextFactory.CreateContext();
         var salesforceSetting = ctx.SalesforceSettings.FirstOrDefault(c => c.StoreId == storeId);
         var store = await _storeRepo.FindStore(salesforceSetting?.StoreId);
@@ -65,13 +66,16 @@ public class UIPublicSalesforceController : Controller
             var invoice = await _invoiceController.CreateInvoiceCoreRaw(
                 new CreateInvoiceRequest()
                 {
-                    Amount = model.amount,
+                    Amount = Decimal.Parse(model.amount),
                     Currency = model.currency,
                     Metadata = new JObject
                     {
+                        ["cartId"] = model.cartId,
                         ["orderId"] = model.orderId,
-                        ["paymentMethodId"] = model.paymentMethodId,
-                        ["metadata"] = model.metadata != null ? JObject.FromObject(model.metadata) : null,
+                        ["checkoutId"] = model.checkoutId,
+                        ["webstoreId"] = model.webstoreId,
+                        ["orderReferenceNumber"] = model.orderId
+
                     },
                     AdditionalSearchTerms = new[]
                     {
@@ -80,6 +84,7 @@ public class UIPublicSalesforceController : Controller
                     }
                 }, store,
                 Request.GetAbsoluteRoot(), new List<string>() { salesforceSearchTerm });
+            Console.WriteLine(JsonConvert.SerializeObject(invoice, Formatting.Indented));
             return ReturnResponse(invoice);
         }
         catch (Exception ex)

@@ -88,14 +88,11 @@ public class UISalesforceController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var userStore = ctx.SalesforceSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new SalesforceSetting();
         return View(userStore);
-
-        
     }
 
 
     [HttpPost("~/plugins/stores/{storeId}/salesforce")]
-    public async Task<IActionResult> Index(string storeId,
-            SalesforceSetting vm, string command = "")
+    public async Task<IActionResult> Index(string storeId, SalesforceSetting vm, string command = "")
     {
         try 
         {
@@ -103,33 +100,6 @@ public class UISalesforceController : Controller
             var salesforceSetting = ctx.SalesforceSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
             switch (command)
             {
-                case "SaveSalseforcePaymentGatewayProvider":
-                    {
-                        var validCreds = vm?.CredentialsPopulated() == true;
-                        if (!validCreds)
-                        {
-                            TempData[WellKnownTempData.ErrorMessage] = "Please provide valid Salesforce credentials";
-                            return View(vm);
-                        }
-                        try
-                        {
-                            var request = HttpContext.Request;
-                            string baseUrl = $"{request.Scheme}://{request.Host}".TrimEnd('/');
-                            var apiClient = new SalesforceApiClient(_clientFactory);
-                            var paymentGatewayId = await apiClient.FetchPaymentGatewayProviderId(vm);
-                            await apiClient.SetupCustomObject(vm, baseUrl, storeId);
-                            vm.PaymentGatewayProvider = paymentGatewayId;
-                        }
-                        catch (SalesforceApiException err)
-                        {
-                            TempData[WellKnownTempData.ErrorMessage] = $"Unable to retrieve payment gateway: {err.Message}";
-                            return View(vm);
-                        }
-                        ctx.Update(vm);
-                        await ctx.SaveChangesAsync();
-                        TempData[WellKnownTempData.SuccessMessage] = "Salesforce payment gateway saved successfully";
-                        break;
-                    }
                 case "SalseforceSaveCredentials":
                     {
                         var validCreds = vm?.CredentialsPopulated() == true;
@@ -143,10 +113,9 @@ public class UISalesforceController : Controller
                             var apiClient = new SalesforceApiClient(_clientFactory);
                             var request = HttpContext.Request;
                             string baseUrl = $"{request.Scheme}://{request.Host}".TrimEnd('/');
+                            Console.WriteLine($"Base URL: {baseUrl}");
+                            Console.WriteLine($"Store Id: {storeId}");
                             await apiClient.SetupCustomObject(vm, baseUrl, storeId);
-                            //var paymentGatewayId = await apiClient.FetchPaymentGatewayProviderId(vm);
-                            //vm.PaymentGatewayProvider = paymentGatewayId;
-                            await apiClient.CreateBTCPaySettingsObject(vm);
                         }
                         catch (SalesforceApiException err)
                         {
