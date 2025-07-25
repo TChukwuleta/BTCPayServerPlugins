@@ -23,7 +23,6 @@ using StoreData = BTCPayServer.Data.StoreData;
 using BTCPayServer.Services;
 using BTCPayServer.Plugins.Salesforce.Services;
 using BTCPayServer.Plugins.Salesforce.Data;
-using BTCPayServer.Plugins.Salesforce.Helper;
 
 namespace BTCPayServer.Plugins.Salesforce;
 
@@ -93,10 +92,9 @@ public class UISalesforceController : Controller
 
 
     [HttpPost("~/plugins/stores/{storeId}/salesforce")]
-    public async Task<IActionResult> Index(string storeId,
-            SalesforceSetting vm, string command = "")
+    public async Task<IActionResult> Index(string storeId, SalesforceSetting vm, string command = "")
     {
-        try
+        try 
         {
             await using var ctx = _dbContextFactory.CreateContext();
             var salesforceSetting = ctx.SalesforceSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
@@ -110,16 +108,14 @@ public class UISalesforceController : Controller
                             TempData[WellKnownTempData.ErrorMessage] = "Please provide valid Salesforce credentials";
                             return View(vm);
                         }
-                        var apiClient = new SalesforceApiClient(_clientFactory);
                         try
                         {
-                            var authResponse = await apiClient.Authenticate(vm);
+                            var apiClient = new SalesforceApiClient(_clientFactory);
                             var request = HttpContext.Request;
                             string baseUrl = $"{request.Scheme}://{request.Host}".TrimEnd('/');
-                            await apiClient.RegisterBTCPayStoreInSalesforce(vm, baseUrl, CurrentStore.Id);
-                            /*await apiClient.CreateBTCInvoiceIdField(authResponse);
-                            await apiClient.CreateBTCPaymentUrlField(authResponse);
-                            await apiClient.CreatePaymentStatusField(authResponse);*/
+                            Console.WriteLine($"Base URL: {baseUrl}");
+                            Console.WriteLine($"Store Id: {storeId}");
+                            await apiClient.SetupCustomObject(vm, baseUrl, storeId);
                         }
                         catch (SalesforceApiException err)
                         {
@@ -186,32 +182,3 @@ public class UISalesforceController : Controller
 
     private string GetUserId() => _userManager.GetUserId(User);
 }
-
-
-/*[HttpPost("btcpay")]
-    public async Task<IActionResult> HandleBTCPayWebhook([FromBody] JsonElement payload)
-    {
-        try
-        {
-            _logger.LogInformation("Received BTCPay webhook");
-
-            var invoiceId = payload.GetProperty("invoiceId").GetString();
-            var type = payload.GetProperty("type").GetString();
-
-            if (type == "InvoiceSettled" || type == "InvoiceProcessing" || type == "InvoiceExpired")
-            {
-                // Get full invoice details
-                var invoice = await _btcpayService.GetInvoiceAsync(invoiceId!);
-
-                // Update Salesforce
-                await _salesforceService.UpdateTransactionStatusAsync(invoiceId!, invoice.Status.ToString());
-            }
-
-            return Ok(new { status = "success" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing BTCPay webhook");
-            return StatusCode(500, new { error = ex.Message });
-        }
-    }*/

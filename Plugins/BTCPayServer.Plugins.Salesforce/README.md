@@ -1,73 +1,17 @@
-force-app/main/default/
-├── classes/
-│   ├── BTCPayServerService.cls              # API service for BTCPay calls
-│   ├── BTCPayServerService.cls-meta.xml
-│   ├── BitcoinPaymentService.cls            # Business logic for payments
-│   ├── BitcoinPaymentService.cls-meta.xml
-│   ├── BTCPayPaymentUpdateAPI.cls           # REST API for plugin callbacks
-│   ├── BTCPayPaymentUpdateAPI.cls-meta.xml
-│   ├── BTCPayServerServiceTest.cls          # Test classes
-│   ├── BTCPayServerServiceTest.cls-meta.xml
-│   ├── BitcoinPaymentServiceTest.cls
-│   └── BitcoinPaymentServiceTest.cls-meta.xml
-│
-├── objects/
-│   ├── BTCPay_Configuration__c/
-│   │   ├── BTCPay_Configuration__c.object-meta.xml
-│   │   └── fields/
-│   │       ├── API_Key__c.field-meta.xml
-│   │       ├── Server_URL__c.field-meta.xml
-│   │       └── Store_ID__c.field-meta.xml
-│   │
-│   ├── BTCPay_Transaction__c/
-│   │   ├── BTCPay_Transaction__c.object-meta.xml
-│   │   └── fields/
-│   │       ├── Amount__c.field-meta.xml
-│   │       ├── Invoice_ID__c.field-meta.xml
-│   │       ├── Status__c.field-meta.xml
-│   │       ├── Opportunity__c.field-meta.xml
-│   │       ├── Quote__c.field-meta.xml
-│   │       ├── Payment_URL__c.field-meta.xml
-│   │       ├── Currency__c.field-meta.xml
-│   │       ├── Created_Date__c.field-meta.xml
-│   │       └── Expiration_Date__c.field-meta.xml
-│   │
-│   ├── Opportunity/
-│   │   └── fields/
-│   │       ├── Bitcoin_Payment_Status__c.field-meta.xml
-│   │       ├── Bitcoin_Transaction_ID__c.field-meta.xml
-│   │       └── Bitcoin_Paid_Date__c.field-meta.xml
-│   │
-│   └── Quote/
-│       └── fields/
-│           ├── Bitcoin_Payment_Status__c.field-meta.xml
-│           ├── Bitcoin_Transaction_ID__c.field-meta.xml
-│           └── Bitcoin_Paid_Date__c.field-meta.xml
-│
-├── lwc/
-│   └── btcpayPayment/
-│       ├── btcpayPayment.html
-│       ├── btcpayPayment.js
-│       ├── btcpayPayment.js-meta.xml
-│       └── btcpayPayment.css
-│
-├── flexipages/
-│   ├── Opportunity_Record_Page.flexipage-meta.xml
-│   └── Quote_Record_Page.flexipage-meta.xml
-│
-├── permissionsets/
-│   └── BTCPay_Integration_Admin.permissionset-meta.xml
-│
-└── staticresources/
-    └── btcpay_icons.resource-meta.xml
+If you dont have a salesforce site..
+
+you can follow this guide: https://help.salesforce.com/s/articleView?id=platform.sites_setup_overview.htm&type=5
 
 
 
-    You need to create a Connected App in Salesforce to enable API access:
+On getting details:
+- your username is your salesforce username
+- Your password is your salesforce password
+- For the salesforce security tokem.. Log in to your salesforce account, go to profile, click on Settings, and on the left bar click on Reset my security token.. and your security token would be sent to your email.
 
 In Salesforce Setup:
 
-Go to App Manager → New Connected App
+Go to App Manager → New External client App
 Enable OAuth Settings
 Add scopes: api, refresh_token, offline_access
 1. Access Lightning applications (lightning)
@@ -76,6 +20,30 @@ Add scopes: api, refresh_token, offline_access
 Enable "Client Credentials Flow" for server-to-server integration
 
 
+
+1. Local: These apps are developed and used exclusively within a single Salesforce org. They cannot be distributed to other orgs and are not copied to a new sandbox when you clone or refresh a sandbox. This setting is ideal for apps that are specific to a single organization and do not require sharing or distribution.
+Packaged: These apps are designed to be included in second-generation (2GP) managed packages and can be distributed to subscriber orgs. This setting enables the app to be shared across multiple organizations, making it suitable for apps that need to be deployed in various environments or shared with other Salesforce users. Packaged external client apps are copied to sandboxes during refresh or clone operations, ensuring consistency across environments.
+
+
+
+1. A custom object needs to be manually created.. Before I can reate the custom fields
+
 Security token:
 
 - Profile (top right) -> Settings -> Reset my security token
+
+
+
+Steps: 
+
+- Credentials setup
+- Custom objects (Predefined)
+- create custom object fields and record
+- Deploy the code
+- Create new gateway provider 
+- Create a named credentials
+- Create a payment gateway record
+
+
+
+https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_commercepayments_async_adapter_setup.htm

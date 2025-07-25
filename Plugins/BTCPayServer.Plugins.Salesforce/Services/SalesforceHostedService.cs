@@ -5,6 +5,7 @@ using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
 using BTCPayServer.Plugins.Salesforce.Helper;
 using BTCPayServer.Services.Invoices;
+using BTCPayServer.Services.Rates;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System;
@@ -16,18 +17,21 @@ namespace BTCPayServer.Plugins.Salesforce.Services;
 
 public class SalesforceHostedService : EventHostedServiceBase
 {
+    private readonly CurrencyNameTable _currencyNameTable;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly SalesforceApiClient _salesforceApiClient;
     private readonly SalesforceDbContextFactory _dbContextFactory;
 
     public SalesforceHostedService(EventAggregator eventAggregator,
         InvoiceRepository invoiceRepository,
+        CurrencyNameTable currencyNameTable,
         SalesforceApiClient salesforceApiClient,
         SalesforceDbContextFactory dbContextFactory,
         Logs logs) : base(eventAggregator, logs)
     {
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
+        _currencyNameTable = currencyNameTable;
         _salesforceApiClient = salesforceApiClient;
     }
 
@@ -81,9 +85,17 @@ public class SalesforceHostedService : EventHostedServiceBase
         if (salesforceSettings == null) 
             return logs;
 
+        decimal? btcpayPaid = invoice switch
+        {
+            { Status: InvoiceStatus.Settled } => invoice.Price,
+            { Status: InvoiceStatus.Expired, ExceptionStatus: InvoiceExceptionStatus.PaidPartial } => NetSettled(invoice),
+            { Status: InvoiceStatus.Invalid, ExceptionStatus: InvoiceExceptionStatus.Marked } => 0.0m,
+            { Status: InvoiceStatus.Invalid } => NetSettled(invoice),
+            _ => null
+        };
         try
         {
-            await _salesforceApiClient.UpdateTransactionStatus(salesforceSettings, invoice.Id, invoice.Status.ToString());
+            await _salesforceApiClient.WebhookNotification(salesforceSettings, invoice.Id, invoice.Status.ToString(), invoice.StoreId, btcpayPaid.ToString());
             logs.Write(
                 $"Successfully captured the order on Salesforce. ({invoice.Currency})",
                 InvoiceEventData.EventSeverity.Info);
@@ -94,5 +106,11 @@ public class SalesforceHostedService : EventHostedServiceBase
                 InvoiceEventData.EventSeverity.Error);
         }
         return logs;
+    }
+
+
+    private decimal NetSettled(InvoiceEntity invoice)
+    {
+        return Math.Round(invoice.NetSettled, _currencyNameTable.GetNumberFormatInfo(invoice.Currency)?.CurrencyDecimalDigits ?? 2);
     }
 }
