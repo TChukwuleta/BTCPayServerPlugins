@@ -41,7 +41,6 @@ public class UIPublicSalesforceController : Controller
     [HttpPost("create-invoice")]
     public async Task<IActionResult> CreateInvoice([FromRoute] string storeId, [FromBody] CreateInvoiceRequestVm model)
     {
-        Console.WriteLine(JsonConvert.SerializeObject(model, Formatting.Indented));
         await using var ctx = _dbContextFactory.CreateContext();
         var salesforceSetting = ctx.SalesforceSettings.FirstOrDefault(c => c.StoreId == storeId);
         var store = await _storeRepo.FindStore(salesforceSetting?.StoreId);
@@ -84,13 +83,33 @@ public class UIPublicSalesforceController : Controller
                     }
                 }, store,
                 Request.GetAbsoluteRoot(), new List<string>() { salesforceSearchTerm });
-            Console.WriteLine(JsonConvert.SerializeObject(invoice, Formatting.Indented));
             return ReturnResponse(invoice);
         }
         catch (Exception ex)
         {
             return BadRequest($"An error occurred while trying to create invoice for salesforce. {ex.Message}");
         }
+    }
+
+
+    [HttpGet("invoices/{invoiceId}")]
+    public async Task<IActionResult> GetInvoice([FromRoute] string storeId, [FromRoute] string invoiceId)
+    {
+        Console.WriteLine($"GetInvoice called for storeId: {storeId}, invoiceId: {invoiceId}");
+        await using var ctx = _dbContextFactory.CreateContext();
+        var salesforceSetting = ctx.SalesforceSettings.FirstOrDefault(c => c.StoreId == storeId);
+        var store = await _storeRepo.FindStore(salesforceSetting?.StoreId);
+        if (salesforceSetting == null || store == null || !salesforceSetting.IntegratedAt.HasValue)
+        {
+            return BadRequest("Invalid BTCPay Store specified. Please contact the admin");
+        }
+        var invoice = await _invoiceRepository.GetInvoice(invoiceId);
+        if (invoice == null || invoice.StoreId != salesforceSetting.StoreId)
+        {
+            return NotFound("Invoice not found or does not belong to the specified store.");
+        }
+        Console.WriteLine(JsonConvert.SerializeObject(invoice, Formatting.Indented));
+        return ReturnResponse(invoice);
     }
 
 
@@ -117,32 +136,12 @@ public class UIPublicSalesforceController : Controller
         return Ok("Invoice successfully marked as invalid");
     }
 
-
-    [HttpGet("invoices/{invoiceId}")]
-    public async Task<IActionResult> GetInvoice(string storeId, string invoiceId)
-    {
-        await using var ctx = _dbContextFactory.CreateContext();
-        var salesforceSetting = ctx.SalesforceSettings.FirstOrDefault(c => c.StoreId == storeId);
-        var store = await _storeRepo.FindStore(salesforceSetting?.StoreId);
-        if (salesforceSetting == null || store == null || !salesforceSetting.IntegratedAt.HasValue)
-        {
-            return BadRequest("Invalid BTCPay Store specified. Please contact the admin");
-        }
-        var invoice = await _invoiceRepository.GetInvoice(invoiceId);
-        if (invoice == null || invoice.StoreId != salesforceSetting.StoreId)
-        {
-            return NotFound("Invoice not found or does not belong to the specified store.");
-        }
-        Console.WriteLine(JsonConvert.SerializeObject(invoice, Formatting.Indented));
-        return ReturnResponse(invoice);
-    }
-
     private IActionResult ReturnResponse(InvoiceEntity invoice)
     {
         return Ok(new
         {
-            id = invoice.Id,
-            status = InvoiceStatus.Invalid.ToString(),
+            invoiceId = invoice.Id,
+            status = invoice.Status.ToString(),
             currency = invoice.Currency,
             amount = invoice.Price,
             checkoutLink = Url.Action(nameof(UIInvoiceController.Checkout), "UIInvoice", new { invoiceId = invoice.Id }, Request.Scheme)
