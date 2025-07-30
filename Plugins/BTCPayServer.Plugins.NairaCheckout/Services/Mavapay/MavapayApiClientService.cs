@@ -1,13 +1,16 @@
-﻿using System.Collections.Generic;
-using System;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using BTCPayServer.Plugins.NairaCheckout.ViewModels;
-using Newtonsoft.Json;
+using BTCPayServer.Data;
+using BTCPayServer.Logging;
 using BTCPayServer.Plugins.NairaCheckout.Data;
+using BTCPayServer.Plugins.NairaCheckout.ViewModels;
 using BTCPayServer.Services.Invoices;
-using System.Linq;
+using NBitpayClient;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.NairaCheckout.Services;
 
@@ -27,7 +30,7 @@ public class MavapayApiClientService
     }
 
     public async Task<NairaCheckoutResponseViewModel> NairaCheckout(string apikey, decimal amount, string lnInvoice, string invoiceId, string storeId)
-    { 
+    {
         try
         {
             var createQuote = await CreateQuote(new CreateQuoteRequestVm
@@ -39,7 +42,7 @@ public class MavapayApiClientService
                 targetCurrency = "BTCSAT",
                 paymentMethod = "BankTransfer",
                 beneficiary = new MavapayBeneficiaryVm { lnInvoice = lnInvoice }
-            }, apikey);
+            }, invoiceId, apikey);
             if (createQuote == null || string.IsNullOrEmpty(createQuote.id))
             {
                 return new NairaCheckoutResponseViewModel { ErrorMessage = "An error occured while creating record via Mavapay. Please contact the merchant" };
@@ -66,17 +69,21 @@ public class MavapayApiClientService
     }
 
     // Quote
-    public async Task<CreateQuoteResponseVm> CreateQuote(CreateQuoteRequestVm requestModel, string apiKey)
+    public async Task<CreateQuoteResponseVm> CreateQuote(CreateQuoteRequestVm requestModel, string invoiceId, string apiKey)
     {
+        var result = new InvoiceLogs();
+        result.Write($"Initiating call to mavapay to create quote", InvoiceEventData.EventSeverity.Info);
         var postJson = JsonConvert.SerializeObject(requestModel);
         var req = CreateRequest(HttpMethod.Post, "quote");
         req.Content = new StringContent(postJson, Encoding.UTF8, "application/json");
         var response = await SendRequest(req, apiKey);
+        result.Write($"Mavapay quote response: {response}", InvoiceEventData.EventSeverity.Info);
         var responseModel = JsonConvert.DeserializeObject<EntityVm<CreateQuoteResponseVm>>(response, new JsonSerializerSettings
         {
             MissingMemberHandling = MissingMemberHandling.Ignore,
             NullValueHandling = NullValueHandling.Include
         });
+        await _invoiceRepository.AddInvoiceLogs(invoiceId, result);
         return responseModel.data;
     }
 
@@ -160,11 +167,10 @@ public class MavapayApiClientService
     private async Task<string> SendRequest(HttpRequestMessage req, string apiKey)
     {
         const string headerKey = "X-API-KEY";
-        if (_httpClient.DefaultRequestHeaders.Contains(headerKey))
-            _httpClient.DefaultRequestHeaders.Remove(headerKey);
+        if (req.Headers.Contains(headerKey))
+            req.Headers.Remove(headerKey);
 
-        _httpClient.DefaultRequestHeaders.Add(headerKey, apiKey);
-
+        req.Headers.Add(headerKey, apiKey);
         var response = await _httpClient.SendAsync(req);
         var responseContent = await response.Content.ReadAsStringAsync();
         Console.WriteLine(responseContent);
