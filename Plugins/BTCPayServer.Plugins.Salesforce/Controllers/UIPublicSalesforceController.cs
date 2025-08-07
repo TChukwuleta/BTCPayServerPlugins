@@ -108,7 +108,6 @@ public class UIPublicSalesforceController : Controller
         {
             return NotFound("Invoice not found or does not belong to the specified store.");
         }
-        Console.WriteLine(JsonConvert.SerializeObject(invoice, Formatting.Indented));
         return ReturnResponse(invoice);
     }
 

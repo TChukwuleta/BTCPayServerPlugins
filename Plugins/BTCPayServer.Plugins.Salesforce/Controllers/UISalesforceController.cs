@@ -113,8 +113,6 @@ public class UISalesforceController : Controller
                             var apiClient = new SalesforceApiClient(_clientFactory);
                             var request = HttpContext.Request;
                             string baseUrl = $"{request.Scheme}://{request.Host}".TrimEnd('/');
-                            Console.WriteLine($"Base URL: {baseUrl}");
-                            Console.WriteLine($"Store Id: {storeId}");
                             await apiClient.SetupCustomObject(vm, baseUrl, storeId);
                         }
                         catch (SalesforceApiException err)

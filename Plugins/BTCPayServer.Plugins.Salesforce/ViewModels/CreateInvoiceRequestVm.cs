@@ -8,4 +8,5 @@ public class CreateInvoiceRequestVm
     public string checkoutId { get; set; }
     public string cartId { get; set; }
     public string webstoreId { get; set; }
+    public string paymentMethodId { get; set; }
 }

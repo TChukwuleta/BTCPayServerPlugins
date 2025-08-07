@@ -14,7 +14,7 @@ public class SalesforceApiClient
 {
     private readonly HttpClient _httpClient;
     private readonly string salesforceVersion = "v62.0";
-    private readonly string customObjectName = "Kroenke"; // "BTCPay_Server_Settings";
+    private readonly string customObjectName = "BTCPay_Server_Settings"; // "BTCPay_Server_Settings";
     private readonly string PaymentGatewayProvider = "BTCPayServerGatewayProvider";
 
     private readonly string customObjectLabel = "BTCPay Server Settings";
@@ -267,7 +267,6 @@ public class SalesforceApiClient
         var content = new StringContent(JsonConvert.SerializeObject(fieldDefinition), Encoding.UTF8, "application/json");
         var response = await _httpClient.PostAsync(url, content);
         var responseContent = await response.Content.ReadAsStringAsync();
-        Console.WriteLine(responseContent);
         return response.IsSuccessStatusCode;
     }
 
