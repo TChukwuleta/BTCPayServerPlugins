@@ -20,7 +20,7 @@ Before diving into the setup process, ensure you have the following:
 
 3. Once installed you should see `Naira (Mavapay)`, included in the side nav of your instance in the wallets section
 
-4. Log in to your Mavapay account on a new tab, on the dashboard, you'd see your Test Keys. Copy the key.
+4. Log in to your Mavapay account on a new tab, on the dashboard, you'd see your Secret. Copy the key.
 
 5. Head back to your BTCPay Server instance, click on `Naira (Mavapay)` in the side nav, and paste the key into the `Mavapay API Key` input field.
 
