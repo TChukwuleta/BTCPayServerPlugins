@@ -20,12 +20,11 @@ using NBitcoin.DataEncoders;
 using NBitcoin;
 using System.Net.Http;
 using System.Collections.Generic;
-using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.Template;
 
 [Route("stores/{storeId}/naira")]
-[Authorize]
+[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UINairaController : Controller
 {
     private readonly RateFetcher _rateFactory;
@@ -59,25 +58,24 @@ public class UINairaController : Controller
     private StoreData StoreData => HttpContext.GetStoreData();
 
     [HttpGet]
-    public async Task<IActionResult> StoreConfig(string storeId)
+    public async Task<IActionResult> StoreConfig()
     {
-        var store = await _storeRepository.FindStore(storeId);
-        var paymentMethods = store.GetPaymentMethodConfigs(_handler, onlyEnabled: true);
+        var paymentMethods = StoreData.GetPaymentMethodConfigs(_handler, onlyEnabled: true);
         var hasLightningPaymentMethod = paymentMethods.Keys.Any(key => lightningPaymentMethods.Contains(key.ToString()));
         await using var ctx = _dbContextFactory.CreateContext();
-        var existingSetting = ctx.MavapaySettings.FirstOrDefault(m => m.StoreId == storeId);
-        var model = new NairaStoreViewModel { Enabled = await _nairaStatusProvider.NairaEnabled(storeId), WebhookSecret = existingSetting?.WebhookSecret, ApiKey = existingSetting?.ApiKey };
+        var existingSetting = ctx.MavapaySettings.FirstOrDefault(m => m.StoreId == StoreData.Id);
+        var model = new NairaStoreViewModel { Enabled = await _nairaStatusProvider.NairaEnabled(StoreData.Id), WebhookSecret = existingSetting?.WebhookSecret, ApiKey = existingSetting?.ApiKey };
         return View(model);
     }
 
 
     [HttpPost]
-    public async Task<IActionResult> StoreConfig(NairaStoreViewModel viewModel, string storeId)
+    public async Task<IActionResult> StoreConfig(NairaStoreViewModel viewModel)
     {
-        var store = await _storeRepository.FindStore(storeId);
-        var blob = store.GetStoreBlob();
+        var store = StoreData;
+        var blob = StoreData.GetStoreBlob();
         var paymentMethodId = NairaCheckoutPlugin.NairaPmid;
-        var paymentMethods = store.GetPaymentMethodConfigs(_handler, onlyEnabled: true);
+        var paymentMethods = StoreData.GetPaymentMethodConfigs(_handler, onlyEnabled: true);
         var hasLightningPaymentMethod = paymentMethods.Keys.Any(key => lightningPaymentMethods.Contains(key.ToString()));
         if (!hasLightningPaymentMethod)
         {
@@ -87,12 +85,12 @@ public class UINairaController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var apiClient = new MavapayApiClientService(_clientFactory, _dbContextFactory, _invoiceRepository);
         var webhookSecret = !string.IsNullOrEmpty(viewModel.WebhookSecret) ? viewModel.WebhookSecret : Encoders.Base58.EncodeData(RandomUtils.GetBytes(10));
-        var url = Url.Action("ReceiveMavapayWebhook", "UINairaPublic", new { storeId }, Request.Scheme);
+        var url = Url.Action("ReceiveMavapayWebhook", "UINairaPublic", new { storeId = StoreData.Id }, Request.Scheme);
         var entity = ctx.NairaCheckoutSettings.FirstOrDefault(c => c.Enabled) ?? new NairaCheckoutSetting { WalletName = Wallet.Mavapay.ToString() };
         bool successfulCalls = false;
         if (viewModel.Enabled)
         {
-            var existingSetting = ctx.MavapaySettings.FirstOrDefault(m => m.StoreId == storeId);
+            var existingSetting = ctx.MavapaySettings.FirstOrDefault(m => m.StoreId == StoreData.Id);
             bool needsUpdate = existingSetting == null || existingSetting.WebhookSecret != webhookSecret;
             bool webhookSuccess = !needsUpdate || await apiClient.UpdateWebhook(viewModel.ApiKey, url, webhookSecret);
             successfulCalls = webhookSuccess;
@@ -104,7 +102,7 @@ public class UINairaController : Controller
                     {
                         ApiKey = viewModel.ApiKey,
                         WebhookSecret = webhookSecret,
-                        StoreId = storeId,
+                        StoreId = StoreData.Id,
                         StoreName = StoreData.StoreName,
                         ApplicationUserId = GetUserId(),
                         IntegratedAt = DateTime.UtcNow,
@@ -125,13 +123,13 @@ public class UINairaController : Controller
             return RedirectToAction(nameof(StoreConfig), new { storeId = store.Id, paymentMethodId });
         }
 
-        var currentPaymentMethodConfig = store.GetPaymentMethodConfig<CashPaymentMethodConfig>(paymentMethodId, _handler);
+        var currentPaymentMethodConfig = StoreData.GetPaymentMethodConfig<CashPaymentMethodConfig>(paymentMethodId, _handler);
         currentPaymentMethodConfig ??= new CashPaymentMethodConfig();
         blob.SetExcluded(paymentMethodId, !viewModel.Enabled);
-        store.SetPaymentMethodConfig(_handler[paymentMethodId], currentPaymentMethodConfig);
+        StoreData.SetPaymentMethodConfig(_handler[paymentMethodId], currentPaymentMethodConfig);
         store.SetStoreBlob(blob);
         await _storeRepository.UpdateStore(store);
-        entity.Enabled = await _nairaStatusProvider.NairaEnabled(storeId);
+        entity.Enabled = await _nairaStatusProvider.NairaEnabled(StoreData.Id);
         ctx.NairaCheckoutSettings.Update(entity);
         await ctx.SaveChangesAsync();
         return RedirectToAction(nameof(StoreConfig), new { storeId = store.Id, paymentMethodId });
