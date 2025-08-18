@@ -35,4 +35,5 @@ public class NairaCheckoutResponseViewModel
     public string LightningInvoice { get; set; }
     public string AccountName { get; set; }
     public string ErrorMessage { get; set; }
+    public DateTimeOffset? AccountNumberExpiration { get; set; }
 }

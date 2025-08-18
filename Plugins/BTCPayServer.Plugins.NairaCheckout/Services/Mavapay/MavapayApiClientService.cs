@@ -47,9 +47,15 @@ public class MavapayApiClientService
             {
                 return new NairaCheckoutResponseViewModel { ErrorMessage = "An error occured while creating record via Mavapay. Please contact the merchant" };
             }
-            var amountInNaira = createQuote.amountInSourceCurrency / 100m; // display to user amount in source currency.. amount is usually in Kobo
+            var amountInNaira = createQuote.amountInSourceCurrency / 100m; // display to user amount in source currency.. amount is usually in Kobo, but user needs to see Naira
             await CreateOrderRecord(createQuote, invoiceId, amount, storeId);
-            return new NairaCheckoutResponseViewModel { BankName = createQuote.bankName, AccountNumber = createQuote.ngnBankAccountNumber, AccountName = createQuote.ngnAccountName, Amount = amountInNaira };
+            return new NairaCheckoutResponseViewModel { 
+                BankName = createQuote.bankName, 
+                AccountNumber = createQuote.ngnBankAccountNumber, 
+                AccountName = createQuote.ngnAccountName, 
+                Amount = amountInNaira,
+                AccountNumberExpiration = createQuote.expiry,
+            };
         }
         catch (Exception ex)
         {
