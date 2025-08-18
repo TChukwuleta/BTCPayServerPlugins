@@ -12,6 +12,7 @@
     string bankName = string.Empty;
     string accountNumber = string.Empty;
     decimal amount = 0;
+    DateTimeOffset? expiryDate = null;
 
     var lightningDetails = await mavapayClient.GetLightningPaymentLink(Model.InvoiceId);
     if (string.IsNullOrEmpty(lightningDetails.lnInvoice) || lightningDetails.amount == 0)
@@ -32,6 +33,7 @@
         bankName = createQuoteResponse.BankName;
         accountName = createQuoteResponse.AccountName;
         accountNumber = createQuoteResponse.AccountNumber;
+        expiryDate = createQuoteResponse.AccountNumberExpiration;
     }
 }
 
@@ -43,7 +45,7 @@
                 To complete your payment, kindly make a transfer to the following bank account:
             </p>
 
-            <div class="card border-0 shadow-sm p-4 bg-light mx-auto" style="max-width: 400px;">
+            <div v-if="!expired" class="card border-0 shadow-sm p-4 bg-light mx-auto" style="max-width: 400px;">
                 <p class="mb-2">
                     <strong class="text-dark">Bank Name:</strong><br>
                     <span class="fs-5 text-secondary">{{ bankName }}</span>
@@ -52,14 +54,21 @@
                     <strong class="text-dark">Account Name:</strong><br>
                     <span class="fs-5 text-secondary">{{ accountName }}</span>
                 </p>
-                <p class="mb-0">
+                <p class="mb-2">
                     <strong class="text-dark">Account Number:</strong><br>
                     <span class="fs-5 text-secondary">{{ accountNumber }}</span>
                 </p>
-                <p class="mb-0">
+                <p class="mb-2">
                     <strong class="text-dark">Amount:</strong><br>
                     <span class="fs-5 text-secondary">{{ amount }}</span>
                 </p>
+                <p class="mb-0 text-danger fw-bold" v-if="timeLeft">
+                    Expires in: {{ timeLeft }}
+                </p>
+            </div>
+
+            <div v-else class="alert alert-warning fw-bold mt-3" role="alert">
+                The account number provided has expired. Kindly create a new invoice to continue your payment
             </div>
         </template>
 
@@ -86,8 +95,35 @@
                 accountName: @safe.Json(accountName),
                 accountNumber: @safe.Json(accountNumber),
                 errorMessage: @safe.Json(errorMessage),
-                amount: @safe.Json(amount)
+                amount: @safe.Json(amount),
+                expiryDate: @safe.Json(expiryDate),
+                timeLeft: null,
+                expired: false
             };
+        },
+        mounted() {
+            if (this.expiryDate) {
+                this.startCountdown();
+            }
+        },
+        methods: {
+            startCountdown() {
+                const expiry = new Date(this.expiryDate).getTime();
+                const interval = setInterval(() => {
+                    const now = new Date().getTime();
+                    const distance = expiry - now;
+
+                    if (distance <= 0) {
+                        clearInterval(interval);
+                        this.timeLeft = "Expired";
+                        this.expired = true;
+                    } else {
+                        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                        this.timeLeft = `${minutes}m ${seconds}s`;
+                    }
+                }, 1000);
+            }
         }
     });
 </script>
