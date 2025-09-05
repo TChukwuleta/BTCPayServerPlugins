@@ -19,7 +19,7 @@ public class MavapayApiClientService
     private readonly HttpClient _httpClient;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly NairaCheckoutDbContextFactory _dbContextFactory;
-    public readonly string ApiUrl = "https://api.mavapay.co/api/v1"; //"https://staging.api.mavapay.co/api/v1";
+    public readonly string ApiUrl = "https://staging.api.mavapay.co/api/v1"; //"https://staging.api.mavapay.co/api/v1";
     private readonly List<string> validStatuses = new List<string> { "success", "ok" };
 
     public MavapayApiClientService(IHttpClientFactory httpClientFactory, NairaCheckoutDbContextFactory dbContextFactory, InvoiceRepository invoiceRepository)
@@ -63,6 +63,44 @@ public class MavapayApiClientService
         }
     }
 
+    public async Task<NairaCheckoutResponseViewModel> MavapayNairaPayout(PayoutNGNViewModel model, string apikey)
+    {
+        try
+        {
+            var createPayout = await CreatePayout(new CreatePayoutRequestVm
+            {
+                amount = model.Amount * 100m,
+                customerInternalFee = 0,
+                sourceCurrency = "BTCSAT",
+                targetCurrency = "NGNKOBO",
+                paymentMethod = "LIGHTNING",
+                autopayout = true,
+                paymentCurrency = "NGNKOBO",
+                beneficiary = new PayoutBeneficiary { bankAccountName = model.AccountName, bankAccountNumber = model.AccountNumber, bankCode = model.BankCode, bankName = model.BankName }
+            }, apikey);
+            if (createPayout == null || string.IsNullOrEmpty(createPayout.id))
+            {
+                return new NairaCheckoutResponseViewModel { ErrorMessage = "An error occured while creating payout record via Mavapay. Please contact the merchant" };
+            }
+            /*var amountInNaira = createQuote.amountInSourceCurrency / 100m; // display to user amount in source currency.. amount is usually in Kobo, but user needs to see Naira
+            await CreateOrderRecord(createQuote, invoiceId, amount, storeId);
+            return new NairaCheckoutResponseViewModel
+            {
+                BankName = createQuote.bankName,
+                AccountNumber = createQuote.ngnBankAccountNumber,
+                AccountName = createQuote.ngnAccountName,
+                Amount = amountInNaira,
+                AccountNumberExpiration = createQuote.expiry,
+            };*/
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return new NairaCheckoutResponseViewModel { ErrorMessage = $"An error occured: {ex.Message}. Please contact the merchant" };
+        }
+    }
+
     public async Task<(decimal amount, string lnInvoice)> GetLightningPaymentLink(string invoiceId)
     {
         var entity = await _invoiceRepository.GetInvoice(invoiceId, true);
@@ -74,7 +112,6 @@ public class MavapayApiClientService
         return (accounting?.TotalDue ?? 0m, prompt.Destination);
     }
 
-    // Quote
     public async Task<CreateQuoteResponseVm> CreateQuote(CreateQuoteRequestVm requestModel, string invoiceId, string apiKey)
     {
         var result = new InvoiceLogs();
@@ -92,6 +129,50 @@ public class MavapayApiClientService
         await _invoiceRepository.AddInvoiceLogs(invoiceId, result);
         return responseModel.data;
     }
+
+    public async Task<CreateQuoteResponseVm> CreatePayout(CreatePayoutRequestVm requestModel, string apiKey)
+    {
+        var postJson = JsonConvert.SerializeObject(requestModel);
+        var req = CreateRequest(HttpMethod.Post, "quote");
+        req.Content = new StringContent(postJson, Encoding.UTF8, "application/json");
+        var response = await SendRequest(req, apiKey);
+        var responseModel = JsonConvert.DeserializeObject<EntityVm<CreateQuoteResponseVm>>(response, new JsonSerializerSettings
+        {
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            NullValueHandling = NullValueHandling.Include
+        });
+        return responseModel.data;
+    }
+
+    public async Task<List<GetNGNBanks>> GetNGNBanks(string apiKey)
+    {
+        var req = CreateRequest(HttpMethod.Get, "bank/bankcode?country=NG");
+        var response = await SendRequest(req, apiKey);
+        var responseModel = JsonConvert.DeserializeObject<EntityVm<List<GetNGNBanks>>>(response, new JsonSerializerSettings
+        {
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            NullValueHandling = NullValueHandling.Include
+        });
+        if (responseModel == null || !validStatuses.Contains(responseModel.status?.ToLower().Trim()))
+            return null;
+        return responseModel.data;
+    }
+
+    public async Task<NGNNameEquiry> NGNNameEnquiry(string bankCode, string accountNumber, string apiKey)
+    {
+        var req = CreateRequest(HttpMethod.Get, $"bank/name-enquiry?accountNumber={accountNumber}&bankCode={bankCode}");
+        var response = await SendRequest(req, apiKey);
+        Console.WriteLine($"Name enquiry response: {response}");
+        var responseModel = JsonConvert.DeserializeObject<EntityVm<NGNNameEquiry>>(response, new JsonSerializerSettings
+        {
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            NullValueHandling = NullValueHandling.Include
+        });
+        if (responseModel == null || !validStatuses.Contains(responseModel.status?.ToLower().Trim()))
+            return null;
+        return responseModel.data;
+    }
+
 
     // Webhook
     public async Task<bool> RegisterWebhook(string apiKey, string url, string secret)
@@ -179,7 +260,6 @@ public class MavapayApiClientService
         req.Headers.Add(headerKey, apiKey);
         var response = await _httpClient.SendAsync(req);
         var responseContent = await response.Content.ReadAsStringAsync();
-        Console.WriteLine(responseContent);
         return responseContent;
     }
 }

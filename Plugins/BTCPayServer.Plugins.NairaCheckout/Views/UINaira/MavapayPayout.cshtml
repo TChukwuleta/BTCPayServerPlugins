@@ -1,0 +1,109 @@
+﻿@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Plugins.NairaCheckout
+@using BTCPayServer.Plugins.NairaCheckout.ViewModels
+@using Microsoft.AspNetCore.Mvc.TagHelpers
+@inject IScopeProvider ScopeProvider
+@model MavapayPayoutViewModel
+@{
+    ViewData.SetActivePage(NairaCheckoutPlugin.PluginNavKey, "Mavapay Configuration", "Configuration");
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+
+<div>
+    <h2 class="mb-4">Mavapay Payouts</h2>
+
+    <ul class="nav nav-tabs" id="payoutTabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" id="ngn-tab" data-bs-toggle="tab" data-bs-target="#ngn" type="button" role="tab">NGN</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" id="zar-tab" data-bs-toggle="tab" data-bs-target="#zar" type="button" role="tab">ZAR</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" id="kes-tab" data-bs-toggle="tab" data-bs-target="#kes" type="button" role="tab">KES</button>
+        </li>
+    </ul>
+
+    <div class="tab-content mt-3">
+        <div class="tab-pane fade show active" id="ngn" role="tabpanel">
+            <form asp-action="ProcessNGNPayout" asp-route-storeId=@storeId method="post">
+                <div class="mb-3">
+                    <label class="form-label">Bank</label>
+                    <select asp-items="Model.NGNBanks" asp-for="NGN.BankCode" class="form-select"></select>
+                </div>
+                <div class="mb-3">
+                    <label>Account Number</label>
+                    <div class="input-group">
+                        <input asp-for="NGN.AccountNumber" class="form-control" maxlength="10" />
+                        <button type="submit" formaction="@Url.Action("ValidateNgnAccountNumber", "UINaira", new { storeId })" class="btn btn-outline-primary">
+                            Validate
+                        </button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(Model.NGN?.AccountName))
+                    {
+                        <span class="text-muted">@Model.NGN.AccountName</span>
+                    }
+                    <span asp-validation-for="NGN.AccountNumber" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label>Amount</label>
+                    <input asp-for="NGN.Amount" type="number" step="0.01" class="form-control" required />
+                </div>
+                <button type="submit" class="btn btn-success">Send NGN Payout</button>
+            </form>
+        </div>
+
+        <div class="tab-pane fade" id="kes" role="tabpanel">
+            <form asp-action="ProcessKESPayout" method="post">
+                <div class="mb-3">
+                    <label>Payout Method</label>
+                    <select asp-for="KES.Method" class="form-control" id="kesMethod" required>
+                        <option value="BillNumber">Bill Number</option>
+                        <option value="TillNumber">Till Number</option>
+                        <option value="PhoneNumber">Phone Number</option>
+                    </select>
+                </div>
+
+                <div id="kesBillFields" class="d-none">
+                    <div class="mb-3">
+                        <label>Bill Number</label>
+                        <input asp-for="KES.Identifier" class="form-control" />
+                    </div>
+                    <div class="mb-3">
+                        <label>Account Number</label>
+                        <input asp-for="KES.AccountNumber" class="form-control" />
+                    </div>
+                </div>
+
+                <div id="kesTillPhoneFields" class="d-none">
+                    <div class="mb-3">
+                        <label>Till Number / Phone Number</label>
+                        <input asp-for="KES.Identifier" class="form-control" />
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label>Amount</label>
+                    <input asp-for="KES.Amount" type="number" step="0.01" class="form-control" required />
+                </div>
+
+                <button type="submit" class="btn btn-warning">Send KES Payout</button>
+            </form>
+        </div>
+
+        <div class="tab-pane fade" id="zar" role="tabpanel">
+            <form asp-action="ProcessZARPayout" method="post">
+                <div class="mb-3">
+                    <label>Bank Account Number</label>
+                    <input asp-for="ZAR.AccountNumber" class="form-control" required />
+                </div>
+                <div class="mb-3">
+                    <label>Amount</label>
+                    <input asp-for="ZAR.Amount" type="number" step="0.01" class="form-control" required />
+                </div>
+                <button type="submit" class="btn btn-primary">Send ZAR Payout</button>
+            </form>
+        </div>
+    </div>
+</div>
