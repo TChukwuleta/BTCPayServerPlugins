@@ -55,23 +55,37 @@ public class UINairaPublicController : Controller
 
             var webhookResponse = JsonConvert.DeserializeObject<MavapayWebhookResponseVm>(requestBody);
             var order = ctx.NairaCheckoutOrders.FirstOrDefault(c => c.ExternalHash == webhookResponse.data.hash && c.StoreId == storeId);
-            if (order == null)
+            var payout = ctx.PayoutTransactions.FirstOrDefault(p => p.ExternalReference == webhookResponse.data.@ref && p.StoreId == storeId);
+            if (order == null && payout == null)
                 return BadRequest();
 
             switch (webhookResponse.@event)
             {
                 case "payment.received":
-                    order.ThirdPartyStatus = "PaymentReceived";
-                    order.UpdatedAt = DateTime.UtcNow;
-                    ctx.NairaCheckoutOrders.Update(order);
-                    await ctx.SaveChangesAsync();
+                    if (order != null)
+                    {
+                        order.ThirdPartyStatus = "PaymentReceived";
+                        order.UpdatedAt = DateTime.UtcNow;
+                        ctx.NairaCheckoutOrders.Update(order);
+                        await ctx.SaveChangesAsync();
+                    }
                     break;
 
                 case "payment.sent":
-                    order.ThirdPartyStatus = "PaymentSent";
-                    order.ThirdPartyMarkedPaid = true;
-                    order.UpdatedAt = DateTime.UtcNow;
-                    ctx.NairaCheckoutOrders.Update(order);
+                    if (order != null)
+                    {
+                        order.ThirdPartyStatus = "PaymentSent";
+                        order.ThirdPartyMarkedPaid = true;
+                        order.UpdatedAt = DateTime.UtcNow;
+                        ctx.NairaCheckoutOrders.Update(order);
+                    }
+                    if (payout != null)
+                    {
+                        payout.IsSuccess = true;
+                        payout.ThirdPartyStatus = "PaymentSent";
+                        payout.CompletedAt = DateTime.UtcNow;
+                        ctx.PayoutTransactions.Update(payout);
+                    }
                     await ctx.SaveChangesAsync();
                     break;
 

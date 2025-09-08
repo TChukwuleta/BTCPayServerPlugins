@@ -17,5 +17,6 @@ public class NairaCheckoutDbContext : DbContext
     public DbSet<MavapaySetting> MavapaySettings { get; set; }
     public DbSet<NairaCheckoutOrder> NairaCheckoutOrders { get; set; }
     public DbSet<NairaCheckoutSetting> NairaCheckoutSettings { get; set; }
+    public DbSet<PayoutTransaction> PayoutTransactions { get; set; }
 
 }

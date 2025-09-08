@@ -1,0 +1,54 @@
+﻿@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Plugins.NairaCheckout
+@using BTCPayServer.Plugins.NairaCheckout.ViewModels
+@using Microsoft.AspNetCore.Mvc.TagHelpers
+@inject IScopeProvider ScopeProvider
+@model List<PayoutTransactionVm>
+@{
+    ViewData.SetActivePage(NairaCheckoutPlugin.PluginNavKey, "Mavapay Configuration", "Configuration");
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+
+@if (Model.Any())
+{
+    <div class="table-responsive-md">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th scope="col">Pull Payment Id</th>
+                    <th scope="col">ExternalReference</th>
+                    <th scope="col">Amount</th>
+                    <th scope="col">Currency</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" class="text-end"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var pp in Model)
+                {
+                    <tr class="mass-action-row">
+                        <td>@pp.PullPaymentId</td>
+                        <td>@pp.ExternalReference</td>
+                        <td>@pp.Amount</td>
+                        <td>@pp.Currency</td>
+                        <td>@(pp.IsSuccess ? "Completed" : "Pending")</td>
+
+                        <td class="text-end">
+                            <div class="d-inline-flex align-items-center gap-3">
+                                <a class="dropdown-item" asp-controller="PayrollUser" asp-action="ResendInvitation" asp-route-storeId="@storeId"
+                                   asp-route-storeId="@storeId">View Transaction Status</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <p class="text-secondary mt-4">
+        <span>There are no payout found</span>
+    </p>
+}

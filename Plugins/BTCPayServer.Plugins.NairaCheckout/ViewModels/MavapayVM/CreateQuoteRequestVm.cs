@@ -24,15 +24,7 @@ public class CreatePayoutRequestVm
     public string sourceCurrency { get; set; }
     public string targetCurrency { get; set; }
     public string paymentMethod { get; set; }
-    public PayoutBeneficiary beneficiary { get; set; }
+    public object beneficiary { get; set; }
     public bool autopayout { get; set; }
     public string paymentCurrency { get; set; }
-}
-
-public class PayoutBeneficiary
-{
-    public string bankAccountNumber { get; set; }
-    public string bankAccountName { get; set; }
-    public string bankCode { get; set; }
-    public string bankName { get; set; }
 }

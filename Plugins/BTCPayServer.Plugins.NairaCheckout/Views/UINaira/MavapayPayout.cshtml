@@ -18,21 +18,21 @@
             <button class="nav-link active" id="ngn-tab" data-bs-toggle="tab" data-bs-target="#ngn" type="button" role="tab">NGN</button>
         </li>
         <li class="nav-item">
-            <button class="nav-link" id="zar-tab" data-bs-toggle="tab" data-bs-target="#zar" type="button" role="tab">ZAR</button>
+            <button class="nav-link" id="kes-tab" data-bs-toggle="tab" data-bs-target="#kes" type="button" role="tab">KES</button>
         </li>
         <li class="nav-item">
-            <button class="nav-link" id="kes-tab" data-bs-toggle="tab" data-bs-target="#kes" type="button" role="tab">KES</button>
+            <button class="nav-link" id="zar-tab" data-bs-toggle="tab" data-bs-target="#zar" type="button" role="tab">ZAR</button>
         </li>
     </ul>
 
     <div class="tab-content mt-3">
         <div class="tab-pane fade show active" id="ngn" role="tabpanel">
             <form asp-action="ProcessNGNPayout" asp-route-storeId=@storeId method="post">
-                <div class="mb-3">
+                <div class="mb-3 w-50">
                     <label class="form-label">Bank</label>
                     <select asp-items="Model.NGNBanks" asp-for="NGN.BankCode" class="form-select"></select>
                 </div>
-                <div class="mb-3">
+                <div class="mb-3 w-50">
                     <label>Account Number</label>
                     <div class="input-group">
                         <input asp-for="NGN.AccountNumber" class="form-control" maxlength="10" />
@@ -46,64 +46,86 @@
                     }
                     <span asp-validation-for="NGN.AccountNumber" class="text-danger"></span>
                 </div>
-                <div class="mb-3">
+                <div class="mb-3 w-50">
                     <label>Amount</label>
-                    <input asp-for="NGN.Amount" type="number" step="0.01" class="form-control" required />
+                    <input asp-for="NGN.Amount" type="number" step="1" class="form-control" required />
                 </div>
                 <button type="submit" class="btn btn-success">Send NGN Payout</button>
             </form>
         </div>
 
+
         <div class="tab-pane fade" id="kes" role="tabpanel">
-            <form asp-action="ProcessKESPayout" method="post">
-                <div class="mb-3">
+            <form asp-action="ProcessKESPayout" asp-route-storeId=@storeId method="post">
+                <div class="mb-3 w-50">
                     <label>Payout Method</label>
-                    <select asp-for="KES.Method" class="form-control" id="kesMethod" required>
-                        <option value="BillNumber">Bill Number</option>
-                        <option value="TillNumber">Till Number</option>
-                        <option value="PhoneNumber">Phone Number</option>
-                    </select>
+                    <select asp-items="Model.KESPaymentMethod" asp-for="KES.Method" class="form-select" id="kesMethod"></select>
                 </div>
 
-                <div id="kesBillFields" class="d-none">
-                    <div class="mb-3">
-                        <label>Bill Number</label>
-                        <input asp-for="KES.Identifier" class="form-control" />
-                    </div>
-                    <div class="mb-3">
-                        <label>Account Number</label>
-                        <input asp-for="KES.AccountNumber" class="form-control" />
-                    </div>
+                <div id="kesAccountNumber" class="mb-3 w-50 d-none">
+                    <label>Account Number</label>
+                    <input asp-for="KES.AccountNumber" class="form-control" />
                 </div>
 
-                <div id="kesTillPhoneFields" class="d-none">
-                    <div class="mb-3">
-                        <label>Till Number / Phone Number</label>
-                        <input asp-for="KES.Identifier" class="form-control" />
-                    </div>
+                <div class="mb-3 w-50">
+                    <label>Till/Bill/Phone Number</label>
+                    <input asp-for="KES.Identifier" class="form-control" required />
                 </div>
 
-                <div class="mb-3">
+                <div class="mb-3 w-50">
                     <label>Amount</label>
-                    <input asp-for="KES.Amount" type="number" step="0.01" class="form-control" required />
+                    <input asp-for="KES.Amount" type="number" step="1" class="form-control" required />
                 </div>
 
-                <button type="submit" class="btn btn-warning">Send KES Payout</button>
+                <button type="submit" class="btn btn-success">Send KES Payout</button>
             </form>
         </div>
 
+
         <div class="tab-pane fade" id="zar" role="tabpanel">
-            <form asp-action="ProcessZARPayout" method="post">
-                <div class="mb-3">
+            <form asp-action="ProcessZARPayout" asp-route-storeId=@storeId method="post">
+                <div class="mb-3 w-50">
+                    <label class="form-label">Bank</label>
+                    <select asp-items="Model.ZARBanks" asp-for="ZAR.Bank" class="form-select"></select>
+                </div>
+                <div class="mb-3 w-50">
+                    <label>Account Name</label>
+                    <input asp-for="ZAR.AccountName" class="form-control" required />
+                </div>
+                <div class="mb-3 w-50">
                     <label>Bank Account Number</label>
                     <input asp-for="ZAR.AccountNumber" class="form-control" required />
                 </div>
-                <div class="mb-3">
+                <div class="mb-3 w-50">
                     <label>Amount</label>
-                    <input asp-for="ZAR.Amount" type="number" step="0.01" class="form-control" required />
+                    <input asp-for="ZAR.Amount" type="number" step="1" class="form-control" required />
                 </div>
                 <button type="submit" class="btn btn-primary">Send ZAR Payout</button>
             </form>
         </div>
     </div>
 </div>
+
+
+
+@section PageFootContent {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const methodSelect = document.getElementById("kesMethod");
+            const accountNumberDiv = document.getElementById("kesAccountNumber");
+
+            function toggleAccountNumber() {
+                if (methodSelect.value === "BillNumber") {
+                    accountNumberDiv.classList.remove("d-none");
+                    accountNumberDiv.querySelector("input").setAttribute("required", "required");
+                } else {
+                    accountNumberDiv.classList.add("d-none");
+                    accountNumberDiv.querySelector("input").removeAttribute("required");
+                }
+            }
+
+            methodSelect.addEventListener("change", toggleAccountNumber);
+            toggleAccountNumber();
+        });
+    </script>
+}
