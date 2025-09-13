@@ -1,0 +1,82 @@
+﻿@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Plugins.NairaCheckout
+@using BTCPayServer.Plugins.NairaCheckout.ViewModels
+@using BTCPayServer.Plugins.NairaCheckout.Views
+@using Microsoft.AspNetCore.Mvc.TagHelpers
+@inject IScopeProvider ScopeProvider
+@model PayoutListViewModel
+@{
+    ViewData.SetActivePage(PluginNavPages.Index, "Mavapay Payout");
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+
+<div class="sticky-header">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <a asp-controller="UINaira" asp-action="MavapayPayout" asp-route-storeId="@storeId" class="btn btn-secondary" role="button">Go Back</a>
+    </div>
+</div>
+
+<partial name="_StatusMessage" />
+
+<form class="d-flex flex-wrap flex-sm-nowrap align-items-center gap-3 mb-4 col-xxl-8" asp-action="ListMavapayPayouts"
+      asp-route-storeId="@storeId" method="get">
+    <input asp-for="SearchText" class="form-control" name="searchText" placeholder="Search" />
+</form>
+
+@if (Model.PayoutTransactions.Any())
+{
+    <div class="table-responsive-md">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th scope="col">Pull Payment</th>
+                    <th scope="col">External Reference</th>
+                    <th scope="col">Amount</th>
+                    <th scope="col">Currency</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" class="text-end"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var pp in Model.PayoutTransactions)
+                {
+                    <tr class="mass-action-row">
+                        <td>
+                            <a 
+                                class="link-success text-decoration-none" 
+                                asp-controller="UIPullPayment"
+                                asp-action="ViewPullPayment"
+                                asp-route-pullPaymentId="@pp.PullPaymentId"
+                                target="_blank"
+                                rel="noopener noreferrer">
+								View Pull Payment
+                            </a>
+                        </td>
+                        <td>@pp.ExternalReference</td>
+                        <td>@pp.Amount</td>
+                        <td>@pp.Currency</td>
+                        <td>@(pp.IsSuccess ? "Completed" : "Pending")</td>
+
+                        <td class="text-end">
+                            @if (!pp.IsSuccess)
+                            {
+                                <div class="d-inline-flex align-items-center gap-3">
+                                    <a class="link-success text-decoration-none" asp-controller="UINaira" asp-action="VerifyMavapayTransaction"
+                                       asp-route-storeId="@storeId" asp-route-externalReferemce="@pp.ExternalReference">Query Transaction Status</a>
+                                </div>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <p class="text-secondary mt-4">
+        <span>There are no payout found</span>
+    </p>
+}

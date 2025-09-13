@@ -3,6 +3,7 @@ using System;
 using BTCPayServer.Plugins.NairaCheckout;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.NairaCheckout.Migrations
 {
     [DbContext(typeof(NairaCheckoutDbContext))]
-    partial class NairaCheckoutDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250908163306_includeStoreIdToCheckout")]
+    partial class includeStoreIdToCheckout
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

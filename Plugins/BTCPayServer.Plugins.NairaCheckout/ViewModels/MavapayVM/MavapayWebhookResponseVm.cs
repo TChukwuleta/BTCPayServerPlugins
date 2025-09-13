@@ -22,7 +22,6 @@ public class WebhookData
     public bool autopayout { get; set; }
     public DateTime? createdAt { get; set; }
     public DateTime? updatedAt { get; set; }
-    public object btcUsdMetadata { get; set; }
 }
 
 public class BtcUsdMetadata

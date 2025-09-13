@@ -17,10 +17,12 @@ namespace BTCPayServer.Plugins.Template;
 [Route("~/plugins/{storeId}/naira-checkout/api/", Order = 1)]
 public class UINairaPublicController : Controller
 {
+    private readonly MavapayApiClientService _mavapayApiClientService;
     private readonly NairaCheckoutDbContextFactory _dbContextFactory;
-    public UINairaPublicController(NairaCheckoutDbContextFactory dbContextFactory)
+    public UINairaPublicController(NairaCheckoutDbContextFactory dbContextFactory, MavapayApiClientService mavapayApiClientService)
     {
         _dbContextFactory = dbContextFactory;
+        _mavapayApiClientService = mavapayApiClientService;
     }
 
 
@@ -55,24 +57,30 @@ public class UINairaPublicController : Controller
 
             var webhookResponse = JsonConvert.DeserializeObject<MavapayWebhookResponseVm>(requestBody);
             var order = ctx.NairaCheckoutOrders.FirstOrDefault(c => c.ExternalHash == webhookResponse.data.hash && c.StoreId == storeId);
-            if (order == null)
-                return BadRequest();
 
             switch (webhookResponse.@event)
             {
                 case "payment.received":
-                    order.ThirdPartyStatus = "PaymentReceived";
-                    order.UpdatedAt = DateTime.UtcNow;
-                    ctx.NairaCheckoutOrders.Update(order);
-                    await ctx.SaveChangesAsync();
+                    if (order != null)
+                    {
+                        order.ThirdPartyStatus = "PaymentReceived";
+                        order.UpdatedAt = DateTime.UtcNow;
+                        ctx.NairaCheckoutOrders.Update(order);
+                        await ctx.SaveChangesAsync();
+                    }
                     break;
 
                 case "payment.sent":
-                    order.ThirdPartyStatus = "PaymentSent";
-                    order.ThirdPartyMarkedPaid = true;
-                    order.UpdatedAt = DateTime.UtcNow;
-                    ctx.NairaCheckoutOrders.Update(order);
-                    await ctx.SaveChangesAsync();
+                    if (order != null)
+                    {
+                        order.ThirdPartyStatus = "PaymentSent";
+                        order.ThirdPartyMarkedPaid = true;
+                        order.UpdatedAt = DateTime.UtcNow;
+                        ctx.NairaCheckoutOrders.Update(order);
+                        await ctx.SaveChangesAsync();
+                    }
+                    //webhookResponse.data.@ref webhookResponse.data.hash
+                    await _mavapayApiClientService.MarkTransactionStatusAsSuccess(ctx, webhookResponse.data.hash, storeId);
                     break;
 
                 default:
