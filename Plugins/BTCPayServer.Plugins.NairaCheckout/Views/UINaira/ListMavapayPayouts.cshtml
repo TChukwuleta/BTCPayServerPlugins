@@ -32,11 +32,11 @@
             <thead>
                 <tr>
                     <th scope="col">Pull Payment</th>
-                    <th scope="col">ExternalReference</th>
+                    <th scope="col">External Reference</th>
                     <th scope="col">Amount</th>
                     <th scope="col">Currency</th>
-                    @* <th scope="col">Status</th>
-                    <th scope="col" class="text-end"></th> *@
+                    <th scope="col">Status</th>
+                    <th scope="col" class="text-end"></th>
                 </tr>
             </thead>
             <tbody>
@@ -57,14 +57,17 @@
                         <td>@pp.ExternalReference</td>
                         <td>@pp.Amount</td>
                         <td>@pp.Currency</td>
-                        @* <td>@(pp.IsSuccess ? "Completed" : "Pending")</td>
+                        <td>@(pp.IsSuccess ? "Completed" : "Pending")</td>
 
                         <td class="text-end">
-                            <div class="d-inline-flex align-items-center gap-3">
-                                <a class="link-success text-decoration-none" asp-controller="UINaira" asp-action="VerifyMavapayTransaction"
-                                   asp-route-storeId="@storeId" asp-route-externalReferemce="@pp.ExternalReference">View Transaction Status</a>
-                            </div>
-                        </td> *@
+                            @if (!pp.IsSuccess)
+                            {
+                                <div class="d-inline-flex align-items-center gap-3">
+                                    <a class="link-success text-decoration-none" asp-controller="UINaira" asp-action="VerifyMavapayTransaction"
+                                       asp-route-storeId="@storeId" asp-route-externalReferemce="@pp.ExternalReference">Query Transaction Status</a>
+                                </div>
+                            }
+                        </td>
                     </tr>
                 }
             </tbody>

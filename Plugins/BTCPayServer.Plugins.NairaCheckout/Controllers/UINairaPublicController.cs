@@ -17,10 +17,12 @@ namespace BTCPayServer.Plugins.Template;
 [Route("~/plugins/{storeId}/naira-checkout/api/", Order = 1)]
 public class UINairaPublicController : Controller
 {
+    private readonly MavapayApiClientService _mavapayApiClientService;
     private readonly NairaCheckoutDbContextFactory _dbContextFactory;
-    public UINairaPublicController(NairaCheckoutDbContextFactory dbContextFactory)
+    public UINairaPublicController(NairaCheckoutDbContextFactory dbContextFactory, MavapayApiClientService mavapayApiClientService)
     {
         _dbContextFactory = dbContextFactory;
+        _mavapayApiClientService = mavapayApiClientService;
     }
 
 
@@ -55,9 +57,6 @@ public class UINairaPublicController : Controller
 
             var webhookResponse = JsonConvert.DeserializeObject<MavapayWebhookResponseVm>(requestBody);
             var order = ctx.NairaCheckoutOrders.FirstOrDefault(c => c.ExternalHash == webhookResponse.data.hash && c.StoreId == storeId);
-            var payout = ctx.PayoutTransactions.FirstOrDefault(p => p.ExternalReference == webhookResponse.data.@ref && p.StoreId == storeId);
-            if (order == null && payout == null)
-                return BadRequest();
 
             switch (webhookResponse.@event)
             {
@@ -78,15 +77,10 @@ public class UINairaPublicController : Controller
                         order.ThirdPartyMarkedPaid = true;
                         order.UpdatedAt = DateTime.UtcNow;
                         ctx.NairaCheckoutOrders.Update(order);
+                        await ctx.SaveChangesAsync();
                     }
-                    if (payout != null)
-                    {
-                        payout.IsSuccess = true;
-                        payout.ThirdPartyStatus = "PaymentSent";
-                        payout.CompletedAt = DateTime.UtcNow;
-                        ctx.PayoutTransactions.Update(payout);
-                    }
-                    await ctx.SaveChangesAsync();
+                    //webhookResponse.data.@ref webhookResponse.data.hash
+                    await _mavapayApiClientService.MarkTransactionStatusAsSuccess(ctx, webhookResponse.data.hash, storeId);
                     break;
 
                 default:

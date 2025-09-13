@@ -342,7 +342,6 @@ public class UINairaController : Controller
     [HttpGet("mavapay/payout/list")]
     public async Task<IActionResult> ListMavapayPayouts(string storeId, string searchText)
     {
-        Console.WriteLine(searchText);
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
@@ -352,7 +351,6 @@ public class UINairaController : Controller
         {
             payoutTransactions = payoutTransactions.Where(o => o.ExternalReference.Contains(searchText) || o.PullPaymentId.Contains(searchText));
         }
-        Console.WriteLine(JsonConvert.SerializeObject(payoutTransactions));
         List<PayoutTransactionVm> vm = payoutTransactions.ToList().Select(c => new PayoutTransactionVm
             {
                 Currency = c.Currency,
@@ -372,7 +370,6 @@ public class UINairaController : Controller
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
-        Console.WriteLine($"Verifying transaction {externalReferemce} for store {StoreData.Id}");
         await using var ctx = _dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         if (mavapaySetting == null || string.IsNullOrEmpty(mavapaySetting.ApiKey))
@@ -380,15 +377,19 @@ public class UINairaController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Cannot verify transaction. Kindly enable your mavapay account";
             return RedirectToAction(nameof(ListMavapayPayouts), new { storeId = StoreData.Id });
         }
-        var transactionRecord = ctx.PayoutTransactions.FirstOrDefault(c => c.StoreId == StoreData.Id && c.ExternalReference == externalReferemce && c.Provider == Wallet.Mavapay.ToString());
+        var transactionRecord = ctx.PayoutTransactions.FirstOrDefault(c => c.StoreId == StoreData.Id && c.ExternalReference.EndsWith(":" + externalReferemce) && c.Provider == Wallet.Mavapay.ToString());
         if (mavapaySetting == null)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Cannot find reference transaction";
             return RedirectToAction(nameof(ListMavapayPayouts), new { storeId = StoreData.Id });
         }
-        var verifiedTransaction = await _mavapayApiClientService.GetMavapayTransactionRecord(mavapaySetting.ApiKey, id: GetExternalReferenceId(externalReferemce));
-        Console.WriteLine(JsonConvert.SerializeObject(verifiedTransaction));
-        TempData[WellKnownTempData.SuccessMessage] = "Transaction validated successfully";
+        var verifiedTransaction = await _mavapayApiClientService.GetMavapayTransactionRecord(mavapaySetting.ApiKey, hash: externalReferemce);
+        var successfulTransaction = verifiedTransaction?.All(c => c.status.Equals("SUCCESS", StringComparison.InvariantCultureIgnoreCase)) ?? false;
+        if (successfulTransaction)
+        {
+            await _mavapayApiClientService.MarkTransactionStatusAsSuccess(ctx, externalReferemce, StoreData.Id);
+        }
+        TempData[WellKnownTempData.SuccessMessage] = successfulTransaction ? "Transaction validated and completed successfully" : "Transaction queried successfully. Transaction pending completion from Mavapay";
         return RedirectToAction(nameof(ListMavapayPayouts), new { storeId = StoreData.Id });
     }
 
@@ -436,7 +437,7 @@ public class UINairaController : Controller
 
     private string GetUserId() => _userManager.GetUserId(User);
 
-    private string GetExternalReferenceId(string reference) => reference.Split(':', 2)[0];
+    private string GetExternalReferenceId(string reference) => reference.Split(':', 2)[1];
 
 
 }

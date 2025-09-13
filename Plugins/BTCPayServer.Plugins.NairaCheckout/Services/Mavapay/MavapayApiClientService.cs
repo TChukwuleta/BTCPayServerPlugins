@@ -278,29 +278,46 @@ public class MavapayApiClientService
         return validStatuses.Contains(responseModel.status?.ToLower().Trim());
     }
 
-    public async Task<TransactionResponseVm> GetMavapayTransactionRecord(string apiKey, string id = null, string orderId = null, string hash = null)
+    public async Task<List<TransactionResponseVm>> GetMavapayTransactionRecord(string apiKey, string id = null, string orderId = null, string hash = null)
     {
-        var queryParams = new List<string>();
-        if (!string.IsNullOrWhiteSpace(id))
-            queryParams.Add($"id={Uri.EscapeDataString(id)}");
-
-        if (!string.IsNullOrWhiteSpace(orderId))
-            queryParams.Add($"orderId={Uri.EscapeDataString(orderId)}");
-
-        if (!string.IsNullOrWhiteSpace(hash))
-            queryParams.Add($"hash={Uri.EscapeDataString(hash)}");
-
-        var queryString = queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : string.Empty;
-        var req = CreateRequest(HttpMethod.Get, $"transaction/{queryString}");
-        var response = await SendRequest(req, apiKey);
-        Console.WriteLine($"Get transaction response: {response}");
-        var responseModel = JsonConvert.DeserializeObject<EntityVm<TransactionResponseVm>>(response, new JsonSerializerSettings
+        try
         {
-            MissingMemberHandling = MissingMemberHandling.Ignore,
-            NullValueHandling = NullValueHandling.Include
-        });
-        return responseModel.data;
+            var queryParams = new List<string>();
+            if (!string.IsNullOrWhiteSpace(id))
+                queryParams.Add($"id={Uri.EscapeDataString(id)}");
+
+            if (!string.IsNullOrWhiteSpace(orderId))
+                queryParams.Add($"orderId={Uri.EscapeDataString(orderId)}");
+
+            if (!string.IsNullOrWhiteSpace(hash))
+                queryParams.Add($"hash={Uri.EscapeDataString(hash)}");
+
+            var queryString = queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : string.Empty;
+            var req = CreateRequest(HttpMethod.Get, $"transaction/{queryString}");
+            var response = await SendRequest(req, apiKey);
+            var responseModel = JsonConvert.DeserializeObject<EntityVm<List<TransactionResponseVm>>>(response, new JsonSerializerSettings
+            {
+                MissingMemberHandling = MissingMemberHandling.Ignore,
+                NullValueHandling = NullValueHandling.Include
+            });
+            return responseModel.data;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
+
+    public async Task MarkTransactionStatusAsSuccess(NairaCheckoutDbContext ctx, string externalReference, string storeId)
+    {
+        var payout = ctx.PayoutTransactions.FirstOrDefault(c => c.StoreId == storeId && c.ExternalReference.EndsWith(":" + externalReference) && c.Provider == Wallet.Mavapay.ToString());
+        if (payout == null) return;
+
+        payout.IsSuccess = true;
+        ctx.PayoutTransactions.Update(payout);
+        await ctx.SaveChangesAsync();
+    }
+
 
     private async Task CreateOrderRecord(CreateQuoteResponseVm quoteResponse, string invoiceId, decimal amount, string storeId)
     {
