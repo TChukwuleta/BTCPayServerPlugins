@@ -1,18 +1,51 @@
 ﻿@using BTCPayServer.Abstractions.Contracts
 @using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.PayoutProcessors
+@using BTCPayServer.Payouts
 @using BTCPayServer.Plugins.NairaCheckout
 @using BTCPayServer.Plugins.NairaCheckout.ViewModels
+@using BTCPayServer.Plugins.NairaCheckout.Views
+@using Microsoft.AspNetCore.Http
 @using Microsoft.AspNetCore.Mvc.TagHelpers
+@using Microsoft.AspNetCore.Routing
+@inject IEnumerable<IPayoutProcessorFactory> PayoutProcessorFactories
+@inject PayoutProcessorService PayoutProcessorService
+@inject IHttpContextAccessor HttpContextAccessor
 @inject IScopeProvider ScopeProvider
+@inject LinkGenerator LinkGenerator
 @model MavapayPayoutViewModel
 @{
-    ViewData.SetActivePage(NairaCheckoutPlugin.PluginNavKey, "Mavapay Configuration", "Configuration");
+    ViewData.SetActivePage(PluginNavPages.Index, "Mavapay Payout");
     var storeId = ScopeProvider.GetCurrentStoreId();
+    PayoutMethodId pmi = PayoutTypes.LN.GetPayoutMethodId("BTC");
+    PayoutMethodId pmichain = PayoutTypes.CHAIN.GetPayoutMethodId("BTC");
+    string PayoutProcessorLink = LinkGenerator.GetUriByAction(HttpContextAccessor.HttpContext, "ConfigureStorePayoutProcessors", "UIPayoutProcessors", new { StoreId = storeId });
+    var fetchProcessors = PayoutProcessorService.GetProcessors(new PayoutProcessorService.PayoutProcessorQuery()
+    {
+        Stores = new[] { storeId },
+        PayoutMethods = new[] { pmi, pmichain }
+    });
+    var NoPayoutProcessors = PayoutProcessorFactories.Any(factory => factory.GetSupportedPayoutMethods().Contains(pmi)) && (await fetchProcessors).All(data =>
+                !new[] { pmi, pmichain }.Contains(data.GetPayoutMethodId()));
 }
 
-<div>
-    <h2 class="mb-4">Mavapay Payouts</h2>
+<div class="sticky-header">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <a asp-controller="UINaira" asp-action="ListMavapayPayouts" asp-route-storeId="@storeId" class="btn btn-primary" role="button">View Payouts</a>
+    </div>
+</div>
 
+@if (NoPayoutProcessors)
+{
+    <div class="alert alert-warning mb-5" role="alert">
+        An automated payout processor is required in order to automate Mavapay payouts. <a class="alert-link p-0" href="@PayoutProcessorLink">Configure now</a>
+    </div>
+}
+
+<partial name="_StatusMessage" />
+
+<div>
     <ul class="nav nav-tabs" id="payoutTabs" role="tablist">
         <li class="nav-item">
             <button class="nav-link active" id="ngn-tab" data-bs-toggle="tab" data-bs-target="#ngn" type="button" role="tab">NGN</button>
@@ -26,7 +59,7 @@
     </ul>
 
     <div class="tab-content mt-3">
-        <div class="tab-pane fade show active" id="ngn" role="tabpanel">
+        <div class="tab-pane show active" id="ngn" role="tabpanel">
             <form asp-action="ProcessNGNPayout" asp-route-storeId=@storeId method="post">
                 <div class="mb-3 w-50">
                     <label class="form-label">Bank</label>
@@ -55,7 +88,7 @@
         </div>
 
 
-        <div class="tab-pane fade" id="kes" role="tabpanel">
+        <div class="tab-pane" id="kes" role="tabpanel">
             <form asp-action="ProcessKESPayout" asp-route-storeId=@storeId method="post">
                 <div class="mb-3 w-50">
                     <label>Payout Method</label>
@@ -82,7 +115,7 @@
         </div>
 
 
-        <div class="tab-pane fade" id="zar" role="tabpanel">
+        <div class="tab-pane" id="zar" role="tabpanel">
             <form asp-action="ProcessZARPayout" asp-route-storeId=@storeId method="post">
                 <div class="mb-3 w-50">
                     <label class="form-label">Bank</label>

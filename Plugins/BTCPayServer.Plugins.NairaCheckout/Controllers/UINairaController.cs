@@ -24,7 +24,6 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 using Newtonsoft.Json;
-using static BTCPayServer.Models.WalletViewModels.PayoutsModel;
 
 namespace BTCPayServer.Plugins.Template;
 
@@ -69,6 +68,9 @@ public class UINairaController : Controller
     [HttpGet]
     public async Task<IActionResult> StoreConfig()
     {
+        if (string.IsNullOrEmpty(StoreData.Id))
+            return NotFound();
+
         var paymentMethods = StoreData.GetPaymentMethodConfigs(_handler, onlyEnabled: true);
         var hasLightningPaymentMethod = paymentMethods.Keys.Any(key => lightningPaymentMethods.Contains(key.ToString()));
         await using var ctx = _dbContextFactory.CreateContext();
@@ -81,6 +83,9 @@ public class UINairaController : Controller
     [HttpPost]
     public async Task<IActionResult> StoreConfig(NairaStoreViewModel viewModel)
     {
+        if (string.IsNullOrEmpty(StoreData.Id))
+            return NotFound();
+
         var store = StoreData;
         var blob = StoreData.GetStoreBlob();
         var paymentMethodId = NairaCheckoutPlugin.NairaPmid;
@@ -148,6 +153,9 @@ public class UINairaController : Controller
     [HttpGet("/mavapay/payout")]
     public async Task<IActionResult> MavapayPayout()
     {
+        if (string.IsNullOrEmpty(StoreData.Id))
+            return NotFound();
+
         await using var ctx = _dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         var nairaEnabled = await _nairaStatusProvider.NairaEnabled(StoreData.Id);
@@ -183,6 +191,9 @@ public class UINairaController : Controller
     [HttpPost("mavapay/ngn-payout")]
     public async Task<IActionResult> ProcessNGNPayout(MavapayPayoutViewModel model)
     {
+        if (string.IsNullOrEmpty(StoreData.Id))
+            return NotFound();
+
         await using var ctx = _dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         if (string.IsNullOrWhiteSpace(model.NGN.AccountNumber) || model.NGN.AccountNumber.Length != 10)
@@ -220,6 +231,9 @@ public class UINairaController : Controller
     [HttpPost("mavapay/naira/name-enquiry")]
     public async Task<IActionResult> ValidateNgnAccountNumber(MavapayPayoutViewModel model)
     {
+        if (string.IsNullOrEmpty(StoreData.Id))
+            return NotFound();
+
         await using var ctx = _dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         var ngnBanks = await _mavapayApiClientService.GetNGNBanks(mavapaySetting.ApiKey);
@@ -264,6 +278,9 @@ public class UINairaController : Controller
     [HttpPost("mavapay/zar-payout")]
     public async Task<IActionResult> ProcessZARPayout(MavapayPayoutViewModel model)
     {
+        if (string.IsNullOrEmpty(StoreData.Id))
+            return NotFound();
+
         await using var ctx = _dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         if (string.IsNullOrWhiteSpace(model.ZAR.AccountNumber) || string.IsNullOrWhiteSpace(model.ZAR.AccountName) || model.ZAR.Amount <= 0)
@@ -293,7 +310,9 @@ public class UINairaController : Controller
     [HttpPost("mavapay/kes-payout")]
     public async Task<IActionResult> ProcessKESPayout(MavapayPayoutViewModel model)
     {
-        Console.WriteLine(JsonConvert.SerializeObject(model.KES));
+        if (string.IsNullOrEmpty(StoreData.Id))
+            return NotFound();
+
         await using var ctx = _dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         if (string.IsNullOrWhiteSpace(model.KES.Identifier) || model.KES.Amount <= 0)
@@ -320,43 +339,57 @@ public class UINairaController : Controller
         }
     }
 
+    [HttpGet("mavapay/payout/list")]
+    public async Task<IActionResult> ListMavapayPayouts(string storeId, string searchText)
+    {
+        Console.WriteLine(searchText);
+        if (string.IsNullOrEmpty(StoreData.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var payoutTransactions = ctx.PayoutTransactions.Where(c => c.StoreId == StoreData.Id && c.Provider == Wallet.Mavapay.ToString());
+        if (!string.IsNullOrEmpty(searchText))
+        {
+            payoutTransactions = payoutTransactions.Where(o => o.ExternalReference.Contains(searchText) || o.PullPaymentId.Contains(searchText));
+        }
+        Console.WriteLine(JsonConvert.SerializeObject(payoutTransactions));
+        List<PayoutTransactionVm> vm = payoutTransactions.ToList().Select(c => new PayoutTransactionVm
+            {
+                Currency = c.Currency,
+                Amount = c.Amount,
+                ExternalReference = GetExternalReferenceId(c.ExternalReference),
+                PullPaymentId = c.PullPaymentId,
+                IsSuccess = c.IsSuccess,
+                CompletedAt = c.CompletedAt
+            }).ToList();
+        return View(new PayoutListViewModel { PayoutTransactions = vm, SearchText = searchText });
+    }
+
 
     [HttpGet("/mavapay/transactions/{externalReferemce}/status")]
     public async Task<IActionResult> VerifyMavapayTransaction(string storeId, string externalReferemce)
     {
-        // Do something
-        var verifyTransaction = await _mavapayApiClientService.GetMavapayTransactionRecord(externalReferemce, storeId);
+        if (string.IsNullOrEmpty(StoreData.Id))
+            return NotFound();
 
+        Console.WriteLine($"Verifying transaction {externalReferemce} for store {StoreData.Id}");
         await using var ctx = _dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
-        var nairaEnabled = await _nairaStatusProvider.NairaEnabled(StoreData.Id);
-        var entity = ctx.NairaCheckoutSettings.FirstOrDefault(c => c.Enabled);
-        if (mavapaySetting == null || string.IsNullOrEmpty(mavapaySetting.ApiKey) || !nairaEnabled || entity.WalletName != Wallet.Mavapay.ToString())
+        if (mavapaySetting == null || string.IsNullOrEmpty(mavapaySetting.ApiKey))
         {
-            TempData[WellKnownTempData.ErrorMessage] = "Kindly activate or configure Mavapay";
-            return RedirectToAction(nameof(StoreConfig), new { storeId = StoreData.Id });
+            TempData[WellKnownTempData.ErrorMessage] = "Cannot verify transaction. Kindly enable your mavapay account";
+            return RedirectToAction(nameof(ListMavapayPayouts), new { storeId = StoreData.Id });
         }
-        var ngnBanks = await _mavapayApiClientService.GetNGNBanks(mavapaySetting.ApiKey);
-        var zarBanks = await _mavapayApiClientService.GetZARBanks(mavapaySetting.ApiKey);
-        var viewModel = new MavapayPayoutViewModel
+        var transactionRecord = ctx.PayoutTransactions.FirstOrDefault(c => c.StoreId == StoreData.Id && c.ExternalReference == externalReferemce && c.Provider == Wallet.Mavapay.ToString());
+        if (mavapaySetting == null)
         {
-            KESPaymentMethod = Enum.GetValues(typeof(MpesaPaymentMethod)).Cast<MpesaPaymentMethod>().Select(s => new SelectListItem
-            {
-                Value = s.ToString(),
-                Text = System.Text.RegularExpressions.Regex.Replace(s.ToString(), "([a-z])([A-Z])", "$1 $2")
-            }).ToList(),
-            ZARBanks = zarBanks.Select(s => new SelectListItem
-            {
-                Value = s,
-                Text = s
-            }).ToList() ?? new List<SelectListItem>(),
-            NGNBanks = ngnBanks.Select(s => new SelectListItem
-            {
-                Value = s.nipBankCode,
-                Text = s.bankName
-            }).ToList() ?? new List<SelectListItem>()
-        };
-        return View(viewModel);
+            TempData[WellKnownTempData.ErrorMessage] = "Cannot find reference transaction";
+            return RedirectToAction(nameof(ListMavapayPayouts), new { storeId = StoreData.Id });
+        }
+        var verifiedTransaction = await _mavapayApiClientService.GetMavapayTransactionRecord(mavapaySetting.ApiKey, id: GetExternalReferenceId(externalReferemce));
+        Console.WriteLine(JsonConvert.SerializeObject(verifiedTransaction));
+        TempData[WellKnownTempData.SuccessMessage] = "Transaction validated successfully";
+        return RedirectToAction(nameof(ListMavapayPayouts), new { storeId = StoreData.Id });
     }
 
     private async Task ClaimPayout(NairaCheckoutDbContext ctx, CreatePayoutResponseModel responseModel, string storeId, string currency, string accountNumber)
@@ -385,7 +418,7 @@ public class UINairaController : Controller
             Currency = "SATS",
             Identifier = accountNumber,
             StoreId = storeId,
-            ExternalReference = responseModel.id,
+            ExternalReference = $"{responseModel.id}:{responseModel.hash}",
             CreatedAt = DateTimeOffset.UtcNow,
             Data = JsonConvert.SerializeObject(responseModel),
         });
@@ -402,4 +435,8 @@ public class UINairaController : Controller
     }
 
     private string GetUserId() => _userManager.GetUserId(User);
+
+    private string GetExternalReferenceId(string reference) => reference.Split(':', 2)[0];
+
+
 }

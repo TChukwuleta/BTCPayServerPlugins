@@ -1,4 +1,4 @@
-namespace BTCPayServer.Plugins.MassStoreGenerator.Views;
+namespace BTCPayServer.Plugins.NairaCheckout.Views;
 
 public enum PluginNavPages
 {

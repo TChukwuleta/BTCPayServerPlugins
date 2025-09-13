@@ -10,7 +10,6 @@ using BTCPayServer.Plugins.NairaCheckout.Data;
 using BTCPayServer.Plugins.NairaCheckout.ViewModels;
 using BTCPayServer.Services.Invoices;
 using Newtonsoft.Json;
-using static QRCoder.PayloadGenerator;
 
 namespace BTCPayServer.Plugins.NairaCheckout.Services;
 
@@ -199,7 +198,6 @@ public class MavapayApiClientService
         var req = CreateRequest(HttpMethod.Post, "quote");
         req.Content = new StringContent(postJson, Encoding.UTF8, "application/json");
         var response = await SendRequest(req, apiKey);
-        Console.WriteLine(response);
         var responseModel = JsonConvert.DeserializeObject<EntityVm<CreatePayoutResponseModel>>(response, new JsonSerializerSettings
         {
             MissingMemberHandling = MissingMemberHandling.Ignore,
@@ -240,7 +238,6 @@ public class MavapayApiClientService
     {
         var req = CreateRequest(HttpMethod.Get, $"bank/name-enquiry?accountNumber={accountNumber}&bankCode={bankCode}");
         var response = await SendRequest(req, apiKey);
-        Console.WriteLine($"Name enquiry response: {response}");
         var responseModel = JsonConvert.DeserializeObject<EntityVm<NGNNameEquiry>>(response, new JsonSerializerSettings
         {
             MissingMemberHandling = MissingMemberHandling.Ignore,
@@ -296,6 +293,7 @@ public class MavapayApiClientService
         var queryString = queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : string.Empty;
         var req = CreateRequest(HttpMethod.Get, $"transaction/{queryString}");
         var response = await SendRequest(req, apiKey);
+        Console.WriteLine($"Get transaction response: {response}");
         var responseModel = JsonConvert.DeserializeObject<EntityVm<TransactionResponseVm>>(response, new JsonSerializerSettings
         {
             MissingMemberHandling = MissingMemberHandling.Ignore,

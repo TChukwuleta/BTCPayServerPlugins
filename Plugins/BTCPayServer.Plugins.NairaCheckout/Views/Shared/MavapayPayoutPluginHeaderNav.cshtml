@@ -1,6 +1,6 @@
 @using BTCPayServer.Abstractions.Contracts
 @using BTCPayServer.Abstractions.Extensions
-@using BTCPayServer.Plugins.MassStoreGenerator.Views
+@using BTCPayServer.Plugins.NairaCheckout.Views
 @using Microsoft.AspNetCore.Mvc.TagHelpers
 @inject IScopeProvider ScopeProvider
 @{
@@ -11,7 +11,7 @@
 {
     <li class="nav-item">
         <a asp-controller="UINaira" asp-action="MavapayPayout" asp-route-storeId="@storeId" class="nav-link align-items-center gap-2 @ViewData.IsActivePage(PluginNavPages.MavapayPayout)">
-            <svg width="20" height="40" viewBox="0 0 201 129" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg width="20" height="20" viewBox="0 0 201 129" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M0.933594 59.5353V122.919C0.933594 127.198 5.84067 129.618 9.2356 127.014L53.8554 92.7891C58.7053 89.069 65.7154 92.5268 65.7154 98.6392V122.987C65.7154 125.714 67.926 127.924 70.6529 127.924C72.8115 127.924 74.7272 126.537 75.5463 124.54C80.0831 113.479 97.5176 79.1008 138.971 79.1008C179.763 79.1008 189.245 112.39 191.311 123.991C191.705 126.205 193.595 127.921 195.845 127.921C198.212 127.921 200.132 126.001 200.132 123.633V68.5108C200.132 8.9088 126.269 1.60791 102.7 32.6064V22.9312C102.7 4.87883 82.241 -5.5707 67.6156 5.0115L6.01841 49.58C2.82476 51.8907 0.933594 55.5934 0.933594 59.5353Z" fill="#05AD5D" />
             </svg>
             <span>Mavapay Payout</span>
