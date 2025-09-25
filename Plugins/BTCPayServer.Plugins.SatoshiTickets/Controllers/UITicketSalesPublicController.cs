@@ -26,9 +26,7 @@ using NBitcoin.DataEncoders;
 using BTCPayServer.Plugins.SatoshiTickets.Helper.Extensions;
 using BTCPayServer.Abstractions.Constants;
 using QRCoder;
-using Newtonsoft.Json;
 using Microsoft.AspNetCore.Cors;
-using System.Text;
 
 namespace BTCPayServer.Plugins.SatoshiTickets;
 
@@ -335,42 +333,6 @@ public class UITicketSalesPublicController : Controller
             }).ToList(),
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
         });
-    }
-
-
-    [HttpGet("{eventId}/tickets/ticket-checkin")]
-    public async Task<IActionResult> TicketCheckin(string storeId, string eventId)
-    {
-        await using var ctx = _dbContextFactory.CreateContext();
-        await using var dbMain = _context.CreateContext();
-        var store = await dbMain.Stores.FirstOrDefaultAsync(a => a.Id == storeId);
-        if (store == null) return NotFound();
-
-        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == storeId);
-        if (entity == null) return NotFound();
-
-        return View(new TicketScannerViewModel { 
-            EventName = entity.Title,
-            EventId = entity.Id, 
-            StoreId = storeId,
-            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()) 
-        });
-    }
-
-
-    [HttpPost("{eventId}/tickets/check-in")]
-    public async Task<IActionResult> Checkin(string storeId, string eventId, string ticketNumber)
-    {
-        var checkinTicket = await _ticketService.CheckinTicket(eventId, ticketNumber, storeId);
-        if (checkinTicket.Success)
-        {
-            TempData["CheckInSuccessMessage"] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} checked-in successfully";
-        }
-        else
-        {
-            TempData["CheckInErrorMessage"] = checkinTicket.ErrorMessage;
-        }
-        return RedirectToAction(nameof(TicketCheckin), new { storeId, eventId });
     }
 
 

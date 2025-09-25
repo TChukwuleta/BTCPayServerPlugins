@@ -12,7 +12,7 @@
     ViewData.SetActivePage(PluginNavPages.Index, $"{Model.EventTitle}");
     var canUpload = await FileService.IsAvailable();
     var storeId = ScopeProvider.GetCurrentStoreId();
-    string checkInUrl = Url.Action("TicketCheckin", "UITicketSalesPublic", new { storeId, eventId = Model.EventId }, protocol: Context.Request.Scheme);
+    string checkInUrl = Url.Action("TicketCheckin", "UITicketType", new { storeId, eventId = Model.EventId }, protocol: Context.Request.Scheme);
 }
 
 <div class="sticky-header">
@@ -22,7 +22,7 @@
         <a asp-action="ExportTickets" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-success">Export Ticket Sales</a>
         <div class="d-flex align-items-center gap-2">
             <a id="ticket-checkin-link"
-               asp-controller="UITicketSalesPublic" asp-action="TicketCheckin" 
+               asp-controller="UITicketType" asp-action="TicketCheckin"
                asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId"
                class="btn btn-success" target="_blank" rel="noopener noreferrer">Ticket Check-in</a>
             <button type="button" class="btn btn-link d-flex p-0 clipboard-button" data-bs-toggle="Copy Ticket check-in link" data-clipboard="@checkInUrl">

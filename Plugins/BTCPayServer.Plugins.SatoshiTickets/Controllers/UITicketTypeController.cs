@@ -1,16 +1,21 @@
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
 using System.Linq;
-using Microsoft.AspNetCore.Routing;
-using BTCPayServer.Client;
-using Microsoft.AspNetCore.Http;
-using BTCPayServer.Abstractions.Models;
-using Microsoft.AspNetCore.Authorization;
+using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
-using StoreData = BTCPayServer.Data.StoreData;
+using BTCPayServer.Abstractions.Models;
+using BTCPayServer.Client;
+using BTCPayServer.Data;
+using BTCPayServer.Models;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels;
+using BTCPayServer.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
+using EntityState = BTCPayServer.Plugins.SatoshiTickets.Data.EntityState;
+using StoreData = BTCPayServer.Data.StoreData;
 
 namespace BTCPayServer.Plugins.SatoshiTickets;
 
@@ -19,12 +24,56 @@ namespace BTCPayServer.Plugins.SatoshiTickets;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UITicketTypeController : Controller
 {
+    private readonly UriResolver _uriResolver;
+    private readonly TicketService _ticketService;
+    private readonly ApplicationDbContextFactory _context;
     private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
-    public UITicketTypeController(SimpleTicketSalesDbContextFactory dbContextFactory)
+    public UITicketTypeController(SimpleTicketSalesDbContextFactory dbContextFactory,
+        ApplicationDbContextFactory context, UriResolver uriResolver, TicketService ticketService)
     {
+        _context = context;
+        _uriResolver = uriResolver;
+        _ticketService = ticketService;
         _dbContextFactory = dbContextFactory;
     }
     public StoreData CurrentStore => HttpContext.GetStoreData();
+
+
+    [HttpGet("ticket-checkin")]
+    public async Task<IActionResult> TicketCheckin(string storeId, string eventId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        await using var dbMain = _context.CreateContext();
+        var store = await dbMain.Stores.FirstOrDefaultAsync(a => a.Id == storeId);
+        if (store == null) return NotFound();
+
+        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == storeId);
+        if (entity == null) return NotFound();
+
+        return View(new TicketScannerViewModel
+        {
+            EventName = entity.Title,
+            EventId = entity.Id,
+            StoreId = storeId,
+            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob())
+        });
+    }
+
+
+    [HttpPost("tickets/check-in")]
+    public async Task<IActionResult> Checkin(string storeId, string eventId, string ticketNumber)
+    {
+        var checkinTicket = await _ticketService.CheckinTicket(eventId, ticketNumber, storeId);
+        if (checkinTicket.Success)
+        {
+            TempData["CheckInSuccessMessage"] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} checked-in successfully";
+        }
+        else
+        {
+            TempData["CheckInErrorMessage"] = checkinTicket.ErrorMessage;
+        }
+        return RedirectToAction(nameof(TicketCheckin), new { storeId, eventId });
+    }
 
 
     [HttpGet("list")]
