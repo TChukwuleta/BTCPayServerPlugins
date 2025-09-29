@@ -38,6 +38,7 @@ public class UINairaController : Controller
     private readonly NairaStatusProvider _nairaStatusProvider;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly PullPaymentHostedService _pullPaymentService;
+    private readonly GeneralCheckoutService _generalCheckoutService;
     private readonly NairaCheckoutDbContextFactory _dbContextFactory;
     private readonly MavapayApiClientService _mavapayApiClientService;
     public UINairaController
@@ -48,6 +49,7 @@ public class UINairaController : Controller
         NairaStatusProvider nairaStatusProvider,
         UserManager<ApplicationUser> userManager,
         PullPaymentHostedService pullPaymentService,
+        GeneralCheckoutService generalCheckoutService,
         MavapayApiClientService mavapayApiClientService,
         NairaCheckoutDbContextFactory dbContextFactory)
     {
@@ -59,6 +61,7 @@ public class UINairaController : Controller
         _invoiceRepository = invoiceRepository;
         _pullPaymentService = pullPaymentService;
         _nairaStatusProvider = nairaStatusProvider;
+        _generalCheckoutService = generalCheckoutService;
         _mavapayApiClientService = mavapayApiClientService;
     }
 
@@ -217,6 +220,12 @@ public class UINairaController : Controller
                 TempData[WellKnownTempData.ErrorMessage] = ngnPayout.ErrorMessage;
                 return RedirectToAction(nameof(MavapayPayout), new { storeId = StoreData.Id });
             }
+            var lightningBalance = await GetLightningBalance(StoreData.Id);
+            if (lightningBalance <= ngnPayout.totalAmountInSourceCurrency)
+            {
+                TempData[WellKnownTempData.ErrorMessage] = "Insufficient balance to process request";
+                return RedirectToAction(nameof(MavapayPayout), new { storeId = StoreData.Id });
+            }
             await ClaimPayout(ctx, ngnPayout, StoreData.Id, SupportedCurrency.NGN.ToString(), model.NGN.AccountNumber);
             TempData[WellKnownTempData.SuccessMessage] = "Pauyout processed successfully";
             return RedirectToAction(nameof(MavapayPayout), new { storeId = StoreData.Id });
@@ -296,6 +305,12 @@ public class UINairaController : Controller
                 TempData[WellKnownTempData.ErrorMessage] = zarPayout.ErrorMessage;
                 return RedirectToAction(nameof(MavapayPayout), new { storeId = StoreData.Id });
             }
+            var lightningBalance = await GetLightningBalance(StoreData.Id);
+            if (lightningBalance <= zarPayout.totalAmountInSourceCurrency)
+            {
+                TempData[WellKnownTempData.ErrorMessage] = "Insufficient balance to process request";
+                return RedirectToAction(nameof(MavapayPayout), new { storeId = StoreData.Id });
+            }
             await ClaimPayout(ctx, zarPayout, StoreData.Id, SupportedCurrency.ZAR.ToString(), model.ZAR.AccountNumber);
             TempData[WellKnownTempData.SuccessMessage] = "Pauyout processed successfully";
             return RedirectToAction(nameof(MavapayPayout), new { storeId = StoreData.Id });
@@ -326,6 +341,12 @@ public class UINairaController : Controller
             if (!string.IsNullOrEmpty(kesPayout.ErrorMessage))
             {
                 TempData[WellKnownTempData.ErrorMessage] = kesPayout.ErrorMessage;
+                return RedirectToAction(nameof(MavapayPayout), new { storeId = StoreData.Id });
+            }
+            var lightningBalance = await GetLightningBalance(StoreData.Id);
+            if (lightningBalance <= kesPayout.totalAmountInSourceCurrency)
+            {
+                TempData[WellKnownTempData.ErrorMessage] = "Insufficient balance to process request";
                 return RedirectToAction(nameof(MavapayPayout), new { storeId = StoreData.Id });
             }
             await ClaimPayout(ctx, kesPayout, StoreData.Id, SupportedCurrency.KES.ToString(), model.KES.Identifier);
@@ -399,7 +420,7 @@ public class UINairaController : Controller
         var pullPaymentId = await _pullPaymentService.CreatePullPayment(StoreData, new Client.Models.CreatePullPaymentRequest
         {
             Name = $"Mavapay {currency} Payout - {accountNumber}",
-            Amount = responseModel.amountInSourceCurrency,
+            Amount = responseModel.totalAmountInSourceCurrency,
             Currency = "SATS",
             BOLT11Expiration = expirySpan,
             PayoutMethods = new[]
@@ -413,7 +434,7 @@ public class UINairaController : Controller
         ctx.PayoutTransactions.Add(new PayoutTransaction
         {
             Provider = Wallet.Mavapay.ToString(),
-            Amount = responseModel.amountInSourceCurrency,
+            Amount = responseModel.totalAmountInSourceCurrency,
             PullPaymentId = pullPaymentId,
             BaseCurrency = currency, 
             Currency = "SATS",
@@ -429,7 +450,7 @@ public class UINairaController : Controller
         {
             Destination = new LNURLPayClaimDestinaton(responseModel.invoice),
             PullPaymentId = pullPaymentId,
-            ClaimedAmount = responseModel.amountInSourceCurrency,
+            ClaimedAmount = responseModel.totalAmountInSourceCurrency,
             PayoutMethodId = PayoutTypes.LN.GetPayoutMethodId("BTC"),
             StoreId = StoreData.Id,
         });
@@ -439,5 +460,9 @@ public class UINairaController : Controller
 
     private string GetExternalReferenceId(string reference) => reference.Split(':', 2)[1];
 
-
+    private async Task<long> GetLightningBalance(string storeId)
+    {
+        var balance = await _generalCheckoutService.GetLightningNodeBalance(storeId);
+        return balance.MilliSatoshi / 1000;
+    }
 }

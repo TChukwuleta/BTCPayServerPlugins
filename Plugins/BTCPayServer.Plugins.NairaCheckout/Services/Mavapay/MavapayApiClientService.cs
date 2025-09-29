@@ -21,7 +21,8 @@ public class MavapayApiClientService
     public readonly string ApiUrl = "https://api.mavapay.co/api/v1"; //"https://staging.api.mavapay.co/api/v1";
     private readonly List<string> validStatuses = new List<string> { "success", "ok" };
 
-    public MavapayApiClientService(IHttpClientFactory httpClientFactory, NairaCheckoutDbContextFactory dbContextFactory, InvoiceRepository invoiceRepository)
+    public MavapayApiClientService(IHttpClientFactory httpClientFactory, NairaCheckoutDbContextFactory dbContextFactory, 
+        InvoiceRepository invoiceRepository)
     {
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
@@ -75,7 +76,7 @@ public class MavapayApiClientService
             });
             if (createPayout == null || string.IsNullOrEmpty(createPayout.id))
             {
-                return new CreatePayoutResponseModel { ErrorMessage = "An error occured while creating payout record via Mavapay. Please contact the merchant" };
+                return new CreatePayoutResponseModel { ErrorMessage = $"An error occured while creating payout record via Mavapay. Please contact the merchant. {createPayout?.ErrorMessage}" };
             }
             return createPayout;
         }
@@ -97,7 +98,7 @@ public class MavapayApiClientService
             });
             if (createPayout == null || string.IsNullOrEmpty(createPayout.id))
             {
-                return new CreatePayoutResponseModel { ErrorMessage = "An error occured while creating payout record via Mavapay. Please contact the merchant" };
+                return new CreatePayoutResponseModel { ErrorMessage = $"An error occured while creating payout record via Mavapay. Please contact the merchant. {createPayout?.ErrorMessage}" };
             }
             return createPayout;
         }
@@ -143,7 +144,7 @@ public class MavapayApiClientService
             }
             if (createPayout == null || string.IsNullOrEmpty(createPayout.id))
             {
-                return new CreatePayoutResponseModel { ErrorMessage = "An error occured while creating payout record via Mavapay. Please contact the merchant" };
+                return new CreatePayoutResponseModel { ErrorMessage = $"An error occured while creating payout record via Mavapay. Please contact the merchant. {createPayout?.ErrorMessage}" };
             }
             return createPayout;
         }
