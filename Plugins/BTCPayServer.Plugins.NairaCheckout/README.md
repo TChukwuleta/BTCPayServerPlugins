@@ -35,6 +35,10 @@ Before diving into the setup process, ensure you have the following:
 ![BTCPay-Mavapay configuration= page](./img/NairaCheckout/btcpay_page.png)
 
 
+
+## Naira checkout on BTCPay Server with Mavapay
+
+
 Go ahead and create an invoice, you can do this by clicking on the `Create Invoice` button in the top right corner of your BTCPay Server instance.
 
 On checkout, together with the existing payment options, you should see the option to pay with Naira.
@@ -45,13 +49,47 @@ Select the Naira option, and then an account number and Bank would be displayed 
 ![Mavapay Credential page](./img/NairaCheckout/Checkout_1.png)
 
 
-![BTCPay-Mavapay configuration= page](./img/NairaCheckout/Checkout_2.png)
+![BTCPay-Mavapay configuration page](./img/NairaCheckout/Checkout_2.png)
 
 
 At this point open your bank app, and make a transfer to the account number displayed. Please ensure the amount is the same as the one displayed on the invoice.
 
 Once the transaction is successful, in a matter of seconds, the invoice would be paid, just as if you had paid with Bitcoin directly.
 
+
+
+## Withdrawing your Bitcoin to Naira, Kenyan Shillings or South-African Rand
+
+Now that you are accepting Bitcoin and the sats are sitting in your BTCPay wallet, you can push them straight into a local bank account or mobile-money wallet.
+
+With Mavapay, you can now payout to: 
+
+- Nigerian Naira (NGN) – any Nigerian bank
+- 
+- Kenyan Shilling (KES) – M-PESA, bank 
+- 
+- South-African Rand (ZAR) – any South African bank
+
+
+1. On the left navigation menu, in the plugin section, click on `Mavapay Payout`
+
+2. Select the currency you want to withdraw to, NGN, KES or ZAR
+
+3. Enter the necessary details, including the amount you want to withdraw, and click on the `Send Payout` button.
+
+4. You should see a success message if the transaction was successful.
+
+5. You can check the status of your payout by clicking on the `View Payouts` button.
+
+Please note that the sats are sent from yout Lightning wallet connected to BTCPay Server, so ensure you have enough sats in your wallet to cover the withdrawal amount and the network fee.
+
+Also note that Mavapay charges a small fee for each withdrawal, and the exchange rate may vary.
+
+
+![Mavapay Payout page](./img/NairaCheckout/mavapay_payout.png)
+
+
+![Mavapay Payout list page](./img/NairaCheckout/mavapay_payout_history.png)
 
 
 ## Contribute
