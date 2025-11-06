@@ -230,7 +230,7 @@ public class UITicketTypeController : Controller
         }
         if (ticketEvent.HasMaximumCapacity && !ValidateTicketCapacity(ticketEvent, ctx.TicketTypes.Where(t => t.EventId == ticketEvent.Id && t.Id != excludeTicketTypeId).Sum(c => c.Quantity), vm.Quantity))
         {
-            error = $"Quantity specified is higher than available event capacity ({ticketEvent.MaximumEventCapacity - ctx.TicketTypes.Sum(c => c.Quantity)}). Kindly update event to cater for more";
+            error = $"Quantity specified is higher than available event capacity. Kindly update event to cater for more";
             return false;
         }
         return true;
