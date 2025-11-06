@@ -72,7 +72,7 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
     private async Task RegisterTicketTransaction(InvoiceEntity invoice, string orderId, bool success)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets).FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id);
+        var order = ctx.Orders.Include(c => c.Tickets).FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id);
         if (order == null) return;
 
         var result = new InvoiceLogs();
@@ -92,16 +92,22 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
 
         if (success)
         {
+            var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == order.EventId).ToList();
             var ticketCounts = order.Tickets.GroupBy(t => t.TicketTypeId).ToDictionary(g => g.Key, g => g.Count());
-            foreach (var (typeId, sold) in ticketCounts)
-                ctx.TicketTypes.Where(t => t.Id == typeId && t.EventId == order.EventId).ExecuteUpdate(t => t.SetProperty(p => p.QuantitySold, p => p.QuantitySold + sold));
+            foreach (var ticketType in ticketTypes)
+            {
+                if (ticketCounts.TryGetValue(ticketType.Id, out var count))
+                {
+                    ticketType.QuantitySold += count;
+                }
+            }
         }
 
         if (success)
         {
             var sender = await _emailSenderFactory.GetEmailSender(invoice.StoreId);
-            var settings = await sender.GetEmailSettings() ?? new EmailSettings();
-            if (settings.IsComplete())
+            var settings = await sender.GetEmailSettings();
+            if (settings?.IsComplete() == true)
             {
                 try
                 {
@@ -109,7 +115,7 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
                     if (emailResponse.IsSuccessful) order.EmailSent = true;
                     result.Write($"Email sent successfully to recipients in Order with Id: {order.Id}", InvoiceEventData.EventSeverity.Success);
                 }
-                catch { }
+                catch { result.Write($"Failed to send email for Order Id: {order.Id}.", InvoiceEventData.EventSeverity.Error); }
             }
         }
         ctx.Orders.Update(order);

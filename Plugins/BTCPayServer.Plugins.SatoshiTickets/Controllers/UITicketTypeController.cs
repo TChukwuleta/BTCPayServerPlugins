@@ -153,7 +153,7 @@ public class UITicketTypeController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Invalid event";
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
-        var validateTicketType = ValidateTicketType(ctx, ticketEvent, vm, out string errorMessage);
+        var validateTicketType = ValidateTicketType(ctx, ticketEvent, vm, null, out string errorMessage);
         if (!validateTicketType)
         {
             TempData[WellKnownTempData.ErrorMessage] = errorMessage;
@@ -162,8 +162,9 @@ public class UITicketTypeController : Controller
         var entity = TicketTypeViewModelToEntity(vm);
         entity.EventId = eventId;
         entity.TicketTypeState = EntityState.Active;
+        entity.IsDefault = vm.IsDefault;
         var currentDefault = ctx.TicketTypes.FirstOrDefault(c => c.EventId == entity.EventId && c.IsDefault);
-        if (currentDefault is not null && vm.IsDefault)
+        if (currentDefault is not null && entity.IsDefault)
             currentDefault.IsDefault = false;
         else
             entity.IsDefault = true;
@@ -193,7 +194,7 @@ public class UITicketTypeController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Invalid ticket type specifed";
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
-        var validateTicketType = ValidateTicketType(ctx, ticketEvent, vm, out string errorMessage);
+        var validateTicketType = ValidateTicketType(ctx, ticketEvent, vm, ticketTypeId, out string errorMessage);
         if (!validateTicketType)
         {
             TempData[WellKnownTempData.ErrorMessage] = errorMessage;
@@ -214,7 +215,7 @@ public class UITicketTypeController : Controller
         return RedirectToAction(nameof(List), new { storeId, eventId });
     }
 
-    private bool ValidateTicketType(SimpleTicketSalesDbContext ctx, Event ticketEvent, TicketTypeViewModel vm, out string error)
+    private bool ValidateTicketType(SimpleTicketSalesDbContext ctx, Event ticketEvent, TicketTypeViewModel vm, string? excludeTicketTypeId, out string error)
     {
         error = string.Empty;
         if (vm.Price <= 0)
@@ -227,9 +228,9 @@ public class UITicketTypeController : Controller
             error = "Quantity must be greater than zero";
             return false;
         }
-        if (ticketEvent.HasMaximumCapacity && !ValidateTicketCapacity(ticketEvent, ctx.TicketTypes.Sum(c => c.Quantity), vm.Quantity))
+        if (ticketEvent.HasMaximumCapacity && !ValidateTicketCapacity(ticketEvent, ctx.TicketTypes.Where(t => t.EventId == ticketEvent.Id && t.Id != excludeTicketTypeId).Sum(c => c.Quantity), vm.Quantity))
         {
-            error = $"Quantity specified is higher than avaible event capacity ({ticketEvent.MaximumEventCapacity - ctx.TicketTypes.Sum(c => c.Quantity)}). Kindly update event to cater for more";
+            error = $"Quantity specified is higher than available event capacity ({ticketEvent.MaximumEventCapacity - ctx.TicketTypes.Sum(c => c.Quantity)}). Kindly update event to cater for more";
             return false;
         }
         return true;

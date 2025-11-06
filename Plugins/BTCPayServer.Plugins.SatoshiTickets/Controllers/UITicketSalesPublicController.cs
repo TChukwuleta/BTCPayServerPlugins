@@ -227,7 +227,7 @@ public class UITicketSalesPublicController : Controller
         }
         orderViewModel.ContactInfo = model.ContactInfo;
         orderViewModel.IsStepTwoComplete = true; // Move to Payment step
-        HttpContext.Session.SetObject(sessionKey, model);
+        HttpContext.Session.SetObject(sessionKey, orderViewModel);
         var now = DateTimeOffset.UtcNow;
         var tickets = new List<Ticket>();
         var order = new Order
