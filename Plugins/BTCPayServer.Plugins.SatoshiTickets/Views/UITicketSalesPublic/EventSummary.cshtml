@@ -1,6 +1,8 @@
+@using BTCPayServer.Abstractions.Services
 @using BTCPayServer.Plugins.SatoshiTickets.Data
 @using BTCPayServer.Plugins.SatoshiTickets.ViewModels
 @using System.Globalization
+@inject Safe Safe
 @model EventSummaryViewModel
 @{
     Layout = "_BaseSimpleTicketPublicLayout";
@@ -19,7 +21,7 @@
         </div>
 
         <div class="col-md-6">
-            <h1 class="display-6 fw-bold mb-4">@Model.EventTitle.ToUpper()</h1>
+            <h1 class="display-6 fw-bold text-uppercase mb-4">@Model.EventTitle</h1>
             <div class="d-flex align-items-center mb-3">
                 <div class="me-2">
                     <i class="bi bi-calendar-event fs-5"></i>
@@ -36,22 +38,13 @@
                 </div>
             }
 
-            <div class="bg-light p-3 rounded mb-4">
-                @if (Model.EventType == EventType.Virtual)
-                {
-                    <p>This is an online event. Access details will be sent to your email once purchase is complete.</p>
-                }
-                @if (Model.EventType == EventType.Physical)
-                {
-                    <p>This is a physical event. QR code tickets will be sent to your email once purchase is complete.</p>
-                }
+            <div class="bg-light p-2 rounded mb-3 small">
+                @(Model.EventType == EventType.Virtual ? "Online event – access link will be e-mailed after purchase." : "Physical event – QR ticket will be e-mailed after purchase.")
             </div>
 
             <hr class="my-4">
-
             <h2 class="h4 fw-bold mb-3">About this event</h2>
-
-            <p>@Model.Description</p>
+            <p>@Safe.Raw(Model.Description)</p>
         </div>
     </div>
 </div>

@@ -185,16 +185,13 @@
             display: none;
             z-index: 1000;
         }
-
         .autocomplete-item {
             padding: 8px 12px;
             cursor: pointer;
         }
-
         .autocomplete-item:hover {
             background-color: #f0f0f0;
         }
-
         .variable-highlight {
             background-color: #e8f0fe;
             border-radius: 3px;
@@ -215,8 +212,6 @@
             }
             updateVisibility();
             toggle.addEventListener("change", updateVisibility);
-
-
             const variables = [
                 'Name',
                 'Email',
@@ -246,9 +241,7 @@
                 const text = textarea.value.substring(0, position);
                 const lines = text.split('\n');
                 const currentLineNumber = lines.length - 1;
-
                 const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight) || 20;
-
                 popup.innerHTML = '';
 
                 variables.forEach(variable => {
@@ -264,10 +257,8 @@
                     item.addEventListener('click', function() {
                         insertVariable(variable);
                     });
-
                     popup.appendChild(item);
                 });
-
                 popup.style.position = 'absolute';
                 popup.style.left = '50px'; 
                 popup.style.top = `${(currentLineNumber * lineHeight) + 30}px`;

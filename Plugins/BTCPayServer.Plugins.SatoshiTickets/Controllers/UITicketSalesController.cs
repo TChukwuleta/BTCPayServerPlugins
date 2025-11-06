@@ -379,7 +379,6 @@ public class UITicketSalesController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Invalid Event specified";
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
         }
-
         var ordersQuery = ctx.Orders.AsNoTracking().Include(c => c.Tickets)
             .Where(c => c.EventId == eventId && c.StoreId == CurrentStore.Id && c.PaymentStatus == TransactionStatus.Settled.ToString());
 
@@ -388,12 +387,9 @@ public class UITicketSalesController : Controller
         if (!string.IsNullOrEmpty(searchText))
         {
             ordersQuery = ordersQuery.Where(o =>
-                o.InvoiceId.Contains(searchText) ||
-                o.Tickets.Any(t => t.TxnNumber.Contains(searchText) || t.FirstName.Contains(searchText) ||  t.LastName.Contains(searchText) || t.Email.Contains(searchText)
-                ));
+                o.InvoiceId.Contains(searchText) || o.Tickets.Any(t => t.TxnNumber.Contains(searchText) || t.FirstName.Contains(searchText) ||  t.LastName.Contains(searchText) || t.Email.Contains(searchText)));
         }  
         var orders = ordersQuery.ToList();
-
         var vm = new EventTicketViewModel
         {
             TicketsCount = ticketsBought,
@@ -424,7 +420,6 @@ public class UITicketSalesController : Controller
                 }).ToList(),
             }).ToList()
         };
-
         return View(vm);
     }
 
@@ -437,7 +432,7 @@ public class UITicketSalesController : Controller
         var checkinTicket = await _ticketService.CheckinTicket(eventId, ticketNumber, CurrentStore.Id);
         if (checkinTicket.Success)
         {
-            TempData[WellKnownTempData.SuccessMessage] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} checked-in successfully";
+            TempData[WellKnownTempData.SuccessMessage] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} of ticket type: {checkinTicket.Ticket.TicketTypeName} checked-in successfully";
         }
         else
         {

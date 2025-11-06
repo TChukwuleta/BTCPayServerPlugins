@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
+using AngleSharp.Dom;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;
@@ -66,7 +67,7 @@ public class UITicketTypeController : Controller
         var checkinTicket = await _ticketService.CheckinTicket(eventId, ticketNumber, storeId);
         if (checkinTicket.Success)
         {
-            TempData["CheckInSuccessMessage"] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} checked-in successfully";
+            TempData["CheckInSuccessMessage"] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} of ticket type: {checkinTicket.Ticket.TicketTypeName} checked-in successfully";
         }
         else
         {
@@ -84,8 +85,7 @@ public class UITicketTypeController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == eventId);
-        if (ticketEvent == null)
-            return NotFound();
+        if (ticketEvent == null) return NotFound();
 
         var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == ticketEvent.Id);
         ticketTypes = sortBy switch
@@ -116,8 +116,7 @@ public class UITicketTypeController : Controller
     [HttpGet("view")]
     public async Task<IActionResult> ViewTicketType(string storeId, string eventId, string ticketTypeId)
     {
-        if (string.IsNullOrEmpty(CurrentStore.Id))
-            return NotFound();
+        if (string.IsNullOrEmpty(CurrentStore.Id)) return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
@@ -145,8 +144,7 @@ public class UITicketTypeController : Controller
     [HttpPost("create")]
     public async Task<IActionResult> CreateTicketType(string storeId, string eventId, TicketTypeViewModel vm)
     {
-        if (string.IsNullOrEmpty(CurrentStore.Id))
-            return NotFound();
+        if (string.IsNullOrEmpty(CurrentStore.Id)) return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
@@ -155,30 +153,18 @@ public class UITicketTypeController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Invalid event";
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
-        if (vm.Price <= 0)
+        var validateTicketType = ValidateTicketType(ctx, ticketEvent, vm, out string errorMessage);
+        if (!validateTicketType)
         {
-            TempData[WellKnownTempData.ErrorMessage] = "Price cannot be zero or negative";
-            return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
-        }
-        if (vm.Quantity <= 0 && ticketEvent.HasMaximumCapacity)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Price cannot be zero or negative";
-            return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
-        }
-        if (ticketEvent.HasMaximumCapacity && !ValidateTicketCapacity(ticketEvent, ctx.TicketTypes.Sum(c => c.Quantity), vm.Quantity))
-        {
-            TempData[WellKnownTempData.ErrorMessage] = $"Quantity specified is higher than avaible event capacity ({ticketEvent.MaximumEventCapacity - ctx.TicketTypes.Sum(c => c.Quantity)}). Kindly update event to cater for more";
+            TempData[WellKnownTempData.ErrorMessage] = errorMessage;
             return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
         }
         var entity = TicketTypeViewModelToEntity(vm);
         entity.EventId = eventId;
         entity.TicketTypeState = EntityState.Active;
-        var existingDefaultTicketType = ctx.TicketTypes.FirstOrDefault(c => c.EventId == entity.EventId && c.IsDefault);
-        if (existingDefaultTicketType != null)
-        {
-            existingDefaultTicketType.IsDefault = vm.IsDefault ? false : true;
-            ctx.TicketTypes.Update(existingDefaultTicketType);
-        }
+        var currentDefault = ctx.TicketTypes.FirstOrDefault(c => c.EventId == entity.EventId && c.IsDefault);
+        if (currentDefault is not null && vm.IsDefault)
+            currentDefault.IsDefault = false;
         else
             entity.IsDefault = true;
 
@@ -192,8 +178,7 @@ public class UITicketTypeController : Controller
     [HttpPost("update/{ticketTypeId}")]
     public async Task<IActionResult> UpdateTicketType(string storeId, string eventId, string ticketTypeId, TicketTypeViewModel vm)
     {
-        if (string.IsNullOrEmpty(CurrentStore.Id))
-            return NotFound();
+        if (string.IsNullOrEmpty(CurrentStore.Id)) return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
@@ -208,19 +193,10 @@ public class UITicketTypeController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Invalid ticket type specifed";
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
-        if (vm.Price <= 0)
+        var validateTicketType = ValidateTicketType(ctx, ticketEvent, vm, out string errorMessage);
+        if (!validateTicketType)
         {
-            TempData[WellKnownTempData.ErrorMessage] = "Price cannot be zero or negative";
-            return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
-        }
-        if (vm.Quantity <= 0 && ticketEvent.HasMaximumCapacity)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Price cannot be zero or negative";
-            return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
-        }
-        if (ticketEvent.HasMaximumCapacity && !ValidateTicketCapacity(ticketEvent, ctx.TicketTypes.Sum(c => c.Quantity), vm.Quantity))
-        {
-            TempData[WellKnownTempData.ErrorMessage] = $"Quantity specified is higher than avaible event capacity ({ticketEvent.MaximumEventCapacity - ctx.TicketTypes.Sum(c => c.Quantity)}). Kindly update event to cater for more";
+            TempData[WellKnownTempData.ErrorMessage] = errorMessage;
             return RedirectToAction(nameof(ViewTicketType), new { storeId, eventId });
         }
         entity.Name = vm.Name;
@@ -230,27 +206,44 @@ public class UITicketTypeController : Controller
         entity.IsDefault = vm.IsDefault;
         if (!entity.IsDefault)
         {
-            var existingDefaultTicketType = ctx.TicketTypes.FirstOrDefault(c => c.EventId == entity.EventId && c.IsDefault);
-            if (existingDefaultTicketType == null)
-                entity.IsDefault = true;
+            var anyDefault = ctx.TicketTypes.Any(t => t.EventId == eventId && t.Id != ticketTypeId && t.IsDefault);
+            if (!anyDefault) entity.IsDefault = true;
         }
-        ctx.TicketTypes.Update(entity);
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Ticket type updated successfully";
         return RedirectToAction(nameof(List), new { storeId, eventId });
+    }
+
+    private bool ValidateTicketType(SimpleTicketSalesDbContext ctx, Event ticketEvent, TicketTypeViewModel vm, out string error)
+    {
+        error = string.Empty;
+        if (vm.Price <= 0)
+        {
+            error = "Price cannot be zero or negative";
+            return false;
+        }
+        if (vm.Quantity <= 0 && ticketEvent.HasMaximumCapacity)
+        {
+            error = "Quantity must be greater than zero";
+            return false;
+        }
+        if (ticketEvent.HasMaximumCapacity && !ValidateTicketCapacity(ticketEvent, ctx.TicketTypes.Sum(c => c.Quantity), vm.Quantity))
+        {
+            error = $"Quantity specified is higher than avaible event capacity ({ticketEvent.MaximumEventCapacity - ctx.TicketTypes.Sum(c => c.Quantity)}). Kindly update event to cater for more";
+            return false;
+        }
+        return true;
     }
 
 
     [HttpGet("toggle/{ticketTypeId}")]
     public async Task<IActionResult> ToggleTicketTypeStatus(string storeId, string eventId, string ticketTypeId, bool enable)
     {
-        if (CurrentStore is null)
-            return NotFound();
+        if (CurrentStore is null) return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == eventId);
-        if (ticketEvent == null)
-            return NotFound();
+        if (ticketEvent == null) return NotFound();
 
         var ticketType = ctx.TicketTypes.FirstOrDefault(c => c.EventId == ticketEvent.Id && c.Id == ticketTypeId);
         if (ticketType == null)
@@ -265,13 +258,11 @@ public class UITicketTypeController : Controller
     [HttpPost("toggle/{ticketTypeId}")]
     public async Task<IActionResult> ToggleTicketTypeStatusPost(string storeId, string eventId, string ticketTypeId, bool enable)
     {
-        if (CurrentStore is null)
-            return NotFound();
+        if (CurrentStore is null) return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == eventId);
-        if (ticketEvent == null)
-            return NotFound();
+        if (ticketEvent == null) return NotFound();
 
         var ticketType = ctx.TicketTypes.FirstOrDefault(c => c.EventId == ticketEvent.Id && c.Id == ticketTypeId);
         if (ticketType == null)
@@ -279,17 +270,7 @@ public class UITicketTypeController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Invalid route specified";
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
-        switch (ticketType.TicketTypeState)
-        {
-            case EntityState.Disabled:
-                ticketType.TicketTypeState = EntityState.Active;
-                break;
-            case EntityState.Active:
-            default:
-                ticketType.TicketTypeState = EntityState.Disabled;
-                break;
-        }
-        ctx.TicketTypes.Update(ticketType);
+        ticketType.TicketTypeState = enable ? EntityState.Active : EntityState.Disabled;
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = $"Ticket type {(enable ? "activated" : "disabled")} successfully";
         return RedirectToAction(nameof(List), new { storeId, eventId });
@@ -299,13 +280,11 @@ public class UITicketTypeController : Controller
     [HttpGet("delete/{ticketTypeId}")]
     public async Task<IActionResult> DeleteTicketType(string storeId, string eventId, string ticketTypeId)
     {
-        if (CurrentStore is null)
-            return NotFound();
+        if (CurrentStore is null) return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == eventId);
-        if (ticketEvent == null)
-            return NotFound();
+        if (ticketEvent == null) return NotFound();
 
         var ticketType = ctx.TicketTypes.FirstOrDefault(c => c.EventId == ticketEvent.Id && c.Id == ticketTypeId);
         if (ticketType == null)
@@ -320,13 +299,11 @@ public class UITicketTypeController : Controller
     [HttpPost("delete/{ticketTypeId}")]
     public async Task<IActionResult> DeleteTicketTypePost(string storeId, string eventId, string ticketTypeId)
     {
-        if (CurrentStore is null)
-            return NotFound();
+        if (CurrentStore is null) return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == eventId);
-        if (ticketEvent == null)
-            return NotFound();
+        if (ticketEvent == null) return NotFound();
 
         var ticketType = ctx.TicketTypes.FirstOrDefault(c => c.EventId == ticketEvent.Id && c.Id == ticketTypeId);
         if (ticketType == null)
@@ -340,9 +317,7 @@ public class UITicketTypeController : Controller
         return RedirectToAction(nameof(List), new { storeId, eventId });
     }
 
-    private bool ValidateTicketCapacity(Event ticketEvent, int quantityOfTicketsUsed, int ticketModelQuantity)
-        => ticketModelQuantity <= (ticketEvent.MaximumEventCapacity - quantityOfTicketsUsed);
-
+    private bool ValidateTicketCapacity(Event ticketEvent, int quantityOfTicketsUsed, int ticketModelQuantity) => ticketModelQuantity <= (ticketEvent.MaximumEventCapacity - quantityOfTicketsUsed);
 
     private TicketTypeViewModel TicketTypeToViewModel(TicketType entity)
     {
