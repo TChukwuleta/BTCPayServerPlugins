@@ -13,6 +13,8 @@ public class UpdateSimpleTicketSalesEventViewModel
     public string EventId { get; set; }
     public string StoreId { get; set; }
     public string Title { get; set; }
+
+    [Display(Name = "Event Type")]
     public EventType EventType { get; set; }
     public List<SelectListItem> EventTypes { get; set; }
     public string Description { get; set; }
@@ -24,9 +26,13 @@ public class UpdateSimpleTicketSalesEventViewModel
     [JsonIgnore]
     public IFormFile EventImageFile { get; set; }
 
-    [Display(Name = "Event Address or Link")]
+    [Display(Name = "Event location or URL")]
     public string Location { get; set; }
+
+    [Display(Name = "Event Start Date")]
     public DateTime StartDate { get; set; } = DateTime.UtcNow.Date;
+
+    [Display(Name = "Event End Date")]
     public DateTime? EndDate { get; set; }
     public string StoreDefaultCurrency { get; set; }
     public string Currency { get; set; }

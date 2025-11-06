@@ -144,8 +144,7 @@ public class UITicketSalesController : Controller
             vm.EventImageUrl = getFile == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile));
             vm.StoreDefaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, entity.Currency);
         }
-        vm.EventTypes = Enum.GetValues(typeof(EventType))
-            .Cast<EventType>()
+        vm.EventTypes = Enum.GetValues(typeof(EventType)).Cast<EventType>()
             .Select(e => new SelectListItem
             {
                 Value = e.ToString(),
@@ -193,11 +192,9 @@ public class UITicketSalesController : Controller
                 entity.EventLogo = imageUpload.StoredFile.Id;
             }
         }
-        vm.EventImageFile = null;
         entity.CreatedAt = DateTime.UtcNow;
         entity.Currency = await GetStoreDefaultCurrentIfEmpty(storeId, vm.Currency);
-        entity.StoreId = CurrentStore.Id;
-        ctx.Events.Update(entity);
+        ctx.Events.Add(entity);
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Event created successfully. Kindly create ticket tiers for your event to publish your event";
         return RedirectToAction(nameof(UITicketTypeController.List), "UITicketType", new { storeId = CurrentStore.Id, eventId = entity.Id });
@@ -211,14 +208,12 @@ public class UITicketSalesController : Controller
             return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-
         var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Invalid event record specified for this store";
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
         }
-
         var ticketTiersCount = ctx.TicketTypes.Where(t => t.EventId == eventId).Sum(c => c.Quantity);
         if (vm.HasMaximumCapacity && vm.MaximumEventCapacity < ticketTiersCount)
         {
@@ -231,7 +226,6 @@ public class UITicketSalesController : Controller
             return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id, eventId });
         }
         entity = TicketSalesEventViewModelToEntity(vm, entity);
-        entity.Id = eventId;
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
         {
@@ -249,7 +243,6 @@ public class UITicketSalesController : Controller
         else if (RemoveEventLogoFile)
         {
             entity.EventLogo = null;
-            vm.EventImageUrl = null;
             vm.EventImageUrl = null;
         }
         ctx.Events.Update(entity);
@@ -386,7 +379,6 @@ public class UITicketSalesController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Invalid Event specified";
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
         }
-
         var ordersQuery = ctx.Orders.AsNoTracking().Include(c => c.Tickets)
             .Where(c => c.EventId == eventId && c.StoreId == CurrentStore.Id && c.PaymentStatus == TransactionStatus.Settled.ToString());
 
@@ -395,12 +387,9 @@ public class UITicketSalesController : Controller
         if (!string.IsNullOrEmpty(searchText))
         {
             ordersQuery = ordersQuery.Where(o =>
-                o.InvoiceId.Contains(searchText) ||
-                o.Tickets.Any(t => t.TxnNumber.Contains(searchText) || t.FirstName.Contains(searchText) ||  t.LastName.Contains(searchText) || t.Email.Contains(searchText)
-                ));
+                o.InvoiceId.Contains(searchText) || o.Tickets.Any(t => t.TxnNumber.Contains(searchText) || t.FirstName.Contains(searchText) ||  t.LastName.Contains(searchText) || t.Email.Contains(searchText)));
         }  
         var orders = ordersQuery.ToList();
-
         var vm = new EventTicketViewModel
         {
             TicketsCount = ticketsBought,
@@ -431,7 +420,6 @@ public class UITicketSalesController : Controller
                 }).ToList(),
             }).ToList()
         };
-
         return View(vm);
     }
 
@@ -444,7 +432,7 @@ public class UITicketSalesController : Controller
         var checkinTicket = await _ticketService.CheckinTicket(eventId, ticketNumber, CurrentStore.Id);
         if (checkinTicket.Success)
         {
-            TempData[WellKnownTempData.SuccessMessage] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} checked-in successfully";
+            TempData[WellKnownTempData.SuccessMessage] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} of ticket type: {checkinTicket.Ticket.TicketTypeName} checked-in successfully";
         }
         else
         {
@@ -562,40 +550,33 @@ public class UITicketSalesController : Controller
 
     private Event TicketSalesEventViewModelToEntity(UpdateSimpleTicketSalesEventViewModel model, Event entity)
     {
-        if (entity == null)
+        void MapTo(Event e)
         {
-            return new Event
-            {
-                StoreId = model.StoreId,
-                Title = model.Title,
-                Description = model.Description,
-                EventLogo = model.EventImageUrl,
-                Location = model.Location,
-                StartDate = model.StartDate,
-                EndDate = model.EndDate,
-                Currency = model.Currency,
-                EmailBody = model.EmailBody,
-                EventType = model.EventType,
-                RedirectUrl = model.RedirectUrl,
-                EmailSubject = model.EmailSubject,
-                HasMaximumCapacity = model.HasMaximumCapacity,
-                MaximumEventCapacity = model.MaximumEventCapacity
-            };
+            e.StoreId = CurrentStore.Id;
+            e.Title = model.Title;
+            e.Description = model.Description;
+            e.Location = model.Location;
+            e.StartDate = model.StartDate;
+            e.EndDate = model.EndDate;
+            e.Currency = model.Currency;
+            e.EmailBody = model.EmailBody;
+            e.EventType = model.EventType;
+            e.RedirectUrl = model.RedirectUrl;
+            e.EmailSubject = model.EmailSubject;
+            e.HasMaximumCapacity = model.HasMaximumCapacity;
+            e.MaximumEventCapacity = model.MaximumEventCapacity;
+
+            if (!string.IsNullOrWhiteSpace(model.EventImageUrl))
+                e.EventLogo = model.EventImageUrl;
         }
-        entity.StoreId = model.StoreId;
-        entity.Title = model.Title;
-        entity.Description = model.Description;
-        entity.EventLogo = entity.EventLogo;
-        entity.Location = model.Location;
-        entity.StartDate = model.StartDate;
-        entity.EndDate = model.EndDate;
-        entity.Currency = model.Currency;
-        entity.EmailBody = model.EmailBody;
-        entity.EventType = model.EventType;
-        entity.RedirectUrl = model.RedirectUrl;
-        entity.EmailSubject = model.EmailSubject;
-        entity.HasMaximumCapacity = model.HasMaximumCapacity;
-        entity.MaximumEventCapacity = model.MaximumEventCapacity;
+
+        if (entity is null)
+        {
+            var newEvent = new Event();
+            MapTo(newEvent);
+            return newEvent;
+        }
+        MapTo(entity);
         return entity;
     }
 }

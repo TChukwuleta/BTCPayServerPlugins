@@ -27,37 +27,6 @@
     </div>
 </div>
 
-@section PageHeadContent
-{
-    <style>
-        .autocomplete-popup {
-            position: absolute;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            max-height: 200px;
-            overflow-y: auto;
-            display: none;
-            z-index: 1000;
-        }
-
-        .autocomplete-item {
-            padding: 8px 12px;
-            cursor: pointer;
-        }
-
-            .autocomplete-item:hover {
-                background-color: #f0f0f0;
-            }
-
-        .variable-highlight {
-            background-color: #e8f0fe;
-            border-radius: 3px;
-            padding: 2px 0;
-        }
-    </style>
-}
 
 <partial name="_StatusMessage" />
 
@@ -65,9 +34,21 @@
     <div class="row">
         <div class="col-sm-10 col-md-9 col-xl-7 col-xxl-6">
             <div class="form-group">
+                <label asp-for="EventType" class="form-label" data-required></label>
+                <select asp-for="EventType" asp-items="Model.EventTypes" class="form-control" required></select>
+                <span asp-validation-for="EventType" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
                 <label asp-for="Title" class="form-label" data-required></label>
                 <input asp-for="Title" class="form-control" required />
                 <span asp-validation-for="Title" class="text-danger"></span>
+            </div>
+
+            <div class="form-group mt-3">
+                <label asp-for="Description" class="form-label" data-required></label>
+                <textarea asp-for="Description" rows="5" class="form-control richtext" required></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
             </div>
 
             <div class="form-group">
@@ -80,12 +61,6 @@
                 <label asp-for="RedirectUrl" class="form-label"></label>
                 <input asp-for="RedirectUrl" class="form-control" />
                 <span asp-validation-for="RedirectUrl" class="text-danger"></span>
-            </div>
-
-            <div class="form-group">
-                <label asp-for="EventType" class="form-label" data-required></label>
-                <select asp-for="EventType" asp-items="Model.EventTypes" class="form-control" required></select>
-                <span asp-validation-for="EventType" class="text-danger"></span>
             </div>
 
             <div class="form-group">
@@ -114,16 +89,6 @@
                     <input asp-for="EventImageFile" type="file" class="form-control" disabled />
                     <div class="form-text">In order to upload an image, a <a asp-controller="UIServer" asp-action="Files">file storage</a> must be configured.</div>
                 }
-            </div>
-        </div>
-    </div>
-
-    <div class="row mt-3">
-        <div class="col-sm-6">
-            <div class="form-group">
-                <label asp-for="Description" class="form-label" data-required></label>
-                <textarea asp-for="Description" rows="5" class="form-control richtext" required></textarea>
-                <span asp-validation-for="Description" class="text-danger"></span>
             </div>
         </div>
     </div>
@@ -205,7 +170,39 @@
     </div>
 </form>
 
+@section PageHeadContent
+{
+    <link href="~/vendor/summernote/summernote-bs5.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        .autocomplete-popup {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+        }
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        .autocomplete-item:hover {
+            background-color: #f0f0f0;
+        }
+        .variable-highlight {
+            background-color: #e8f0fe;
+            border-radius: 3px;
+            padding: 2px 0;
+        }
+    </style>
+}
+
+
 @section PageFootContent {
+    <script src="~/vendor/summernote/summernote-bs5.js" asp-append-version="true"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const toggle = document.getElementById("maxCapacityToggle");
@@ -215,8 +212,6 @@
             }
             updateVisibility();
             toggle.addEventListener("change", updateVisibility);
-
-
             const variables = [
                 'Name',
                 'Email',
@@ -246,9 +241,7 @@
                 const text = textarea.value.substring(0, position);
                 const lines = text.split('\n');
                 const currentLineNumber = lines.length - 1;
-
                 const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight) || 20;
-
                 popup.innerHTML = '';
 
                 variables.forEach(variable => {
@@ -264,10 +257,8 @@
                     item.addEventListener('click', function() {
                         insertVariable(variable);
                     });
-
                     popup.appendChild(item);
                 });
-
                 popup.style.position = 'absolute';
                 popup.style.left = '50px'; 
                 popup.style.top = `${(currentLineNumber * lineHeight) + 30}px`;

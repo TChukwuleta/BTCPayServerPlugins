@@ -1,16 +1,15 @@
-﻿using BTCPayServer.Data;
+﻿using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using BTCPayServer.Client.Models;
+using BTCPayServer.Data;
 using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
 using BTCPayServer.Services.Invoices;
-using Microsoft.EntityFrameworkCore;
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using BTCPayServer.Services.Mails;
-using BTCPayServer.Client.Models;
-using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Services;
 
@@ -26,8 +25,7 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
         EventAggregator eventAggregator,
         EmailSenderFactory emailSenderFactory,
         InvoiceRepository invoiceRepository,
-        SimpleTicketSalesDbContextFactory dbContextFactory,
-        Logs logs) : base(eventAggregator, logs)
+        SimpleTicketSalesDbContextFactory dbContextFactory, Logs logs) : base(eventAggregator, logs)
     {
         _emailService = emailService;
         _dbContextFactory = dbContextFactory;
@@ -74,18 +72,17 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
     private async Task RegisterTicketTransaction(InvoiceEntity invoice, string orderId, bool success)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var result = new InvoiceLogs();
-        result.Write($"Invoice status: {invoice.Status.ToString().ToLower()}", InvoiceEventData.EventSeverity.Info);
-        var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets).FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id);
+        var order = ctx.Orders.Include(c => c.Tickets).FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id);
         if (order == null) return;
 
+        var result = new InvoiceLogs();
+        result.Write($"Invoice status: {invoice.Status.ToString().ToLower()}", InvoiceEventData.EventSeverity.Info);
         if (order != null && order.PaymentStatus != Data.TransactionStatus.New.ToString())
         {
-            result.Write("Transaction has previously been completed", InvoiceEventData.EventSeverity.Info);
+            result.Write("Transaction has previously been acted on", InvoiceEventData.EventSeverity.Info);
             await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
             return;
         }
-
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == order.EventId && c.StoreId == order.StoreId);
         order.PurchaseDate = DateTime.UtcNow;
         order.InvoiceStatus = invoice.Status.ToString().ToLower();
@@ -104,21 +101,22 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
                     ticketType.QuantitySold += count;
                 }
             }
-            ctx.TicketTypes.UpdateRange(ticketTypes);
         }
 
-        var emailSender = await _emailSenderFactory.GetEmailSender(invoice.StoreId);
-        var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
-        if (success && isEmailSettingsConfigured)
+        if (success)
         {
-            try
+            var sender = await _emailSenderFactory.GetEmailSender(invoice.StoreId);
+            var settings = await sender.GetEmailSettings();
+            if (settings?.IsComplete() == true)
             {
-                var emailResponse = await _emailService.SendTicketRegistrationEmail(invoice.StoreId, order.Tickets.First(), ticketEvent);
-                if (emailResponse.IsSuccessful)
-                    order.EmailSent = true;
-                result.Write($"Email sent successfully to recipients in Order with Id: {order.Id}", InvoiceEventData.EventSeverity.Success);
+                try
+                {
+                    var emailResponse = await _emailService.SendTicketRegistrationEmail(invoice.StoreId, order.Tickets.First(), ticketEvent);
+                    if (emailResponse.IsSuccessful) order.EmailSent = true;
+                    result.Write($"Email sent successfully to recipients in Order with Id: {order.Id}", InvoiceEventData.EventSeverity.Success);
+                }
+                catch { result.Write($"Failed to send email for Order Id: {order.Id}.", InvoiceEventData.EventSeverity.Error); }
             }
-            catch (Exception) { }
         }
         ctx.Orders.Update(order);
         await ctx.SaveChangesAsync();
