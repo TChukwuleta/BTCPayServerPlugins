@@ -62,12 +62,19 @@
                                 }
                                 else
                                 {
-                                    <input type="number" class="form-control ticket-quantity"
+                                    @* <input type="number" class="form-control ticket-quantity"
                                            data-price="@ticket.Price"
                                            data-ticket-type-id="@ticket.TicketTypeId"
                                            data-ticket-name="@ticket.Name"
                                            min="0" max="@maxQuantity" value="0"
-                                           onchange="updateSummary()" />
+                                           onchange="updateSummary()" /> *@
+
+                                    <input type="number" class="form-control form-control-lg ticket-quantity text-center"
+                                           data-price="@ticket.Price"
+                                           data-ticket-type-id="@ticket.TicketTypeId"
+                                           data-ticket-name="@ticket.Name"
+                                           min="0" max="@maxQuantity" value="0"
+                                           style="width: 80px; min-height: 48px;" />
                                 }
                             </div>
                         </div>
@@ -109,6 +116,20 @@
 
 
 @section PageFootContent {
+    <style>
+        .ticket-quantity {
+            font-size: 16px;
+            -webkit-appearance: none;
+            -moz-appearance: textfield;
+        }
+        
+        .ticket-quantity::-webkit-inner-spin-button,
+        .ticket-quantity::-webkit-outer-spin-button {
+            opacity: 1;
+            height: 46px;
+        }
+    </style>
+
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             function updateSummary() {
