@@ -175,7 +175,7 @@ public class UITicketSalesPublicController : Controller
         var storeData = await _storeRepo.FindStore(storeId);
         if (storeData == null) return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = _dbContextFactory.CreateContext(); 
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
         if (!ValidateEvent(ctx, storeId, eventId))
             return NotFound();
