@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using BTCPayServer.Plugins.NairaCheckout.Data;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace BTCPayServer.Plugins.NairaCheckout.ViewModels;
@@ -29,13 +28,10 @@ public class PayoutNGNViewModel
     public string BankCode { get; set; }
     [Required]
     public string BankName { get; set; }
-
-    [Required, StringLength(10, MinimumLength = 10)]
     public string AccountNumber { get; set; }
 
     [Range(4000, double.MaxValue, ErrorMessage = "Amount must be greater than 4000")]
     public decimal Amount { get; set; }
-    [Required]
     public string AccountName { get; set; }
 }
 
@@ -43,6 +39,7 @@ public class PayoutKESViewModel
 {
     public string Method { get; set; }
     public string AccountNumber { get; set; }
+    public string AccountName { get; set; }
     public string Identifier { get; set; }
     public decimal Amount { get; set; }
 }
