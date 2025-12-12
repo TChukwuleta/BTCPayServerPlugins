@@ -98,6 +98,7 @@
             @if (!string.IsNullOrEmpty(Model.KES?.AccountName))
             {
                 <span class="text-muted">@Model.KES.AccountName</span>
+                <input type="hidden" asp-for="KES.AccountName" />
             }
             <span id="kesValidationResult" class="text-muted"></span>
             <span asp-validation-for="KES.Identifier" class="text-danger"></span>

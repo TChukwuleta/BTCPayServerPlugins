@@ -18,7 +18,7 @@ public class MavapayApiClientService
     private readonly HttpClient _httpClient;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly NairaCheckoutDbContextFactory _dbContextFactory;
-    public readonly string ApiUrl = "https://staging.api.mavapay.co/api/v1"; //"https://staging.api.mavapay.co/api/v1";
+    public readonly string ApiUrl = "https://api.mavapay.co/api/v1"; //"https://staging.api.mavapay.co/api/v1";
     private readonly List<string> validStatuses = new List<string> { "success", "ok" };
 
     public MavapayApiClientService(IHttpClientFactory httpClientFactory, NairaCheckoutDbContextFactory dbContextFactory, 
@@ -250,14 +250,20 @@ public class MavapayApiClientService
     }
 
     // This method is only applicable for till and bill number.. and is called before creating a quote
-    public async Task<KESNameEnquiry> KESNameEnquiry(string identifier, string identifierType, string apiKey)
+    public async Task<KESNameEnquiryDataResponse> KESNameEnquiry(string identifier, string identifierType, string apiKey)
     {
+        Enum.TryParse<MpesaPaymentMethod>(identifierType, true, out var identifierEnum);
+        identifierType = identifierEnum switch
+        {
+            MpesaPaymentMethod.TillNumber => "Till",
+            MpesaPaymentMethod.BillNumber => "PayBill",
+            _ => identifierType
+        };
         var postJson = JsonConvert.SerializeObject(new { identifier, identifierType });
         var req = CreateRequest(HttpMethod.Post, "quote/validate-kes-identifier");
         req.Content = new StringContent(postJson, Encoding.UTF8, "application/json");
         var response = await SendRequest(req, apiKey);
-        Console.WriteLine(response.ToString());
-        var responseModel = JsonConvert.DeserializeObject<EntityVm<KESNameEnquiry>>(response, new JsonSerializerSettings
+        var responseModel = JsonConvert.DeserializeObject<EntityVm<KESNameEnquiryDataResponse>>(response, new JsonSerializerSettings
         {
             MissingMemberHandling = MissingMemberHandling.Ignore,
             NullValueHandling = NullValueHandling.Include

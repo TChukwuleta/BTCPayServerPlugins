@@ -175,6 +175,30 @@ public class UINairaController : Controller
         return View(viewModel);
     }
 
+    [HttpPost("mavapay/naira/name-enquiry")]
+    public async Task<IActionResult> ValidateNgnAccountNumber(MavapayPayoutViewModel model)
+    {
+        if (string.IsNullOrEmpty(StoreData.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
+        var viewModel = await PayoutViewModel(mavapaySetting, model);
+        if (string.IsNullOrWhiteSpace(model.NGN.AccountNumber) || model.NGN.AccountNumber.Length != 10)
+        {
+            ModelState.AddModelError("NGN.AccountNumber", "Account number must be exactly 10 digits");
+            return View(nameof(MavapayPayout), viewModel);
+        }
+        var result = await _mavapayApiClientService.NGNNameEnquiry(model.NGN.BankCode, model.NGN.AccountNumber, mavapaySetting.ApiKey);
+        if (result == null || string.IsNullOrEmpty(result.accountName))
+        {
+            ModelState.AddModelError("NGN.AccountNumber", "Account number cannot be verified at the moment");
+            return View(nameof(MavapayPayout), viewModel);
+        }
+        viewModel.NGN.AccountName = result.accountName;
+        return View(nameof(MavapayPayout), viewModel);
+    }
+
     [HttpPost("mavapay/ngn-payout")]
     public async Task<IActionResult> ProcessNGNPayout(MavapayPayoutViewModel model)
     {
@@ -221,55 +245,6 @@ public class UINairaController : Controller
         }
     }
 
-    [HttpPost("mavapay/naira/name-enquiry")]
-    public async Task<IActionResult> ValidateNgnAccountNumber(MavapayPayoutViewModel model)
-    {
-        if (string.IsNullOrEmpty(StoreData.Id))
-            return NotFound();
-
-        await using var ctx = _dbContextFactory.CreateContext();
-        var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
-        var viewModel = await PayoutViewModel(mavapaySetting, model);
-        if (string.IsNullOrWhiteSpace(model.NGN.AccountNumber) || model.NGN.AccountNumber.Length != 10)
-        {
-            ModelState.AddModelError("NGN.AccountNumber", "Account number must be exactly 10 digits");
-            return View(nameof(MavapayPayout), viewModel);
-        }
-        var result = await _mavapayApiClientService.NGNNameEnquiry(model.NGN.BankCode, model.NGN.AccountNumber, mavapaySetting.ApiKey);
-        if (result == null || string.IsNullOrEmpty(result.accountName))
-        {
-            ModelState.AddModelError("NGN.AccountNumber", "Account number cannot be verified at the moment");
-            return View(nameof(MavapayPayout), viewModel);
-        }
-        viewModel.NGN.AccountName = result.accountName;
-        return View(nameof(MavapayPayout), viewModel);
-    }
-
-
-    [HttpPost("mavapay/kes/name-enquiry")]
-    public async Task<IActionResult> ValidateKesTillAndBillNumber(MavapayPayoutViewModel model)
-    {
-        if (string.IsNullOrEmpty(StoreData.Id))
-            return NotFound();
-
-        await using var ctx = _dbContextFactory.CreateContext();
-        var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
-        var viewModel = await PayoutViewModel(mavapaySetting, model);
-        if (string.IsNullOrWhiteSpace(model.KES.AccountNumber))
-        {
-            ModelState.AddModelError("KES.AccountNumber", "Account number must be provided");
-            return View(nameof(MavapayPayout), viewModel);
-        }
-        var result = await _mavapayApiClientService.KESNameEnquiry(model.KES.Identifier, model.KES.Identifier, mavapaySetting.ApiKey);
-        if (result == null || result?.data == null || string.IsNullOrEmpty(result?.data?.organization_name))
-        {
-            ModelState.AddModelError("KES.AccountNumber", "Till or Bill number cannot be verified at the moment");
-            return View(nameof(MavapayPayout), viewModel);
-        }
-        viewModel.KES.AccountName = result.data.organization_name;
-        return View(nameof(MavapayPayout), viewModel);
-    }
-
     [HttpPost("mavapay/zar-payout")]
     public async Task<IActionResult> ProcessZARPayout(MavapayPayoutViewModel model)
     {
@@ -308,6 +283,31 @@ public class UINairaController : Controller
         }
     }
 
+    [HttpPost("mavapay/kes/name-enquiry")]
+    public async Task<IActionResult> ValidateKesTillAndBillNumber(MavapayPayoutViewModel model)
+    {
+        if (string.IsNullOrEmpty(StoreData.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
+        var viewModel = await PayoutViewModel(mavapaySetting, model);
+
+        if (string.IsNullOrWhiteSpace(model.KES.Identifier))
+        {
+            ModelState.AddModelError("KES.Identifier", "Identifier number must be provided");
+            return View(nameof(MavapayPayout), viewModel);
+        }
+        var result = await _mavapayApiClientService.KESNameEnquiry(model.KES.Identifier, model.KES.Method, mavapaySetting.ApiKey);
+        if (result == null || string.IsNullOrEmpty(result?.organization_name))
+        {
+            ModelState.AddModelError("KES.Identifier", "Till or Bill number cannot be verified at the moment");
+            return View(nameof(MavapayPayout), viewModel);
+        }
+        viewModel.KES.AccountName = result.organization_name;
+        return View(nameof(MavapayPayout), viewModel);
+    }
+
     [HttpPost("mavapay/kes-payout")]
     public async Task<IActionResult> ProcessKESPayout(MavapayPayoutViewModel model)
     {
@@ -341,7 +341,7 @@ public class UINairaController : Controller
         }
         catch (Exception ex)
         {
-            TempData[WellKnownTempData.ErrorMessage] = $"Error processing ZAR payout - {ex.Message}";
+            TempData[WellKnownTempData.ErrorMessage] = $"Error processing KES payout - {ex.Message}";
             return RedirectToAction(nameof(MavapayPayout), new { storeId = StoreData.Id });
         }
     }
