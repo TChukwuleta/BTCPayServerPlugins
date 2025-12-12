@@ -268,6 +268,9 @@ public class MavapayApiClientService
             MissingMemberHandling = MissingMemberHandling.Ignore,
             NullValueHandling = NullValueHandling.Include
         });
+        if (responseModel == null || !validStatuses.Contains(responseModel.status?.ToLower().Trim()))
+            return null;
+
         return responseModel.data;
     }
 
