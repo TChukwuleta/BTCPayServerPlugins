@@ -12,7 +12,6 @@ using BTCPayServer.Plugins.NairaCheckout.ViewModels;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.NairaCheckout.Services;
 
@@ -59,7 +58,6 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
         }.Contains(invoiceEvent.Name):
                 {
                     var invoice = invoiceEvent.Invoice;
-                    Console.WriteLine(JsonConvert.SerializeObject(invoice));
                     bool? success = invoice.Status switch
                     {
                         InvoiceStatus.Settled => true,
@@ -95,13 +93,13 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
             ctx.NairaCheckoutOrders.Update(order);
             await ctx.SaveChangesAsync();
             var settings = await _storeRepository.GetSettingAsync<MavapayCheckoutSettings>(invoice.StoreId, NairaCheckoutPlugin.SettingsName) ?? new MavapayCheckoutSettings();
-            if (settings.EnableSplitPayment)
+            if (settings.EnableSplitPayment && invoice.Currency.ToLower().Contains("ngn"))
             {
                 var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == invoice.StoreId);
                 var store = await _storeRepository.GetStoreByInvoiceId(invoice.Id);
                 var lightningBalance = await GetLightningBalance(invoice.StoreId);
 
-                //decimal amount = 
+                decimal amount = invoice.NetSettled * (settings.SplitPercentage / 100m);
                 var parsed = Enum.TryParse<SupportedCurrency>(settings.Currency, out var currency);
                 switch (parsed ? currency : default)
                 {
@@ -112,7 +110,7 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
                             BankCode = settings.NGNBankCode,
                             BankName = settings.NGNBankName,
                             AccountNumber = settings.NGNAccountNumber,
-                            Amount = 0 // Set amount
+                            Amount = amount
                         }, mavapaySetting.ApiKey);
 
                         if (lightningBalance > ngnPayout.totalAmountInSourceCurrency)
@@ -128,7 +126,7 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
                             AccountNumber = settings.KESAccountNumber,
                             AccountName = settings.KESAccountName,
                             Identifier = settings.KESIdentifier,
-                            Amount = 0 // Set amount
+                            Amount = amount
                         }, mavapaySetting.ApiKey);
 
                         if (lightningBalance > kesPayout.totalAmountInSourceCurrency)
@@ -143,7 +141,7 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
                             Bank = settings.ZARBank,
                             AccountName = settings.ZARAccountName,
                             AccountNumber = settings.ZARAccountNumber,
-                            Amount = 0, // Set amount
+                            Amount = amount
                         }, mavapaySetting.ApiKey);
 
                         if (lightningBalance > zarPayout.totalAmountInSourceCurrency)
@@ -161,7 +159,7 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
         }
         catch (Exception ex)
         {
-            Logs.PayServer.LogError(ex, $"Naira plugin error while trying to save. {ex.Message} Triggered by invoiceId: {invoice.Id}");
+            Logs.PayServer.LogError(ex, $"Naira plugin error. {ex.Message} Triggered by invoiceId: {invoice.Id}");
         }
         await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
     }

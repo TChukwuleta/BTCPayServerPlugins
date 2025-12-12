@@ -2,84 +2,6 @@
 @using BTCPayServer.Plugins.NairaCheckout.ViewModels
 @model MavapaySettingViewModel
 
-@* <div class="container mt-4">
-    <h3>Split Payment Settings</h3>
-
-    <div class="row">
-        <div class="col-xl-10 col-xxl-constrain">
-            <form asp-action="SplitPaymentSettings" method="post">
-                <div class="form-group d-flex align-items-center">
-                    <input asp-for="EnableSplitPayment" type="checkbox" class="btcpay-toggle me-3" id="enableSplit" />
-                    <label asp-for="EnableSplitPayment" for="enableSplit" class="form-label mb-0 me-1"></label>
-                </div>
-
-                <div id="splitSection" class="d-none">
-                    <div class="mb-3 w-100 w-md-50">
-                        <label class="form-label">Split Percentage (%)</label>
-                        <input asp-for="SplitPayment.SplitPercentage" type="number" min="1" max="100" class="form-control" />
-                    </div>
-                    <div class="mb-3 w-100 w-md-50">
-                        <label class="form-label">Payout Currency</label>
-                        <select asp-for="SplitPayment.Currency" class="form-select" id="currencySelect">
-                            <option value="">-- Select Currency --</option>
-                            <option value="NGN">NGN</option>
-                            <option value="KES">KES</option>
-                            <option value="ZAR">ZAR</option>
-                        </select>
-                    </div>
-                    <div id="ngnSection" class="d-none">
-                        <h5>NGN Account Details</h5>
-                        <div class="mb-3">
-                            <label>Bank</label>
-                            <select asp-for="SplitPayment.NGNBankCode" asp-items="Model.SplitPayment.NGNBanks" class="form-select"></select>
-                        </div>
-                        <div class="mb-3">
-                            <label>Account Number</label>
-                            <input asp-for="SplitPayment.NGNAccountNumber" maxlength="10" class="form-control" />
-                        </div>
-                        <div class="mb-3">
-                            <label>Account Name</label>
-                            <input asp-for="SplitPayment.NGNAccountName" class="form-control" />
-                        </div>
-                    </div>
-                    <div id="kesSection" class="d-none">
-                        <h5>KES Account Details</h5>
-                        <div class="mb-3">
-                            <label>Payout Method</label>
-                            <select asp-for="SplitPayment.KESMethod" asp-items="Model.SplitPayment.KESPaymentMethod" class="form-select"></select>
-                        </div>
-                        <div class="mb-3">
-                            <label>Till/Bill/Phone Number</label>
-                            <input asp-for="SplitPayment.KESIdentifier" class="form-control" />
-                        </div>
-                        <div class="mb-3">
-                            <label>Account Name</label>
-                            <input asp-for="SplitPayment.KESAccountName" class="form-control" />
-                        </div>
-                    </div>
-                    <div id="zarSection" class="d-none">
-                        <h5>ZAR Account Details</h5>
-                        <div class="mb-3">
-                            <label>Bank</label>
-                            <select asp-for="SplitPayment.ZARBank" asp-items="Model.SplitPayment.ZARBanks" class="form-select"></select>
-                        </div>
-                        <div class="mb-3">
-                            <label>Account Number</label>
-                            <input asp-for="SplitPayment.ZARAccountNumber" class="form-control" />
-                        </div>
-                        <div class="mb-3">
-                            <label>Account Name</label>
-                            <input asp-for="SplitPayment.ZARAccountName" class="form-control" />
-                        </div>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary mt-4">Save Settings</button>
-            </form>
-        </div>
-    </div>
-</div> *@
-
-
 <form method="post" asp-action="MavapayCheckoutSettings">
     <div class="sticky-header d-flex align-items-center justify-content-between">
         <h2>Split Payment Settings</h2>
@@ -92,7 +14,10 @@
         <div class="col-xl-10 col-xxl-constrain">
             <div class="form-group d-flex align-items-center">
                 <input asp-for="EnableSplitPayment" type="checkbox" class="btcpay-toggle me-3" id="enableSplit" />
-                <label asp-for="EnableSplitPayment" for="enableSplit" class="form-label mb-0 me-1"></label>
+                <div class="text-secondary">
+                    <label asp-for="EnableSplitPayment" for="enableSplit" class="form-label mb-0 me-1"></label>
+                    <span text-translate="true">(This would split payment for every NGN invoice received)</span>
+                </div>
             </div>
 
             <div id="splitSection" class="d-none">
