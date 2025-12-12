@@ -97,6 +97,9 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
             {
                 var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == invoice.StoreId);
                 var store = await _storeRepository.GetStoreByInvoiceId(invoice.Id);
+                if (mavapaySetting is null || string.IsNullOrEmpty(mavapaySetting.ApiKey))
+                    return;
+
                 var lightningBalance = await GetLightningBalance(invoice.StoreId);
 
                 decimal amount = invoice.NetSettled * (settings.SplitPercentage / 100m);
@@ -113,7 +116,7 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
                             Amount = amount
                         }, mavapaySetting.ApiKey);
 
-                        if (lightningBalance > ngnPayout.totalAmountInSourceCurrency)
+                        if (string.IsNullOrEmpty(ngnPayout.ErrorMessage) && lightningBalance > ngnPayout.totalAmountInSourceCurrency)
                         {
                             await _mavapayApiClientService.ClaimPayout(ctx, ngnPayout, store, SupportedCurrency.NGN.ToString(), settings.NGNAccountNumber);
                         }
@@ -129,9 +132,9 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
                             Amount = amount
                         }, mavapaySetting.ApiKey);
 
-                        if (lightningBalance > kesPayout.totalAmountInSourceCurrency)
+                        if (string.IsNullOrEmpty(kesPayout.ErrorMessage) && lightningBalance > kesPayout.totalAmountInSourceCurrency)
                         {
-                            await _mavapayApiClientService.ClaimPayout(ctx, kesPayout, store, SupportedCurrency.KES.ToString(), settings.KESAccountNumber);
+                            await _mavapayApiClientService.ClaimPayout(ctx, kesPayout, store, SupportedCurrency.KES.ToString(), settings.KESIdentifier);
                         }
                         break;
 
@@ -144,7 +147,7 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
                             Amount = amount
                         }, mavapaySetting.ApiKey);
 
-                        if (lightningBalance > zarPayout.totalAmountInSourceCurrency)
+                        if (string.IsNullOrEmpty(zarPayout.ErrorMessage) && lightningBalance > zarPayout.totalAmountInSourceCurrency)
                         {
                             await _mavapayApiClientService.ClaimPayout(ctx, zarPayout, store, SupportedCurrency.ZAR.ToString(), settings.ZARAccountNumber);
                         }

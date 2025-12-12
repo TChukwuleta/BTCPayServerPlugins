@@ -388,6 +388,12 @@ public class UIMavapayController : Controller
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
+        if (vm.SplitPayment.SplitPercentage is < 0 or > 100)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Please enter a valid percentage value";
+            return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
+        }
+
         await using var ctx = _dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         if (mavapaySetting == null)
