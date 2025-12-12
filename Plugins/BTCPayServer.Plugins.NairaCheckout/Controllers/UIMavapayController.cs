@@ -8,6 +8,7 @@ using BTCPayServer.Client;
 using BTCPayServer.Data;
 using BTCPayServer.Data.Payouts.LightningLike;
 using BTCPayServer.HostedServices;
+using BTCPayServer.Migrations;
 using BTCPayServer.Payments;
 using BTCPayServer.Payouts;
 using BTCPayServer.Plugins.NairaCheckout;
@@ -24,12 +25,13 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 using Newtonsoft.Json;
+using static Dapper.SqlMapper;
 
 namespace BTCPayServer.Plugins.Template;
 
-[Route("stores/{storeId}/naira")]
+[Route("stores/{storeId}/mavapay/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
-public class UINairaController : Controller
+public class UIMavapayController : Controller
 {
     private readonly StoreRepository _storeRepository;
     private readonly IHttpClientFactory _clientFactory;
@@ -41,7 +43,7 @@ public class UINairaController : Controller
     private readonly GeneralCheckoutService _generalCheckoutService;
     private readonly NairaCheckoutDbContextFactory _dbContextFactory;
     private readonly MavapayApiClientService _mavapayApiClientService;
-    public UINairaController
+    public UIMavapayController
         (StoreRepository storeRepository,
         IHttpClientFactory clientFactory,
         InvoiceRepository invoiceRepository,
@@ -99,7 +101,7 @@ public class UINairaController : Controller
         var blob = StoreData.GetStoreBlob();
         var config = StoreData.GetPaymentMethodConfig<CashPaymentMethodConfig>(paymentMethodId, _handler) ?? new CashPaymentMethodConfig();
         var webhookSecret = !string.IsNullOrEmpty(viewModel.WebhookSecret) ? viewModel.WebhookSecret : Encoders.Base58.EncodeData(RandomUtils.GetBytes(10));
-        var webhookUrl = Url.Action(nameof(UINairaPublicController.ReceiveMavapayWebhook), "UINairaPublic", new { storeId = StoreData.Id }, Request.Scheme);
+        var webhookUrl = Url.Action(nameof(UIMavapayPublicController.ReceiveMavapayWebhook), "UIMavapayPublic", new { storeId = StoreData.Id }, Request.Scheme);
 
         await using var ctx = _dbContextFactory.CreateContext();
         var apiClient = new MavapayApiClientService(_clientFactory, _dbContextFactory, _invoiceRepository);
@@ -156,7 +158,7 @@ public class UINairaController : Controller
     }
 
 
-    [HttpGet("/mavapay/payout")]
+    [HttpGet("payout")]
     public async Task<IActionResult> MavapayPayout()
     {
         if (string.IsNullOrEmpty(StoreData.Id))
@@ -175,7 +177,7 @@ public class UINairaController : Controller
         return View(viewModel);
     }
 
-    [HttpPost("mavapay/naira/name-enquiry")]
+    [HttpPost("naira/name-enquiry")]
     public async Task<IActionResult> ValidateNgnAccountNumber(MavapayPayoutViewModel model)
     {
         if (string.IsNullOrEmpty(StoreData.Id))
@@ -199,7 +201,7 @@ public class UINairaController : Controller
         return View(nameof(MavapayPayout), viewModel);
     }
 
-    [HttpPost("mavapay/ngn-payout")]
+    [HttpPost("ngn-payout")]
     public async Task<IActionResult> ProcessNGNPayout(MavapayPayoutViewModel model)
     {
         if (string.IsNullOrEmpty(StoreData.Id))
@@ -245,7 +247,7 @@ public class UINairaController : Controller
         }
     }
 
-    [HttpPost("mavapay/zar-payout")]
+    [HttpPost("zar-payout")]
     public async Task<IActionResult> ProcessZARPayout(MavapayPayoutViewModel model)
     {
         if (string.IsNullOrEmpty(StoreData.Id))
@@ -283,7 +285,7 @@ public class UINairaController : Controller
         }
     }
 
-    [HttpPost("mavapay/kes/name-enquiry")]
+    [HttpPost("kes/name-enquiry")]
     public async Task<IActionResult> ValidateKesTillAndBillNumber(MavapayPayoutViewModel model)
     {
         if (string.IsNullOrEmpty(StoreData.Id))
@@ -308,7 +310,7 @@ public class UINairaController : Controller
         return View(nameof(MavapayPayout), viewModel);
     }
 
-    [HttpPost("mavapay/kes-payout")]
+    [HttpPost("kes-payout")]
     public async Task<IActionResult> ProcessKESPayout(MavapayPayoutViewModel model)
     {
         if (string.IsNullOrEmpty(StoreData.Id))
@@ -344,6 +346,76 @@ public class UINairaController : Controller
             TempData[WellKnownTempData.ErrorMessage] = $"Error processing KES payout - {ex.Message}";
             return RedirectToAction(nameof(MavapayPayout), new { storeId = StoreData.Id });
         }
+    }
+
+    [HttpGet("mavapay-checkout-settings")]
+    public async Task<IActionResult> MavapayCheckoutSettings(string storeId)
+    {
+        if (string.IsNullOrEmpty(StoreData.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
+        if (mavapaySetting == null)
+            return NotFound();
+
+        var settings = await _storeRepository.GetSettingAsync<MavapayCheckoutSettings>(storeId, NairaCheckoutPlugin.SettingsName) ?? new MavapayCheckoutSettings();
+        var viewModel = await PayoutViewModel(mavapaySetting);
+        var model = new SplitPaymentSettingsViewModel
+        {
+            SplitPercentage = settings.SplitPercentage,
+            NGNBankCode = settings.NGNBankCode,
+            NGNAccountNumber = settings.NGNAccountNumber,
+            NGNAccountName = settings.NGNAccountName,
+            NGNBankName = settings.NGNBankName,
+            KESMethod = settings.KESMethod,
+            KESIdentifier = settings.KESIdentifier,
+            KESAccountName = settings.KESAccountName,
+            KESAccountNumber = settings.KESAccountNumber,
+            ZARBank = settings.ZARBank,
+            ZARAccountNumber = settings.ZARAccountNumber,
+            ZARAccountName = settings.ZARAccountName,
+            KESPaymentMethod = viewModel.KESPaymentMethod,
+            ZARBanks = viewModel.ZARBanks,
+            NGNBanks = viewModel.NGNBanks,
+            Currency = Enum.TryParse<SplitPaymentSettingsViewModel.MavapayCurrency>(settings.Currency, out var c)
+            ? c : SplitPaymentSettingsViewModel.MavapayCurrency.NGN
+        };
+        return View(new MavapaySettingViewModel { EnableSplitPayment = settings.EnableSplitPayment, SplitPayment = model });
+    }
+
+    [HttpPost("mavapay-checkout-settings")]
+    public async Task<IActionResult> MavapayCheckoutSettings(string storeId, MavapaySettingViewModel vm)
+    {
+        if (string.IsNullOrEmpty(StoreData.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
+        if (mavapaySetting == null)
+            return NotFound();
+
+        var settings = await _storeRepository.GetSettingAsync<MavapayCheckoutSettings>(storeId, NairaCheckoutPlugin.SettingsName) ?? new MavapayCheckoutSettings();
+        settings = new MavapayCheckoutSettings
+        {
+            EnableSplitPayment = vm.EnableSplitPayment,
+            SplitPercentage = vm.SplitPayment.SplitPercentage,
+            Currency = vm.SplitPayment.Currency.ToString(),
+            NGNBankCode = vm.SplitPayment.NGNBankCode,
+            NGNAccountNumber = vm.SplitPayment.NGNAccountNumber,
+            NGNAccountName = vm.SplitPayment.NGNAccountName,
+            NGNBankName = vm.SplitPayment.NGNBankName,
+            KESMethod = vm.SplitPayment.KESMethod,
+            KESIdentifier = vm.SplitPayment.KESIdentifier,
+            KESAccountNumber = vm.SplitPayment.KESAccountNumber,
+            KESAccountName = vm.SplitPayment.KESAccountName,
+            ZARBank = vm.SplitPayment.ZARBank,
+            ZARAccountNumber = vm.SplitPayment.ZARAccountNumber,
+            ZARAccountName = vm.SplitPayment.ZARAccountName
+        };
+        await _storeRepository.UpdateSetting(storeId, NairaCheckoutPlugin.SettingsName, settings);
+        TempData[WellKnownTempData.SuccessMessage] = "Mavapay checkout settings saved successfully";
+        return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId });
     }
 
     [HttpGet("mavapay/payout/list")]
