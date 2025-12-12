@@ -7,23 +7,36 @@ using BTCPayServer.Data;
 using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
+using BTCPayServer.Plugins.NairaCheckout.Data;
+using BTCPayServer.Plugins.NairaCheckout.ViewModels;
 using BTCPayServer.Services.Invoices;
+using BTCPayServer.Services.Stores;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.NairaCheckout.Services;
 
 public class NairaCheckoutHostedService : EventHostedServiceBase
 {
+    private readonly StoreRepository _storeRepository;
     private readonly InvoiceRepository _invoiceRepository;
+    private readonly GeneralCheckoutService _generalCheckoutService;
     private readonly NairaCheckoutDbContextFactory _dbContextFactory;
+    private readonly MavapayApiClientService _mavapayApiClientService;
 
     public NairaCheckoutHostedService(EventAggregator eventAggregator,
-        NairaCheckoutDbContextFactory dbContextFactory,
+        StoreRepository storeRepository,
         InvoiceRepository invoiceRepository,
+        GeneralCheckoutService generalCheckoutService,
+        NairaCheckoutDbContextFactory dbContextFactory,
+        MavapayApiClientService mavapayApiClientService,
         Logs logs) : base(eventAggregator, logs)
     {
-        _invoiceRepository = invoiceRepository;
+        _storeRepository = storeRepository;
         _dbContextFactory = dbContextFactory;
+        _invoiceRepository = invoiceRepository;
+        _mavapayApiClientService = mavapayApiClientService;
+        _generalCheckoutService = generalCheckoutService;
     }
 
     protected override void SubscribeToEvents()
@@ -46,6 +59,7 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
         }.Contains(invoiceEvent.Name):
                 {
                     var invoice = invoiceEvent.Invoice;
+                    Console.WriteLine(JsonConvert.SerializeObject(invoice));
                     bool? success = invoice.Status switch
                     {
                         InvoiceStatus.Settled => true,
@@ -80,14 +94,81 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
             order.UpdatedAt = DateTime.UtcNow;
             ctx.NairaCheckoutOrders.Update(order);
             await ctx.SaveChangesAsync();
+            var settings = await _storeRepository.GetSettingAsync<MavapayCheckoutSettings>(invoice.StoreId, NairaCheckoutPlugin.SettingsName) ?? new MavapayCheckoutSettings();
+            if (settings.EnableSplitPayment)
+            {
+                var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == invoice.StoreId);
+                var store = await _storeRepository.GetStoreByInvoiceId(invoice.Id);
+                var lightningBalance = await GetLightningBalance(invoice.StoreId);
+
+                //decimal amount = 
+                var parsed = Enum.TryParse<SupportedCurrency>(settings.Currency, out var currency);
+                switch (parsed ? currency : default)
+                {
+                    case SupportedCurrency.NGN:
+                        var ngnPayout = await _mavapayApiClientService.MavapayNairaPayout(new PayoutNGNViewModel
+                        {
+                            AccountName = settings.NGNAccountName,
+                            BankCode = settings.NGNBankCode,
+                            BankName = settings.NGNBankName,
+                            AccountNumber = settings.NGNAccountNumber,
+                            Amount = 0 // Set amount
+                        }, mavapaySetting.ApiKey);
+
+                        if (lightningBalance > ngnPayout.totalAmountInSourceCurrency)
+                        {
+                            await _mavapayApiClientService.ClaimPayout(ctx, ngnPayout, store, SupportedCurrency.NGN.ToString(), settings.NGNAccountNumber);
+                        }
+                        break;
+
+                    case SupportedCurrency.KES:
+                        var kesPayout = await _mavapayApiClientService.MavapayKenyanShillingPayout(new PayoutKESViewModel
+                        {
+                            Method = settings.KESMethod,
+                            AccountNumber = settings.KESAccountNumber,
+                            AccountName = settings.KESAccountName,
+                            Identifier = settings.KESIdentifier,
+                            Amount = 0 // Set amount
+                        }, mavapaySetting.ApiKey);
+
+                        if (lightningBalance > kesPayout.totalAmountInSourceCurrency)
+                        {
+                            await _mavapayApiClientService.ClaimPayout(ctx, kesPayout, store, SupportedCurrency.KES.ToString(), settings.KESAccountNumber);
+                        }
+                        break;
+
+                    case SupportedCurrency.ZAR:
+                        var zarPayout = await _mavapayApiClientService.MavapayRandsPayout(new PayoutZARViewModel
+                        {
+                            Bank = settings.ZARBank,
+                            AccountName = settings.ZARAccountName,
+                            AccountNumber = settings.ZARAccountNumber,
+                            Amount = 0, // Set amount
+                        }, mavapaySetting.ApiKey);
+
+                        if (lightningBalance > zarPayout.totalAmountInSourceCurrency)
+                        {
+                            await _mavapayApiClientService.ClaimPayout(ctx, zarPayout, store, SupportedCurrency.ZAR.ToString(), settings.ZARAccountNumber);
+                        }
+                        break;
+
+                    default:
+                        break;
+                }
+
+            }
             result.Write($"Successfully recored naira checkout.", InvoiceEventData.EventSeverity.Info);
         }
         catch (Exception ex)
         {
-            Logs.PayServer.LogError(ex,
-                $"Naira plugin error while trying to save. {ex.Message}" +
-                $"Triggered by invoiceId: {invoice.Id}");
+            Logs.PayServer.LogError(ex, $"Naira plugin error while trying to save. {ex.Message} Triggered by invoiceId: {invoice.Id}");
         }
         await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
+    }
+
+    private async Task<long> GetLightningBalance(string storeId)
+    {
+        var balance = await _generalCheckoutService.GetLightningNodeBalance(storeId);
+        return balance.MilliSatoshi / 1000;
     }
 }

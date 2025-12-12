@@ -4,8 +4,13 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
+using BTCPayServer.Data.Payouts.LightningLike;
+using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
+using BTCPayServer.Payments;
+using BTCPayServer.Payouts;
 using BTCPayServer.Plugins.NairaCheckout.Data;
 using BTCPayServer.Plugins.NairaCheckout.ViewModels;
 using BTCPayServer.Services.Invoices;
@@ -17,15 +22,17 @@ public class MavapayApiClientService
 {
     private readonly HttpClient _httpClient;
     private readonly InvoiceRepository _invoiceRepository;
+    private readonly PullPaymentHostedService _pullPaymentService;
     private readonly NairaCheckoutDbContextFactory _dbContextFactory;
     public readonly string ApiUrl = "https://api.mavapay.co/api/v1"; //"https://staging.api.mavapay.co/api/v1";
     private readonly List<string> validStatuses = new List<string> { "success", "ok" };
 
     public MavapayApiClientService(IHttpClientFactory httpClientFactory, NairaCheckoutDbContextFactory dbContextFactory, 
-        InvoiceRepository invoiceRepository)
+        InvoiceRepository invoiceRepository, PullPaymentHostedService pullPaymentService)
     {
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
+        _pullPaymentService = pullPaymentService;
         _httpClient = httpClientFactory?.CreateClient(nameof(MavapayApiClientService)) ?? new HttpClient();
     }
 
@@ -272,6 +279,49 @@ public class MavapayApiClientService
             return null;
 
         return responseModel.data;
+    }
+
+
+    public async Task ClaimPayout(NairaCheckoutDbContext ctx, CreatePayoutResponseModel responseModel, BTCPayServer.Data.StoreData store, string currency, string accountNumber)
+    {
+        TimeSpan expirySpan = responseModel.expiry - DateTime.UtcNow;
+        var pullPaymentId = await _pullPaymentService.CreatePullPayment(store, new CreatePullPaymentRequest
+        {
+            Name = $"Mavapay {currency} Payout - {accountNumber}",
+            Amount = responseModel.totalAmountInSourceCurrency,
+            Currency = "SATS",
+            BOLT11Expiration = expirySpan,
+            PayoutMethods = new[]
+            {
+                PaymentTypes.CHAIN.GetPaymentMethodId("BTC").ToString(),
+                PaymentTypes.LN.GetPaymentMethodId("BTC").ToString()
+            },
+            AutoApproveClaims = true,
+        });
+
+        ctx.PayoutTransactions.Add(new PayoutTransaction
+        {
+            Provider = Wallet.Mavapay.ToString(),
+            Amount = responseModel.totalAmountInSourceCurrency,
+            PullPaymentId = pullPaymentId,
+            BaseCurrency = currency,
+            Currency = "SATS",
+            Identifier = accountNumber,
+            StoreId = store.Id,
+            ExternalReference = $"{responseModel.id}:{responseModel.hash}",
+            CreatedAt = DateTimeOffset.UtcNow,
+            Data = JsonConvert.SerializeObject(responseModel),
+        });
+        await ctx.SaveChangesAsync();
+
+        await _pullPaymentService.Claim(new ClaimRequest()
+        {
+            Destination = new LNURLPayClaimDestinaton(responseModel.invoice),
+            PullPaymentId = pullPaymentId,
+            ClaimedAmount = responseModel.totalAmountInSourceCurrency,
+            PayoutMethodId = PayoutTypes.LN.GetPayoutMethodId("BTC"),
+            StoreId = store.Id,
+        });
     }
 
     public async Task<bool> RegisterWebhook(string apiKey, string url, string secret)

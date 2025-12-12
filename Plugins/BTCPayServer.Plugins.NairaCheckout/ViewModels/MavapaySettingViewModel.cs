@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using BTCPayServer.Plugins.NairaCheckout.Data;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace BTCPayServer.Plugins.NairaCheckout.ViewModels;
@@ -12,18 +13,10 @@ public class MavapaySettingViewModel
     public SplitPaymentSettingsViewModel SplitPayment { get; set; }
 }
 
-
 public class SplitPaymentSettingsViewModel
 {
-    public enum MavapayCurrency
-    {
-        NGN,
-        KES,
-        ZAR
-    }
-
     public int SplitPercentage { get; set; }
-    public MavapayCurrency Currency { get; set; }
+    public string Currency { get; set; }
     public string NGNBankCode { get; set; }
     public string NGNAccountNumber { get; set; }
     public string NGNAccountName { get; set; }
