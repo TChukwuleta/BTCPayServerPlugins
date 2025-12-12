@@ -38,106 +38,104 @@
 
 @if (NoPayoutProcessors)
 {
-    <div class="alert alert-warning mb-5" role="alert">
+    <div class="alert alert-warning mb-4" role="alert">
         An automated payout processor is required in order to automate Mavapay payouts. <a class="alert-link p-0" href="@PayoutProcessorLink">Configure now</a>
     </div>
 }
 
 <partial name="_StatusMessage" />
+<div class="container-fluid px-0">
 
-<div>
-    <ul class="nav nav-tabs" id="payoutTabs" role="tablist">
-        <li class="nav-item">
-            <button class="nav-link active" id="ngn-tab" data-bs-toggle="tab" data-bs-target="#ngn" type="button" role="tab">NGN</button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" id="kes-tab" data-bs-toggle="tab" data-bs-target="#kes" type="button" role="tab">KES</button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" id="zar-tab" data-bs-toggle="tab" data-bs-target="#zar" type="button" role="tab">ZAR</button>
-        </li>
-    </ul>
-
-    <div class="tab-content mt-3">
-        <div class="tab-pane show active" id="ngn" role="tabpanel">
-            <form asp-action="ProcessNGNPayout" asp-route-storeId=@storeId method="post">
-                <div class="mb-3 w-50">
-                    <label class="form-label">Bank</label>
-                    <select asp-items="Model.NGNBanks" asp-for="NGN.BankCode" class="form-select"></select>
-                </div>
-                <div class="mb-3 w-50">
-                    <label>Account Number</label>
-                    <div class="input-group">
-                        <input asp-for="NGN.AccountNumber" class="form-control" maxlength="10" />
-                        <button type="submit" formaction="@Url.Action("ValidateNgnAccountNumber", "UINaira", new { storeId })" class="btn btn-outline-primary">
-                            Validate
-                        </button>
-                    </div>
-                    @if (!string.IsNullOrEmpty(Model.NGN?.AccountName))
-                    {
-                        <span class="text-muted">@Model.NGN.AccountName</span>
-                    }
-                    <span asp-validation-for="NGN.AccountNumber" class="text-danger"></span>
-                </div>
-                <div class="mb-3 w-50">
-                    <label>Amount</label>
-                    <input asp-for="NGN.Amount" type="number" step="1" class="form-control" required />
-                </div>
-                <button type="submit" class="btn btn-success">Send NGN Payout</button>
-            </form>
+    <h4 class="mt-4">NGN Payout</h4>
+    <form asp-action="ProcessNGNPayout" asp-route-storeId=@storeId method="post">
+        <div class="mb-3 w-100 w-md-50">
+            <label class="form-label">Bank</label>
+            <select asp-items="Model.NGNBanks" asp-for="NGN.BankCode" class="form-select"></select>
+        </div>
+        <div class="mb-3 w-100 w-md-50">
+            <label class="form-label">Account Number</label>
+            <div class="input-group">
+                <input asp-for="NGN.AccountNumber" class="form-control" maxlength="10" />
+                <button type="submit" formaction="@Url.Action("ValidateNgnAccountNumber", "UINaira", new { storeId })" class="btn btn-outline-primary">
+                    Validate
+                </button>
+            </div>
+            @if (!string.IsNullOrEmpty(Model.NGN?.AccountName))
+            {
+                <span class="text-muted">@Model.NGN.AccountName</span>
+            }
+            <span asp-validation-for="NGN.AccountNumber" class="text-danger"></span>
+        </div>
+        <div class="mb-3 w-100 w-md-50">
+            <label class="form-label">Amount</label>
+            <input asp-for="NGN.Amount" type="number" step="1" class="form-control" required />
         </div>
 
+        <button type="submit" class="btn btn-success">Send NGN Payout</button>
+    </form>
 
-        <div class="tab-pane" id="kes" role="tabpanel">
-            <form asp-action="ProcessKESPayout" asp-route-storeId=@storeId method="post">
-                <div class="mb-3 w-50">
-                    <label>Payout Method</label>
-                    <select asp-items="Model.KESPaymentMethod" asp-for="KES.Method" class="form-select" id="kesMethod"></select>
-                </div>
+    <hr class="my-5" />
 
-                <div id="kesAccountNumber" class="mb-3 w-50 d-none">
-                    <label>Account Number</label>
-                    <input asp-for="KES.AccountNumber" class="form-control" />
-                </div>
-
-                <div class="mb-3 w-50">
-                    <label>Till/Bill/Phone Number</label>
-                    <input asp-for="KES.Identifier" class="form-control" required />
-                </div>
-
-                <div class="mb-3 w-50">
-                    <label>Amount</label>
-                    <input asp-for="KES.Amount" type="number" step="1" class="form-control" required />
-                </div>
-
-                <button type="submit" class="btn btn-success">Send KES Payout</button>
-            </form>
+    <h4 class="mt-4">KES Payout</h4>
+    <form asp-action="ProcessKESPayout" asp-route-storeId=@storeId method="post">
+        <div class="mb-3 w-100 w-md-50">
+            <label class="form-label">Payout Method</label>
+            <select asp-items="Model.KESPaymentMethod" asp-for="KES.Method" class="form-select" id="kesMethod"></select>
+        </div>
+        <div id="kesAccountNumber" class="mb-3 w-100 w-md-50 d-none">
+            <label class="form-label">Account Number</label>
+            <input asp-for="KES.AccountNumber" class="form-control" />
+        </div>
+        <div class="mb-3 w-100 w-md-50">
+            <label class="form-label">Till/Bill/Phone Number</label>
+            <div class="input-group">
+                <input asp-for="KES.Identifier" class="form-control" required id="kesIdentifier" />
+                <button type="submit" id="validateKesBtn" formaction="@Url.Action("ValidateKesTillAndBillNumber", "UINaira", new { storeId })"
+                        class="btn btn-outline-primary d-none">
+                    Validate
+                </button>
+            </div>
+            @if (!string.IsNullOrEmpty(Model.KES?.AccountName))
+            {
+                <span class="text-muted">@Model.KES.AccountName</span>
+                <input type="hidden" asp-for="KES.AccountName" />
+            }
+            <span id="kesValidationResult" class="text-muted"></span>
+            <span asp-validation-for="KES.Identifier" class="text-danger"></span>
+        </div>
+        <div class="mb-3 w-100 w-md-50">
+            <label class="form-label">Amount</label>
+            <input asp-for="KES.Amount" type="number" step="1" class="form-control" required />
         </div>
 
+        <button type="submit" class="btn btn-success">Send KES Payout</button>
+    </form>
 
-        <div class="tab-pane" id="zar" role="tabpanel">
-            <form asp-action="ProcessZARPayout" asp-route-storeId=@storeId method="post">
-                <div class="mb-3 w-50">
-                    <label class="form-label">Bank</label>
-                    <select asp-items="Model.ZARBanks" asp-for="ZAR.Bank" class="form-select"></select>
-                </div>
-                <div class="mb-3 w-50">
-                    <label>Account Name</label>
-                    <input asp-for="ZAR.AccountName" class="form-control" required />
-                </div>
-                <div class="mb-3 w-50">
-                    <label>Bank Account Number</label>
-                    <input asp-for="ZAR.AccountNumber" class="form-control" required />
-                </div>
-                <div class="mb-3 w-50">
-                    <label>Amount</label>
-                    <input asp-for="ZAR.Amount" type="number" step="1" class="form-control" required />
-                </div>
-                <button type="submit" class="btn btn-primary">Send ZAR Payout</button>
-            </form>
+    <hr class="my-5" />
+
+    <h4 class="mt-4">ZAR Payout</h4>
+    <form asp-action="ProcessZARPayout" asp-route-storeId=@storeId method="post">
+        <div class="mb-3 w-100 w-md-50">
+            <label class="form-label">Bank</label>
+            <select asp-items="Model.ZARBanks" asp-for="ZAR.Bank" class="form-select"></select>
         </div>
-    </div>
+        <div class="mb-3 w-100 w-md-50">
+            <label class="form-label">Account Name</label>
+            <input asp-for="ZAR.AccountName" class="form-control" required />
+        </div>
+        <div class="mb-3 w-100 w-md-50">
+            <label class="form-label">Bank Account Number</label>
+            <input asp-for="ZAR.AccountNumber" class="form-control" required />
+        </div>
+        <div class="mb-3 w-100 w-md-50">
+            <label class="form-label">Amount</label>
+            <input asp-for="ZAR.Amount" type="number" step="1" class="form-control" required />
+        </div>
+
+        <button type="submit" class="btn btn-primary">Send ZAR Payout</button>
+    </form>
 </div>
+
 
 
 
@@ -147,18 +145,28 @@
             const methodSelect = document.getElementById("kesMethod");
             const accountNumberDiv = document.getElementById("kesAccountNumber");
 
-            function toggleAccountNumber() {
-                if (methodSelect.value === "BillNumber") {
+            const validateBtn = document.getElementById("validateKesBtn");
+            const identifierInput = document.getElementById("kesIdentifier");
+
+            function toggleUI() {
+                const method = methodSelect.value;
+
+                if (method === "BillNumber") {
                     accountNumberDiv.classList.remove("d-none");
                     accountNumberDiv.querySelector("input").setAttribute("required", "required");
                 } else {
                     accountNumberDiv.classList.add("d-none");
                     accountNumberDiv.querySelector("input").removeAttribute("required");
                 }
-            }
 
-            methodSelect.addEventListener("change", toggleAccountNumber);
-            toggleAccountNumber();
+                if (method === "TillNumber" || method === "BillNumber") {
+                    validateBtn.classList.remove("d-none");
+                } else {
+                    validateBtn.classList.add("d-none");
+                }
+            }
+            methodSelect.addEventListener("change", toggleUI);
+            toggleUI();
         });
     </script>
 }

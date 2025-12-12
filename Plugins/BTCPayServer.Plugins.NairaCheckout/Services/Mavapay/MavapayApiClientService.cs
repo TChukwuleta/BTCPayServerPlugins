@@ -119,14 +119,14 @@ public class MavapayApiClientService
                     createPayout = await CreatePayout(apikey, model.Amount, "KESCENT", new
                     {
                         identifierType = "paytophone",
-                        identifiers = new { phoneNumber = model.Identifier }
+                        identifiers = new { phoneNumber = model.Identifier, accountName = model.AccountName }
                     });
                     break;
                 case "TillNumber":
                     createPayout = await CreatePayout(apikey, model.Amount, "KESCENT", new
                     {
                         identifierType = "paytotill",
-                        identifiers = new { tillNumber = model.Identifier }
+                        identifiers = new { tillNumber = model.Identifier, accountName = model.AccountName }
                     });
                     break;
                 case "BillNumber":
@@ -137,7 +137,7 @@ public class MavapayApiClientService
                     createPayout = await CreatePayout(apikey, model.Amount, "KESCENT", new
                     {
                         identifierType = "paytobill",
-                        identifiers = new { paybillNumber = model.Identifier, accountNumber = model.AccountNumber }
+                        identifiers = new { paybillNumber = model.Identifier, accountNumber = model.AccountNumber, accountName = model.AccountName }
                     });
                     break;
                 default: return new CreatePayoutResponseModel { ErrorMessage = "Invalid Kenyan shilling payment method" };
@@ -246,6 +246,31 @@ public class MavapayApiClientService
         });
         if (responseModel == null || !validStatuses.Contains(responseModel.status?.ToLower().Trim()))
             return null;
+        return responseModel.data;
+    }
+
+    // This method is only applicable for till and bill number.. and is called before creating a quote
+    public async Task<KESNameEnquiryDataResponse> KESNameEnquiry(string identifier, string identifierType, string apiKey)
+    {
+        Enum.TryParse<MpesaPaymentMethod>(identifierType, true, out var identifierEnum);
+        identifierType = identifierEnum switch
+        {
+            MpesaPaymentMethod.TillNumber => "Till",
+            MpesaPaymentMethod.BillNumber => "PayBill",
+            _ => identifierType
+        };
+        var postJson = JsonConvert.SerializeObject(new { identifier, identifierType });
+        var req = CreateRequest(HttpMethod.Post, "quote/validate-kes-identifier");
+        req.Content = new StringContent(postJson, Encoding.UTF8, "application/json");
+        var response = await SendRequest(req, apiKey);
+        var responseModel = JsonConvert.DeserializeObject<EntityVm<KESNameEnquiryDataResponse>>(response, new JsonSerializerSettings
+        {
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            NullValueHandling = NullValueHandling.Include
+        });
+        if (responseModel == null || !validStatuses.Contains(responseModel.status?.ToLower().Trim()))
+            return null;
+
         return responseModel.data;
     }
 
