@@ -18,6 +18,7 @@ public class NairaCheckoutPlugin : BaseBTCPayServerPlugin
 
     internal static PaymentMethodId NairaPmid = new("NAIRA");
     internal static string NairaDisplayName = "Naira";
+    public const string SettingsName = "MavapayPluginSettings";
 
     public override IBTCPayServerPlugin.PluginDependency[] Dependencies { get; } =
     [

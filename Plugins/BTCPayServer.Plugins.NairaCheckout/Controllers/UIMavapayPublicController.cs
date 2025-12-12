@@ -15,11 +15,11 @@ namespace BTCPayServer.Plugins.Template;
 [AllowAnonymous]
 [Route("~/plugins/{storeId}/naira-checkout/public/", Order = 0)]
 [Route("~/plugins/{storeId}/naira-checkout/api/", Order = 1)]
-public class UINairaPublicController : Controller
+public class UIMavapayPublicController : Controller
 {
     private readonly MavapayApiClientService _mavapayApiClientService;
     private readonly NairaCheckoutDbContextFactory _dbContextFactory;
-    public UINairaPublicController(NairaCheckoutDbContextFactory dbContextFactory, MavapayApiClientService mavapayApiClientService)
+    public UIMavapayPublicController(NairaCheckoutDbContextFactory dbContextFactory, MavapayApiClientService mavapayApiClientService)
     {
         _dbContextFactory = dbContextFactory;
         _mavapayApiClientService = mavapayApiClientService;

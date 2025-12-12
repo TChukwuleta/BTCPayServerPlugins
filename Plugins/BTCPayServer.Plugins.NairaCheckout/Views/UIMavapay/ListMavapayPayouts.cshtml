@@ -14,7 +14,7 @@
 <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
-        <a asp-controller="UINaira" asp-action="MavapayPayout" asp-route-storeId="@storeId" class="btn btn-secondary" role="button">Go Back</a>
+        <a asp-controller="UIMavapay" asp-action="MavapayPayout" asp-route-storeId="@storeId" class="btn btn-secondary" role="button">Go Back</a>
     </div>
 </div>
 
@@ -63,7 +63,7 @@
                             @if (!pp.IsSuccess)
                             {
                                 <div class="d-inline-flex align-items-center gap-3">
-                                    <a class="link-success text-decoration-none" asp-controller="UINaira" asp-action="VerifyMavapayTransaction"
+                                    <a class="link-success text-decoration-none" asp-controller="UIMavapay" asp-action="VerifyMavapayTransaction"
                                        asp-route-storeId="@storeId" asp-route-externalReferemce="@pp.ExternalReference">Query Transaction Status</a>
                                 </div>
                             }
