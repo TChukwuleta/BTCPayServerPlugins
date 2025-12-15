@@ -27,6 +27,7 @@ using NBitcoin.DataEncoders;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using QRCoder;
+using static QRCoder.PayloadGenerator;
 using TransactionStatus = BTCPayServer.Plugins.SatoshiTickets.Data.TransactionStatus;
 
 namespace BTCPayServer.Plugins.SatoshiTickets;
@@ -257,11 +258,6 @@ public class UITicketSalesPublicController : Controller
         ctx.Orders.Add(order);
         await ctx.SaveChangesAsync();
 
-        Console.WriteLine("The post method model is:");
-        Console.WriteLine(JsonConvert.SerializeObject(model, Formatting.Indented));
-        Console.WriteLine("The order view model is:");
-        Console.WriteLine(JsonConvert.SerializeObject(orderViewModel, Formatting.Indented));
-
         var deliveryOption = Request.Form["ticketDeliveryOption"].ToString();
         var sendIndividually = deliveryOption == "individual";
         var contactIndex = 0;
@@ -285,9 +281,9 @@ public class UITicketSalesPublicController : Controller
                     TicketTypeId = ticketType.Id,
                     Amount = ticketType.Price,
                     QRCodeLink = Url.Action(nameof(EventTicketDisplay), "UITicketSalesPublic", new { storeId, eventId, orderId = order.Id }, Request.Scheme),
-                    FirstName = contact.FirstName.Trim(),
-                    LastName = contact.LastName.Trim(),
-                    Email = contact.Email.Trim(),
+                    FirstName = contact.FirstName?.Trim() ?? string.Empty,
+                    LastName = contact.LastName?.Trim() ?? string.Empty,
+                    Email = contact.Email?.Trim() ?? string.Empty,
                     CreatedAt = now,
                     TxnNumber = ticketTxn,
                     TicketNumber = $"EVT-{eventId:D4}-{now:yyMMdd}-{ticketTxn}",

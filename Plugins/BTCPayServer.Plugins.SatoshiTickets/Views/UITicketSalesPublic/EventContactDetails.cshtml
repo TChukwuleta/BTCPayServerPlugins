@@ -77,19 +77,16 @@
 
                                     <div class="mb-3">
                                         <label class="form-label" data-required>First name</label>
-                                        @* <input class="form-control contact-required" asp-for="ContactInfo[i].FirstName" required /> *@
                                         <input type="text" class="form-control contact-required" asp-for="ContactInfo[i].FirstName" placeholder="First name" required>
                                     </div>
 
                                     <div class="mb-3">
                                         <label class="form-label" data-required>Last name</label>
-                                        @* <input class="form-control contact-required" asp-for="ContactInfo[i].LastName" required /> *@
                                         <input type="text" class="form-control contact-required" asp-for="ContactInfo[i].LastName" placeholder="Last name" required>
                                     </div>
 
                                     <div class="mb-3">
                                         <label class="form-label" data-required>Email Address</label>
-                                        @* <input class="form-control contact-required" asp-for="ContactInfo[i].Email" required /> *@
                                         <input type="email" class="form-control contact-required" asp-for="ContactInfo[i].Email" placeholder="Email address" required>
                                     </div>
                                 </div>
@@ -133,60 +130,6 @@
 
 
 @section PageFootContent {
-    @* <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const submitButton = document.getElementById('complete-payment-btn');
-            const contactGroups = document.querySelectorAll('.contact-group');
-            const sendToMe = document.getElementById('sendToMe');
-            const sendIndividually = document.getElementById('sendIndividually');
-
-            function updateVisibility() {
-                if (sendIndividually && sendIndividually.checked) {
-                    contactGroups.forEach(group => {
-                        group.style.display = 'block';
-                        group.querySelectorAll('input[type="text"], input[type="email"]')
-                             .forEach(i => i.required = true);
-                    });
-                } else {
-                    contactGroups.forEach((group, index) => {
-                        if (index === 0) {
-                            group.style.display = 'block';
-                            group.querySelectorAll('input[type="text"], input[type="email"]')
-                                 .forEach(i => i.required = true);
-                        } else {
-                            group.style.display = 'none';
-                            group.querySelectorAll('input[type="text"], input[type="email"]')
-                                 .forEach(i => {
-                                     i.required = false;
-                                     i.value = '';
-                                 });
-                        }
-                    });
-                }
-
-                validate();
-            }
-
-            function validate() {
-                const visibleInputs = Array.from(contactGroups)
-                    .filter(g => g.style.display !== 'none')
-                    .flatMap(g => Array.from(
-                        g.querySelectorAll('input[required]')
-                    ));
-
-                submitButton.disabled = !visibleInputs.every(i => i.value.trim() !== '');
-            }
-
-            document.querySelectorAll('.contact-required')
-                .forEach(i => i.addEventListener('input', validate));
-
-            if (sendToMe) sendToMe.addEventListener('change', updateVisibility);
-            if (sendIndividually) sendIndividually.addEventListener('change', updateVisibility);
-
-            updateVisibility();
-        });
-    </script> *@
-
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const submitButton = document.getElementById('complete-payment-btn');

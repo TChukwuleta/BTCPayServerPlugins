@@ -61,11 +61,7 @@
             <thead class="mass-action-head">
                 <tr>
                     <th class="text-nowrap">Invoice</th>
-                    <th class="text-nowrap">First Name</th>
-                    <th class="text-nowrap">Last Name</th>
-                    <th class="text-nowrap">Email</th>
                     <th class="text-nowrap">Quantity Purchased</th>
-                    <th class="text-end">Action</th>
                     <th class="w-75px"></th>
                 </tr>
             </thead>
@@ -76,14 +72,7 @@
                         <td class="text-break align-middle invoiceId-col">
                             <a asp-action="Invoice" asp-controller="UIInvoice" class="invoice-details-link" asp-route-invoiceId="@ticket.InvoiceId">@ticket.InvoiceId</a>
                         </td>
-                        <td class="align-middle">@ticket.FirstName</td>
-                        <td class="align-middle">@ticket.LastName</td>
-                        <td class="align-middle">@ticket.Email</td>
                         <td class="align-middle">@ticket.Quantity</td>
-
-                        <td class="text-end amount-col">
-                            <a asp-action="SendReminder" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-orderId="@ticket.OrderId">Resend Ticket Email</a>
-                        </td>
                         <td>
                             <button class="btn btn-link dropdown-toggle p-0" type="button" data-bs-toggle="collapse"
                                     data-bs-target="#collapse_@ticket.OrderId" aria-expanded="false" aria-controls="collapse_@ticket.OrderId">
@@ -106,7 +95,7 @@
                                                 <th>Amount</th>
                                                 <th>Currency</th>
                                                 <th>Checkin Attendee</th>
-                                                <th class="text-end">Checked-In</th>
+                                                <th class="text-end">Send Reminder</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -126,7 +115,9 @@
                                                             <a asp-action="CheckinTicketAttendee" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketNumber="@ticketVm.TicketNumber">Check In</a>
                                                         }
                                                     </td>
-                                                    <td class="text-end text-success">@ticketVm.CheckedIn</td>
+                                                    <td class="text-end">
+                                                        <a asp-action="SendTicketReminder" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticketVm.Id" asp-route-orderId="@ticket.OrderId">Resend Ticket Email</a>
+                                                    </td>
                                                 </tr>
                                             }
                                         </tbody>

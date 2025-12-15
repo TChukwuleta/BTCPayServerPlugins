@@ -102,12 +102,19 @@ Click the link to view your tickets: {ticket.QRCodeLink}";
 
 Click the link to view your tickets: {ticket.QRCodeLink}";
 
-            recipients.Add(new EmailRecipient
+            try
             {
-                Address = InternetAddress.Parse(ticket.Email),
-                Subject = ticketEvent.EmailSubject,
-                MessageText = emailBody
-            });
+                recipients.Add(new EmailRecipient
+                {
+                    Address = InternetAddress.Parse(ticket.Email),
+                    Subject = ticketEvent.EmailSubject,
+                    MessageText = emailBody
+                });
+            }
+            catch (Exception ex)
+            {
+                _logs.PayServer.LogWarning(ex, $"Invalid email for ticket {ticket.Id}: {ticket.Email}");
+            }
         }
         return await SendBulkEmail(storeId, recipients);
     }

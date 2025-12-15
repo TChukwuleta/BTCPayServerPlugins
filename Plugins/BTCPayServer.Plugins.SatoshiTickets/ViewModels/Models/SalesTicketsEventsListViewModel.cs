@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.ViewModels;
@@ -52,4 +53,12 @@ public class SalesTicketsEventsViewModel
     public List<SalesTicketsEventsListViewModel> DisplayedEvents { get; set; }
     public bool Active { get; set; }
     public bool Expired { get; set; }
+}
+
+public class SendTicketReminderViewModel
+{
+    public string EventId { get; set; }
+    public string TicketId { get; set; }
+    public string OrderId { get; set; }
+    public string Email { get; set; }
 }
