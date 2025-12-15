@@ -26,6 +26,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using BTCPayServer.Controllers;
 using System.Text;
 using Microsoft.CodeAnalysis;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.SatoshiTickets;
 
@@ -387,7 +388,8 @@ public class UITicketSalesController : Controller
         if (!string.IsNullOrEmpty(searchText))
         {
             ordersQuery = ordersQuery.Where(o =>
-                o.InvoiceId.Contains(searchText) || o.Tickets.Any(t => t.TxnNumber.Contains(searchText) || t.FirstName.Contains(searchText) ||  t.LastName.Contains(searchText) || t.Email.Contains(searchText)));
+                o.InvoiceId.Contains(searchText) || o.Tickets.Any(t => t.TxnNumber.Contains(searchText) || t.FirstName.Contains(searchText) 
+                ||  t.LastName.Contains(searchText) || t.Email.Contains(searchText)));
         }  
         var orders = ordersQuery.ToList();
         var vm = new EventTicketViewModel
@@ -413,6 +415,9 @@ public class UITicketSalesController : Controller
                     Id = t.Id,
                     Amount = t.Amount,
                     TicketTypeId = t.TicketTypeId,
+                    FirstName = t.FirstName,
+                    LastName = t.LastName,
+                    Email = t.Email,
                     TicketNumber = t.TxnNumber,
                     Currency = o.Currency,
                     CheckedIn = t.UsedAt.HasValue,
@@ -441,8 +446,8 @@ public class UITicketSalesController : Controller
         return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
     }
 
-    [HttpGet("{eventId}/send-reminder/{orderId}")]
-    public async Task<IActionResult> SendReminder(string storeId, string eventId, string orderId)
+    [HttpGet("{eventId}/send-reminder/{orderId}/{ticketId}")]
+    public async Task<IActionResult> SendTicketReminder(string storeId, string eventId, string orderId, string ticketId)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
@@ -453,12 +458,42 @@ public class UITicketSalesController : Controller
         if (ticketEvent == null || order == null || !order.Tickets.Any())
             return NotFound();
 
+        return View(new SendTicketReminderViewModel
+        {
+            TicketId = ticketId,
+            EventId = eventId,
+            Email = order.Tickets.First(a => a.Id == ticketId)?.Email,
+            OrderId = orderId,
+        });
+    }
+
+    [HttpPost("{eventId}/send-reminder/{orderId}/{ticketId}")]
+    public async Task<IActionResult> SendTicketReminder(SendTicketReminderViewModel model)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        Console.WriteLine(JsonConvert.SerializeObject(model));
+        await using var ctx = _dbContextFactory.CreateContext();
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id.Equals(model.EventId) && c.StoreId.Equals(CurrentStore.Id));
+        var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets)
+            .FirstOrDefault(o => o.Id == model.OrderId && o.StoreId == CurrentStore.Id && o.EventId == model.EventId && o.Tickets.Any());
+
+        if (ticketEvent == null || order == null || !order.Tickets.Any())
+            return NotFound();
+
+        var ticket = order.Tickets.Where(c => c.Id == model.TicketId).FirstOrDefault();
+        if (ticket == null)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = $"Invalid Ticket specified";
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId = model.EventId });
+        }
         var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStore.Id);
         var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
         if (!isEmailConfigured)
         {
             TempData[WellKnownTempData.ErrorMessage] = $"Email settings not setup. Kindly configure Email SMTP in the admin settings";
-            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId = model.EventId });
         }
         try
         {
@@ -472,10 +507,10 @@ public class UITicketSalesController : Controller
         catch (Exception ex)
         {
             TempData[WellKnownTempData.ErrorMessage] = $"An error occured when sending ticket details. {ex.Message}";
-            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId = model.EventId });
         }
         TempData[WellKnownTempData.SuccessMessage] = $"Ticket details has been sent to recipients via email";
-        return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId });
+        return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId = model.EventId });
     }
 
 

@@ -104,6 +104,7 @@ public class TicketContactInfoViewModel
     public string LastName { get; set; }
     public string Email { get; set; }
     public string TicketTypeId { get; set; }
+    public string TicketTypeName { get; set; }
     public int Quantity { get; set; }
 }
 

@@ -61,7 +61,7 @@ public class EmailService
 
     public async Task<EmailDispatchResult> SendTicketRegistrationEmail(string storeId, Ticket ticket, Event ticketEvent)
     {
-        var emailRecipients = new List<EmailRecipient>();
+        var recipients = new List<EmailRecipient>();
         string emailBody = ticketEvent.EmailBody
                             .Replace("{{Title}}", ticketEvent.Title)
                             .Replace("{{Location}}", ticketEvent.Location)
@@ -75,13 +75,48 @@ public class EmailService
 
 Click the link to view your tickets: {ticket.QRCodeLink}";
 
-        emailRecipients.Add(new EmailRecipient
+        recipients.Add(new EmailRecipient
         {
             Address = InternetAddress.Parse(ticket.Email),
             Subject = ticketEvent.EmailSubject,
             MessageText = emailBody
         });
-        return await SendBulkEmail(storeId, emailRecipients);
+        return await SendBulkEmail(storeId, recipients);
+    }
+
+    public async Task<EmailDispatchResult> SendTicketRegistrationEmail(string storeId, IEnumerable<Ticket> tickets, Event ticketEvent)
+    {
+        var recipients = new List<EmailRecipient>();
+        foreach (var ticket in tickets)
+        {
+            string emailBody = ticketEvent.EmailBody
+                .Replace("{{Title}}", ticketEvent.Title)
+                .Replace("{{Location}}", ticketEvent.Location)
+                .Replace("{{Name}}", $"{ticket.FirstName} {ticket.LastName}")
+                .Replace("{{Email}}", ticket.Email)
+                .Replace("{{Description}}", ticketEvent.Description)
+                .Replace("{{EventDate}}", ticketEvent.StartDate.ToString("MMMM dd, yyyy"))
+                .Replace("{{Currency}}", ticketEvent.Currency);
+
+            emailBody = @$"{emailBody}
+
+Click the link to view your tickets: {ticket.QRCodeLink}";
+
+            try
+            {
+                recipients.Add(new EmailRecipient
+                {
+                    Address = InternetAddress.Parse(ticket.Email),
+                    Subject = ticketEvent.EmailSubject,
+                    MessageText = emailBody
+                });
+            }
+            catch (Exception ex)
+            {
+                _logs.PayServer.LogWarning(ex, $"Invalid email for ticket {ticket.Id}: {ticket.Email}");
+            }
+        }
+        return await SendBulkEmail(storeId, recipients);
     }
 
     public string GetEmbeddedResourceContent(string resourceName)

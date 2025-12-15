@@ -1,0 +1,32 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Plugins.SatoshiTickets.Data
+@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@using BTCPayServer.Abstractions.Extensions
+@inject IScopeProvider ScopeProvider
+@model SendTicketReminderViewModel
+@{
+    Layout = "_Layout";
+    ViewData.SetActivePage(PluginNavPages.Index, "Satoshi Tickets Events");
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+
+<div class="sticky-header">
+    <h2 text-translate="true">Send Event Reminder</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <a asp-controller="UITicketSales" asp-action="ViewEventTicket" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Go Back</a>
+        <button type="submit" form="event-reminder-form" class="btn btn-success">Send Reminder</button>
+    </div>
+</div>
+<partial name="_StatusMessage" />
+
+<form id="event-reminder-form" asp-action="SendTicketReminder" asp-route-storeId="@storeId" asp-route-orderId="@Model.OrderId" asp-route-eventId="@Model.EventId"
+    asp-route-ticketId="@Model.TicketId" method="post" class="col-md-6">
+    <input type="hidden" asp-for="EventId" />
+    <input type="hidden" asp-for="OrderId" />
+    <input type="hidden" asp-for="TicketId" />
+    <div class="mb-3">
+        <label asp-for="Email" class="form-label fw-bold"></label>
+        <input asp-for="Email" class="form-control" />
+        <span asp-validation-for="Email" class="text-danger"></span>
+    </div>
+</form>

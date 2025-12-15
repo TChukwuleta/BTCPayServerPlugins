@@ -1,6 +1,5 @@
 using System.Linq;
 using System.Threading.Tasks;
-using AngleSharp.Dom;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;

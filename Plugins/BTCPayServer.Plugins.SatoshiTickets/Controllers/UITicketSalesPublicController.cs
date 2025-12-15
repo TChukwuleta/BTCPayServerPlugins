@@ -175,11 +175,24 @@ public class UITicketSalesPublicController : Controller
         var storeData = await _storeRepo.FindStore(storeId);
         if (storeData == null) return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext(); 
+        await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
         if (!ValidateEvent(ctx, storeId, eventId))
             return NotFound();
 
+        var contactInfo = new List<TicketContactInfoViewModel>();
+        foreach (var ticket in order.Tickets)
+        {
+            for (int i = 0; i < ticket.Quantity; i++)
+            {
+                contactInfo.Add(new TicketContactInfoViewModel
+                {
+                    TicketTypeId = ticket.TicketTypeId,
+                    TicketTypeName = ticket.TicketTypeName,
+                    Quantity = 1
+                });
+            }
+        }
         return View(new ContactInfoPageViewModel
         {
             TxnId = txnId,
@@ -190,7 +203,7 @@ public class UITicketSalesPublicController : Controller
             Tickets = order.Tickets,
             EventTitle = ticketEvent.Title,
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, storeData.GetStoreBlob()),
-            ContactInfo = new List<TicketContactInfoViewModel> { new TicketContactInfoViewModel() },
+            ContactInfo = contactInfo
         });
     }
 
@@ -243,11 +256,21 @@ public class UITicketSalesPublicController : Controller
         ctx.Orders.Add(order);
         await ctx.SaveChangesAsync();
 
+        var deliveryOption = Request.Form["ticketDeliveryOption"].ToString();
+        var sendIndividually = deliveryOption == "individual";
+        var contactIndex = 0;
+        var expectedTickets = orderViewModel.Tickets.Sum(t => t.Quantity);
+        if (model.ContactInfo.Count != expectedTickets)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Contact information does not match the number of tickets selected";
+            return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, txnId = model.TxnId });
+        }
         foreach (var ticketRequest in orderViewModel.Tickets)
         {
             var ticketType = ticketTypes[ticketRequest.TicketTypeId];
             for (int i = 0; i < ticketRequest.Quantity; i++)
             {
+                var contact = sendIndividually ? model.ContactInfo[contactIndex] : model.ContactInfo[0];
                 string ticketTxn = Encoders.Base58.EncodeData(RandomUtils.GetBytes(10));
                 var ticket = new Ticket
                 {
@@ -255,10 +278,10 @@ public class UITicketSalesPublicController : Controller
                     EventId = eventId,
                     TicketTypeId = ticketType.Id,
                     Amount = ticketType.Price,
-                    QRCodeLink = Url.Action(nameof(EventTicketDisplay), "UITicketSalesPublic", new { storeId, eventId, orderId = order.Id }, Request.Scheme),
-                    FirstName = model.ContactInfo.First().FirstName.Trim(),
-                    LastName = model.ContactInfo.First().LastName.Trim(),
-                    Email = model.ContactInfo.First().Email.Trim(),
+                    QRCodeLink = Url.Action(nameof(EventTicketDisplay), "UITicketSalesPublic", new { storeId, eventId, orderId = order.Id, txnNumber = ticketTxn }, Request.Scheme),
+                    FirstName = contact.FirstName?.Trim() ?? string.Empty,
+                    LastName = contact.LastName?.Trim() ?? string.Empty,
+                    Email = contact.Email?.Trim() ?? string.Empty,
                     CreatedAt = now,
                     TxnNumber = ticketTxn,
                     TicketNumber = $"EVT-{eventId:D4}-{now:yyMMdd}-{ticketTxn}",
@@ -266,6 +289,7 @@ public class UITicketSalesPublicController : Controller
                     PaymentStatus = TransactionStatus.New.ToString()
                 };
                 tickets.Add(ticket);
+                contactIndex++;
             }
         }
         order.Tickets = tickets;
@@ -279,7 +303,7 @@ public class UITicketSalesPublicController : Controller
     }
 
     [HttpGet("event/{eventId}/ticket/{orderId}/summary")]
-    public async Task<IActionResult> EventTicketDisplay(string storeId, string eventId, string orderId)
+    public async Task<IActionResult> EventTicketDisplay(string storeId, string eventId, string orderId, string txnNumber)
     {
         var store = await _storeRepo.FindStore(storeId);
         if (store == null) return NotFound();
@@ -289,8 +313,14 @@ public class UITicketSalesPublicController : Controller
         var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets).FirstOrDefault(o => o.StoreId == storeId && o.EventId == eventId && o.Id == orderId);
         if (order?.Tickets?.Any() != true) return NotFound();
 
+        var tickets = order.Tickets.AsEnumerable();
+        if (!string.IsNullOrEmpty(txnNumber))
+        {
+            if (order.Tickets.FirstOrDefault(c => c.TxnNumber == txnNumber) == null) return NotFound();
+            tickets = order.Tickets.Where(c => c.TxnNumber == txnNumber);
+        }
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
-        if (ticketEvent == null) return NotFound();
+        if (ticketEvent == null || !tickets.Any()) return NotFound();
 
         return View(new TicketViewModel
         {
@@ -299,7 +329,7 @@ public class UITicketSalesPublicController : Controller
             StartDate = ticketEvent.StartDate,
             EndDate = ticketEvent.EndDate,
             PurchaseDate = order.PurchaseDate.Value,
-            Tickets = order.Tickets.Select(t => new TicketListViewModel
+            Tickets = tickets.Select(t => new TicketListViewModel
             {
                 FirstName = t.FirstName,
                 LastName = t.LastName,
