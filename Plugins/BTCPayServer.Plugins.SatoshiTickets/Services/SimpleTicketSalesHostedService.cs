@@ -111,7 +111,7 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
             {
                 try
                 {
-                    var emailResponse = await _emailService.SendTicketRegistrationEmail(invoice.StoreId, order.Tickets.First(), ticketEvent);
+                    var emailResponse = await _emailService.SendTicketRegistrationEmail(invoice.StoreId, order.Tickets, ticketEvent);
                     if (emailResponse.IsSuccessful) order.EmailSent = true;
                     result.Write($"Email sent successfully to recipients in Order with Id: {order.Id}", InvoiceEventData.EventSeverity.Success);
                 }

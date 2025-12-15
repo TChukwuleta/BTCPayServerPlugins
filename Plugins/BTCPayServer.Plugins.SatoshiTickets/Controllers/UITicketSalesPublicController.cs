@@ -24,6 +24,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using NBitcoin;
 using NBitcoin.DataEncoders;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using QRCoder;
 using TransactionStatus = BTCPayServer.Plugins.SatoshiTickets.Data.TransactionStatus;
@@ -180,6 +181,19 @@ public class UITicketSalesPublicController : Controller
         if (!ValidateEvent(ctx, storeId, eventId))
             return NotFound();
 
+        var contactInfo = new List<TicketContactInfoViewModel>();
+        foreach (var ticket in order.Tickets)
+        {
+            for (int i = 0; i < ticket.Quantity; i++)
+            {
+                contactInfo.Add(new TicketContactInfoViewModel
+                {
+                    TicketTypeId = ticket.TicketTypeId,
+                    TicketTypeName = ticket.TicketTypeName,
+                    Quantity = 1
+                });
+            }
+        }
         return View(new ContactInfoPageViewModel
         {
             TxnId = txnId,
@@ -190,7 +204,7 @@ public class UITicketSalesPublicController : Controller
             Tickets = order.Tickets,
             EventTitle = ticketEvent.Title,
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, storeData.GetStoreBlob()),
-            ContactInfo = new List<TicketContactInfoViewModel> { new TicketContactInfoViewModel() },
+            ContactInfo = contactInfo
         });
     }
 
@@ -243,11 +257,26 @@ public class UITicketSalesPublicController : Controller
         ctx.Orders.Add(order);
         await ctx.SaveChangesAsync();
 
+        Console.WriteLine("The post method model is:");
+        Console.WriteLine(JsonConvert.SerializeObject(model, Formatting.Indented));
+        Console.WriteLine("The order view model is:");
+        Console.WriteLine(JsonConvert.SerializeObject(orderViewModel, Formatting.Indented));
+
+        var deliveryOption = Request.Form["ticketDeliveryOption"].ToString();
+        var sendIndividually = deliveryOption == "individual";
+        var contactIndex = 0;
+        var expectedTickets = orderViewModel.Tickets.Sum(t => t.Quantity);
+        if (model.ContactInfo.Count != expectedTickets)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Contact information does not match the number of tickets selected";
+            return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, txnId = model.TxnId });
+        }
         foreach (var ticketRequest in orderViewModel.Tickets)
         {
             var ticketType = ticketTypes[ticketRequest.TicketTypeId];
             for (int i = 0; i < ticketRequest.Quantity; i++)
             {
+                var contact = sendIndividually ? model.ContactInfo[contactIndex] : model.ContactInfo[0];
                 string ticketTxn = Encoders.Base58.EncodeData(RandomUtils.GetBytes(10));
                 var ticket = new Ticket
                 {
@@ -256,9 +285,9 @@ public class UITicketSalesPublicController : Controller
                     TicketTypeId = ticketType.Id,
                     Amount = ticketType.Price,
                     QRCodeLink = Url.Action(nameof(EventTicketDisplay), "UITicketSalesPublic", new { storeId, eventId, orderId = order.Id }, Request.Scheme),
-                    FirstName = model.ContactInfo.First().FirstName.Trim(),
-                    LastName = model.ContactInfo.First().LastName.Trim(),
-                    Email = model.ContactInfo.First().Email.Trim(),
+                    FirstName = contact.FirstName.Trim(),
+                    LastName = contact.LastName.Trim(),
+                    Email = contact.Email.Trim(),
                     CreatedAt = now,
                     TxnNumber = ticketTxn,
                     TicketNumber = $"EVT-{eventId:D4}-{now:yyMMdd}-{ticketTxn}",
@@ -266,6 +295,7 @@ public class UITicketSalesPublicController : Controller
                     PaymentStatus = TransactionStatus.New.ToString()
                 };
                 tickets.Add(ticket);
+                contactIndex++;
             }
         }
         order.Tickets = tickets;

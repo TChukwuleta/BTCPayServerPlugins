@@ -44,23 +44,52 @@
                         </div>
                     </div>
 
+                    @if (Model.ContactInfo.Count > 1)
+                    {
+                        <div class="mb-4 mt-4">
+                            <label class="form-label fw-bold">Who should receive the tickets?</label>
+
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="ticketDeliveryOption" id="sendToMe" value="me" checked>
+                                <label class="form-check-label" for="sendToMe">
+                                    Send all tickets to me
+                                </label>
+                            </div>
+
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="ticketDeliveryOption" id="sendIndividually" value="individual">
+                                <label class="form-check-label" for="sendIndividually">
+                                    Send tickets individually to different people
+                                </label>
+                            </div>
+                        </div>
+                    }
+
                     <div class="p-3 rounded mb-4">
                         <div id="contactList">
                             @for (var i = 0; i < Model.ContactInfo.Count; i++)
                             {
-                                <div class="contact-group">
+                                <div class="contact-group mb-4" data-index="@i">
+                                    <h6 class="fw-bold mb-3 ticket-heading" data-ticket-type="@Model.ContactInfo[i].TicketTypeName"> </h6>
+                                    <input type="hidden" asp-for="ContactInfo[i].TicketTypeId" />
+                                    <input type="hidden" asp-for="ContactInfo[i].TicketTypeName" />
+                                    <input type="hidden" asp-for="ContactInfo[i].Quantity" />
+
                                     <div class="mb-3">
                                         <label class="form-label" data-required>First name</label>
+                                        @* <input class="form-control contact-required" asp-for="ContactInfo[i].FirstName" required /> *@
                                         <input type="text" class="form-control contact-required" asp-for="ContactInfo[i].FirstName" placeholder="First name" required>
                                     </div>
 
                                     <div class="mb-3">
                                         <label class="form-label" data-required>Last name</label>
+                                        @* <input class="form-control contact-required" asp-for="ContactInfo[i].LastName" required /> *@
                                         <input type="text" class="form-control contact-required" asp-for="ContactInfo[i].LastName" placeholder="Last name" required>
                                     </div>
 
                                     <div class="mb-3">
                                         <label class="form-label" data-required>Email Address</label>
+                                        @* <input class="form-control contact-required" asp-for="ContactInfo[i].Email" required /> *@
                                         <input type="email" class="form-control contact-required" asp-for="ContactInfo[i].Email" placeholder="Email address" required>
                                     </div>
                                 </div>
@@ -68,21 +97,6 @@
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Who should receive the tickets?</label>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="ticketDeliveryOption" id="sendToMe" value="me" checked>
-                            <label class="form-check-label" for="sendToMe">
-                                Send all tickets to me
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="ticketDeliveryOption" id="sendIndividually" value="individual">
-                            <label class="form-check-label" for="sendIndividually">
-                                Send tickets individually to different people
-                            </label>
-                        </div>
-                    </div>
                 </div>
                 <input type="hidden" name="txnId" value="@Model.TxnId" />
 
@@ -119,18 +133,132 @@
 
 
 @section PageFootContent {
+    @* <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const submitButton = document.getElementById('complete-payment-btn');
+            const contactGroups = document.querySelectorAll('.contact-group');
+            const sendToMe = document.getElementById('sendToMe');
+            const sendIndividually = document.getElementById('sendIndividually');
+
+            function updateVisibility() {
+                if (sendIndividually && sendIndividually.checked) {
+                    contactGroups.forEach(group => {
+                        group.style.display = 'block';
+                        group.querySelectorAll('input[type="text"], input[type="email"]')
+                             .forEach(i => i.required = true);
+                    });
+                } else {
+                    contactGroups.forEach((group, index) => {
+                        if (index === 0) {
+                            group.style.display = 'block';
+                            group.querySelectorAll('input[type="text"], input[type="email"]')
+                                 .forEach(i => i.required = true);
+                        } else {
+                            group.style.display = 'none';
+                            group.querySelectorAll('input[type="text"], input[type="email"]')
+                                 .forEach(i => {
+                                     i.required = false;
+                                     i.value = '';
+                                 });
+                        }
+                    });
+                }
+
+                validate();
+            }
+
+            function validate() {
+                const visibleInputs = Array.from(contactGroups)
+                    .filter(g => g.style.display !== 'none')
+                    .flatMap(g => Array.from(
+                        g.querySelectorAll('input[required]')
+                    ));
+
+                submitButton.disabled = !visibleInputs.every(i => i.value.trim() !== '');
+            }
+
+            document.querySelectorAll('.contact-required')
+                .forEach(i => i.addEventListener('input', validate));
+
+            if (sendToMe) sendToMe.addEventListener('change', updateVisibility);
+            if (sendIndividually) sendIndividually.addEventListener('change', updateVisibility);
+
+            updateVisibility();
+        });
+    </script> *@
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const requiredInputs = document.querySelectorAll('.contact-required');
             const submitButton = document.getElementById('complete-payment-btn');
-            function checkFields() {
-                const allFilled = Array.from(requiredInputs).every(input => input.value.trim() !== '');
-                submitButton.disabled = !allFilled;
+            const contactGroups = document.querySelectorAll('.contact-group');
+            const sendToMe = document.getElementById('sendToMe');
+            const sendIndividually = document.getElementById('sendIndividually');
+
+            function updateVisibility() {
+                const isIndividual = sendIndividually && sendIndividually.checked;
+                const hasMultiple = contactGroups.length > 1;
+
+                contactGroups.forEach((group, index) => {
+                    const heading = group.querySelector('.ticket-heading');
+                    const ticketType = heading.dataset.ticketType;
+
+                    if (!hasMultiple) {
+                        heading.style.display = 'none';
+                    }
+                    else if (!isIndividual) {
+                        // Send all to me → show one "Tickets"
+                        if (index === 0) {
+                            heading.textContent = 'Tickets';
+                            heading.style.display = 'block';
+                        } else {
+                            heading.style.display = 'none';
+                        }
+                    }
+                    else {
+                        // Send individually
+                        heading.textContent = `Ticket ${index + 1} (${ticketType})`;
+                        heading.style.display = 'block';
+                    }
+
+                    // Toggle form visibility
+                    if (isIndividual) {
+                        group.style.display = 'block';
+                        setRequired(group, true);
+                    } else {
+                        if (index === 0) {
+                            group.style.display = 'block';
+                            setRequired(group, true);
+                        } else {
+                            group.style.display = 'none';
+                            setRequired(group, false);
+                        }
+                    }
+                });
+
+                validate();
             }
-            requiredInputs.forEach(input => {
-                input.addEventListener('input', checkFields);
-            });
-            checkFields();
+
+            function setRequired(group, required) {
+                group.querySelectorAll('input[type="text"], input[type="email"]')
+                    .forEach(i => i.required = required);
+            }
+
+            function validate() {
+                const visibleInputs = Array.from(contactGroups)
+                    .filter(g => g.style.display !== 'none')
+                    .flatMap(g => Array.from(g.querySelectorAll('input[required]')));
+
+                submitButton.disabled = !visibleInputs.every(i => i.value.trim() !== '');
+            }
+
+            document.querySelectorAll('.contact-required')
+                .forEach(i => i.addEventListener('input', validate));
+
+            if (sendToMe) sendToMe.addEventListener('change', updateVisibility);
+            if (sendIndividually) sendIndividually.addEventListener('change', updateVisibility);
+
+            updateVisibility();
         });
     </script>
+
 }

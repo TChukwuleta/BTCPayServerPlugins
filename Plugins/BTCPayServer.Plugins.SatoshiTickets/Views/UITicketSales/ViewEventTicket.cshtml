@@ -100,8 +100,11 @@
                                             <tr>
                                                 <th>Ticket Number</th>
                                                 <th>Ticket Tier</th>
-                                                <th>Currency</th>
+                                                <th>First Name</th>
+                                                <th>Last Name</th>
+                                                <th>Email</th>
                                                 <th>Amount</th>
+                                                <th>Currency</th>
                                                 <th>Checkin Attendee</th>
                                                 <th class="text-end">Checked-In</th>
                                             </tr>
@@ -112,8 +115,11 @@
                                                 <tr>
                                                     <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">@ticketVm.TicketNumber</td>
                                                     <td>@ticketVm.TicketTypeName</td>
-                                                    <td>@ticketVm.Currency</td>
+                                                    <td>@ticketVm.FirstName</td>
+                                                    <td>@ticketVm.LastName</td>
+                                                    <td>@ticketVm.Email</td>
                                                     <td>@ticketVm.Amount</td>
+                                                    <td>@ticketVm.Currency</td>
                                                     <td>
                                                         @if (!ticketVm.CheckedIn)
                                                         {
