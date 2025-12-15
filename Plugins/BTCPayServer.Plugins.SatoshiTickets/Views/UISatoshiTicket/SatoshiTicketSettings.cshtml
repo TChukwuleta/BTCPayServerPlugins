@@ -1,0 +1,42 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Plugins.SatoshiTickets.Data
+@inject IScopeProvider ScopeProvider
+@model SatoshiTicketSettings
+@{
+    Layout = "_Layout";
+    var storeId = ScopeProvider.GetCurrentStoreId();
+    ViewData.SetActivePage(PluginNavPages.Index, $"Plugin Settings");
+}
+
+<div class="sticky-header">
+    <h2 text-translate="true">Satoshi Ticket Settings</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <button type="submit" form="satoshi-ticket-settings" class="btn btn-success">Save Changes</button>
+    </div>
+</div>
+<partial name="_StatusMessage" />
+
+<form id="satoshi-ticket-settings" asp-action="SatoshiTicketSettings" asp-route-storeId="@storeId" method="post" class="col-md-6">
+    <div class="row">
+        <div class="col-xl-10 col-xxl-constrain">
+            <div class="form-group d-flex align-items-center">
+                <input asp-for="EnableEventAutoReminder" type="checkbox" class="btcpay-toggle me-3" id="enableSplit" />
+                <div class="text-secondary">
+                    <label asp-for="EnableEventAutoReminder" for="enableSplit" class="form-label mb-0 me-1">Enable Event Auto Reminder</label>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="EventReminderDaysBefore" class="form-label fw-bold">Send reminder</label>
+                <div class="input-group" style="max-width: 220px;">
+                    <input asp-for="EventReminderDaysBefore" type="number" min="0" max="10" class="form-control" />
+                    <span class="input-group-text">days before event</span>
+                </div>
+                <div class="form-text">
+                    Example: Enter <strong>1</strong> to send reminder 1 day before the event starts.
+                </div>
+            </div>
+        </div>
+    </div>
+</form>

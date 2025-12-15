@@ -14,6 +14,7 @@ public class Plugin : BaseBTCPayServerPlugin
     {
         new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.1.0" }
     };
+    public const string SettingsName = "SatoshiTicketPlugin";
 
     public override void Execute(IServiceCollection services)
     {
