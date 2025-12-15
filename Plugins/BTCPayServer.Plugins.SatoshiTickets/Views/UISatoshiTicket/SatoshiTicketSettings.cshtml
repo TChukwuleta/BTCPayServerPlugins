@@ -1,0 +1,154 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Plugins.SatoshiTickets.Data
+@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@using BTCPayServer.Services
+@inject DisplayFormatter DisplayFormatter
+@inject IFileService FileService
+@inject IScopeProvider ScopeProvider
+@model EventTicketViewModel
+@{
+    Layout = "_Layout";
+    ViewData.SetActivePage(PluginNavPages.Index, $"{Model.EventTitle}");
+    var canUpload = await FileService.IsAvailable();
+    var storeId = ScopeProvider.GetCurrentStoreId();
+    string checkInUrl = Url.Action("TicketCheckin", "UITicketType", new { storeId, eventId = Model.EventId }, protocol: Context.Request.Scheme);
+}
+
+<div class="sticky-header">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <a asp-action="List" asp-route-storeId="@storeId" class="btn btn-secondary">Go Back</a>
+        <a asp-action="ExportTickets" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-success">Export Ticket Sales</a>
+        <div class="d-flex align-items-center gap-2">
+            <a id="ticket-checkin-link"
+               asp-controller="UITicketType" asp-action="TicketCheckin"
+               asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId"
+               class="btn btn-success" target="_blank" rel="noopener noreferrer">Ticket Check-in</a>
+            <button type="button" class="btn btn-link d-flex p-0 clipboard-button" data-bs-toggle="Copy Ticket check-in link" data-clipboard="@checkInUrl">
+                <vc:icon symbol="actions-copy" />
+            </button>
+        </div>
+    </div>
+</div>
+
+<partial name="_StatusMessage" />
+
+<div class="row g-3 mb-4 col-xxl-8">
+    <div class="col-md-6">
+        <div class="p-3 bg-light border rounded shadow-sm h-100">
+            <h6 class="mb-1 text-muted">Total Tickets</h6>
+            <h3 class="mb-0">@Model.TicketsCount</h3>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="p-3 bg-light border rounded shadow-sm h-100">
+            <h6 class="mb-1 text-muted">Checked-in Tickets</h6>
+            <h3 class="mb-0">@Model.CheckedInTicketsCount</h3>
+        </div>
+    </div>
+</div>
+
+<form class="d-flex flex-wrap flex-sm-nowrap align-items-center gap-3 mb-4 col-xxl-8" asp-action="ViewEventTicket"
+      asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" method="get">
+    <input asp-for="SearchText" class="form-control" name="searchText" placeholder="Search" />
+</form>
+
+@if (Model.TicketOrders.Any())
+{
+    <div class="table-responsive">
+        <table id="invoices" class="table table-hover mass-action">
+            <thead class="mass-action-head">
+                <tr>
+                    <th class="text-nowrap">Invoice</th>
+                    <th class="text-nowrap">Quantity Purchased</th>
+                    <th class="w-75px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var ticket in Model.TicketOrders)
+                {
+                    <tr id="invoice_@ticket.InvoiceId">
+                        <td class="text-break align-middle invoiceId-col">
+                            <a asp-action="Invoice" asp-controller="UIInvoice" class="invoice-details-link" asp-route-invoiceId="@ticket.InvoiceId">@ticket.InvoiceId</a>
+                        </td>
+                        <td class="align-middle">@ticket.Quantity</td>
+                        <td>
+                            <button class="btn btn-link dropdown-toggle p-0" type="button" data-bs-toggle="collapse"
+                                    data-bs-target="#collapse_@ticket.OrderId" aria-expanded="false" aria-controls="collapse_@ticket.OrderId">
+                               Show Ticket
+                            </button>
+                        </td>
+                    </tr>
+                    <tr class="collapse" id="collapse_@ticket.OrderId">
+                        <td colspan="7" class="p-0">
+                            <div class="card card-body border-0">
+                                <div class="table-responsive">
+                                    <table class="table table-borderless mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Ticket Number</th>
+                                                <th>Ticket Tier</th>
+                                                <th>First Name</th>
+                                                <th>Last Name</th>
+                                                <th>Email</th>
+                                                <th>Amount</th>
+                                                <th>Currency</th>
+                                                <th>Checkin Attendee</th>
+                                                <th class="text-end">Send Reminder</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var ticketVm in ticket.Tickets)
+                                            {
+                                                <tr>
+                                                    <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">@ticketVm.TicketNumber</td>
+                                                    <td>@ticketVm.TicketTypeName</td>
+                                                    <td>@ticketVm.FirstName</td>
+                                                    <td>@ticketVm.LastName</td>
+                                                    <td>@ticketVm.Email</td>
+                                                    <td>@ticketVm.Amount</td>
+                                                    <td>@ticketVm.Currency</td>
+                                                    <td>
+                                                        @if (!ticketVm.CheckedIn)
+                                                        {
+                                                            <a asp-action="CheckinTicketAttendee" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketNumber="@ticketVm.TicketNumber">Check In</a>
+                                                        }
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <a asp-action="SendTicketReminder" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticketVm.Id" asp-route-orderId="@ticket.OrderId">Resend Ticket Email</a>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <p class="text-secondary mt-3">
+        No tickets found for this event.
+    </p>
+}
+
+@section PageFootContent {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const searchInput = document.querySelector('input[name="searchText"]');
+            searchInput.addEventListener("input", function () {
+                if (this.value.trim() === "") {
+                    window.location.href = window.location.pathname;
+                }
+            });
+        });
+    </script>
+
+}
+

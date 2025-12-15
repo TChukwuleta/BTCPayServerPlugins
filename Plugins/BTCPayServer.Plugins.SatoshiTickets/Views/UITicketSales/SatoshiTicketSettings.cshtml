@@ -1,0 +1,43 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Plugins.SatoshiTickets.Data
+@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@using BTCPayServer.Services
+@inject IFileService FileService
+@inject IScopeProvider ScopeProvider
+@model SatoshiTicketSettings
+@{
+    Layout = "_Layout";
+    var canUpload = await FileService.IsAvailable();
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+
+
+<form method="post" asp-action="MavapayCheckoutSettings">
+    <div class="sticky-header d-flex align-items-center justify-content-between">
+        <h2>Satoshi Tickets Settings</h2>
+        <button type="submit" class="btn btn-primary" id="Edit" value="Save Changes">Save Changes</button>
+    </div>
+
+    <div class="row">
+        <div class="col-xl-10 col-xxl-constrain">
+            <div class="form-group d-flex align-items-center">
+                <input asp-for="EnableEventAutoReminder" type="checkbox" class="btcpay-toggle me-3" id="enableSplit" />
+                <div class="text-secondary">
+                    <label asp-for="EnableEventAutoReminder" for="enableSplit" class="form-label mb-0 me-1">Enable Event Auto Reminder</label>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="EventReminderDaysBefore" class="form-label fw-bold">Send reminder</label>
+                <div class="input-group" style="max-width: 220px;">
+                    <input asp-for="EventReminderDaysBefore" type="number" min="0" max="10" class="form-control" />
+                    <span class="input-group-text">days before event</span>
+                </div>
+                <div class="form-text">
+                    Example: Enter <strong>1</strong> to send reminder 1 day before the event starts.
+                </div>
+            </div>
+        </div>
+    </div>
+</form>

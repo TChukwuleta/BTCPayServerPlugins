@@ -25,6 +25,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 using Newtonsoft.Json;
+using Org.BouncyCastle.Asn1.Cms;
 
 namespace BTCPayServer.Plugins.Template;
 
@@ -400,23 +401,20 @@ public class UIMavapayController : Controller
             return NotFound();
 
         var settings = await _storeRepository.GetSettingAsync<MavapayCheckoutSettings>(StoreData.Id, NairaCheckoutPlugin.SettingsName) ?? new MavapayCheckoutSettings();
-        settings = new MavapayCheckoutSettings
-        {
-            EnableSplitPayment = vm.EnableSplitPayment,
-            SplitPercentage = vm.SplitPayment.SplitPercentage,
-            Currency = vm.SplitPayment.Currency.ToString(),
-            NGNBankCode = vm.SplitPayment.NGNBankCode,
-            NGNAccountNumber = vm.SplitPayment.NGNAccountNumber,
-            NGNAccountName = vm.SplitPayment.NGNAccountName,
-            NGNBankName = vm.SplitPayment.NGNBankName,
-            KESMethod = vm.SplitPayment.KESMethod,
-            KESIdentifier = vm.SplitPayment.KESIdentifier,
-            KESAccountNumber = vm.SplitPayment.KESAccountNumber,
-            KESAccountName = vm.SplitPayment.KESAccountName,
-            ZARBank = vm.SplitPayment.ZARBank,
-            ZARAccountNumber = vm.SplitPayment.ZARAccountNumber,
-            ZARAccountName = vm.SplitPayment.ZARAccountName
-        };
+        settings.EnableSplitPayment = vm.EnableSplitPayment;
+        settings.SplitPercentage = vm.SplitPayment.SplitPercentage;
+        settings.Currency = vm.SplitPayment.Currency.ToString();
+        settings.NGNBankCode = vm.SplitPayment.NGNBankCode;
+        settings.NGNAccountNumber = vm.SplitPayment.NGNAccountNumber;
+        settings.NGNAccountName = vm.SplitPayment.NGNAccountName;
+        settings.NGNBankName = vm.SplitPayment.NGNBankName;
+        settings.KESMethod = vm.SplitPayment.KESMethod;
+        settings.KESIdentifier = vm.SplitPayment.KESIdentifier;
+        settings.KESAccountNumber = vm.SplitPayment.KESAccountNumber;
+        settings.KESAccountName = vm.SplitPayment.KESAccountName;
+        settings.ZARBank = vm.SplitPayment.ZARBank;
+        settings.ZARAccountNumber = vm.SplitPayment.ZARAccountNumber;
+        settings.ZARAccountName = vm.SplitPayment.ZARAccountName;
         await _storeRepository.UpdateSetting(StoreData.Id, NairaCheckoutPlugin.SettingsName, settings);
         TempData[WellKnownTempData.SuccessMessage] = "Mavapay checkout settings saved successfully";
         return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
