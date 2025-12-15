@@ -476,10 +476,18 @@ public class UITicketSalesController : Controller
         Console.WriteLine(JsonConvert.SerializeObject(model));
         await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id.Equals(model.EventId) && c.StoreId.Equals(CurrentStore.Id));
-        var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets).FirstOrDefault(o => o.Id == model.OrderId && o.StoreId == CurrentStore.Id && o.EventId == model.EventId && o.Tickets.Any());
+        var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets)
+            .FirstOrDefault(o => o.Id == model.OrderId && o.StoreId == CurrentStore.Id && o.EventId == model.EventId && o.Tickets.Any());
+
         if (ticketEvent == null || order == null || !order.Tickets.Any())
             return NotFound();
 
+        var ticket = order.Tickets.Where(c => c.Id == model.TicketId).FirstOrDefault();
+        if (ticket == null)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = $"Invalid Ticket specified";
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId = model.EventId });
+        }
         var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStore.Id);
         var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
         if (!isEmailConfigured)

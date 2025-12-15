@@ -24,10 +24,8 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using NBitcoin;
 using NBitcoin.DataEncoders;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using QRCoder;
-using static QRCoder.PayloadGenerator;
 using TransactionStatus = BTCPayServer.Plugins.SatoshiTickets.Data.TransactionStatus;
 
 namespace BTCPayServer.Plugins.SatoshiTickets;
@@ -177,7 +175,7 @@ public class UITicketSalesPublicController : Controller
         var storeData = await _storeRepo.FindStore(storeId);
         if (storeData == null) return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext(); 
+        await using var ctx = _dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
         if (!ValidateEvent(ctx, storeId, eventId))
             return NotFound();
@@ -280,7 +278,7 @@ public class UITicketSalesPublicController : Controller
                     EventId = eventId,
                     TicketTypeId = ticketType.Id,
                     Amount = ticketType.Price,
-                    QRCodeLink = Url.Action(nameof(EventTicketDisplay), "UITicketSalesPublic", new { storeId, eventId, orderId = order.Id }, Request.Scheme),
+                    QRCodeLink = Url.Action(nameof(EventTicketDisplay), "UITicketSalesPublic", new { storeId, eventId, orderId = order.Id, txnNumber = ticketTxn }, Request.Scheme),
                     FirstName = contact.FirstName?.Trim() ?? string.Empty,
                     LastName = contact.LastName?.Trim() ?? string.Empty,
                     Email = contact.Email?.Trim() ?? string.Empty,
@@ -305,7 +303,7 @@ public class UITicketSalesPublicController : Controller
     }
 
     [HttpGet("event/{eventId}/ticket/{orderId}/summary")]
-    public async Task<IActionResult> EventTicketDisplay(string storeId, string eventId, string orderId)
+    public async Task<IActionResult> EventTicketDisplay(string storeId, string eventId, string orderId, string txnNumber)
     {
         var store = await _storeRepo.FindStore(storeId);
         if (store == null) return NotFound();
@@ -315,8 +313,14 @@ public class UITicketSalesPublicController : Controller
         var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets).FirstOrDefault(o => o.StoreId == storeId && o.EventId == eventId && o.Id == orderId);
         if (order?.Tickets?.Any() != true) return NotFound();
 
+        var tickets = order.Tickets.AsEnumerable();
+        if (!string.IsNullOrEmpty(txnNumber))
+        {
+            if (order.Tickets.FirstOrDefault(c => c.TxnNumber == txnNumber) == null) return NotFound();
+            tickets = order.Tickets.Where(c => c.TxnNumber == txnNumber);
+        }
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
-        if (ticketEvent == null) return NotFound();
+        if (ticketEvent == null || !tickets.Any()) return NotFound();
 
         return View(new TicketViewModel
         {
@@ -325,7 +329,7 @@ public class UITicketSalesPublicController : Controller
             StartDate = ticketEvent.StartDate,
             EndDate = ticketEvent.EndDate,
             PurchaseDate = order.PurchaseDate.Value,
-            Tickets = order.Tickets.Select(t => new TicketListViewModel
+            Tickets = tickets.Select(t => new TicketListViewModel
             {
                 FirstName = t.FirstName,
                 LastName = t.LastName,
