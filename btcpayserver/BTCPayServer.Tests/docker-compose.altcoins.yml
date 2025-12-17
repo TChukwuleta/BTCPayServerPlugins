@@ -18,6 +18,9 @@ services:
       TESTS_LTCNBXPLORERURL: http://nbxplorer:32838/
       TESTS_POSTGRES: User ID=postgres;Include Error Detail=true;Host=postgres;Port=5432;Database=btcpayserver
       TESTS_EXPLORER_POSTGRES: User ID=postgres;Include Error Detail=true;Host=postgres;Port=5432;Database=nbxplorer
+      TESTS_MAILPIT_HOST: mailpit
+      TESTS_MAILPIT_SMTP: 1025
+      TESTS_MAILPIT_HTTP: 8025
       TESTS_HOSTNAME: tests
       TESTS_RUN_EXTERNAL_INTEGRATION: ${TESTS_RUN_EXTERNAL_INTEGRATION:-"false"}
       TESTS_AzureBlobStorageConnectionString: ${TESTS_AzureBlobStorageConnectionString:-none}
@@ -29,6 +32,7 @@ services:
       TESTS_SSHPASSWORD: ""
       TESTS_SSHKEYFILE: ""
       TESTS_SOCKSENDPOINT: "tor:9050"
+      TESTS_ARTIFACTS_DIR: "/tmp/Artifacts"
     expose:
       - "80"
     depends_on:
@@ -44,6 +48,7 @@ services:
       - "sshd_datadir:/root/.ssh"
       - "customer_lightningd_datadir:/etc/customer_lightningd_datadir"
       - "merchant_lightningd_datadir:/etc/merchant_lightningd_datadir"
+      - "tests_datadir:/tmp/Artifacts"
 
   # The dev container is not actually used, it is just handy to run `docker-compose up dev` to start all services
   dev:
@@ -58,6 +63,7 @@ services:
       - merchant_lnd
       - sshd
       - tor
+      - mailpit
 
   sshd:
     build:
@@ -71,7 +77,7 @@ services:
         - "sshd_datadir:/root/.ssh"
 
   devlnd:
-    image: btcpayserver/bitcoin:28.1
+    image: btcpayserver/bitcoin:29.1
     environment:
       BITCOIN_NETWORK: regtest
       BITCOIN_WALLETDIR: "/data/wallets"
@@ -96,8 +102,19 @@ services:
       default:
       custom:
 
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      # Web UI
+      - "34218:8025"
+      # SMTP
+      - "34219:1025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
   nbxplorer:
-    image: nicolasdorier/nbxplorer:2.5.22
+    image: nicolasdorier/nbxplorer:2.5.29
     restart: unless-stopped
     ports:
       - "32838:32838"
@@ -133,7 +150,7 @@ services:
 
   bitcoind:
     restart: unless-stopped
-    image: btcpayserver/bitcoin:28.1
+    image: btcpayserver/bitcoin:29.1
     environment:
       BITCOIN_NETWORK: regtest
       BITCOIN_WALLETDIR: "/data/wallets"
@@ -149,6 +166,7 @@ services:
         zmqpubrawtx=tcp://0.0.0.0:28333
         deprecatedrpc=signrawtransaction
         fallbackfee=0.0002
+        minrelaytxfee=0.00001000
     ports:
       - "43782:43782"
       - "39388:39388"
@@ -161,7 +179,7 @@ services:
       - "bitcoin_datadir:/data"
 
   customer_lightningd:
-    image: btcpayserver/lightning:v25.02
+    image: btcpayserver/lightning:v25.05
     stop_signal: SIGKILL
     restart: unless-stopped
     environment:
@@ -190,7 +208,7 @@ services:
       - bitcoind
 
   merchant_lightningd:
-    image: btcpayserver/lightning:v25.02
+    image: btcpayserver/lightning:v25.05
     stop_signal: SIGKILL
     restart: unless-stopped
     environment:
@@ -228,7 +246,7 @@ services:
       - "5432"
 
   merchant_lnd:
-    image: btcpayserver/lnd:v0.18.5-beta
+    image: btcpayserver/lnd:v0.19.3-beta
     restart: unless-stopped
     environment:
       LND_CHAIN: "btc"
@@ -266,7 +284,7 @@ services:
       - bitcoind
 
   customer_lnd:
-    image: btcpayserver/lnd:v0.18.5-beta
+    image: btcpayserver/lnd:v0.19.3-beta
     restart: unless-stopped
     environment:
       LND_CHAIN: "btc"
@@ -366,6 +384,7 @@ services:
           - "elementsd_liquid_datadir:/data"
 
 volumes:
+    tests_datadir:
     sshd_datadir:
     bitcoin_datadir:
     elementsd_liquid_datadir:

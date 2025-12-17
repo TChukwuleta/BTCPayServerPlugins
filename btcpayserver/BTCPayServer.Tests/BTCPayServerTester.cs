@@ -8,13 +8,12 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
+using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Configuration;
-using BTCPayServer.HostedServices;
 using BTCPayServer.Hosting;
 using BTCPayServer.Rating;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
-using BTCPayServer.Services.Mails;
 using BTCPayServer.Services.Rates;
 using BTCPayServer.Services.Stores;
 using BTCPayServer.Tests.Logging;
@@ -26,7 +25,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NBitcoin;
 using NBXplorer;
@@ -89,6 +87,12 @@ namespace BTCPayServer.Tests
 
         public bool MockRates { get; set; } = true;
         public string SocksEndpoint { get; set; }
+
+        /// <summary>
+        /// This helps testing plugins.
+        /// See https://github.com/btcpayserver/btcpayserver/pull/7008
+        /// </summary>
+        public bool LoadPluginsInDefaultAssemblyContext { get; set; } = true;
 
         public HashSet<string> Chains { get; set; } = new HashSet<string>() { "BTC" };
         public bool UseLightning { get; set; }
@@ -169,8 +173,14 @@ namespace BTCPayServer.Tests
 #if DEBUG
             confBuilder.AddJsonFile("appsettings.dev.json", true, false);
 #endif
+            if (LoadPluginsInDefaultAssemblyContext)
+                confBuilder.AddInMemoryCollection([new("TEST_RUNNER_ENABLED", "true")]);
             var conf = confBuilder.Build();
             _Host = new WebHostBuilder()
+                    .UseDefaultServiceProvider(options =>
+                    {
+                        options.ValidateScopes = true;
+                    })
                     .UseConfiguration(conf)
                     .UseContentRoot(FindBTCPayServerDirectory())
                     .UseWebRoot(Path.Combine(FindBTCPayServerDirectory(), "wwwroot"))
@@ -260,8 +270,8 @@ namespace BTCPayServer.Tests
 
         private async Task WaitIsFullySynched(CancellationToken cancellationToken)
         {
-            var dashBoard = GetService<NBXplorerDashboard>();
-            while (!dashBoard.IsFullySynched())
+            var o = GetService<IEnumerable<ISyncSummaryProvider>>().ToArray();
+            while (!o.All(d => d.AllAvailable()))
             {
                 await Task.Delay(10, cancellationToken).ConfigureAwait(false);
             }
@@ -286,10 +296,7 @@ namespace BTCPayServer.Tests
         public string IntegratedLightning { get; internal set; }
         public bool InContainer { get; internal set; }
 
-        public T GetService<T>()
-        {
-            return _Host.Services.GetRequiredService<T>();
-        }
+        public T GetService<T>() => _Host.Services.GetRequiredService<T>();
 
         public IServiceProvider ServiceProvider => _Host.Services;
 

@@ -7,8 +7,8 @@ using BTCPayServer.Data;
 using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
+using BTCPayServer.Plugins.Emails.Services;
 using BTCPayServer.Services.Invoices;
-using BTCPayServer.Services.Mails;
 using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Services;

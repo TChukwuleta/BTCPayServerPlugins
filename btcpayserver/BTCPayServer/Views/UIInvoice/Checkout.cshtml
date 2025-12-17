@@ -2,7 +2,7 @@
 @using BTCPayServer.Abstractions.Contracts
 @inject LanguageService LangService
 @inject BTCPayServerEnvironment Env
-@inject IEnumerable<IUIExtension> UiExtensions 
+@inject IEnumerable<IUIExtension> UiExtensions
 @inject BTCPayServer.Security.ContentSecurityPolicies Csp
 @model CheckoutModel
 @{
@@ -74,7 +74,7 @@
                         <div v-if="showPaymentDueInfo" v-html="replaceNewlines($t('still_due', { amount: `${srvModel.due} ${srvModel.paymentMethodCurrency}` }))"></div>
                     </div>
                 </div>
-                <button id="DetailsToggle" class="d-flex align-items-center gap-1 btn btn-link payment-details-button mb-2" type="button" :aria-expanded="displayPaymentDetails ? 'true' : 'false'" v-on:click="displayPaymentDetails = !displayPaymentDetails">
+                <button id="DetailsToggle" class="d-flex align-items-center gap-2 btn btn-link payment-details-button mb-2" type="button" :aria-expanded="displayPaymentDetails ? 'true' : 'false'" v-on:click="displayPaymentDetails = !displayPaymentDetails">
                     <span class="fw-semibold" v-t="'view_details'"></span>
                     <vc:icon symbol="caret-down" />
                 </button>
@@ -142,7 +142,7 @@
                                 :show-recommended-fee="showRecommendedFee"
                                 v-collapsible="displayPaymentDetails" />
                         </div>
-                        <button class="d-flex align-items-center gap-1 btn btn-link payment-details-button" type="button" :aria-expanded="displayPaymentDetails ? 'true' : 'false'" v-on:click="displayPaymentDetails = !displayPaymentDetails">
+                        <button class="d-flex align-items-center gap-2 btn btn-link payment-details-button" type="button" :aria-expanded="displayPaymentDetails ? 'true' : 'false'" v-on:click="displayPaymentDetails = !displayPaymentDetails">
                             <span class="fw-semibold" v-t="'view_details'"></span>
                             <vc:icon symbol="caret-down" />
                         </button>
@@ -212,7 +212,7 @@
                                 :show-recommended-fee="showRecommendedFee"
                                 v-collapsible="displayPaymentDetails" />
                         </div>
-                        <button class="d-flex align-items-center gap-1 btn btn-link payment-details-button" type="button" :aria-expanded="displayPaymentDetails ? 'true' : 'false'" v-on:click="displayPaymentDetails = !displayPaymentDetails">
+                        <button class="d-flex align-items-center gap-2 btn btn-link payment-details-button" type="button" :aria-expanded="displayPaymentDetails ? 'true' : 'false'" v-on:click="displayPaymentDetails = !displayPaymentDetails">
                             <span class="fw-semibold" v-t="'view_details'"></span>
                             <vc:icon symbol="caret-down" />
                         </button>
@@ -247,7 +247,7 @@
             </p>
         </div>
     </noscript>
-    <script type="text/x-template" id="payment-details">
+<script type="text/x-template" id="payment-details">
         <dl>
             <div v-if="orderAmount > 0" id="PaymentDetails-TotalPrice" key="TotalPrice">
                 <dt v-t="'total_price'"></dt>
@@ -255,7 +255,11 @@
             </div>
             <div v-if="orderAmount > 0 && srvModel.orderAmountFiat" id="PaymentDetails-TotalFiat" key="TotalFiat">
                 <dt v-t="'total_fiat'"></dt>
-                <dd class="clipboard-button clipboard-button-hover" :data-clipboard="asNumber(srvModel.orderAmountFiat)" data-clipboard-hover="start">{{srvModel.orderAmountFiat}}</dd>
+                <dd id="total_fiat" class="clipboard-button clipboard-button-hover" :data-clipboard="asNumber(srvModel.orderAmountFiat)" data-clipboard-hover="start">{{srvModel.orderAmountFiat}}</dd>
+            </div>
+             <div v-if="srvModel.taxIncluded.value > 0 && srvModel.taxIncluded.formatted" id="PaymentDetails-TaxIncluded" key="TaxIncluded">
+                <dt v-t="'tax_included'"></dt>
+                <dd class="clipboard-button clipboard-button-hover" :data-clipboard="srvModel.taxIncluded.value" data-clipboard-hover="start">{{srvModel.taxIncluded.formatted}}</dd>
             </div>
             <div v-if="srvModel.rate && srvModel.paymentMethodCurrency" id="PaymentDetails-ExchangeRate" key="ExchangeRate">
                 <dt v-t="'exchange_rate'"></dt>

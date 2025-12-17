@@ -21,10 +21,10 @@ using BTCPayServer.Plugins.GhostPlugin.Helper;
 using TransactionStatus = BTCPayServer.Plugins.GhostPlugin.Data.TransactionStatus;
 using Newtonsoft.Json;
 using static BTCPayServer.Plugins.GhostPlugin.Services.EmailService;
-using BTCPayServer.Services.Mails;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Identity;
+using BTCPayServer.Plugins.Emails.Services;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 

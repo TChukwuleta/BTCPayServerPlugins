@@ -1,26 +1,27 @@
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using System.Linq;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Authorization;
-using BTCPayServer.Client;
-using BTCPayServer.Abstractions.Constants;
-using BTCPayServer.Services.Stores;
-using StoreData = BTCPayServer.Data.StoreData;
-using BTCPayServer.Plugins.GhostPlugin.Data;
-using BTCPayServer.Plugins.GhostPlugin.Services;
-using Microsoft.EntityFrameworkCore;
-using System.Net.Http;
-using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
 using System;
+using System.Linq;
+using System.Net.Http;
+using System.Threading.Tasks;
+using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Models;
-using Microsoft.AspNetCore.Routing;
-using static BTCPayServer.Plugins.GhostPlugin.Services.EmailService;
-using BTCPayServer.Services.Mails;
+using BTCPayServer.Client;
+using BTCPayServer.Plugins.Emails;
+using BTCPayServer.Plugins.Emails.Controllers;
+using BTCPayServer.Plugins.Emails.Services;
+using BTCPayServer.Plugins.GhostPlugin.Data;
+using BTCPayServer.Plugins.GhostPlugin.Services;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
+using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
+using BTCPayServer.Services.Stores;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
-using BTCPayServer.Controllers;
+using static BTCPayServer.Plugins.GhostPlugin.Services.EmailService;
+using StoreData = BTCPayServer.Data.StoreData;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -128,13 +129,19 @@ public class UIGhostMemberController : Controller
         ViewData["StoreEmailSettingsConfigured"] = isEmailSettingsConfigured;
         if (!isEmailSettingsConfigured)
         {
-            TempData.SetStatusMessageModel(new StatusMessageModel()
+            TempData.SetStatusMessageModel(new StatusMessageModel
             {
-                Html = $"Kindly <a href='{Url.Action(nameof(UIStoresController.StoreEmailSettings), "UIStores", new { storeId = CurrentStore.Id })}' class='alert-link'>configure Email SMTP</a> in the admin settings to be able to send reminder to subscribers",
+                Html = $"Kindly <a href='{Url.Action(action: nameof(UIStoresEmailController.StoreEmailSettings), controller: "UIStoresEmail",
+                    values: new
+                    {
+                        area = EmailsPlugin.Area,
+                        storeId = CurrentStore.Id
+                    })}' class='alert-link'>configure Email SMTP</a> to be able to send reminder to subscribers",
                 Severity = StatusMessageModel.StatusSeverity.Info,
                 AllowDismiss = true
             });
         }
+
         return View(new GhostMembersViewModel { 
             Members = ghostMemberListViewModels, 
             DisplayedMembers = displayedMembers,

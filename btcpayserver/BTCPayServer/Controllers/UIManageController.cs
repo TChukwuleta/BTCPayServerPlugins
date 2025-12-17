@@ -11,7 +11,7 @@ using BTCPayServer.Fido2;
 using BTCPayServer.Models.ManageViewModels;
 using BTCPayServer.Security.Greenfield;
 using BTCPayServer.Services;
-using BTCPayServer.Services.Mails;
+using BTCPayServer.Plugins.Emails.Services;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -200,7 +200,7 @@ namespace BTCPayServer.Controllers
             {
                 TempData[WellKnownTempData.ErrorMessage] = StringLocalizer["Error updating profile"].Value;
             }
-            
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -219,8 +219,8 @@ namespace BTCPayServer.Controllers
                 throw new ApplicationException($"Unable to load user with ID '{_userManager.GetUserId(User)}'.");
             }
 
-            var callbackUrl = await _callbackGenerator.ForEmailConfirmation(user, Request);
-            (await _EmailSenderFactory.GetEmailSender()).SendEmailConfirmation(user.GetMailboxAddress(), callbackUrl);
+            var callbackUrl = await _callbackGenerator.ForEmailConfirmation(user);
+            _eventAggregator.Publish(new UserEvent.ConfirmationEmailRequested(user, callbackUrl));
             TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["Verification email sent. Please check your email."].Value;
             return RedirectToAction(nameof(Index));
         }

@@ -20,6 +20,7 @@ using BTCPayServer.Models.PaymentRequestViewModels;
 using BTCPayServer.Payments;
 using BTCPayServer.Payments.Lightning;
 using BTCPayServer.Payouts;
+using BTCPayServer.Plugins.Webhooks.Views;
 using BTCPayServer.Rating;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Apps;
@@ -45,6 +46,7 @@ namespace BTCPayServer.Controllers
                 typeof(InvoiceMetadata)
                 .GetProperties()
                 .Select(p => p.Name)
+                .Where(p => p != "ReceiptData")
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             InvoiceAdditionalDataExclude.Remove(nameof(InvoiceMetadata.PosData));
         }
@@ -62,9 +64,9 @@ namespace BTCPayServer.Controllers
             if (invoice is null)
                 return NotFound();
             var delivery = await _InvoiceRepository.GetWebhookDelivery(invoiceId, deliveryId);
-            if (delivery is null)
-                return NotFound();
-            return File(delivery.GetBlob().Request, "application/json");
+            if (delivery?.GetBlob()?.Request is {} request)
+                return File(request, "application/json");
+            return NotFound();
         }
 
         [HttpPost("invoices/{invoiceId}/deliveries/{deliveryId}/redeliver")]
@@ -94,7 +96,7 @@ namespace BTCPayServer.Controllers
         }
 
         [HttpGet("invoices/{invoiceId}")]
-        [HttpGet("/stores/{storeId}/invoices/${invoiceId}")]
+        [HttpGet("/stores/{storeId}/invoices/{invoiceId}")]
         [Authorize(Policy = Policies.CanViewInvoices, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
         public async Task<IActionResult> Invoice(string invoiceId)
         {
@@ -153,7 +155,7 @@ namespace BTCPayServer.Controllers
                 ShowCheckout = invoice.Status == InvoiceStatus.New,
                 ShowReceipt = invoice.Status == InvoiceStatus.Settled && (invoice.ReceiptOptions?.Enabled ?? receipt.Enabled is true),
                 Deliveries = (await _InvoiceRepository.GetWebhookDeliveries(invoiceId))
-                                    .Select(c => new Models.StoreViewModels.DeliveryViewModel(c))
+                                    .Select(c => new DeliveryViewModel(c))
                                     .ToList()
             };
 
@@ -164,9 +166,9 @@ namespace BTCPayServer.Controllers
             model.StillDue = details.StillDue;
             model.HasRates = details.HasRates;
 
-            if (additionalData.TryGetValue("receiptData", out object? receiptData))
+            if (additionalData.TryGetValue("receiptData", out var receiptData) && receiptData is Dictionary<string, object> data)
             {
-                model.ReceiptData = (Dictionary<string, object>)receiptData;
+                model.ReceiptData = data;
                 additionalData.Remove("receiptData");
             }
 
@@ -198,7 +200,7 @@ namespace BTCPayServer.Controllers
             var store = await _StoreRepository.GetStoreByInvoiceId(i.Id);
             if (store is null)
                 return NotFound();
-            
+
             if (!await ValidateAccessForArchivedInvoice(i))
                 return NotFound();
 
@@ -228,30 +230,29 @@ namespace BTCPayServer.Controllers
             {
                 return View(vm);
             }
-            
+
             var metaData = PosDataParser.ParsePosData(i.Metadata?.ToJObject());
             var additionalData = metaData
                 .Where(dict => !InvoiceAdditionalDataExclude.Contains(dict.Key))
                 .ToDictionary(dict => dict.Key, dict => dict.Value);
-                
-            // Split receipt data into cart and additional data 
+
+            // Split receipt data into cart and additional data
             if (additionalData.TryGetValue("receiptData", out object? combinedReceiptData))
             {
                 var receiptData = new Dictionary<string, object>((Dictionary<string, object>)combinedReceiptData, StringComparer.OrdinalIgnoreCase);
-                string[] cartKeys = ["cart", "subtotal", "discount", "tip", "total"];
                 // extract cart data and lowercase keys to handle data uniformly in PosData partial
-                if (receiptData.Keys.Any(key => cartKeys.Contains(key.ToLowerInvariant())))
+                if (receiptData.Keys.Any(WellKnownPosData.IsWellKnown))
                 {
                     vm.CartData = new Dictionary<string, object>();
-                    foreach (var key in cartKeys)
+                    foreach (var key in receiptData.Keys.Where(WellKnownPosData.IsWellKnown))
                     {
-                        if (!receiptData.ContainsKey(key)) continue;
+                        if (!receiptData.TryGetValue(key, out object? value)) continue;
                         // add it to cart data and remove it from the general data
-                        vm.CartData.Add(key.ToLowerInvariant(), receiptData[key]);
+                        vm.CartData.Add(key.ToLowerInvariant(), value);
                         receiptData.Remove(key);
                     }
                 }
-                // assign the rest to additional data and remove empty values 
+                // assign the rest to additional data and remove empty values
                 if (receiptData.Any())
                 {
                     vm.AdditionalData = receiptData
@@ -261,6 +262,7 @@ namespace BTCPayServer.Controllers
             }
 
             var payments = ViewPaymentRequestViewModel.PaymentRequestInvoicePayment.GetViewModels(i, _displayFormatter, _transactionLinkProviders, _handlers);
+            vm.TaxIncluded = i.Metadata?.TaxIncluded ?? 0.0m;
             vm.Amount = i.PaidAmount.Net;
             vm.Payments = receipt.ShowPayments is false ? null : payments;
 
@@ -340,7 +342,7 @@ namespace BTCPayServer.Controllers
             var store = GetCurrentStore();
             var pmi = PayoutMethodId.Parse(model.SelectedPayoutMethod);
             var cdCurrency = _CurrencyNameTable.GetCurrencyData(invoice.Currency, true);
-            RateRules rules;
+            RateRulesCollection rules;
             RateResult rateResult;
             CreatePullPaymentRequest createPullPayment;
 
@@ -732,7 +734,7 @@ namespace BTCPayServer.Controllers
 
             if (!await ValidateAccessForArchivedInvoice(invoice))
                 return null;
-            
+
             var store = await _StoreRepository.FindStore(invoice.StoreId);
             if (store == null)
                 return null;
@@ -744,7 +746,7 @@ namespace BTCPayServer.Controllers
                 .Where(p => !excludedPaymentMethodIds.Contains(p.PaymentMethodId))
                 .Select(p => p.PaymentMethodId).ToHashSet();
 
-            
+
             var btcId = PaymentTypes.CHAIN.GetPaymentMethodId("BTC");
             var lnurlId = PaymentTypes.LNURL.GetPaymentMethodId("BTC");
             var lnId = PaymentTypes.LN.GetPaymentMethodId("BTC");
@@ -781,13 +783,12 @@ namespace BTCPayServer.Controllers
                     return null;
                 var paymentMethodTemp = invoice
                     .GetPaymentPrompts()
-                    .Where(p => displayedPaymentMethods.Contains(p.PaymentMethodId))
-                    .FirstOrDefault();
+                    .FirstOrDefault(p => displayedPaymentMethods.Contains(p.PaymentMethodId));
                 if (paymentMethodTemp is null)
                     return null;
                 paymentMethodId = paymentMethodTemp.PaymentMethodId;
             }
-            if (!_handlers.TryGetValue(paymentMethodId, out var handler))
+            if (!_handlers.TryGetValue(paymentMethodId, out _))
                 return null;
 
             // We activate the default payment method, and also those which aren't displayed (as they can't be set as default)
@@ -837,13 +838,7 @@ namespace BTCPayServer.Controllers
             lang ??= storeBlob.DefaultLang;
 
             var receiptEnabled = InvoiceDataBase.ReceiptOptions.Merge(storeBlob.ReceiptOptions, invoice.ReceiptOptions).Enabled is true;
-            var receiptUrl = receiptEnabled ? _linkGenerator.GetUriByAction(
-                nameof(InvoiceReceipt),
-                "UIInvoice",
-                new { invoiceId },
-                Request.Scheme,
-                Request.Host,
-                Request.PathBase) : null;
+            var receiptUrl = receiptEnabled ? _linkGenerator.ReceiptLink(invoiceId, Request.GetRequestBaseUrl()) : null;
 
             var orderId = invoice.Metadata.OrderId;
             var supportUrl = !string.IsNullOrEmpty(storeBlob.StoreSupportUrl)
@@ -930,6 +925,12 @@ namespace BTCPayServer.Controllers
 
             model.PaymentMethodId = paymentMethodId.ToString();
             model.OrderAmountFiat = OrderAmountFromInvoice(model.PaymentMethodCurrency, invoice, DisplayFormatter.CurrencyFormat.Symbol);
+            model.TaxIncluded = new();
+            if (invoice.Metadata.TaxIncluded is { } t)
+            {
+                model.TaxIncluded.Formatted = _displayFormatter.Currency(t, invoice.Currency, DisplayFormatter.CurrencyFormat.Symbol);
+                model.TaxIncluded.Value = t;
+            }
 
             if (storeBlob.PlaySoundOnPayment)
             {
@@ -1006,10 +1007,10 @@ namespace BTCPayServer.Controllers
             var invoice = await _InvoiceRepository.GetInvoice(invoiceId);
             if (invoice == null || invoice.Status == InvoiceStatus.Settled || invoice.Status == InvoiceStatus.Invalid || invoice.Status == InvoiceStatus.Expired)
                 return NotFound();
-            
+
             if (!await ValidateAccessForArchivedInvoice(invoice))
                 return NotFound();
-            
+
             var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
             CompositeDisposable leases = new CompositeDisposable();
             try
@@ -1019,7 +1020,7 @@ namespace BTCPayServer.Controllers
                 leases.Add(_EventAggregator.SubscribeAsync<Events.InvoiceEvent>(async o => await NotifySocket(webSocket, o.Invoice.Id, invoiceId)));
                 while (true)
                 {
-                    var message = await webSocket.ReceiveAndPingAsync(DummyBuffer);
+                    var message = await webSocket.ReceiveAndPingAsync(DummyBuffer, cancellationToken);
                     if (message.MessageType == WebSocketMessageType.Close)
                         break;
                 }
@@ -1119,7 +1120,7 @@ namespace BTCPayServer.Controllers
             {
                 var appsById = apps.ToDictionary(a => a.Id);
                 var searchTexts = appIds.Select(a => appsById.TryGet(a)).Where(a => a != null)
-                    .Select(a => AppService.GetAppSearchTerm(a.AppType, a.Id))
+                    .Select(a => AppService.GetAppSearchTerm(a!.AppType, a!.Id))
                     .ToList();
                 searchTexts.Add(fs.TextSearch);
                 textSearch = string.Join(' ', searchTexts.Where(t => !string.IsNullOrEmpty(t)).ToList());
@@ -1184,7 +1185,6 @@ namespace BTCPayServer.Controllers
                 return NoPaymentMethodResult(store.Id);
             }
 
-            var storeBlob = store.GetStoreBlob();
             model.AvailablePaymentMethods = GetPaymentMethodsSelectList(store);
 
             JObject? metadataObj = null;
@@ -1324,7 +1324,7 @@ namespace BTCPayServer.Controllers
             });
             return RedirectToAction(nameof(ListInvoices), new { storeId });
         }
-        
+
         private async Task<bool> ValidateAccessForArchivedInvoice(InvoiceEntity invoice)
         {
             if (!invoice.Archived) return true;

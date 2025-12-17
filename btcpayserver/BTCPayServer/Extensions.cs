@@ -1,6 +1,5 @@
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
@@ -12,15 +11,20 @@ using System.Net.WebSockets;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Contracts;
+using BTCPayServer.Abstractions.Extensions;
+using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
 using BTCPayServer.BIP78.Sender;
 using BTCPayServer.Configuration;
 using BTCPayServer.Data;
 using BTCPayServer.HostedServices;
+using BTCPayServer.Hwi;
 using BTCPayServer.Lightning;
 using BTCPayServer.Models;
 using BTCPayServer.Models.StoreViewModels;
@@ -28,17 +32,20 @@ using BTCPayServer.NTag424;
 using BTCPayServer.Payments;
 using BTCPayServer.Payments.Bitcoin;
 using BTCPayServer.Payments.Lightning;
-using BTCPayServer.Payouts;
 using BTCPayServer.Security;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Reporting;
 using BTCPayServer.Services.Wallets;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using NBitcoin;
 using NBitcoin.Payment;
 using NBitcoin.RPC;
@@ -52,6 +59,39 @@ namespace BTCPayServer
 {
     public static class Extensions
     {
+        public static string GetNiceModelName(this HwiDeviceClient device)
+        => device.Model switch
+        {
+            "trezor_1" => "Trezor Model One",
+            "trezor_t" => "Trezor Model T",
+            "trezor_r" => "Trezor Model R",
+            "coldcard" => "Coldcard",
+            "coldcard_simulator" => "Coldcard (Simulator)",
+            "trezor_safe 3" => "Trezor Safe 3",
+            "trezor_safe 5" => "Trezor Safe 5",
+            "ledger_nano_s" => "Ledger Nano S",
+            "ledger_nano_x" => "Ledger Nano X",
+            "ledger_stax" => "Ledger Stax",
+            "ledger_flex" => "Ledger Flex",
+            "keepkey" => "KeepKey",
+            "digitalbitbox_01" or "digitalbitbox" => "Digital Bitbox",
+            "digitalbitbox_01_simulator" => "Digital Bitbox (Simulator)",
+            "bitbox02_multi" => "BitBox02 Multi",
+            "bitbox02_btconly" => "BitBox02 Bitcoin Only",
+            "ledger_nano_s_plus" => "Ledger Nano S Plus",
+            "jade" => "Jade",
+            _ => device.Model
+        };
+        public static string ProtectString(this IDataProtector protector,string str)
+        {
+            return Convert.ToBase64String(protector.Protect(Encoding.UTF8.GetBytes(str)));
+        }
+        public static string UnprotectString(this IDataProtector protector, string str)
+        {
+            return Encoding.UTF8.GetString(protector.Unprotect(Convert.FromBase64String(str)));
+        }
+
+
         /// <summary>
         /// Outputs a serializer which will serialize default and null members.
         /// This is useful for discovering the API.
@@ -106,18 +146,10 @@ namespace BTCPayServer
         {
             if (!electrum)
             {
-                var isOD = Regex.Match(xpub, @"\(.*?\)").Success;
+                var isOD = DerivationSchemeParser.MaybeOD(xpub);
                 try
                 {
-                    var result = derivationSchemeParser.ParseOutputDescriptor(xpub);
-                    derivationSchemeSettings.AccountOriginal = xpub.Trim();
-                    derivationSchemeSettings.AccountDerivation = result.Item1;
-                    derivationSchemeSettings.AccountKeySettings = result.Item2.Select((path, i) => new AccountKeySettings()
-                    {
-                        RootFingerprint = path?.MasterFingerprint,
-                        AccountKeyPath = path?.KeyPath,
-                        AccountKey = result.Item1.GetExtPubKeys().ElementAt(i).GetWif(derivationSchemeParser.Network)
-                    }).ToArray();
+                    derivationSchemeSettings = derivationSchemeParser.ParseOD(xpub);
                     return true;
                 }
                 catch (Exception)
@@ -413,6 +445,14 @@ namespace BTCPayServer
 #pragma warning restore CS0618 // Type or member is obsolete
             return services;
         }
+        public static void AddSettingsAccessor<T>(this IServiceCollection services) where T : class, new()
+        {
+            services.TryAddSingleton<ISettingsAccessor<T>, SettingsAccessor<T>>();
+            services.AddSingleton<IHostedService>(provider => (SettingsAccessor<T>)provider.GetRequiredService<ISettingsAccessor<T>>());
+            services.AddSingleton<IStartupTask>(provider => (SettingsAccessor<T>)provider.GetRequiredService<ISettingsAccessor<T>>());
+            // Singletons shouldn't reference the settings directly, but ISettingsAccessor<T>, since singletons won't have refreshed values of the setting
+            services.AddTransient<T>(provider => provider.GetRequiredService<ISettingsAccessor<T>>().Settings);
+        }
         public static IServiceCollection AddReportProvider<T>(this IServiceCollection services)
     where T : ReportProvider
         {
@@ -421,11 +461,26 @@ namespace BTCPayServer
             return services;
         }
 
+        public static IServiceCollection AddScheduledDbScript(this IServiceCollection services, string name, string script)
+        {
+            services.AddTransient(s => new DbPeriodicTask.PeriodicScript(name, script));
+            return services;
+        }
+
         public static IServiceCollection AddScheduledTask<T>(this IServiceCollection services, TimeSpan every)
             where T : class, IPeriodicTask
         {
-            services.AddSingleton<T>();
+            services.TryAddSingleton<T>();
             services.AddTransient<ScheduledTask>(o => new ScheduledTask(typeof(T), every));
+            return services;
+        }
+
+        public static IServiceCollection AddMigration<TDbContext, TMigration>(this IServiceCollection services)
+            where TDbContext : DbContext
+            where TMigration : MigrationBase<TDbContext>
+        {
+            services.TryAddSingleton<IMigrationExecutor, MigrationExecutor<TDbContext>>();
+            services.AddSingleton<MigrationBase<TDbContext>, TMigration>();
             return services;
         }
 
@@ -527,7 +582,8 @@ namespace BTCPayServer
             {
                 PSBT = psbt,
                 DerivationScheme = derivationSchemeSettings.AccountDerivation,
-                AlwaysIncludeNonWitnessUTXO = true
+                AlwaysIncludeNonWitnessUTXO = true,
+                IncludeGlobalXPub = derivationSchemeSettings.IsMultiSigOnServer
             });
             if (result == null)
                 return null;
@@ -611,7 +667,7 @@ namespace BTCPayServer
             var h = (BitcoinLikePaymentHandler)handlers[pmi];
             return h;
         }
-        public static BTCPayNetwork? TryGetNetwork<TId, THandler>(this HandlersDictionary<TId, THandler> handlers, TId id) 
+        public static BTCPayNetwork? TryGetNetwork<TId, THandler>(this HandlersDictionary<TId, THandler> handlers, TId id)
                                                                            where THandler : IHandler<TId>
                                                                            where TId : notnull
         {
@@ -821,6 +877,36 @@ namespace BTCPayServer
 
         public static string RemoveUserInfo(this Uri uri)
         => string.IsNullOrEmpty(uri.UserInfo) ? uri.ToString() : uri.ToString().Replace(uri.UserInfo, "***");
+
+        public static void SetStatusLoginResult(this ITempDataDictionary tempData, UserService.CanLoginContext loginContext)
+        {
+            if (!loginContext.Failures.Any())
+                throw new InvalidOperationException("No login failure found");
+            tempData.Remove(WellKnownTempData.SuccessMessage);
+            tempData.Remove(WellKnownTempData.ErrorMessage);
+            var model = new StatusMessageModel()
+            {
+                Severity = loginContext._user is null ? StatusMessageModel.StatusSeverity.Error : StatusMessageModel.StatusSeverity.Warning
+            };
+
+            List<string> failures = new();
+            foreach (var failure in loginContext.Failures)
+            {
+                StringWriter writer = new();
+                if (failure.Html is null)
+                {
+                    writer.Write(failure.Text.Value);
+                }
+                else
+                {
+                    failure.Html.WriteTo(writer, HtmlEncoder.Default);
+                }
+                failures.Add(writer.ToString());
+            }
+
+            model.Html = string.Join("<br/>", failures);
+            tempData.SetStatusMessageModel(model);
+        }
 
         public static DataDirectories Configure(this DataDirectories dataDirectories, IConfiguration configuration)
         {

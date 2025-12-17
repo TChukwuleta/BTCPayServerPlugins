@@ -1,32 +1,33 @@
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using BTCPayServer.Data;
-using Microsoft.AspNetCore.Identity;
-using System.Linq;
 using System;
+using System.Linq;
 using System.Net.Http;
-using BTCPayServer.Services.Mails;
-using Microsoft.AspNetCore.Routing;
-using BTCPayServer.Services.Apps;
-using BTCPayServer.Client;
-using BTCPayServer.Services;
-using Microsoft.AspNetCore.Http;
-using BTCPayServer.Services.Stores;
-using Microsoft.EntityFrameworkCore;
-using BTCPayServer.Abstractions.Models;
-using Microsoft.AspNetCore.Authorization;
-using BTCPayServer.Abstractions.Contracts;
+using System.Text;
+using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
+using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Extensions;
-using StoreData = BTCPayServer.Data.StoreData;
+using BTCPayServer.Abstractions.Models;
+using BTCPayServer.Client;
+using BTCPayServer.Data;
+using BTCPayServer.Plugins.Emails;
+using BTCPayServer.Plugins.Emails.Controllers;
+using BTCPayServer.Plugins.Emails.Services;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels;
+using BTCPayServer.Services;
+using BTCPayServer.Services.Apps;
+using BTCPayServer.Services.Stores;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using BTCPayServer.Controllers;
-using System.Text;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.CodeAnalysis;
+using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using StoreData = BTCPayServer.Data.StoreData;
 
 namespace BTCPayServer.Plugins.SatoshiTickets;
 
@@ -113,7 +114,12 @@ public class UITicketSalesController : Controller
         {
             TempData.SetStatusMessageModel(new StatusMessageModel
             {
-                Html = $"Kindly <a href='{Url.Action(nameof(UIStoresController.StoreEmailSettings), "UIStores", new { storeId = CurrentStore.Id })}' class='alert-link'>configure Email SMTP</a> to create an event",
+                Html = $"Kindly <a href='{Url.Action(action: nameof(UIStoresEmailController.StoreEmailSettings), controller: "UIStoresEmail",
+                    values: new
+                    {
+                        area = EmailsPlugin.Area,
+                        storeId = CurrentStore.Id
+                    })}' class='alert-link'>configure Email SMTP</a> to create an event",
                 Severity = StatusMessageModel.StatusSeverity.Info
             });
         }

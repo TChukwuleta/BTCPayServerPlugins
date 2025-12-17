@@ -11,6 +11,7 @@ using BTCPayServer.Client;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
 using BTCPayServer.HostedServices;
+using BTCPayServer.Models.InvoicingModels;
 using BTCPayServer.Payments;
 using BTCPayServer.Payouts;
 using BTCPayServer.Rating;
@@ -55,8 +56,8 @@ namespace BTCPayServer.Controllers.Greenfield
             LinkGenerator linkGenerator, LanguageService languageService,
             CurrencyNameTable currencyNameTable, RateFetcher rateProvider,
             InvoiceActivator invoiceActivator,
-            PullPaymentHostedService pullPaymentService, 
-            ApplicationDbContextFactory dbContextFactory, 
+            PullPaymentHostedService pullPaymentService,
+            ApplicationDbContextFactory dbContextFactory,
             IAuthorizationService authorizationService,
             Dictionary<PaymentMethodId, IPaymentLinkExtension> paymentLinkExtensions,
             PayoutMethodHandlerDictionary payoutHandlers,
@@ -220,7 +221,7 @@ namespace BTCPayServer.Controllers.Greenfield
 
             if (!ModelState.IsValid)
                 return this.CreateValidationError(ModelState);
-            
+
             try
             {
                 var invoice = await _invoiceController.CreateInvoiceCoreRaw(request, store,
@@ -469,7 +470,7 @@ namespace BTCPayServer.Controllers.Greenfield
                     ModelState.AddModelError(nameof(request.RefundVariant), "Please select a valid refund option");
                     return this.CreateValidationError(ModelState);
             }
-            
+
             // reduce by percentage
             if (request.SubtractPercentage is > 0 and <= 100)
             {
@@ -491,6 +492,64 @@ namespace BTCPayServer.Controllers.Greenfield
 
             var pp = await _pullPaymentService.GetPullPayment(ppId, false);
             return this.Ok(CreatePullPaymentData(pp));
+        }
+
+        [Authorize(Policy = Policies.CanCreateNonApprovedPullPayments,
+    AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
+        [HttpGet("~/api/v1/stores/{storeId}/invoices/{invoiceId}/refund/{paymentMethodId}")]
+        public async Task<IActionResult> GetInvoiceRefundTriggerData(string storeId, string invoiceId, string paymentMethodId, CancellationToken cancellationToken)
+        {
+            var invoice = await _invoiceRepository.GetInvoice(invoiceId, true);
+            if (!BelongsToThisStore(invoice))
+                return InvoiceNotFound();
+            var pmi = PaymentMethodId.TryParse(paymentMethodId);
+            if (pmi == null)
+                return this.CreateAPIError("invalid-payment-method", "Invalid payment method");
+
+            var paymentPrompt = invoice.GetPaymentPrompt(pmi);
+            if (paymentPrompt == null)
+                return this.CreateAPIError("invalid-payment-method", "Invalid payment method");
+
+            var accounting = paymentPrompt.Calculate();
+            var cryptoPaid = accounting.Paid;
+            var dueAmount = accounting.TotalDue;
+
+            // If no payment, but settled and marked, assume it has been fully paid
+            if (cryptoPaid is 0 && invoice is { Status: InvoiceStatus.Settled, ExceptionStatus: InvoiceExceptionStatus.Marked })
+            {
+                cryptoPaid = accounting.TotalDue;
+                dueAmount = 0;
+            }
+
+            var paymentMethodCurrency = paymentPrompt.Currency;
+
+            var isPaidOver = invoice.ExceptionStatus == InvoiceExceptionStatus.PaidOver;
+            decimal? overpaidAmount = isPaidOver ? Math.Round(cryptoPaid - dueAmount, paymentPrompt.Divisibility) : null;
+            var cdCurrency = _currencyNameTable.GetCurrencyData(invoice.Currency, true);
+
+            var paidAmount = Math.Round(cryptoPaid * paymentPrompt.Rate, cdCurrency.Divisibility);
+            var store = this.HttpContext.GetStoreData();
+            var rules = store.GetStoreBlob().GetRateRules(_defaultRules);
+            var rateResult = await _rateProvider.FetchRate(
+                new CurrencyPair(paymentMethodCurrency, invoice.Currency), rules, new StoreIdRateContext(store.Id),
+                cancellationToken);
+
+            if (rateResult.BidAsk is null)
+                return this.CreateAPIError("rate-failure", "Failed to fetch rate");
+
+            var model = new InvoiceRefundTriggerData
+            {
+                PaymentAmountThen = cryptoPaid.RoundToSignificant(paymentPrompt.Divisibility),
+                PaymentAmountNow = Math.Round(paidAmount / rateResult.BidAsk.Bid, paymentPrompt.Divisibility),
+                InvoiceAmount = paidAmount,
+                PaymentCurrency = paymentMethodCurrency,
+                PaymentCurrencyDivisibility = paymentPrompt.Divisibility,
+                InvoiceCurrencyDivisibility = cdCurrency.Divisibility,
+                InvoiceCurrency = invoice.Currency,
+                OverpaidPaymentAmount = overpaidAmount
+            };
+
+            return Ok(model);
         }
 
         private Client.Models.PullPaymentData CreatePullPaymentData(Data.PullPaymentData pp)
@@ -580,12 +639,13 @@ namespace BTCPayServer.Controllers.Greenfield
             };
         }
 
-        private InvoiceData ToModel(InvoiceEntity entity)
+        [NonAction]
+        public InvoiceData ToModel(InvoiceEntity entity)
         {
-            return ToModel(entity, _linkGenerator, Request);
+            return ToModel(entity, _linkGenerator, _currencyNameTable, Request);
         }
 
-        public static InvoiceData ToModel(InvoiceEntity entity, LinkGenerator linkGenerator, HttpRequest? request)
+        public static InvoiceData ToModel(InvoiceEntity entity, LinkGenerator linkGenerator, CurrencyNameTable currencyNameTable, HttpRequest? request)
         {
             var statuses = new List<InvoiceStatus>();
             var state = entity.GetInvoiceState();
@@ -606,6 +666,7 @@ namespace BTCPayServer.Controllers.Greenfield
                 MonitoringExpiration = entity.MonitoringExpiration,
                 CreatedTime = entity.InvoiceTime,
                 Amount = entity.Price,
+                PaidAmount = Math.Round(entity.PaidAmount.Net, currencyNameTable.GetNumberFormatInfo(entity.Currency)?.CurrencyDecimalDigits ?? 2),
                 Type = entity.Type,
                 Id = entity.Id,
                 CheckoutLink = request is null ? null : linkGenerator.CheckoutLink(entity.Id, request.Scheme, request.Host, request.PathBase),

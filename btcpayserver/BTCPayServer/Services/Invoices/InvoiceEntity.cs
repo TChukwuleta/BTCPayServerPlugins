@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using BTCPayServer.Abstractions;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
@@ -212,6 +213,13 @@ namespace BTCPayServer.Services.Invoices
         [JsonExtensionData]
         public IDictionary<string, JToken> AdditionalData { get; set; }
 
+        [JsonIgnore]
+        public PosReceiptData ReceiptData
+        {
+            get => this.GetAdditionalData<PosReceiptData>("receiptData");
+            set => this.SetAdditionalData("receiptData", value);
+        }
+
         public static InvoiceMetadata FromJObject(JObject jObject)
         {
             return jObject.ToObject<InvoiceMetadata>(MetadataSerializer);
@@ -288,6 +296,7 @@ namespace BTCPayServer.Services.Invoices
         public string Currency { get; set; }
         [JsonConverter(typeof(PaymentMethodIdJsonConverter))]
         public PaymentMethodId DefaultPaymentMethod { get; set; }
+
         [JsonExtensionData]
         public IDictionary<string, JToken> AdditionalData { get; set; }
 
@@ -308,55 +317,19 @@ namespace BTCPayServer.Services.Invoices
                 throw new InvalidOperationException("The Currency of the invoice isn't set");
             return GetRate(new CurrencyPair(currency, Currency));
         }
-        public RateRules GetRateRules()
-        {
-            StringBuilder builder = new StringBuilder();
+
+        public RateRules GetRateRules() => GetInvoiceRates().GetRateRules();
+
+        public bool TryGetRate(string currency, out decimal rate) => GetInvoiceRates().TryGetRate(new(currency, Currency), out rate);
+
+        public bool TryGetRate(CurrencyPair pair, out decimal rate) => GetInvoiceRates().TryGetRate(pair, out rate);
+
+        public decimal GetRate(CurrencyPair pair) => GetInvoiceRates().GetRate(pair);
+
 #pragma warning disable CS0618 // Type or member is obsolete
-            foreach (var r in Rates)
-            {
-                if (r.Key.Contains('_', StringComparison.Ordinal))
-                    builder.AppendLine($"{r.Key} = {r.Value.ToString(CultureInfo.InvariantCulture)};");
-                else
-                    builder.AppendLine($"{r.Key}_{Currency} = {r.Value.ToString(CultureInfo.InvariantCulture)};");
-            }
+        private RateBook GetInvoiceRates() => new RateBook(Currency, Rates);
 #pragma warning restore CS0618 // Type or member is obsolete
-            if (RateRules.TryParse(builder.ToString(), out var rules))
-                return rules;
-            throw new FormatException("Invalid rate rules");
-        }
-        public bool TryGetRate(string currency, out decimal rate)
-        {
-            return TryGetRate(new CurrencyPair(currency, Currency), out rate);
-        }
-        public bool TryGetRate(CurrencyPair pair, out decimal rate)
-        {
-#pragma warning disable CS0618 // Type or member is obsolete
-            if (pair.Right == Currency && Rates.TryGetValue(pair.Left, out rate)) // Fast lane
-                return true;
-#pragma warning restore CS0618 // Type or member is obsolete
-            var rule = GetRateRules().GetRuleFor(pair);
-            rule.Reevaluate();
-            if (rule.BidAsk is null)
-            {
-                rate = 0.0m;
-                return false;
-            }
-            rate = rule.BidAsk.Bid;
-            return true;
-        }
-        public decimal GetRate(CurrencyPair pair)
-        {
-            ArgumentNullException.ThrowIfNull(pair);
-#pragma warning disable CS0618 // Type or member is obsolete
-            if (pair.Right == Currency && Rates.TryGetValue(pair.Left, out var rate)) // Fast lane
-                return rate;
-#pragma warning restore CS0618 // Type or member is obsolete
-            var rule = GetRateRules().GetRuleFor(pair);
-            rule.Reevaluate();
-            if (rule.BidAsk is null)
-                throw new InvalidOperationException($"Rate rule is not evaluated ({rule.Errors.First()})");
-            return rule.BidAsk.Bid;
-        }
+
         public void AddRate(CurrencyPair pair, decimal rate)
         {
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -512,7 +485,9 @@ namespace BTCPayServer.Services.Invoices
         private Uri FillPlaceholdersUri(string v)
         {
             var uriStr = (v ?? string.Empty).Replace("{OrderId}", System.Web.HttpUtility.UrlEncode(Metadata.OrderId) ?? "", StringComparison.OrdinalIgnoreCase)
-                                     .Replace("{InvoiceId}", System.Web.HttpUtility.UrlEncode(Id) ?? "", StringComparison.OrdinalIgnoreCase);
+                                     .Replace("{InvoiceId}", System.Web.HttpUtility.UrlEncode(Id) ?? "", StringComparison.OrdinalIgnoreCase)
+                                     // NOTE: Not recommended to depend on the status on client side, rather fetch invoice status via API instead
+                                     .Replace("{Status}", System.Web.HttpUtility.UrlEncode(Status.ToString()) ?? "", StringComparison.OrdinalIgnoreCase);
             if (Uri.TryCreate(uriStr, UriKind.Absolute, out var uri) && (uri.Scheme == "http" || uri.Scheme == "https"))
                 return uri;
             return null;
@@ -785,11 +760,10 @@ namespace BTCPayServer.Services.Invoices
         public decimal NetSettled { get; private set; }
         [JsonIgnore]
         public bool DisableAccounting { get; set; }
+
+        public RequestBaseUrl GetRequestBaseUrl() => RequestBaseUrl.FromUrl(ServerUrl);
     }
 
-    public enum InvoiceStatusLegacy
-    {
-    }
     public static class InvoiceStatusLegacyExtensions
     {
         public static string ToLegacyStatusString(this InvoiceStatus status) =>
@@ -940,7 +914,7 @@ namespace BTCPayServer.Services.Invoices
         /// An additional fee, hidden from UI, meant to be used when a payment method has a service provider which
         /// have a different way of converting the invoice's amount into the currency of the payment method.
         /// This fee can avoid under/over payments when this case happens.
-        /// 
+        ///
         /// You need to increment it with <see cref="AddTweakFee(decimal)"/> so that the tweak fee is also added to the <see cref="PaymentMethodFee"/>.
         /// </summary>
         [JsonConverter(typeof(NumericStringJsonConverter))]
@@ -1057,7 +1031,6 @@ namespace BTCPayServer.Services.Invoices
 
         public void UpdateAmounts()
         {
-            var value = Value;
             PaidAmount = new Amounts()
             {
                 Currency = Currency,

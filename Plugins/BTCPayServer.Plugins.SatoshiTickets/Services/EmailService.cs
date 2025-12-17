@@ -1,7 +1,6 @@
 ﻿using System.Threading.Tasks;
 using System;
 using BTCPayServer.Logging;
-using BTCPayServer.Services.Mails;
 using MimeKit;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
@@ -9,6 +8,7 @@ using BTCPayServer.Plugins.SatoshiTickets.Data;
 using System.IO;
 using System.Reflection;
 using System.Linq;
+using BTCPayServer.Plugins.Emails.Services;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Services;
 

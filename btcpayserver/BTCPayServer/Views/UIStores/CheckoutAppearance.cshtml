@@ -7,8 +7,7 @@
 @inject IFileService FileService
 @model CheckoutAppearanceViewModel
 @{
-    ViewData.SetActivePage(StoreNavPages.CheckoutAppearance, StringLocalizer["Checkout Experience"], Context.GetStoreData().Id);
-
+    ViewData.SetLayoutModel(new LayoutModel(nameof(StoreNavPages.CheckoutAppearance), StringLocalizer["Checkout Experience"]).SetCategory(WellKnownCategories.Store));
     var canUpload = await FileService.IsAvailable();
 }
 @functions {
@@ -44,7 +43,7 @@
 			$("#ShowPayInWalletButton").prop('checked', true);
 			$("#ShowStoreHeader").prop('checked', true);
 		});
-        
+
 		delegate('click', '#CheckNFC button', async e => {
 			if ('NDEFReader' in window) {
                 const ndef = new NDEFReader();
@@ -67,7 +66,7 @@
 <form method="post" enctype="multipart/form-data" permissioned="@Policies.CanModifyStoreSettings">
     <div class="sticky-header">
         <h2>@ViewData["Title"]</h2>
-		<button id="page-primary" type="submit" class="btn btn-primary">Save</button>
+		<button id="page-primary" type="submit" class="btn btn-primary" text-translate="true">Save</button>
     </div>
     <partial name="_StatusMessage" />
 
@@ -118,12 +117,12 @@
 						<div id="Presets_Online" class="btcpay-list-select-item dropdown-item">
 							<vc:icon symbol="pos-cart" />
 							<span text-translate="true">Online</span>
-							<span class="note" text-translate="true">Enhance the checkout process for online purchases.<br />This assumes the payment page will be displayed on the customer's device.</span>
+							<span class="note" text-translate="true"  html-translate="true">Enhance the checkout process for online purchases.<br />This assumes the payment page will be displayed on the customer's device.</span>
 						</div>
 						<div id="Presets_InStore" class="btcpay-list-select-item dropdown-item">
 							<vc:icon symbol="nav-store" />
 							<span text-translate="true">In-store</span>
-							<span class="note" text-translate="true">Enhance the checkout process for in-store purchases.<br />This assumes the payment page will be displayed on the merchant's device.</span>
+							<span class="note" text-translate="true" html-translate="true">Enhance the checkout process for in-store purchases.<br />This assumes the payment page will be displayed on the merchant's device.</span>
 						</div>
 					</div>
 				</div>

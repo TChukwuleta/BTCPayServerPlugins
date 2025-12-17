@@ -15,11 +15,11 @@ using BTCPayServer.Data;
 using BTCPayServer.Data.Payouts.LightningLike;
 using BTCPayServer.Forms;
 using BTCPayServer.HostedServices;
-using BTCPayServer.HostedServices.Webhooks;
 using BTCPayServer.Lightning;
 using BTCPayServer.Lightning.Charge;
 using BTCPayServer.Lightning.CLightning;
 using BTCPayServer.Lightning.Eclair;
+using BTCPayServer.Lightning.Phoenixd;
 using BTCPayServer.Lightning.LNbank;
 using BTCPayServer.Lightning.LND;
 using BTCPayServer.Lightning.LNDhub;
@@ -41,7 +41,7 @@ using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Fees;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Labels;
-using BTCPayServer.Services.Mails;
+using BTCPayServer.Plugins.Emails.Services;
 using BTCPayServer.Services.Notifications;
 using BTCPayServer.Services.Notifications.Blobs;
 using BTCPayServer.Services.PaymentRequests;
@@ -69,11 +69,16 @@ using BTCPayServer.Services.Reporting;
 using BTCPayServer.Services.WalletFileParsing;
 using BTCPayServer.Payments.LNURLPay;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Payouts;
 using ExchangeSharp;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Localization;
 using Microsoft.AspNetCore.Mvc.Localization;
-using System.Reflection;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Hosting
 {
@@ -84,18 +89,24 @@ namespace BTCPayServer.Hosting
             services.AddSingleton<IJsonConverterRegistration, JsonConverterRegistration>((s) => new JsonConverterRegistration(create));
             return services;
         }
+
         public static IServiceCollection AddBTCPayServer(this IServiceCollection services, IConfiguration configuration, Logs logs)
         {
-            services.TryAddSingleton<CallbackGenerator>();
+            services.TryAddScoped<CallbackGenerator>();
             services.TryAddSingleton<IStringLocalizerFactory, LocalizerFactory>();
             services.TryAddSingleton<IHtmlLocalizerFactory, LocalizerFactory>();
             services.TryAddSingleton<LocalizerService>();
             services.TryAddSingleton<ViewLocalizer>();
-            services.TryAddSingleton<IStringLocalizer>(o => o.GetRequiredService<IStringLocalizerFactory>().Create("",""));
+            services.TryAddSingleton<IStringLocalizer>(o => o.GetRequiredService<IStringLocalizerFactory>().Create("", ""));
             services.TryAddSingleton<DelayedTaskScheduler>();
+            services.TryAddSingleton<UIExtensionsRegistry>();
 
             services.AddSingleton<MvcNewtonsoftJsonOptions>(o => o.GetRequiredService<IOptions<MvcNewtonsoftJsonOptions>>().Value);
             services.AddSingleton<JsonSerializerSettings>(o => o.GetRequiredService<IOptions<MvcNewtonsoftJsonOptions>>().Value.SerializerSettings);
+
+            services.AddSingleton<IDbContextFactory<ApplicationDbContext>, ApplicationDbContextFactory>((provider) =>
+                provider.GetRequiredService<ApplicationDbContextFactory>());
+            services.AddSingleton<IMigrationExecutor, MigrationExecutor<ApplicationDbContext>>();
             services.AddDbContext<ApplicationDbContext>((provider, o) =>
             {
                 var factory = provider.GetRequiredService<ApplicationDbContextFactory>();
@@ -138,6 +149,8 @@ namespace BTCPayServer.Hosting
             services.AddSingleton<Func<HttpClient, ILightningConnectionStringHandler>>(client =>
                 new EclairConnectionStringHandler(client));
             services.AddSingleton<Func<HttpClient, ILightningConnectionStringHandler>>(client =>
+                new PhoenixdConnectionStringHandler(client));
+            services.AddSingleton<Func<HttpClient, ILightningConnectionStringHandler>>(client =>
                 new LndConnectionStringHandler(client));
             services.AddSingleton<Func<HttpClient, ILightningConnectionStringHandler>>(client =>
                 new LndHubConnectionStringHandler(client));
@@ -155,12 +168,13 @@ namespace BTCPayServer.Hosting
             services.AddStartupTask<MigrationStartupTask>();
 
             //
-            AddSettingsAccessor<PoliciesSettings>(services);
-            AddSettingsAccessor<ThemeSettings>(services);
+            services.AddSettingsAccessor<PoliciesSettings>();
+            services.AddSettingsAccessor<ThemeSettings>();
+            services.AddSettingsAccessor<ServerSettings>();
             //
 
             AddOnchainWalletParsers(services);
-            
+
 
             services.AddStartupTask<BlockExplorerLinkStartupTask>();
             services.AddStartupTask<LoadCurrencyNameTableStartupTask>();
@@ -173,55 +187,53 @@ namespace BTCPayServer.Hosting
             services.TryAddSingleton<EventAggregator>();
             services.TryAddSingleton<PaymentRequestService>();
             services.TryAddSingleton<UserService>();
+            services.AddSingleton<UserService.LoginExtension, UserService.DefaultLoginExtension>();
+
             services.TryAddSingleton<UriResolver>();
             services.TryAddSingleton<WalletHistogramService>();
             services.TryAddSingleton<LightningHistogramService>();
             services.AddSingleton<ApplicationDbContextFactory>();
-            services.AddOptions<BTCPayServerOptions>().Configure(
-                (options) =>
+            services.AddOptions<BTCPayServerOptions>().Configure((options) =>
+            {
+                options.LoadArgs(configuration, logs);
+            });
+            services.AddOptions<DataDirectories>().Configure((options) =>
+            {
+                options.Configure(configuration);
+            });
+            services.AddOptions<DatabaseOptions>().Configure<IOptions<DataDirectories>>((options, datadirs) =>
+            {
+                var postgresConnectionString = configuration["postgres"];
+                if (!string.IsNullOrEmpty(postgresConnectionString))
                 {
-                    options.LoadArgs(configuration, logs);
-                });
-            services.AddOptions<DataDirectories>().Configure(
-                (options) =>
+                    options.ConnectionString = postgresConnectionString;
+                }
+                else
                 {
-                    options.Configure(configuration);
-                });
-            services.AddOptions<DatabaseOptions>().Configure<IOptions<DataDirectories>>(
-                (options, datadirs) =>
+                    throw new InvalidOperationException("No database option was configured.");
+                }
+            });
+            services.AddOptions<NBXplorerOptions>().Configure<BTCPayNetworkProvider>((options, btcPayNetworkProvider) =>
+            {
+                foreach (BTCPayNetwork btcPayNetwork in btcPayNetworkProvider.GetAll().OfType<BTCPayNetwork>())
                 {
-                    var postgresConnectionString = configuration["postgres"];
-                    if (!string.IsNullOrEmpty(postgresConnectionString))
-                    {
-                        options.ConnectionString = postgresConnectionString;
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException("No database option was configured.");
-                    }
-                });
-            services.AddOptions<NBXplorerOptions>().Configure<BTCPayNetworkProvider>(
-                (options, btcPayNetworkProvider) =>
-                {
-                    foreach (BTCPayNetwork btcPayNetwork in btcPayNetworkProvider.GetAll().OfType<BTCPayNetwork>())
-                    {
-                        NBXplorerConnectionSetting setting =
-                            new NBXplorerConnectionSetting
-                            {
-                                CryptoCode = btcPayNetwork.CryptoCode,
-                                ExplorerUri = configuration.GetOrDefault<Uri>(
-                                    $"{btcPayNetwork.CryptoCode}.explorer.url",
-                                    btcPayNetwork.NBXplorerNetwork.DefaultSettings.DefaultUrl),
-                                CookieFile = configuration.GetOrDefault<string>(
-                                    $"{btcPayNetwork.CryptoCode}.explorer.cookiefile",
-                                    btcPayNetwork.NBXplorerNetwork.DefaultSettings.DefaultCookieFile)
-                            };
-                        options.NBXplorerConnectionSettings.Add(setting);
-                        options.ConnectionString = configuration.GetOrDefault<string>("explorer.postgres", null);
-                    }
-                });
-            services.AddOptions<LightningNetworkOptions>().Configure<BTCPayNetworkProvider, LightningClientFactoryService>(
-                (options, btcPayNetworkProvider, lightningClientFactoryService) =>
+                    NBXplorerConnectionSetting setting =
+                        new NBXplorerConnectionSetting
+                        {
+                            CryptoCode = btcPayNetwork.CryptoCode,
+                            ExplorerUri = configuration.GetOrDefault<Uri>(
+                                $"{btcPayNetwork.CryptoCode}.explorer.url",
+                                btcPayNetwork.NBXplorerNetwork.DefaultSettings.DefaultUrl),
+                            CookieFile = configuration.GetOrDefault<string>(
+                                $"{btcPayNetwork.CryptoCode}.explorer.cookiefile",
+                                btcPayNetwork.NBXplorerNetwork.DefaultSettings.DefaultCookieFile)
+                        };
+                    options.NBXplorerConnectionSettings.Add(setting);
+                    options.ConnectionString = configuration.GetOrDefault<string>("explorer.postgres", null);
+                }
+            });
+            services.AddOptions<LightningNetworkOptions>()
+                .Configure<BTCPayNetworkProvider, LightningClientFactoryService>((options, btcPayNetworkProvider, lightningClientFactoryService) =>
                 {
                     foreach (var net in btcPayNetworkProvider.GetAll().OfType<BTCPayNetwork>())
                     {
@@ -255,6 +267,8 @@ namespace BTCPayServer.Hosting
                                                               Environment.NewLine +
                                                               $"               eclair server: 'type=eclair;server=http://eclair.com:4570;password=eclairpassword;bitcoin-host=bitcoind:37393" +
                                                               Environment.NewLine +
+                                                              $"If you have a phoenixd server: 'type=phoenixd;server=http://phoenixd:9740/;password=phoenixdpassword'" +
+                                                              Environment.NewLine +
                                                               $"Error: {error}" + Environment.NewLine +
                                                               "This service will not be exposed through BTCPay Server");
                             }
@@ -265,35 +279,35 @@ namespace BTCPayServer.Hosting
                                     logs.Configuration.LogWarning(
                                         $"Setting {net.CryptoCode}.lightning is a deprecated format ({lightning}), it will work now, but please replace it for future versions with '{lightningClient}'");
                                 }
+
                                 options.InternalLightningByCryptoCode.Add(net.CryptoCode, lightningClient);
                             }
                         }
                     }
                 });
-            services.AddOptions<ExternalServicesOptions>().Configure<BTCPayNetworkProvider>(
-                (options, btcPayNetworkProvider) =>
+            services.AddOptions<ExternalServicesOptions>().Configure<BTCPayNetworkProvider>((options, btcPayNetworkProvider) =>
+            {
+                foreach (var net in btcPayNetworkProvider.GetAll().OfType<BTCPayNetwork>())
                 {
-                    foreach (var net in btcPayNetworkProvider.GetAll().OfType<BTCPayNetwork>())
-                    {
-                        options.ExternalServices.Load(net.CryptoCode, configuration);
-                    }
+                    options.ExternalServices.Load(net.CryptoCode, configuration);
+                }
 
-                    options.ExternalServices.LoadNonCryptoServices(configuration);
+                options.ExternalServices.LoadNonCryptoServices(configuration);
 
-                    var services = configuration.GetOrDefault<string>("externalservices", null);
-                    if (services != null)
+                var services = configuration.GetOrDefault<string>("externalservices", null);
+                if (services != null)
+                {
+                    foreach (var service in services.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                                 .Select(p => (p, SeparatorIndex: p.IndexOf(':', StringComparison.OrdinalIgnoreCase)))
+                                 .Where(p => p.SeparatorIndex != -1)
+                                 .Select(p => (Name: p.p.Substring(0, p.SeparatorIndex),
+                                     Link: p.p.Substring(p.SeparatorIndex + 1))))
                     {
-                        foreach (var service in services.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                            .Select(p => (p, SeparatorIndex: p.IndexOf(':', StringComparison.OrdinalIgnoreCase)))
-                            .Where(p => p.SeparatorIndex != -1)
-                            .Select(p => (Name: p.p.Substring(0, p.SeparatorIndex),
-                                Link: p.p.Substring(p.SeparatorIndex + 1))))
-                        {
-                            if (Uri.TryCreate(service.Link, UriKind.RelativeOrAbsolute, out var uri))
-                                options.OtherExternalServices.AddOrReplace(service.Name, uri);
-                        }
+                        if (Uri.TryCreate(service.Link, UriKind.RelativeOrAbsolute, out var uri))
+                            options.OtherExternalServices.AddOrReplace(service.Name, uri);
                     }
-                });
+                }
+            });
             services.TryAddSingleton<BTCPayNetworkProvider>();
 
             services.AddExceptionHandler<PluginExceptionHandler>();
@@ -379,7 +393,6 @@ namespace BTCPayServer.Hosting
             services.AddSingleton<IHostedService, Services.NBXplorerConnectionFactory>(o => o.GetRequiredService<Services.NBXplorerConnectionFactory>());
             services.AddSingleton<HostedServices.CheckConfigurationHostedService>();
             services.AddSingleton<IHostedService, HostedServices.CheckConfigurationHostedService>(o => o.GetRequiredService<CheckConfigurationHostedService>());
-            services.AddSingleton<IHostedService, StoreEmailRuleProcessorSender>();
             services.AddSingleton<IHostedService, PeriodicTaskLauncherHostedService>();
             services.AddScheduledTask<GithubVersionFetcher>(TimeSpan.FromDays(1));
             services.AddScheduledTask<PluginUpdateFetcher>(TimeSpan.FromDays(1));
@@ -388,16 +401,15 @@ namespace BTCPayServer.Hosting
             services.AddReportProvider<OnChainWalletReportProvider>();
             services.AddReportProvider<ProductsReportProvider>();
             services.AddReportProvider<PayoutsReportProvider>();
-            services.AddReportProvider<LegacyInvoiceExportReportProvider>();
+            services.AddReportProvider<InvoicesReportProvider>();
             services.AddReportProvider<RefundsReportProvider>();
-            services.AddWebhooks();
 
             services.AddSingleton<Dictionary<PaymentMethodId, IPaymentMethodBitpayAPIExtension>>(o =>
-            o.GetRequiredService<IEnumerable<IPaymentMethodBitpayAPIExtension>>().ToDictionary(o => o.PaymentMethodId, o => o));
+                o.GetRequiredService<IEnumerable<IPaymentMethodBitpayAPIExtension>>().ToDictionary(o => o.PaymentMethodId, o => o));
             services.AddSingleton<Dictionary<PaymentMethodId, IPaymentLinkExtension>>(o =>
-o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.PaymentMethodId, o => o));
+                o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.PaymentMethodId, o => o));
             services.AddSingleton<Dictionary<PaymentMethodId, ICheckoutModelExtension>>(o =>
-            o.GetRequiredService<IEnumerable<ICheckoutModelExtension>>().ToDictionary(o => o.PaymentMethodId, o => o));
+                o.GetRequiredService<IEnumerable<ICheckoutModelExtension>>().ToDictionary(o => o.PaymentMethodId, o => o));
 
             services.AddHttpClient(LightningLikePayoutHandler.LightningLikePayoutHandlerOnionNamedClient)
                 .ConfigurePrimaryHttpMessageHandler<Socks5HttpClientHandler>();
@@ -417,7 +429,7 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
             services.AddSingleton<PayoutMethodHandlerDictionary>();
 
             services.AddSingleton<NotificationManager>();
-            services.AddScoped<NotificationSender>();
+            services.AddSingleton<NotificationSender>();
 
             RegisterExchangeRecommendations(services);
             services.AddSingleton<DefaultRulesCollection>();
@@ -425,12 +437,31 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
             services.AddSingleton<IHostedService, InvoiceEventSaverService>();
             services.AddSingleton<IHostedService, BitpayIPNSender>();
             services.AddSingleton<IHostedService, InvoiceWatcher>();
-            services.AddSingleton<IHostedService, RatesHostedService>();
+            services.AddScheduledDbScript("Invoice Cleanup",
+                """
+                WITH useless_invoices AS (
+                  SELECT * FROM "Invoices"
+                  WHERE "Status" = 'Expired'
+                    AND "ExceptionStatus" = ''
+                    AND "Created" < @now - INTERVAL '6 months'
+                    ORDER BY "Created" LIMIT 1000
+                ),
+                deleted_invoices AS (
+                    DELETE FROM "Invoices"
+                    WHERE "Id" IN ( SELECT "Id" FROM useless_invoices)
+                    RETURNING *
+                )
+                SELECT COUNT(*) FROM deleted_invoices;
+                """);
+
+            services.AddSingleton<RatesHostedService>();
+            services.AddSingleton<IHostedService>(s => s.GetRequiredService<RatesHostedService>());
+            services.AddScheduledTask<RatesHostedService>(TimeSpan.FromSeconds(30));
             services.AddSingleton<IHostedService, BackgroundJobSchedulerHostedService>();
             services.AddSingleton<IHostedService, AppHubStreamer>();
             services.AddSingleton<IHostedService, AppInventoryUpdaterHostedService>();
             services.AddSingleton<IHostedService, TransactionLabelMarkerHostedService>();
-            services.AddSingleton<IHostedService, UserEventHostedService>();
+            services.AddSingleton<IHostedService, OnChainRateTrackerHostedService>();
             services.AddSingleton<IHostedService, DynamicDnsHostedService>();
             services.AddSingleton<PaymentRequestStreamer>();
             services.AddSingleton<IHostedService>(s => s.GetRequiredService<PaymentRequestStreamer>());
@@ -440,7 +471,6 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
 
             services.AddSingleton<INotificationHandler, NewVersionNotification.Handler>();
             services.AddSingleton<INotificationHandler, NewUserRequiresApprovalNotification.Handler>();
-            services.AddSingleton<INotificationHandler, InviteAcceptedNotification.Handler>();
             services.AddSingleton<INotificationHandler, PluginUpdateNotification.Handler>();
             services.AddSingleton<INotificationHandler, InvoiceEventNotification.Handler>();
             services.AddSingleton<INotificationHandler, PayoutNotification.Handler>();
@@ -470,15 +500,12 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
             services.AddSingleton<EmailSenderFactory>();
             services.AddSingleton<InvoiceActivator>();
 
-            //create a simple client which hooks up to the http scope
-            services.AddScoped<BTCPayServerClient, LocalBTCPayServerClient>();
-            //also provide a factory that can impersonate user/store id
-            services.AddSingleton<IBTCPayServerClientFactory, BTCPayServerClientFactory>();
             services.AddPayoutProcesors();
             services.AddForms();
 
             services.AddAPIKeyAuthentication();
             services.AddBtcPayServerAuthenticationSchemes();
+
             services.AddAuthorization(o => o.AddBTCPayPolicies());
 
             services.AddCors(options =>
@@ -494,7 +521,8 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
                     Serilog.Log.Logger = new LoggerConfiguration()
                         .Enrich.FromLogContext()
                         .MinimumLevel.Is(BTCPayServerOptions.GetDebugLogLevel(configuration))
-                        .WriteTo.File(debugLogFile, rollingInterval: RollingInterval.Day, fileSizeLimitBytes: MAX_DEBUG_LOG_FILE_SIZE, rollOnFileSizeLimit: true, retainedFileCountLimit: 1)
+                        .WriteTo.File(debugLogFile, rollingInterval: RollingInterval.Day, fileSizeLimitBytes: MAX_DEBUG_LOG_FILE_SIZE,
+                            rollOnFileSizeLimit: true, retainedFileCountLimit: 1)
                         .CreateLogger();
                     logBuilder.AddProvider(new Serilog.Extensions.Logging.SerilogLoggerProvider(Log.Logger));
                 }
@@ -510,38 +538,29 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
                 services.AddSingleton<IHostedService, Cheater>(o => o.GetRequiredService<Cheater>());
             }
 
-            var userAgent = new System.Net.Http.Headers.ProductInfoHeaderValue("BTCPayServer", BTCPayServerEnvironment.GetInformationalVersion());
-            foreach (var clientName in WebhookSender.AllClients.Concat(new[] { BitpayIPNSender.NamedClient }))
-            {
-                services.AddHttpClient(clientName)
-                    .ConfigureHttpClient(client =>
-                    {
-                        client.DefaultRequestHeaders.UserAgent.Add(userAgent);
-                    });
-            }
-
             return services;
         }
 
         public static void RegisterExchangeRecommendations(IServiceCollection services)
         {
             foreach (var rule in new Dictionary<string, string>()
-            {
-                { "EUR", "kraken" },
-                { "USD", "kraken" },
-                { "CAD", "kraken" },
-                { "GBP", "kraken" },
-                { "CHF", "kraken" },
-                { "GTQ", "bitpay" },
-                { "COP", "yadio" },
-                { "ARS", "yadio" },
-                { "JPY", "bitbank" },
-                { "TRY", "btcturk" },
-                { "UGX", "yadio"},
-                { "RSD", "bitpay"},
-                { "NGN", "bitnob"},
-                { "NOK", "barebitcoin"}
-            })
+                     {
+                         { "EUR", "kraken" },
+                         { "USD", "kraken" },
+                         { "CAD", "kraken" },
+                         { "GBP", "kraken" },
+                         { "CHF", "kraken" },
+                         { "GTQ", "bitpay" },
+                         { "COP", "yadio" },
+                         { "ARS", "yadio" },
+                         { "JPY", "bitbank" },
+                         { "TRY", "btcturk" },
+                         { "UGX", "yadio" },
+                         { "RSD", "bitpay" },
+                         { "NGN", "bitnob" },
+                         { "NOK", "barebitcoin" },
+                         { "CZK", "coinmate" },
+                     })
             {
                 var r = new DefaultRules.Recommendation(rule.Key, rule.Value);
                 r.Order = DefaultRules.HardcodedRecommendedExchangeOrder;
@@ -565,7 +584,8 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
         internal static void RegisterCurrencyData(IServiceCollection services)
         {
             services.TryAddSingleton<CurrencyNameTable>();
-            services.AddSingleton<CurrencyDataProvider, AssemblyCurrencyDataProvider>(c => new AssemblyCurrencyDataProvider(typeof(BTCPayServer.Rating.BidAsk).Assembly, "BTCPayServer.Rating.Currencies.json"));
+            services.AddSingleton<CurrencyDataProvider, AssemblyCurrencyDataProvider>(c =>
+                new AssemblyCurrencyDataProvider(typeof(BTCPayServer.Rating.BidAsk).Assembly, "BTCPayServer.Rating.Currencies.json"));
         }
 
         internal static void RegisterRateSources(IServiceCollection services)
@@ -575,7 +595,8 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
             services.AddRateProviderExchangeSharp<ExchangePoloniexAPI>(new("poloniex", "Poloniex", " https://api.poloniex.com/markets/price"));
             services.AddRateProviderExchangeSharp<ExchangeNDAXAPI>(new("ndax", "NDAX", "https://ndax.io/api/returnTicker"));
 
-            services.AddRateProviderExchangeSharp<ExchangeBitfinexAPI>(new("bitfinex", "Bitfinex", "https://api.bitfinex.com/v2/tickers?symbols=tBTCUSD,tLTCUSD,tLTCBTC,tETHUSD,tETHBTC,tETCBTC,tETCUSD,tRRTUSD,tRRTBTC,tZECUSD,tZECBTC,tXMRUSD,tXMRBTC,tDSHUSD,tDSHBTC,tBTCEUR,tBTCJPY,tXRPUSD,tXRPBTC,tIOTUSD,tIOTBTC,tIOTETH,tEOSUSD,tEOSBTC,tEOSETH,tSANUSD,tSANBTC,tSANETH,tOMGUSD,tOMGBTC,tOMGETH,tNEOUSD,tNEOBTC,tNEOETH,tETPUSD,tETPBTC,tETPETH,tQTMUSD,tQTMBTC,tQTMETH,tAVTUSD,tAVTBTC,tAVTETH,tEDOUSD,tEDOBTC,tEDOETH,tBTGUSD,tBTGBTC,tDATUSD,tDATBTC,tDATETH,tQSHUSD,tQSHBTC,tQSHETH,tYYWUSD,tYYWBTC,tYYWETH,tGNTUSD,tGNTBTC,tGNTETH,tSNTUSD,tSNTBTC,tSNTETH,tIOTEUR,tBATUSD,tBATBTC,tBATETH,tMNAUSD,tMNABTC,tMNAETH,tFUNUSD,tFUNBTC,tFUNETH,tZRXUSD,tZRXBTC,tZRXETH,tTNBUSD,tTNBBTC,tTNBETH,tSPKUSD,tSPKBTC,tSPKETH,tTRXUSD,tTRXBTC,tTRXETH,tRCNUSD,tRCNBTC,tRCNETH,tRLCUSD,tRLCBTC,tRLCETH,tAIDUSD,tAIDBTC,tAIDETH,tSNGUSD,tSNGBTC,tSNGETH,tREPUSD,tREPBTC,tREPETH,tELFUSD,tELFBTC,tELFETH,tNECUSD,tNECBTC,tNECETH,tBTCGBP,tETHEUR,tETHJPY,tETHGBP,tNEOEUR,tNEOJPY,tNEOGBP,tEOSEUR,tEOSJPY,tEOSGBP,tIOTJPY,tIOTGBP,tIOSUSD,tIOSBTC,tIOSETH,tAIOUSD,tAIOBTC,tAIOETH,tREQUSD,tREQBTC,tREQETH,tRDNUSD,tRDNBTC,tRDNETH,tLRCUSD,tLRCBTC,tLRCETH,tWAXUSD,tWAXBTC,tWAXETH,tDAIUSD,tDAIBTC,tDAIETH,tAGIUSD,tAGIBTC,tAGIETH,tBFTUSD,tBFTBTC,tBFTETH,tMTNUSD,tMTNBTC,tMTNETH,tODEUSD,tODEBTC,tODEETH,tANTUSD,tANTBTC,tANTETH,tDTHUSD,tDTHBTC,tDTHETH,tMITUSD,tMITBTC,tMITETH,tSTJUSD,tSTJBTC,tSTJETH,tXLMUSD,tXLMEUR,tXLMJPY,tXLMGBP,tXLMBTC,tXLMETH,tXVGUSD,tXVGEUR,tXVGJPY,tXVGGBP,tXVGBTC,tXVGETH,tBCIUSD,tBCIBTC,tMKRUSD,tMKRBTC,tMKRETH,tKNCUSD,tKNCBTC,tKNCETH,tPOAUSD,tPOABTC,tPOAETH,tEVTUSD,tLYMUSD,tLYMBTC,tLYMETH,tUTKUSD,tUTKBTC,tUTKETH,tVEEUSD,tVEEBTC,tVEEETH,tDADUSD,tDADBTC,tDADETH,tORSUSD,tORSBTC,tORSETH,tAUCUSD,tAUCBTC,tAUCETH,tPOYUSD,tPOYBTC,tPOYETH,tFSNUSD,tFSNBTC,tFSNETH,tCBTUSD,tCBTBTC,tCBTETH,tZCNUSD,tZCNBTC,tZCNETH,tSENUSD,tSENBTC,tSENETH,tNCAUSD,tNCABTC,tNCAETH,tCNDUSD,tCNDBTC,tCNDETH,tCTXUSD,tCTXBTC,tCTXETH,tPAIUSD,tPAIBTC,tSEEUSD,tSEEBTC,tSEEETH,tESSUSD,tESSBTC,tESSETH,tATMUSD,tATMBTC,tATMETH,tHOTUSD,tHOTBTC,tHOTETH,tDTAUSD,tDTABTC,tDTAETH,tIQXUSD,tIQXBTC,tIQXEOS,tWPRUSD,tWPRBTC,tWPRETH,tZILUSD,tZILBTC,tZILETH,tBNTUSD,tBNTBTC,tBNTETH,tABSUSD,tABSETH,tXRAUSD,tXRAETH,tMANUSD,tMANETH,tBBNUSD,tBBNETH,tNIOUSD,tNIOETH,tDGXUSD,tDGXETH,tVETUSD,tVETBTC,tVETETH,tUTNUSD,tUTNETH,tTKNUSD,tTKNETH,tGOTUSD,tGOTEUR,tGOTETH,tXTZUSD,tXTZBTC,tCNNUSD,tCNNETH,tBOXUSD,tBOXETH,tTRXEUR,tTRXGBP,tTRXJPY,tMGOUSD,tMGOETH,tRTEUSD,tRTEETH,tYGGUSD,tYGGETH,tMLNUSD,tMLNETH,tWTCUSD,tWTCETH,tCSXUSD,tCSXETH,tOMNUSD,tOMNBTC,tINTUSD,tINTETH,tDRNUSD,tDRNETH,tPNKUSD,tPNKETH,tDGBUSD,tDGBBTC,tBSVUSD,tBSVBTC,tBABUSD,tBABBTC,tWLOUSD,tWLOXLM,tVLDUSD,tVLDETH,tENJUSD,tENJETH,tONLUSD,tONLETH,tRBTUSD,tRBTBTC,tUSTUSD,tEUTEUR,tEUTUSD,tGSDUSD,tUDCUSD,tTSDUSD,tPAXUSD,tRIFUSD,tRIFBTC,tPASUSD,tPASETH,tVSYUSD,tVSYBTC,tZRXDAI,tMKRDAI,tOMGDAI,tBTTUSD,tBTTBTC,tBTCUST,tETHUST,tCLOUSD,tCLOBTC,tIMPUSD,tIMPETH,tLTCUST,tEOSUST,tBABUST,tSCRUSD,tSCRETH,tGNOUSD,tGNOETH,tGENUSD,tGENETH,tATOUSD,tATOBTC,tATOETH,tWBTUSD,tXCHUSD,tEUSUSD,tWBTETH,tXCHETH,tEUSETH,tLEOUSD,tLEOBTC,tLEOUST,tLEOEOS,tLEOETH,tASTUSD,tASTETH,tFOAUSD,tFOAETH,tUFRUSD,tUFRETH,tZBTUSD,tZBTUST,tOKBUSD,tUSKUSD,tGTXUSD,tKANUSD,tOKBUST,tOKBETH,tOKBBTC,tUSKUST,tUSKETH,tUSKBTC,tUSKEOS,tGTXUST,tKANUST,tAMPUSD,tALGUSD,tALGBTC,tALGUST,tBTCXCH,tSWMUSD,tSWMETH,tTRIUSD,tTRIETH,tLOOUSD,tLOOETH,tAMPUST,tDUSK:USD,tDUSK:BTC,tUOSUSD,tUOSBTC,tRRBUSD,tRRBUST,tDTXUSD,tDTXUST,tAMPBTC,tFTTUSD,tFTTUST,tPAXUST,tUDCUST,tTSDUST,tBTC:CNHT,tUST:CNHT,tCNH:CNHT,tCHZUSD,tCHZUST,tBTCF0:USTF0,tETHF0:USTF0"));
+            services.AddRateProviderExchangeSharp<ExchangeBitfinexAPI>(new("bitfinex", "Bitfinex",
+                "https://api.bitfinex.com/v2/tickers?symbols=tBTCUSD,tLTCUSD,tLTCBTC,tETHUSD,tETHBTC,tETCBTC,tETCUSD,tRRTUSD,tRRTBTC,tZECUSD,tZECBTC,tXMRUSD,tXMRBTC,tDSHUSD,tDSHBTC,tBTCEUR,tBTCJPY,tXRPUSD,tXRPBTC,tIOTUSD,tIOTBTC,tIOTETH,tEOSUSD,tEOSBTC,tEOSETH,tSANUSD,tSANBTC,tSANETH,tOMGUSD,tOMGBTC,tOMGETH,tNEOUSD,tNEOBTC,tNEOETH,tETPUSD,tETPBTC,tETPETH,tQTMUSD,tQTMBTC,tQTMETH,tAVTUSD,tAVTBTC,tAVTETH,tEDOUSD,tEDOBTC,tEDOETH,tBTGUSD,tBTGBTC,tDATUSD,tDATBTC,tDATETH,tQSHUSD,tQSHBTC,tQSHETH,tYYWUSD,tYYWBTC,tYYWETH,tGNTUSD,tGNTBTC,tGNTETH,tSNTUSD,tSNTBTC,tSNTETH,tIOTEUR,tBATUSD,tBATBTC,tBATETH,tMNAUSD,tMNABTC,tMNAETH,tFUNUSD,tFUNBTC,tFUNETH,tZRXUSD,tZRXBTC,tZRXETH,tTNBUSD,tTNBBTC,tTNBETH,tSPKUSD,tSPKBTC,tSPKETH,tTRXUSD,tTRXBTC,tTRXETH,tRCNUSD,tRCNBTC,tRCNETH,tRLCUSD,tRLCBTC,tRLCETH,tAIDUSD,tAIDBTC,tAIDETH,tSNGUSD,tSNGBTC,tSNGETH,tREPUSD,tREPBTC,tREPETH,tELFUSD,tELFBTC,tELFETH,tNECUSD,tNECBTC,tNECETH,tBTCGBP,tETHEUR,tETHJPY,tETHGBP,tNEOEUR,tNEOJPY,tNEOGBP,tEOSEUR,tEOSJPY,tEOSGBP,tIOTJPY,tIOTGBP,tIOSUSD,tIOSBTC,tIOSETH,tAIOUSD,tAIOBTC,tAIOETH,tREQUSD,tREQBTC,tREQETH,tRDNUSD,tRDNBTC,tRDNETH,tLRCUSD,tLRCBTC,tLRCETH,tWAXUSD,tWAXBTC,tWAXETH,tDAIUSD,tDAIBTC,tDAIETH,tAGIUSD,tAGIBTC,tAGIETH,tBFTUSD,tBFTBTC,tBFTETH,tMTNUSD,tMTNBTC,tMTNETH,tODEUSD,tODEBTC,tODEETH,tANTUSD,tANTBTC,tANTETH,tDTHUSD,tDTHBTC,tDTHETH,tMITUSD,tMITBTC,tMITETH,tSTJUSD,tSTJBTC,tSTJETH,tXLMUSD,tXLMEUR,tXLMJPY,tXLMGBP,tXLMBTC,tXLMETH,tXVGUSD,tXVGEUR,tXVGJPY,tXVGGBP,tXVGBTC,tXVGETH,tBCIUSD,tBCIBTC,tMKRUSD,tMKRBTC,tMKRETH,tKNCUSD,tKNCBTC,tKNCETH,tPOAUSD,tPOABTC,tPOAETH,tEVTUSD,tLYMUSD,tLYMBTC,tLYMETH,tUTKUSD,tUTKBTC,tUTKETH,tVEEUSD,tVEEBTC,tVEEETH,tDADUSD,tDADBTC,tDADETH,tORSUSD,tORSBTC,tORSETH,tAUCUSD,tAUCBTC,tAUCETH,tPOYUSD,tPOYBTC,tPOYETH,tFSNUSD,tFSNBTC,tFSNETH,tCBTUSD,tCBTBTC,tCBTETH,tZCNUSD,tZCNBTC,tZCNETH,tSENUSD,tSENBTC,tSENETH,tNCAUSD,tNCABTC,tNCAETH,tCNDUSD,tCNDBTC,tCNDETH,tCTXUSD,tCTXBTC,tCTXETH,tPAIUSD,tPAIBTC,tSEEUSD,tSEEBTC,tSEEETH,tESSUSD,tESSBTC,tESSETH,tATMUSD,tATMBTC,tATMETH,tHOTUSD,tHOTBTC,tHOTETH,tDTAUSD,tDTABTC,tDTAETH,tIQXUSD,tIQXBTC,tIQXEOS,tWPRUSD,tWPRBTC,PRETH,tZILUSD,tZILBTC,tZILETH,tBNTUSD,tBNTBTC,tBNTETH,tABSUSD,tABSETH,tXRAUSD,tXRAETH,tMANUSD,tMANETH,tBBNUSD,tBBNETH,tNIOUSD,tNIOETH,tDGXUSD,tDGXETH,tVETUSD,tVETBTC,tVETETH,tUTNUSD,tUTNETH,tTKNUSD,tTKNETH,tGOTUSD,tGOTEUR,tGOTETH,tXTZUSD,tXTZBTC,tCNNUSD,tCNNETH,tBOXUSD,tBOXETH,tTRXEUR,tTRXGBP,tTRXJPY,tMGOUSD,tMGOETH,tRTEUSD,tRTEETH,tYGGUSD,tYGGETH,tMLNUSD,tMLNETH,tWTCUSD,tWTCETH,tCSXUSD,tCSXETH,tOMNUSD,tOMNBTC,tINTUSD,tINTETH,tDRNUSD,tDRNETH,tPNKUSD,tPNKETH,tDGBUSD,tDGBBTC,tBSVUSD,tBSVBTC,tBABUSD,tBABBTC,tWLOUSD,tWLOXLM,tVLDUSD,tVLDETH,tENJUSD,tENJETH,tONLUSD,tONLETH,tRBTUSD,tRBTBTC,tUSTUSD,tEUTEUR,tEUTUSD,tGSDUSD,tUDCUSD,tTSDUSD,tPAXUSD,tRIFUSD,tRIFBTC,tPASUSD,tPASETH,tVSYUSD,tVSYBTC,tZRXDAI,tMKRDAI,tOMGDAI,tBTTUSD,tBTTBTC,tBTCUST,tETHUST,tCLOUSD,tCLOBTC,tIMPUSD,tIMPETH,tLTCUST,tEOSUST,tBABUST,tSCRUSD,tSCRETH,tGNOUSD,tGNOETH,tGENUSD,tGENETH,tATOUSD,tATOBTC,tATOETH,tWBTUSD,tXCHUSD,tEUSUSD,tWBTETH,tXCHETH,tEUSETH,tLEOUSD,tLEOBTC,tLEOUST,tLEOEOS,tLEOETH,tASTUSD,tASTETH,tFOAUSD,tFOAETH,tUFRUSD,tUFRETH,tZBTUSD,tZBTUST,tOKBUSD,tUSKUSD,tGTXUSD,tKANUSD,tOKBUST,tOKBETH,tOKBBTC,tUSKUST,tUSKETH,tUSKBTC,tUSKEOS,tGTXUST,tKANUST,tAMPUSD,tALGUSD,tALGBTC,tALGUST,tBTCXCH,tSWMUSD,tSWMETH,tTRIUSD,tTRIETH,tLOOUSD,tLOOETH,tAMPUST,tDUSK:USD,tDUSK:BTC,tUOSUSD,tUOSBTC,tRRBUSD,tRRBUST,tDTXUSD,tDTXUST,tAMPBTC,tFTTUSD,tFTTUST,tPAXUST,tUDCUST,tTSDUST,tBTC:CNHT,tUST:CNHT,tCNH:CNHT,tCHZUSD,tCHZUST,tBTCF0:USTF0,tETHF0:USTF0"));
             services.AddRateProviderExchangeSharp<ExchangeOKExAPI>(new("okex", "OKEx", "https://www.okex.com/api/futures/v3/instruments/ticker"));
             services.AddRateProviderExchangeSharp<ExchangeCoinbaseAPI>(new("coinbasepro", "Coinbase Pro", "https://api.pro.coinbase.com/products"));
 
@@ -597,6 +618,7 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
             services.AddRateProvider<FreeCurrencyRatesRateProvider>();
             services.AddRateProvider<BitmyntRateProvider>();
             services.AddRateProvider<BareBitcoinRateProvider>();
+            services.AddRateProvider<CoinmateRateProvider>();
 
             services.AddSingleton<InvoiceBlobMigratorHostedService>();
             services.AddSingleton<IHostedService, InvoiceBlobMigratorHostedService>(o => o.GetRequiredService<InvoiceBlobMigratorHostedService>());
@@ -617,6 +639,7 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
         {
             services.AddSingleton<IRateProvider, T>();
         }
+
         public static IServiceCollection AddBTCPayNetwork(this IServiceCollection services, BTCPayNetworkBase network)
         {
             services.AddSingleton(new DefaultRules(network.DefaultRateRules));
@@ -629,6 +652,7 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
             services.AddSingleton<CurrencyDataProvider, InMemoryCurrencyDataProvider>(c => new InMemoryCurrencyDataProvider(currencyData));
             return services;
         }
+
         public static IServiceCollection AddBTCPayNetwork(this IServiceCollection services, BTCPayNetwork network)
         {
             services.AddSingleton(new DefaultRules(network.DefaultRateRules));
@@ -638,22 +662,26 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
                 services.AddDefaultPrettyName(pmi, network.DisplayName);
                 services.AddSingleton<BTCPayNetworkBase>(network);
                 services.AddSingleton<IPaymentMethodHandler>(provider =>
-                (BitcoinLikePaymentHandler)ActivatorUtilities.CreateInstance(provider, typeof(BitcoinLikePaymentHandler), new object[] { network, pmi }));
+                    (BitcoinLikePaymentHandler)ActivatorUtilities.CreateInstance(provider, typeof(BitcoinLikePaymentHandler), new object[] { network, pmi }));
                 services.AddSingleton<IPaymentLinkExtension>(provider =>
-(IPaymentLinkExtension)ActivatorUtilities.CreateInstance(provider, typeof(BitcoinPaymentLinkExtension), new object[] { network, pmi }));
+                    (IPaymentLinkExtension)ActivatorUtilities.CreateInstance(provider, typeof(BitcoinPaymentLinkExtension), new object[] { network, pmi }));
                 services.AddSingleton<ICheckoutModelExtension>(provider =>
-    (BitcoinCheckoutModelExtension)ActivatorUtilities.CreateInstance(provider, typeof(BitcoinCheckoutModelExtension), new object[] { network, pmi }));
+                    (BitcoinCheckoutModelExtension)ActivatorUtilities.CreateInstance(provider, typeof(BitcoinCheckoutModelExtension),
+                        new object[] { network, pmi }));
                 services.AddSingleton<IPaymentMethodBitpayAPIExtension>(provider =>
-(IPaymentMethodBitpayAPIExtension)ActivatorUtilities.CreateInstance(provider, typeof(BitcoinPaymentMethodBitpayAPIExtension), new object[] { pmi }));
+                    (IPaymentMethodBitpayAPIExtension)ActivatorUtilities.CreateInstance(provider, typeof(BitcoinPaymentMethodBitpayAPIExtension),
+                        new object[] { pmi }));
 
                 services.AddSingleton<ICheckoutCheatModeExtension>(provider =>
-(ICheckoutCheatModeExtension)ActivatorUtilities.CreateInstance(provider, typeof(BitcoinCheckoutCheatModeExtension), new object[] { network }));
+                    (ICheckoutCheatModeExtension)ActivatorUtilities.CreateInstance(provider, typeof(BitcoinCheckoutCheatModeExtension),
+                        new object[] { network }));
 
                 if (!network.ReadonlyWallet && network.WalletSupported)
                 {
                     var payoutMethodId = PayoutTypes.CHAIN.GetPayoutMethodId(network.CryptoCode);
                     services.AddSingleton<IPayoutHandler>(provider =>
-    (IPayoutHandler)ActivatorUtilities.CreateInstance(provider, typeof(BitcoinLikePayoutHandler), new object[] { payoutMethodId, network }));
+                        (IPayoutHandler)ActivatorUtilities.CreateInstance(provider, typeof(BitcoinLikePayoutHandler),
+                            new object[] { payoutMethodId, network }));
                 }
             }
             if (network.NBitcoinNetwork.Consensus.SupportSegwit && network.SupportLightning)
@@ -666,18 +694,23 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
                     else
                         services.AddDefaultPrettyName(pmi, $"Lightning ({network.DisplayName})");
                     services.AddSingleton<IPaymentMethodHandler>(provider =>
-                    (LightningLikePaymentHandler)ActivatorUtilities.CreateInstance(provider, typeof(LightningLikePaymentHandler), new object[] { network, pmi }));
+                        (LightningLikePaymentHandler)ActivatorUtilities.CreateInstance(provider, typeof(LightningLikePaymentHandler),
+                            new object[] { network, pmi }));
                     services.AddSingleton<IPaymentLinkExtension>(provider =>
-(IPaymentLinkExtension)ActivatorUtilities.CreateInstance(provider, typeof(LightningPaymentLinkExtension), new object[] { network, pmi }));
+                        (IPaymentLinkExtension)ActivatorUtilities.CreateInstance(provider, typeof(LightningPaymentLinkExtension),
+                            new object[] { network, pmi }));
                     services.AddSingleton<ICheckoutModelExtension>(provider =>
-                    (ICheckoutModelExtension)ActivatorUtilities.CreateInstance(provider, typeof(LNCheckoutModelExtension), new object[] { network, pmi }));
+                        (ICheckoutModelExtension)ActivatorUtilities.CreateInstance(provider, typeof(LNCheckoutModelExtension), new object[] { network, pmi }));
                     services.AddSingleton<IPaymentMethodBitpayAPIExtension>(provider =>
-(IPaymentMethodBitpayAPIExtension)ActivatorUtilities.CreateInstance(provider, typeof(LightningPaymentMethodBitpayAPIExtension), new object[] { pmi }));
+                        (IPaymentMethodBitpayAPIExtension)ActivatorUtilities.CreateInstance(provider, typeof(LightningPaymentMethodBitpayAPIExtension),
+                            new object[] { pmi }));
                     var payoutMethodId = PayoutTypes.LN.GetPayoutMethodId(network.CryptoCode);
                     services.AddSingleton<IPayoutHandler>(provider =>
-    (IPayoutHandler)ActivatorUtilities.CreateInstance(provider, typeof(LightningLikePayoutHandler), new object[] { payoutMethodId, network }));
+                        (IPayoutHandler)ActivatorUtilities.CreateInstance(provider, typeof(LightningLikePayoutHandler),
+                            new object[] { payoutMethodId, network }));
                     services.AddSingleton<ICheckoutCheatModeExtension>(provider =>
-(ICheckoutCheatModeExtension)ActivatorUtilities.CreateInstance(provider, typeof(LightningCheckoutCheatModeExtension), new object[] { network }));
+                        (ICheckoutCheatModeExtension)ActivatorUtilities.CreateInstance(provider, typeof(LightningCheckoutCheatModeExtension),
+                            new object[] { network }));
                 }
                 // LNURL
                 {
@@ -687,24 +720,31 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
                     else
                         services.AddDefaultPrettyName(pmi, $"Lightning ({network.DisplayName} via LNURL)");
                     services.AddSingleton<IPaymentMethodHandler>(provider =>
-    (LNURLPayPaymentHandler)ActivatorUtilities.CreateInstance(provider, typeof(LNURLPayPaymentHandler), new object[] { network, pmi }));
+                        (LNURLPayPaymentHandler)ActivatorUtilities.CreateInstance(provider, typeof(LNURLPayPaymentHandler), new object[] { network, pmi }));
                     services.AddSingleton<IPaymentLinkExtension>(provider =>
-                    (IPaymentLinkExtension)ActivatorUtilities.CreateInstance(provider, typeof(LNURLPayPaymentLinkExtension), new object[] { network, pmi }));
+                        (IPaymentLinkExtension)ActivatorUtilities.CreateInstance(provider, typeof(LNURLPayPaymentLinkExtension),
+                            new object[] { network, pmi }));
                     services.AddSingleton<ICheckoutModelExtension>(provider =>
-(ICheckoutModelExtension)ActivatorUtilities.CreateInstance(provider, typeof(LNURLCheckoutModelExtension), new object[] { network, pmi }));
+                        (ICheckoutModelExtension)ActivatorUtilities.CreateInstance(provider, typeof(LNURLCheckoutModelExtension),
+                            new object[] { network, pmi }));
                     services.AddSingleton<IPaymentMethodBitpayAPIExtension>(provider =>
-(IPaymentMethodBitpayAPIExtension)ActivatorUtilities.CreateInstance(provider, typeof(LNURLPayPaymentMethodBitpayAPIExtension), new object[] { pmi }));
+                        (IPaymentMethodBitpayAPIExtension)ActivatorUtilities.CreateInstance(provider, typeof(LNURLPayPaymentMethodBitpayAPIExtension),
+                            new object[] { pmi }));
                 }
             }
+
             return services;
         }
+
         public static void AddTransactionLinkProvider(this IServiceCollection services, PaymentMethodId paymentMethodId, TransactionLinkProvider provider)
         {
             services.AddSingleton<TransactionLinkProviders.Entry>(new TransactionLinkProviders.Entry(paymentMethodId, provider));
         }
+
         [Obsolete("Use AddTransactionLinkProvider(services, PaymentTypes.CHAIN.GetPaymentMethodId(cryptoCode), provider) instead")]
         public static void AddTransactionLinkProvider(this IServiceCollection services, string cryptoCode, TransactionLinkProvider provider) =>
             AddTransactionLinkProvider(services, PaymentTypes.CHAIN.GetPaymentMethodId(cryptoCode), provider);
+
         public static void AddRateProviderExchangeSharp<T>(this IServiceCollection services, RateSourceInfo rateInfo) where T : ExchangeSharp.ExchangeAPI
         {
             services.AddSingleton<IRateProvider, ExchangeSharpRateProvider<T>>(o =>
@@ -715,23 +755,39 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
             });
         }
 
-        private static void AddSettingsAccessor<T>(IServiceCollection services) where T : class, new()
-        {
-            services.TryAddSingleton<ISettingsAccessor<T>, SettingsAccessor<T>>();
-            services.AddSingleton<IHostedService>(provider => (SettingsAccessor<T>)provider.GetRequiredService<ISettingsAccessor<T>>());
-            services.AddSingleton<IStartupTask>(provider => (SettingsAccessor<T>)provider.GetRequiredService<ISettingsAccessor<T>>());
-            // Singletons shouldn't reference the settings directly, but ISettingsAccessor<T>, since singletons won't have refreshed values of the setting
-            services.AddTransient<T>(provider => provider.GetRequiredService<ISettingsAccessor<T>>().Settings);
-        }
-
         public static void SkipModelValidation<T>(this IServiceCollection services)
         {
             services.AddSingleton<SkippableObjectValidatorProvider.ISkipValidation, SkippableObjectValidatorProvider.SkipValidationType<T>>();
         }
+
         private const long MAX_DEBUG_LOG_FILE_SIZE = 2000000; // If debug log is in use roll it every N MB.
+
         private static void AddBtcPayServerAuthenticationSchemes(this IServiceCollection services)
         {
+            services.PostConfigure<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme, opt =>
+            {
+                opt.LoginPath = "/login";
+                opt.AccessDeniedPath = "/errors/403";
+                opt.LogoutPath = "/logout";
+            });
             services.AddAuthentication()
+                .AddCookie(AuthenticationSchemes.LimitedLogin, options =>
+                {
+                    options.Cookie.Name = "pwd_verified";
+                    options.ExpireTimeSpan = TimeSpan.FromMinutes(60); // short-lived
+                    options.SlidingExpiration = false;
+                    options.Cookie.HttpOnly = true;
+                    options.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.SameAsRequest;
+                    options.Events.OnRedirectToLogin = context =>
+                    {
+                        context.RedirectUri = QueryHelpers.AddQueryString(context.RedirectUri, [KeyValuePair.Create("allowLimitedLogin", "true")]);
+                        context.Response.Redirect(context.RedirectUri);
+                        return Task.CompletedTask;
+                    };
+                    options.LoginPath = "/login";
+                    options.AccessDeniedPath = "/errors/403";
+                    options.LogoutPath = "/logout";
+                })
                 .AddBitpayAuthentication()
                 .AddAPIKeyAuthentication();
         }
@@ -742,6 +798,7 @@ o.GetRequiredService<IEnumerable<IPaymentLinkExtension>>().ToDictionary(o => o.P
             app.UseMiddleware<BTCPayMiddleware>();
             return app;
         }
+
         public static IApplicationBuilder UseHeadersOverride(this IApplicationBuilder app)
         {
             app.UseMiddleware<HeadersOverrideMiddleware>();

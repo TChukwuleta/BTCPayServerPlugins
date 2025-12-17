@@ -9,7 +9,8 @@
 	var walletId = Context.GetRouteValue("walletId").ToString();
 	Model.ReturnUrl ??= Url.WalletTransactions(walletId);
 	Layout = "_LayoutWizard";
-	ViewData.SetActivePage(WalletsNavPages.Send, StringLocalizer["Send {0}", Model.CryptoCode], walletId);
+    ViewData.SetLayoutModel(new LayoutModel($"{nameof(WalletsNavPages.Send)}-{Model.CryptoCode}", StringLocalizer["Send {0}", Model.CryptoCode])
+        .SetCategory(WellKnownCategories.ForWallet(Model.CryptoCode)));
 	Csp.Add("worker-src", "blob:");
 	Csp.UnsafeEval();
 }
@@ -127,7 +128,7 @@
                     </div>
                     <div class="form-text crypto-info">
                         <span text-translate="true">Your available balance is</span>
-                        <button type="button" class="crypto-balance-link btn btn-link p-0 align-baseline">@Model.CurrentBalance</button> <span>@Model.CryptoCode</span>.
+                        <button id="SweepBalance" type="button" class="crypto-balance-link btn btn-link p-0 align-baseline">@Model.CurrentBalance</button> <span>@Model.CryptoCode</span>.
                         @if (Model.ImmatureBalance > 0)
                         {
                             <span><br>@StringLocalizer["Note: {0} are still immature and require additional confirmations.", $"{Model.ImmatureBalance} {Model.CryptoCode}"]</span>
@@ -205,7 +206,7 @@
                     <input asp-for="AlwaysIncludeNonWitnessUTXO" class="btcpay-toggle me-3"/>
                     <label asp-for="AlwaysIncludeNonWitnessUTXO" class="form-check-label"></label>
                 </div>
-                
+
                 @if (!string.IsNullOrEmpty(Model.PayJoinBIP21))
                 {
                     <div class="d-flex mb-3">
