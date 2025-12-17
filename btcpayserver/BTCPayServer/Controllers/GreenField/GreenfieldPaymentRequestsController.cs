@@ -119,7 +119,7 @@ namespace BTCPayServer.Controllers.Greenfield
 				if (pr.Invoices.GetReusableInvoice(amount)?.Id is string invoiceId)
 				{
 					var inv = await _InvoiceRepository.GetInvoice(invoiceId);
-					return Ok(GreenfieldInvoiceController.ToModel(inv, _linkGenerator, Request));
+					return Ok(GreenfieldInvoiceController.ToModel(inv, _linkGenerator, _currencyNameTable, Request));
 				}
 			}
 
@@ -127,7 +127,7 @@ namespace BTCPayServer.Controllers.Greenfield
 			{
 				var prData = await _paymentRequestRepository.FindPaymentRequest(pr.Id, null);
 				var invoice = await _invoiceController.CreatePaymentRequestInvoice(prData, amount, pr.AmountDue, this.StoreData, Request, cancellationToken);
-				return Ok(GreenfieldInvoiceController.ToModel(invoice, _linkGenerator, Request));
+				return Ok(GreenfieldInvoiceController.ToModel(invoice, _linkGenerator, _currencyNameTable, Request));
 			}
 			catch (BitpayHttpException e)
 			{
@@ -182,7 +182,7 @@ namespace BTCPayServer.Controllers.Greenfield
 					new PaymentRequestQuery() { StoreId = storeId, Ids = new[] { paymentRequestId } })).FirstOrDefault();
 				if (pr is null)
 					return PaymentRequestNotFound();
-				if ((pr.Amount != request.Amount && request.Amount != 0.0m) || 
+				if ((pr.Amount != request.Amount && request.Amount != 0.0m) ||
 					(pr.Currency != request.Currency && request.Currency != null))
 				{
 					var prWithInvoices = await this.PaymentRequestService.GetPaymentRequest(paymentRequestId, GetUserId());
@@ -205,7 +205,7 @@ namespace BTCPayServer.Controllers.Greenfield
 				pr = new PaymentRequestData()
 				{
 					StoreDataId = storeId,
-					Status = Client.Models.PaymentRequestStatus.Pending,
+					Status = PaymentRequestStatus.Pending,
 					Created = DateTimeOffset.UtcNow,
 					Amount = request.Amount,
 					Currency = request.Currency ?? StoreData.GetStoreBlob().DefaultCurrency,
@@ -213,18 +213,21 @@ namespace BTCPayServer.Controllers.Greenfield
 				};
 			}
 
+			pr.ReferenceId = string.IsNullOrEmpty(request.ReferenceId) ? null : request.ReferenceId;
+
 			if (!ModelState.IsValid)
 				return this.CreateValidationError(ModelState);
 
 			var blob = pr.GetBlob();
 			pr.SetBlob(new()
 			{
+				Title = request.Title,
 				AllowCustomPaymentAmounts = request.AllowCustomPaymentAmounts,
 				Description = request.Description,
 				Email = request.Email,
 				FormId = request.FormId,
-				Title = request.Title,
-				FormResponse = blob.FormId != request.FormId ? null : blob.FormResponse
+				FormResponse = blob.FormId != request.FormId ? null : blob.FormResponse,
+                RequestBaseUrl = Request.GetRequestBaseUrl().ToString()
 			});
 			pr = await _paymentRequestRepository.CreateOrUpdatePaymentRequest(pr);
 			return Ok(FromModel(pr));
@@ -251,6 +254,7 @@ namespace BTCPayServer.Controllers.Greenfield
 				Title = blob.Title,
 				ExpiryDate = data.Expiry,
 				Email = blob.Email,
+				ReferenceId = data.ReferenceId,
 				AllowCustomPaymentAmounts = blob.AllowCustomPaymentAmounts,
 				FormResponse = blob.FormResponse,
 				FormId = blob.FormId

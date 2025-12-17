@@ -1,31 +1,33 @@
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using BTCPayServer.Data;
-using Microsoft.AspNetCore.Identity;
-using System.Linq;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Authorization;
-using BTCPayServer.Abstractions.Constants;
-using BTCPayServer.Services.Stores;
-using System.Collections.Generic;
-using Newtonsoft.Json.Linq;
-using BTCPayServer.Payments;
-using StoreData = BTCPayServer.Data.StoreData;
-using BTCPayServer.Plugins.GhostPlugin.Data;
-using BTCPayServer.Plugins.GhostPlugin.Services;
-using Microsoft.EntityFrameworkCore;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
-using BTCPayServer.Plugins.GhostPlugin.Helper;
-using BTCPayServer.Plugins.GhostPlugin.ViewModels;
-using BTCPayServer.Services.Mails;
-using Microsoft.AspNetCore.Routing;
-using Newtonsoft.Json;
-using BTCPayServer.Services.Apps;
-using BTCPayServer.Client;
+using System.Threading.Tasks;
+using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Models;
+using BTCPayServer.Client;
 using BTCPayServer.Controllers;
+using BTCPayServer.Data;
+using BTCPayServer.Payments;
+using BTCPayServer.Plugins.Emails;
+using BTCPayServer.Plugins.Emails.Controllers;
+using BTCPayServer.Plugins.Emails.Services;
+using BTCPayServer.Plugins.GhostPlugin.Data;
+using BTCPayServer.Plugins.GhostPlugin.Helper;
+using BTCPayServer.Plugins.GhostPlugin.Services;
+using BTCPayServer.Plugins.GhostPlugin.ViewModels;
+using BTCPayServer.Services.Apps;
+using BTCPayServer.Services.Stores;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using StoreData = BTCPayServer.Data.StoreData;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
 
@@ -89,11 +91,16 @@ public class UIGhostController : Controller
         var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
         if (!isEmailSettingsConfigured && !string.IsNullOrEmpty(ghostSetting?.AdminApiKey))
         {
-            TempData.SetStatusMessageModel(new StatusMessageModel()
+            TempData.SetStatusMessageModel(new StatusMessageModel
             {
-                Html = $"Kindly <a href='{Url.Action(nameof(UIStoresController.StoreEmailSettings), "UIStores", new { storeId = CurrentStore.Id })}' class='alert-link'>configure Email SMTP</a> to be able to send reminder to subscribers",
+                Html = $"Kindly <a href='{Url.Action(action: nameof(UIStoresEmailController.StoreEmailSettings), controller: "UIStoresEmail",
+                    values: new
+                    {
+                        area = EmailsPlugin.Area,
+                        storeId = CurrentStore.Id
+                    })}' class='alert-link'>configure Email SMTP</a> to be able to send reminder to subscribers",
                 Severity = StatusMessageModel.StatusSeverity.Info,
-                AllowDismiss = true
+                AllowDismiss= true
             });
         }
         return View(viewModel);

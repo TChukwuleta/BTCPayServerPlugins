@@ -100,8 +100,8 @@ namespace BTCPayServer.Controllers.Greenfield
                 return this.UserNotFound();
             }
 
-            var success = await _userService.ToggleUser(user.Id, request.Locked ? DateTimeOffset.MaxValue : null);
-            return success.HasValue && success.Value ? Ok() : this.CreateAPIError("invalid-state",
+            var success = await _userService.SetDisabled(user.Id, request.Locked);
+            return success is not UserService.SetDisabledResult.Error  ? Ok() : this.CreateAPIError("invalid-state",
                 $"{(request.Locked ? "Locking" : "Unlocking")} user failed");
         }
 
@@ -117,7 +117,7 @@ namespace BTCPayServer.Controllers.Greenfield
 
             if (user.RequiresApproval)
             {
-                var loginLink = _callbackGenerator.ForLogin(user, Request);
+                var loginLink = _callbackGenerator.ForLogin(user);
                 return await _userService.SetUserApproval(user.Id, request.Approved, loginLink)
                     ? Ok()
                     : this.CreateAPIError("invalid-state", $"User is already {(request.Approved ? "approved" : "unapproved")}");
@@ -249,7 +249,7 @@ namespace BTCPayServer.Controllers.Greenfield
         {
             var user = await _userManager.GetUserAsync(User);
             if (user is null) return this.UserNotFound();
-            
+
             UploadImageResultModel? upload = null;
             if (file is null)
                 ModelState.AddModelError(nameof(file), "Invalid file");
@@ -286,7 +286,7 @@ namespace BTCPayServer.Controllers.Greenfield
         {
             var user = await _userManager.GetUserAsync(User);
             if (user is null) return this.UserNotFound();
-            
+
             var blob = user.GetBlob() ?? new UserBlob();
             if (!string.IsNullOrEmpty(blob.ImageUrl))
             {
@@ -315,10 +315,10 @@ namespace BTCPayServer.Controllers.Greenfield
                 ModelState.AddModelError(nameof(request.Email), "Email is missing");
             if (!MailboxAddressValidator.IsMailboxAddress(request.Email))
                 ModelState.AddModelError(nameof(request.Email), "Invalid email");
-            
+
             if (!ModelState.IsValid)
                 return this.CreateValidationError(ModelState);
-            
+
             if (User.Identity is null)
                 throw new JsonHttpException(this.StatusCode(401));
             var anyAdmin = (await _userManager.GetUsersInRoleAsync(Roles.ServerAdmin)).Any();
@@ -358,6 +358,7 @@ namespace BTCPayServer.Controllers.Greenfield
                 Created = DateTimeOffset.UtcNow,
                 Approved = isAdmin // auto-approve first admin and users created by an admin
             };
+
             var blob = user.GetBlob() ?? new();
             blob.Name = request.Name;
             blob.ImageUrl = request.ImageUrl;
@@ -412,14 +413,7 @@ namespace BTCPayServer.Controllers.Greenfield
                     await _settingsRepository.FirstAdminRegistered(policies, _options.UpdateUrl != null, _options.DisableRegistration, Logs);
                 }
             }
-            var currentUser = await _userManager.GetUserAsync(User);
-            var userEvent = currentUser switch
-            {
-                { } invitedBy => await UserEvent.Invited.Create(user, invitedBy, _callbackGenerator, Request, true),
-                _ => await UserEvent.Registered.Create(user, _callbackGenerator, Request)
-            };
-            _eventAggregator.Publish(userEvent);
-
+            _eventAggregator.Publish(await UserEvent.Registered.Create(user, await _userManager.GetUserAsync(User), _callbackGenerator, request.SendInvitationEmail is not false));
             var model = await ForAPI(user);
             return CreatedAtAction(string.Empty, model);
         }
@@ -443,7 +437,7 @@ namespace BTCPayServer.Controllers.Greenfield
             }
 
             // User shouldn't be deleted if it's the only admin
-            if (await _userService.IsUserTheOnlyOneAdmin(user))
+            if (await _userService.IsUserTheOnlyOneAdmin(new (user, baseUrl: Request.GetRequestBaseUrl())))
             {
                 return Forbid(AuthenticationSchemes.GreenfieldBasic);
             }

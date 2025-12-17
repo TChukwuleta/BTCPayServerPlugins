@@ -12,10 +12,8 @@ using BTCPayServer.Services;
 using BTCPayServer.Data;
 using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
-using BTCPayServer.HostedServices.Webhooks;
 using BTCPayServer.Logging;
 using BTCPayServer.Payments;
-using BTCPayServer.Payments.Bitcoin;
 using BTCPayServer.Rating;
 using BTCPayServer.Security;
 using BTCPayServer.Security.Greenfield;
@@ -29,11 +27,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using NBitcoin;
 using Newtonsoft.Json.Linq;
 using StoreData = BTCPayServer.Data.StoreData;
-using Serilog.Filters;
 using BTCPayServer.Payouts;
+using BTCPayServer.Plugins.Webhooks;
 using Microsoft.Extensions.Localization;
 
 namespace BTCPayServer.Controllers
@@ -42,7 +39,6 @@ namespace BTCPayServer.Controllers
     public partial class UIInvoiceController : Controller
     {
         readonly InvoiceRepository _InvoiceRepository;
-        private readonly WalletRepository _walletRepository;
         readonly RateFetcher _RateProvider;
         readonly StoreRepository _StoreRepository;
         readonly UserManager<ApplicationUser> _UserManager;
@@ -74,14 +70,12 @@ namespace BTCPayServer.Controllers
 
         public UIInvoiceController(
             InvoiceRepository invoiceRepository,
-            WalletRepository walletRepository,
             DisplayFormatter displayFormatter,
             CurrencyNameTable currencyNameTable,
             UserManager<ApplicationUser> userManager,
             RateFetcher rateProvider,
             StoreRepository storeRepository,
             EventAggregator eventAggregator,
-            ContentSecurityPolicies csp,
             BTCPayNetworkProvider networkProvider,
             PayoutMethodHandlerDictionary payoutHandlers,
             PaymentMethodHandlerDictionary paymentMethodHandlerDictionary,
@@ -108,7 +102,6 @@ namespace BTCPayServer.Controllers
             _CurrencyNameTable = currencyNameTable ?? throw new ArgumentNullException(nameof(currencyNameTable));
             _StoreRepository = storeRepository ?? throw new ArgumentNullException(nameof(storeRepository));
             _InvoiceRepository = invoiceRepository ?? throw new ArgumentNullException(nameof(invoiceRepository));
-            _walletRepository = walletRepository;
             _RateProvider = rateProvider ?? throw new ArgumentNullException(nameof(rateProvider));
             _UserManager = userManager;
             _EventAggregator = eventAggregator;
@@ -145,7 +138,7 @@ namespace BTCPayServer.Controllers
                 amount = amountDue;
             var redirectUrl = _linkGenerator.PaymentRequestLink(id, request.Scheme, request.Host, request.PathBase);
 
-            JObject invoiceMetadata = prData.GetBlob()?.FormResponse ?? new JObject();
+            JObject invoiceMetadata = prBlob.FormResponse ?? new JObject();
             invoiceMetadata.Merge(new InvoiceMetadata
             {
                 OrderId = PaymentRequestRepository.GetOrderIdForPaymentRequest(id),
@@ -163,7 +156,8 @@ namespace BTCPayServer.Controllers
                     Checkout = { RedirectURL = redirectUrl },
                     Receipt = new InvoiceDataBase.ReceiptOptions { Enabled = false }
                 };
-
+            if (prData.ReferenceId is not null or "")
+                invoiceRequest.AdditionalSearchTerms = [prData.ReferenceId];
             var additionalTags = new List<string> { PaymentRequestRepository.GetInternalTag(id) };
             return await CreateInvoiceCoreRaw(invoiceRequest, storeData, request.GetAbsoluteRoot(), additionalTags, cancellationToken);
         }
@@ -268,13 +262,11 @@ namespace BTCPayServer.Controllers
                             "No wallet has been linked to your BTCPay Store. See the following link for more information on how to connect your store and wallet. (https://docs.btcpayserver.org/WalletSetup/)");
                     else
                     {
-                        var list = logs.ToList();
-                        var errors = list.Where(l => l.Severity == InvoiceEventData.EventSeverity.Error).Select(l => l.Log);
                         message.AppendLine("Error retrieving a matching payment method or rate.");
-                        foreach (var error in errors)
-                            message.AppendLine(error);
+                        foreach (var error in logs.ToList())
+                            message.AppendLine(error.ToString());
                     }
-                    
+
                     throw new BitpayHttpException(400, message.ToString());
                 }
                 entity.SetPaymentPrompts(new PaymentPromptDictionary(contexts.Select(c => c.Prompt)));

@@ -466,7 +466,9 @@ namespace BTCPayServer.Controllers
 
         private async Task<T> SetViewModelValues<T>(T viewModel) where T : AddApiKeyViewModel
         {
-            viewModel.Stores = await _StoreRepository.GetStoresByUserId(_userManager.GetUserId(User));
+            var stores = await _StoreRepository.GetStoresByUserId(_userManager.GetUserId(User));
+            viewModel.Stores = stores.OrderBy(store => store.StoreName, StringComparer.InvariantCultureIgnoreCase).ToArray();
+
             var isAdmin = (await _authorizationService.AuthorizeAsync(User, Policies.CanModifyServerSettings))
                 .Succeeded;
             viewModel.PermissionValues ??= Policies.AllPolicies
@@ -536,6 +538,14 @@ namespace BTCPayServer.Controllers
                     {$"{Policies.CanViewPaymentRequests}:", ("View your payment requests", "Allows viewing the selected stores' payment requests.")},
                     {Policies.CanViewPullPayments, ("View your pull payments", "Allows viewing pull payments on all your stores.")},
                     {$"{Policies.CanViewPullPayments}:", ("View selected stores' pull payments", "Allows viewing pull payments on the selected stores.")},
+                    {Policies.CanViewOfferings, ("View your offerings", "Allows viewing offerings on all your stores.")},
+                    {$"{Policies.CanViewOfferings}:", ("View your offerings", "Allows viewing offerings on the selected stores.")},
+                    {Policies.CanModifyOfferings, ("Modify your offerings", "Allows modifying offerings on all your stores.")},
+                    {$"{Policies.CanModifyOfferings}:", ("Modify your offerings", "Allows modifying offerings on the selected stores.")},
+                    {Policies.CanManageSubscribers, ("Manage your subscribers", "Allows managing subscribers on all your stores.")},
+                    {$"{Policies.CanManageSubscribers}:", ("Manage your subscribers", "Allows managing subscribers on the selected stores.")},
+                    {Policies.CanCreditSubscribers, ("Credit your subscribers", "Allows crediting subscribers on all your stores.")},
+                    {$"{Policies.CanCreditSubscribers}:", ("Credit your subscribers", "Allows crediting subscribers on the selected stores.")},
                     {Policies.CanManagePullPayments, ("Manage your pull payments", "Allows viewing, modifying, deleting and creating pull payments on all your stores.")},
                     {$"{Policies.CanManagePullPayments}:", ("Manage selected stores' pull payments", "Allows viewing, modifying, deleting and creating pull payments on the selected stores.")},
                     {Policies.CanArchivePullPayments, ("Archive your pull payments", "Allows deleting pull payments on all your stores.")},

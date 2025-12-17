@@ -10,12 +10,9 @@ using BTCPayServer.Data;
 using BTCPayServer.Events;
 using BTCPayServer.Models.StoreViewModels;
 using BTCPayServer.Security;
-using BTCPayServer.Services;
-using BTCPayServer.Services.Mails;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Localization;
 using NicolasDorier.RateLimits;
 using static BTCPayServer.Services.Stores.StoreRepository;
 
@@ -74,10 +71,10 @@ public partial class UIStoresController
                 var currentUser = await _userManager.GetUserAsync(HttpContext.User);
 
                 if (currentUser is not null &&
-                    (await _userManager.CreateAsync(user)) is { Succeeded: true } result)
+                    (await _userManager.CreateAsync(user)) is { Succeeded: true })
                 {
                     var invitationEmail = await _emailSenderFactory.IsComplete();
-                    var evt = await UserEvent.Invited.Create(user!, currentUser, _callbackGenerator, Request, invitationEmail);
+                    var evt = (UserEvent.Invited)await UserEvent.Registered.Create(user!, currentUser, _callbackGenerator, invitationEmail);
                     _eventAggregator.Publish(evt);
                     inviteInfo = invitationEmail
                         ? StringLocalizer["An invitation email has been sent.<br/>You may alternatively share this link with them: <a class='alert-link' href='{0}'>{0}</a>", evt.InvitationLink]

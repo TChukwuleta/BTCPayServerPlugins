@@ -26,6 +26,7 @@ using BTCPayServer.Services.Wallets;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 using NBitcoin.Payment;
@@ -58,13 +59,14 @@ namespace BTCPayServer.Tests
 
         public async Task MakeAdmin(bool isAdmin = true)
         {
-            var userManager = parent.PayTester.GetService<UserManager<ApplicationUser>>();
+            using var scope = parent.PayTester.ServiceProvider.CreateScope();
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var u = await userManager.FindByIdAsync(UserId);
             if (isAdmin)
                 await userManager.AddToRoleAsync(u, Roles.ServerAdmin);
             else
                 await userManager.RemoveFromRoleAsync(u, Roles.ServerAdmin);
-            IsAdmin = true;
+            IsAdmin = isAdmin;
         }
 
         public Task<BTCPayServerClient> CreateClient()
@@ -171,14 +173,14 @@ namespace BTCPayServer.Tests
             return controller;
         }
 
-        public async Task CreateStoreAsync()
+        public async Task CreateStoreAsync(string preferredExchange = "CoinGecko")
         {
             if (UserId is null)
             {
                 await RegisterAsync();
             }
             var store = GetController<UIUserStoresController>();
-            await store.CreateStore(new CreateStoreViewModel { Name = "Test Store", PreferredExchange = "coingecko" });
+            await store.CreateStore(new CreateStoreViewModel { Name = "Test Store", PreferredExchange = preferredExchange.ToLowerInvariant(), CanEditPreferredExchange = true});
             StoreId = store.CreatedStoreId;
             parent.Stores.Add(StoreId);
         }
@@ -225,7 +227,7 @@ namespace BTCPayServer.Tests
             Assert.IsType<RedirectToActionResult>(GetController<UIStoresController>().LightningSettings(lnSettingsVm).Result);
         }
 
-        private async Task RegisterAsync(bool isAdmin = false)
+        public async Task RegisterAsync(bool isAdmin = false)
         {
             var account = parent.PayTester.GetController<UIAccountController>();
             RegisterDetails = new RegisterViewModel()
@@ -238,7 +240,7 @@ namespace BTCPayServer.Tests
             await account.Register(RegisterDetails);
 
             //this addresses an obscure issue where LockSubscription is unintentionally set to "true",
-            //resulting in a large number of tests failing.  
+            //resulting in a large number of tests failing.
             if (account.RegisteredUserId == null)
             {
                 var settings = parent.PayTester.GetService<SettingsRepository>();
@@ -689,7 +691,7 @@ retry:
                         {
                             var xpub = (BitcoinExtPubKey)Network.Main.Parse(matched.Value);
                             var xpubTestnet = xpub.ExtPubKey.GetWif(Network.RegTest).ToString();
-                            blob1 = blob1.Replace(xpub.ToString(), xpubTestnet.ToString());
+                            blob1 = blob1.Replace(xpub.ToString(), xpubTestnet);
                             fields[1] = $"\\x{Encoders.Hex.EncodeData(ZipUtils.Zip(blob1))}";
                             localInvoice = string.Join(',', fields);
                         }
