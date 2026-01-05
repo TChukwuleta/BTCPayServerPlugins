@@ -704,6 +704,9 @@ namespace BTCPayServer.Migrations
                     b.Property<string>("StoreDataId")
                         .HasColumnType("text");
 
+                    b.Property<string>("Title")
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Status");
@@ -1580,6 +1583,10 @@ namespace BTCPayServer.Migrations
                     b.Property<string>("ProcessingInvoiceId")
                         .HasColumnType("text")
                         .HasColumnName("processing_invoice_id");
+
+                    b.Property<DateTimeOffset?>("ReminderDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reminder_date");
 
                     b.Property<string>("SuspensionReason")
                         .HasColumnType("text")

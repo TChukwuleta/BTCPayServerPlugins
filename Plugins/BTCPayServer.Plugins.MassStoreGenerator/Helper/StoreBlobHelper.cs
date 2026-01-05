@@ -41,7 +41,6 @@ namespace BTCPayServer.Plugins.MassStoreGenerator.Helper
             { "NGN", "bitnob"}
         };
 
-        public string GetRecommendedExchange() =>
-            RecommendedExchanges.Property(DefaultCurrency)?.Value.ToString() ?? "coingecko";
+        public string GetRecommendedExchange() => RecommendedExchanges.Property(DefaultCurrency)?.Value.ToString() ?? "coingecko";
     }
 }

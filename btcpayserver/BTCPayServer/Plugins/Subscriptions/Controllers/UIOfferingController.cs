@@ -69,7 +69,11 @@ public partial class UIOfferingController(
         };
 
         if (prefilledEmail != null && prefilledEmail.IsValidEmail())
+        {
+            checkoutData.NewSubscriberEmail = prefilledEmail;
             checkoutData.InvoiceMetadata = new InvoiceMetadata() { BuyerEmail = prefilledEmail }.ToJObject().ToString();
+        }
+
         ctx.PlanCheckouts.Add(checkoutData);
         await ctx.SaveChangesAsync();
         return RedirectToPlanCheckout(checkoutData.Id);
@@ -304,7 +308,7 @@ public partial class UIOfferingController(
         else if (section == SubscriptionSection.Mails)
         {
             var settings = await emailSenderFactory.GetSettings(storeId);
-            vm.EmailConfigured = settings is not null;
+            vm.EmailConfigured = settings?.IsComplete() is true;
             vm.PaymentRemindersDays = offering.DefaultPaymentRemindersDays;
             vm.EmailRules = new();
 

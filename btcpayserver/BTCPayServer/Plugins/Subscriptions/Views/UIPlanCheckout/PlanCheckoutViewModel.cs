@@ -10,7 +10,7 @@ public class PlanCheckoutViewModel
     public string Title { get; set; }
     public string StoreName { get; set; }
     public string Email { get; set; }
-    public string Id { get; set; }
+    public string CheckoutId { get; set; }
     public PlanData Data { get; set; }
     public bool IsPrefilled { get; set; }
     public bool IsTrial { get; set; }

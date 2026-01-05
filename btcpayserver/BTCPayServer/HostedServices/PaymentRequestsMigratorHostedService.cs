@@ -26,7 +26,7 @@ namespace BTCPayServer.HostedServices
         {
             _paymentRequestStreamer = paymentRequestStreamer;
         }
-        public override string SettingsKey => "PaymentRequestsMigration2";
+        public override string SettingsKey => "PaymentRequestsMigration3";
 
         protected override IQueryable<PaymentRequestData> GetQuery(ApplicationDbContext ctx, DateTimeOffset? progress)
         {

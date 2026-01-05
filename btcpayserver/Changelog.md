@@ -1,11 +1,48 @@
 # Changelog
 
+## 2.3.2
+
+This release fixes an important regression from `2.3.1` affecting support for payment methods other than BTC and Lightning.
+It also fixes several bugs in the new subscriptions feature that have been reported since the last release.
+
+### Bug fixes
+
+* Fix: Alternative payment methods would not show on the invoice checkout when the BTC Unified QR code was enabled (#7053) @NicolasDorier
+* Fix: Payment reminders were not sent to subscribers (#7055 #7064) @NicolasDorier
+* Fix: In the UI, the prefilled email set when creating a new subscriber was ignored (#7059) @NicolasDorier
+* Fix: The Subscriptions Mail tab did not always warn about unconfigured emails @NicolasDorier
+* Fix: The QR code on the subscription plan checkout did not redirect to the correct page (#7054 #7058) @yemmyharry
+
+### New features
+
+* PoS: Ability to disable zero-amount invoices (#7035 #7066) @NicolasDorier
+
+## 2.3.1
+
+Some plugins such as Ecwid plugin would crash BTCPay Server at startup in a loop. (See [this issue](https://github.com/Nisaba/btcpayserver-plugins/issues/7))
+
+This release fixes that issue.
+If you experience this issue after upgrading to 2.3.0, you ne6772ed to update through command line. You can contact us on chat.btcpayserver.org, if you need some support.
+
+### Bug fixes
+
+* Fix: Lost server email settings after update to 2.3.0 (#7047 #7038) @NicolasDorier
+* Disable all plugins when BTCPay Server crash during startup (#7046) @NicolasDorier
+* Fix: When a user is deleted, the monetized subscriber should also be deleted (#7044 #7048) @NicolasDorier
+
+### Improvements
+
+* Hide payment method selector for single payment method invoices (#6980) @AshwinGajbhiye
+* Show payment request title in wallet transaction tooltip (#6982) @AshwinGajbhiye
+
 ## 2.3.0
 
 ### New features
 
 * Subscriptions: Allow merchants to accept recurring payments from customers. (#6922) @NicolasDorier
 * Greenfield: Subscriptions API (#7022) @NicolasDorier
+* Report: Add payment requests reports (#7015) @thgO-O @rockstardev
+* Add better filtering capabilities to in the payment requests list (#7015) @thgO-O @rockstardev
 * Ambassadors can monetize access to their server. (#6986) @NicolasDorier
 * Ability to install [language packs](https://github.com/btcpayserver/btcpayserver-translator/tree/main/translations) for the backend UI. (#6943) @Abhijay007
 * Email rules
@@ -20,10 +57,11 @@
 
 * Fix: In Server Email, the rich text box (Summernote) was not saving changes in code view. (#6979) @NicolasDorier
 * Work around a browser bug where SVG icons stop displaying when served from cache. (#7003) @NicolasDorier
-* Fix: Denied 403 page if denied access to the default store (#6976) @NicolasDorier
-* Fix: Wallet report was showing a negative balance change in green (#6974) @NicolasDorier
+* Fix: Denied 403 pages if denied access to the default store (#6976) @NicolasDorier
+* Fix: A wallet report was showing a negative balance change in green (#6974) @NicolasDorier
 * Log out users immediately when it is disabled (#6971) @NicolasDorier
 * Fix: Unable to reset email settings (#6963) @NicolasDorier
+* Fix: Unable to copy fiat amount in Invoice Checkout (#6933 #7036) @rockstardev
 
 ### Improvements
 

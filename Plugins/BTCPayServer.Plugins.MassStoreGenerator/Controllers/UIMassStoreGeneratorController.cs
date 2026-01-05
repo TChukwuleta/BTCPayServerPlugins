@@ -1,20 +1,18 @@
-using System.Collections.Generic;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Client;
-using BTCPayServer.Plugins.MassStoreGenerator.ViewModels;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using BTCPayServer.Data;
-using BTCPayServer.Services.Stores;
-using Microsoft.AspNetCore.Identity;
-using System.Linq;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using BTCPayServer.Services.Rates;
-using Microsoft.Extensions.Logging;
 using BTCPayServer.Plugins.MassStoreGenerator.Helper;
-using BTCPayServer.Controllers;
+using BTCPayServer.Plugins.MassStoreGenerator.ViewModels;
+using BTCPayServer.Services.Rates;
+using BTCPayServer.Services.Stores;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace BTCPayServer.Plugins.Template;
 
@@ -22,17 +20,14 @@ namespace BTCPayServer.Plugins.Template;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIMassStoreGeneratorController : Controller
 {
-    private readonly ILogger<UIMassStoreGeneratorController> _logger;
     private readonly RateFetcher _rateFactory;
     private readonly StoreRepository _storeRepository;
     private readonly IAuthorizationService _authorizationService;
     private readonly UserManager<ApplicationUser> _userManager;
     public UIMassStoreGeneratorController
-        (RateFetcher rateFactory,
-        StoreRepository storeRepository,
-        UserManager<ApplicationUser> userManager, ILogger<UIMassStoreGeneratorController> logger, IAuthorizationService authorizationService)
+        (RateFetcher rateFactory, StoreRepository storeRepository,
+        UserManager<ApplicationUser> userManager,IAuthorizationService authorizationService)
     {
-        _logger = logger;
         _userManager = userManager;
         _rateFactory = rateFactory;
         _storeRepository = storeRepository;
@@ -56,7 +51,6 @@ public class UIMassStoreGeneratorController : Controller
         return View(vm);
     }
 
-
     [HttpPost("~/create")]
     public async Task<IActionResult> Create(List<CreateStoreViewModel> model)
     {
@@ -70,12 +64,14 @@ public class UIMassStoreGeneratorController : Controller
             var store = new StoreData { StoreName = vm.Name };
             var blob = store.GetStoreBlob();
             blob.DefaultCurrency = vm.DefaultCurrency;
-            blob.PreferredExchange = vm.PreferredExchange;
+            var rate = blob.GetOrCreateRateSettings(false);
+            rate.PreferredExchange = vm.PreferredExchange;
+            rate.RateScripting = false;
             store.SetStoreBlob(blob);
             await _storeRepository.CreateStore(userId, store);
         }
-        TempData[WellKnownTempData.SuccessMessage] = "Stores successfully created";
-        return RedirectToAction(nameof(UIStoresController.Index), "UIStores", new { storeId = CurrentStore.Id });
+        TempData[WellKnownTempData.SuccessMessage] = "Store(s) successfully created";
+        return RedirectToAction(nameof(Index));
     }
 
     private string GetUserId() => _userManager.GetUserId(User);
