@@ -1,5 +1,6 @@
 ﻿@using BTCPayServer.Abstractions.Contracts
 @using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
 @using BTCPayServer.PayoutProcessors
 @using BTCPayServer.Payouts
 @using BTCPayServer.Plugins.NairaCheckout
@@ -15,7 +16,8 @@
 @inject LinkGenerator LinkGenerator
 @model MavapayPayoutViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Mavapay Payout");
+
+    ViewData.SetLayoutModel(new LayoutModel("Mavapay-Payout", "Mavapay Payout") { ActiveCategory = "Mavapay" });
     var storeId = ScopeProvider.GetCurrentStoreId();
     PayoutMethodId pmi = PayoutTypes.LN.GetPayoutMethodId("BTC");
     PayoutMethodId pmichain = PayoutTypes.CHAIN.GetPayoutMethodId("BTC");
@@ -32,7 +34,6 @@
 <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
-        <a asp-controller="UIMavapay" asp-action="MavapayCheckoutSettings" asp-route-storeId="@storeId" class="btn btn-secondary">Settings</a>
         <a asp-controller="UIMavapay" asp-action="ListMavapayPayouts" asp-route-storeId="@storeId" class="btn btn-primary" role="button">View Payouts</a>
     </div>
 </div>

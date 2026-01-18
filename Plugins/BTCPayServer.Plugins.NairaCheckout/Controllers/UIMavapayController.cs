@@ -394,6 +394,52 @@ public class UIMavapayController : Controller
             return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
         }
 
+        switch (vm.SplitPayment.Currency)
+        {
+            case "NGN":
+                if (string.IsNullOrEmpty(vm.SplitPayment.NGNBankCode) || string.IsNullOrEmpty(vm.SplitPayment.NGNAccountNumber))
+                {
+                    TempData[WellKnownTempData.ErrorMessage] = "Please fill the required banking information";
+                    return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
+                }
+                if (vm.SplitPayment.NGNAccountNumber.Length != 10)
+                {
+                    TempData[WellKnownTempData.ErrorMessage] = "NGN account number must be 10 digits";
+                    return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
+                }
+                break;
+
+            case "ZAR":
+                if (string.IsNullOrEmpty(vm.SplitPayment.ZARBank) || string.IsNullOrEmpty(vm.SplitPayment.ZARAccountNumber))
+                {
+                    TempData[WellKnownTempData.ErrorMessage] = "Please fill the required banking information";
+                    return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
+                }
+                break;
+
+            case "KES":
+                if (string.IsNullOrEmpty(vm.SplitPayment.KESMethod))
+                {
+                    TempData[WellKnownTempData.ErrorMessage] = "Please select a payout method for KES account";
+                    return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
+                }
+                if (string.IsNullOrEmpty(vm.SplitPayment.KESIdentifier))
+                {
+                    TempData[WellKnownTempData.ErrorMessage] = "Please enter KES Till/Bill/Phone number";
+                    return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
+                }
+                if (string.IsNullOrEmpty(vm.SplitPayment.KESAccountName))
+                {
+                    TempData[WellKnownTempData.ErrorMessage] = "Please enter KES account name";
+                    return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
+                }
+                break;
+
+            default:
+                TempData[WellKnownTempData.ErrorMessage] = "Invalid currency selected";
+                return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
+        }
+
         await using var ctx = _dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         if (mavapaySetting == null)
