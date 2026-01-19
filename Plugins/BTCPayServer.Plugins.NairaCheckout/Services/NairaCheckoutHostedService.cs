@@ -114,14 +114,15 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
     static readonly AsyncDuplicateLock PayoutLocks = new AsyncDuplicateLock();
     private async Task HandleSplitPayment(InvoiceEntity invoice)
     {
+        if (invoice.Status != InvoiceStatus.Settled) return;
         await using var ctx = _dbContextFactory.CreateContext();
-        var settledPayout = ctx.PayoutTransactions.FirstOrDefault(p => p.ExternalReference.EndsWith($":{invoice.Id}"));
-        if (invoice.Status != InvoiceStatus.Settled || settledPayout != null) return; 
-       
         var result = new InvoiceLogs();
         try
         {
             using var l = await PayoutLocks.LockAsync(invoice.Id, CancellationToken.None);
+
+            var settledPayout = ctx.PayoutTransactions.FirstOrDefault(p => p.ExternalReference.EndsWith($":{invoice.Id}"));
+            if (settledPayout != null) return;
 
             var settings = await _storeRepository.GetSettingAsync<MavapayCheckoutSettings>(invoice.StoreId, NairaCheckoutPlugin.SettingsName) ?? new MavapayCheckoutSettings();
             var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == invoice.StoreId);
@@ -188,8 +189,10 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
                 default:
                     return;
             }
-            if (lightningBalance <= payoutResponse.totalAmountInSourceCurrency)
-                return;
+
+            if (string.IsNullOrEmpty(payoutResponse.ErrorMessage)) return;
+
+            if (lightningBalance <= payoutResponse.totalAmountInSourceCurrency) return;
 
             await _mavapayApiClientService.ClaimPayout(ctx, payoutResponse, store, payoutCurrency.ToString(), accountIdentifier, invoice.Id);
             result.Write($"Successfully recorded naira checkout.", InvoiceEventData.EventSeverity.Info);
