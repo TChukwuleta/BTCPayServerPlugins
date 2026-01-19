@@ -1,6 +1,12 @@
-﻿@using BTCPayServer.Plugins.NairaCheckout.Data
+﻿@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.NairaCheckout.Data
 @using BTCPayServer.Plugins.NairaCheckout.ViewModels
 @model MavapaySettingViewModel
+@{
+
+    ViewData.SetLayoutModel(new LayoutModel("Mavapay-Settings", "Mavapay Settings") { ActiveCategory = "Mavapay" });
+}
 
 <form method="post" asp-action="MavapayCheckoutSettings">
     <div class="sticky-header d-flex align-items-center justify-content-between">
@@ -16,11 +22,28 @@
                 <input asp-for="EnableSplitPayment" type="checkbox" class="btcpay-toggle me-3" id="enableSplit" />
                 <div class="text-secondary">
                     <label asp-for="EnableSplitPayment" for="enableSplit" class="form-label mb-0 me-1"></label>
-                    <span text-translate="true">(This would split payment for every NGN invoice received)</span>
+                    <span text-translate="true">(Automatically split payments from settled invoices)</span>
                 </div>
             </div>
 
             <div id="splitSection" class="d-none">
+
+                <div class="alert alert-info mt-3">
+                    <h6 class="alert-heading mb-2">
+                        <i class="fa fa-info-circle"></i> How Split Payments Work
+                    </h6>
+                    <p class="mb-2"><strong>Split payments will be processed for:</strong></p>
+                    <ul class="mb-2">
+                        <li><strong>Matching currency invoices:</strong> Invoices created in <strong id="payoutCurrencyMatch">NGN</strong> → paid out in <strong id="payoutCurrencyMatch2">NGN</strong></li>
+                        <li><strong>USD invoices:</strong> Invoices created in <strong>USD</strong> → converted and paid out in <strong id="payoutCurrencyUSD">NGN</strong> using Mavapay exchange rates</li>
+                    </ul>
+                    <p class="mb-0">
+                        <span class="ms-2 small">
+                            Invoices in other currencies (EUR, GBP) or mismatched currencies (e.g., KES invoice when payout is NGN) will <strong>not</strong> trigger split payments.
+                        </span>
+                    </p>
+                </div>
+
                 <div class="mb-3 w-100 w-md-50">
                     <label class="form-label">Split Percentage (%)</label>
                     <input asp-for="SplitPayment.SplitPercentage" type="number" min="1" max="100" class="form-control" />
@@ -28,10 +51,9 @@
                 <div class="mb-3 w-100 w-md-50">
                     <label class="form-label">Payout Currency</label>
                     <select asp-for="SplitPayment.Currency" class="form-select" id="currencySelect">
-                        <option value="">-- Select Currency --</option>
-                        <option value="NGN">NGN</option>
-                        <option value="KES">KES</option>
-                        <option value="ZAR">ZAR</option>
+                        <option value="NGN">NGN (Nigerian Naira)</option>
+                        <option value="KES">KES (Kenyan Shilling)</option>
+                        <option value="ZAR">ZAR (South African Rand)</option>
                     </select>
                 </div>
                 <div id="ngnSection" class="d-none">

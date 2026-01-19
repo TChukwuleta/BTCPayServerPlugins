@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Client;
 using BTCPayServer.Data;
@@ -22,6 +21,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.Extensions.Caching.Memory;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 using Newtonsoft.Json;
@@ -32,6 +32,7 @@ namespace BTCPayServer.Plugins.Template;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIMavapayController : Controller
 {
+    private readonly IMemoryCache _cache;
     private readonly StoreRepository _storeRepository;
     private readonly IHttpClientFactory _clientFactory;
     private readonly InvoiceRepository _invoiceRepository;
@@ -43,7 +44,8 @@ public class UIMavapayController : Controller
     private readonly NairaCheckoutDbContextFactory _dbContextFactory;
     private readonly MavapayApiClientService _mavapayApiClientService;
     public UIMavapayController
-        (StoreRepository storeRepository,
+        (IMemoryCache cache,
+        StoreRepository storeRepository,
         IHttpClientFactory clientFactory,
         InvoiceRepository invoiceRepository,
         PaymentMethodHandlerDictionary handler,
@@ -54,6 +56,7 @@ public class UIMavapayController : Controller
         MavapayApiClientService mavapayApiClientService,
         NairaCheckoutDbContextFactory dbContextFactory)
     {
+        _cache = cache;
         _handler = handler;
         _userManager = userManager;
         _clientFactory = clientFactory;
@@ -103,7 +106,7 @@ public class UIMavapayController : Controller
         var webhookUrl = Url.Action(nameof(UIMavapayPublicController.ReceiveMavapayWebhook), "UIMavapayPublic", new { storeId = StoreData.Id }, Request.Scheme);
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var apiClient = new MavapayApiClientService(_clientFactory, _dbContextFactory, _invoiceRepository, _pullPaymentService);
+        var apiClient = new MavapayApiClientService(_clientFactory, _dbContextFactory, _invoiceRepository, _pullPaymentService, _cache);
         var entity = ctx.NairaCheckoutSettings.FirstOrDefault(c => c.Enabled) ?? new NairaCheckoutSetting { WalletName = Wallet.Mavapay.ToString() };
 
         bool webhookOk = true;
@@ -392,6 +395,42 @@ public class UIMavapayController : Controller
         {
             TempData[WellKnownTempData.ErrorMessage] = "Please enter a valid percentage value";
             return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
+        }
+
+        switch (vm.SplitPayment.Currency)
+        {
+            case "NGN":
+                if (string.IsNullOrEmpty(vm.SplitPayment.NGNBankCode) || string.IsNullOrEmpty(vm.SplitPayment.NGNAccountNumber) || string.IsNullOrEmpty(vm.SplitPayment.NGNAccountName))
+                {
+                    TempData[WellKnownTempData.ErrorMessage] = "Please fill all required banking information";
+                    return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
+                }
+                if (vm.SplitPayment.NGNAccountNumber.Length != 10)
+                {
+                    TempData[WellKnownTempData.ErrorMessage] = "NGN account number must be 10 digits";
+                    return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
+                }
+                break;
+
+            case "ZAR":
+                if (string.IsNullOrEmpty(vm.SplitPayment.ZARBank) || string.IsNullOrEmpty(vm.SplitPayment.ZARAccountNumber) || string.IsNullOrEmpty(vm.SplitPayment.ZARAccountName))
+                {
+                    TempData[WellKnownTempData.ErrorMessage] = "Please fill all required banking information";
+                    return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
+                }
+                break;
+
+            case "KES":
+                if (string.IsNullOrEmpty(vm.SplitPayment.KESIdentifier) || string.IsNullOrEmpty(vm.SplitPayment.KESAccountName))
+                {
+                    TempData[WellKnownTempData.ErrorMessage] = "Please enter KES Till/Bill/Phone number as well as valid account name";
+                    return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
+                }
+                break;
+
+            default:
+                TempData[WellKnownTempData.ErrorMessage] = "Invalid currency selected";
+                return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
         }
 
         await using var ctx = _dbContextFactory.CreateContext();

@@ -29,6 +29,7 @@ public class NairaCheckoutPlugin : BaseBTCPayServerPlugin
     public override void Execute(IServiceCollection services)
     {
         services.AddSingleton<IUIExtension>(new UIExtension("MavapayPayoutPluginHeaderNav", "header-nav"));
+        services.AddMemoryCache();
         services.AddSingleton<GeneralCheckoutService>();
         services.AddSingleton<MavapayApiClientService>();
         services.AddHostedService<PluginMigrationRunner>();
