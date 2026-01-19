@@ -14,26 +14,66 @@ using BTCPayServer.Payouts;
 using BTCPayServer.Plugins.NairaCheckout.Data;
 using BTCPayServer.Plugins.NairaCheckout.ViewModels;
 using BTCPayServer.Services.Invoices;
+using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.NairaCheckout.Services;
 
 public class MavapayApiClientService
 {
+    private readonly IMemoryCache _cache;
     private readonly HttpClient _httpClient;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly PullPaymentHostedService _pullPaymentService;
     private readonly NairaCheckoutDbContextFactory _dbContextFactory;
-    public readonly string ApiUrl = "https://staging.api.mavapay.co/api/v1"; //"https://staging.api.mavapay.co/api/v1";
+    public readonly string ApiUrl = "https://api.mavapay.co/api/v1"; //"https://staging.api.mavapay.co/api/v1";
     private readonly List<string> validStatuses = new List<string> { "success", "ok" };
 
     public MavapayApiClientService(IHttpClientFactory httpClientFactory, NairaCheckoutDbContextFactory dbContextFactory, 
-        InvoiceRepository invoiceRepository, PullPaymentHostedService pullPaymentService)
+        InvoiceRepository invoiceRepository, PullPaymentHostedService pullPaymentService, IMemoryCache cache)
     {
+        _cache = cache;
         _dbContextFactory = dbContextFactory;
         _invoiceRepository = invoiceRepository;
         _pullPaymentService = pullPaymentService;
         _httpClient = httpClientFactory?.CreateClient(nameof(MavapayApiClientService)) ?? new HttpClient();
+    }
+
+    public async Task<decimal> GetUSDToBidRate(SupportedCurrency targetCurrency)
+    {
+        try
+        {
+            var pair = targetCurrency switch
+            {
+                SupportedCurrency.NGN => "USDNGN",
+                SupportedCurrency.KES => "USDKES",
+                SupportedCurrency.ZAR => "USDZAR",
+                _ => throw new ArgumentException($"Unsupported currency: {targetCurrency}")
+            };
+            var cacheKey = $"mavapay_bid_rate_{pair}";
+            if (_cache.TryGetValue<decimal>(cacheKey, out var cachedRate))
+            {
+                return cachedRate;
+            }
+            var url = $"{ApiUrl}/price/ticker?pair={pair}";
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            var response = await _httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync();
+            var rateResponse = JsonConvert.DeserializeObject<MavapayRateResponse>(content);
+
+            if (rateResponse?.Status != "ok" || rateResponse.Data == null)
+                return 0;
+
+            var bidRate = rateResponse.Data.Bid;
+            if (bidRate <= 0)
+                return 0;
+
+            _cache.Set(cacheKey, bidRate, TimeSpan.FromMinutes(5));
+            return bidRate;
+        }
+        catch (Exception) { return 0; }
     }
 
     public async Task<NairaCheckoutResponseViewModel> NairaCheckout(string apikey, decimal amount, string lnInvoice, string invoiceId, string storeId)
@@ -282,7 +322,7 @@ public class MavapayApiClientService
     }
 
 
-    public async Task ClaimPayout(NairaCheckoutDbContext ctx, CreatePayoutResponseModel responseModel, BTCPayServer.Data.StoreData store, string currency, string accountNumber)
+    public async Task ClaimPayout(NairaCheckoutDbContext ctx, CreatePayoutResponseModel responseModel, BTCPayServer.Data.StoreData store, string currency, string accountNumber, string invoiceId = null)
     {
         TimeSpan expirySpan = responseModel.expiry - DateTime.UtcNow;
         var pullPaymentId = await _pullPaymentService.CreatePullPayment(store, new CreatePullPaymentRequest
@@ -299,6 +339,7 @@ public class MavapayApiClientService
             AutoApproveClaims = true,
         });
 
+        var externalReference = string.IsNullOrEmpty(invoiceId) ? $"{responseModel.id}:{responseModel.hash}" : $"{responseModel.id}:{responseModel.hash}:{invoiceId}";
         ctx.PayoutTransactions.Add(new PayoutTransaction
         {
             Provider = Wallet.Mavapay.ToString(),
@@ -308,7 +349,7 @@ public class MavapayApiClientService
             Currency = "SATS",
             Identifier = accountNumber,
             StoreId = store.Id,
-            ExternalReference = $"{responseModel.id}:{responseModel.hash}",
+            ExternalReference = externalReference,
             CreatedAt = DateTimeOffset.UtcNow,
             Data = JsonConvert.SerializeObject(responseModel),
         });
