@@ -114,12 +114,14 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
     {
         if (invoice.Status != InvoiceStatus.Settled) return;
         await using var ctx = _dbContextFactory.CreateContext();
+        var settledPayout = ctx.PayoutTransactions.FirstOrDefault(p => p.ExternalReference.EndsWith($":{invoice.Id}"));
+        if (settledPayout != null) return;
         var result = new InvoiceLogs();
         try
         {
             using var l = await PayoutLocks.LockAsync(invoice.Id, CancellationToken.None);
 
-            var settledPayout = ctx.PayoutTransactions.FirstOrDefault(p => p.ExternalReference.EndsWith($":{invoice.Id}"));
+            settledPayout = ctx.PayoutTransactions.FirstOrDefault(p => p.ExternalReference.EndsWith($":{invoice.Id}"));
             if (settledPayout != null) return;
 
             var settings = await _storeRepository.GetSettingAsync<MavapayCheckoutSettings>(invoice.StoreId, NairaCheckoutPlugin.SettingsName) ?? new MavapayCheckoutSettings();
@@ -193,11 +195,7 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
                 default:
                     return;
             }
-
-            result.Write($"Split payout response", InvoiceEventData.EventSeverity.Info);
-            result.Write(JsonConvert.SerializeObject(payoutResponse), InvoiceEventData.EventSeverity.Info);
-            await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
-            if (string.IsNullOrEmpty(payoutResponse.ErrorMessage)) return;
+            if (!string.IsNullOrEmpty(payoutResponse.ErrorMessage)) return;
 
             if (lightningBalance <= payoutResponse.totalAmountInSourceCurrency) return;
 
