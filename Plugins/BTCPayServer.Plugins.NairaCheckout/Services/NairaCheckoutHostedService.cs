@@ -193,6 +193,10 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
                 default:
                     return;
             }
+
+            result.Write($"Split payout response", InvoiceEventData.EventSeverity.Info);
+            result.Write(JsonConvert.SerializeObject(payoutResponse), InvoiceEventData.EventSeverity.Info);
+            await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
             if (string.IsNullOrEmpty(payoutResponse.ErrorMessage)) return;
 
             if (lightningBalance <= payoutResponse.totalAmountInSourceCurrency) return;
@@ -202,6 +206,7 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
         }
         catch (Exception ex)
         {
+            result.Write($"An error occured.. {ex.Message}", InvoiceEventData.EventSeverity.Error);
             Logs.PayServer.LogError(ex, $"Naira plugin error. {ex.Message} Triggered by invoiceId: {invoice.Id}");
         }
         await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
