@@ -26,7 +26,7 @@ public class MavapayApiClientService
     private readonly InvoiceRepository _invoiceRepository;
     private readonly PullPaymentHostedService _pullPaymentService;
     private readonly NairaCheckoutDbContextFactory _dbContextFactory;
-    public readonly string ApiUrl = "https://staging.api.mavapay.co/api/v1"; //"https://staging.api.mavapay.co/api/v1";
+    public readonly string ApiUrl = "https://api.mavapay.co/api/v1"; //"https://staging.api.mavapay.co/api/v1";
     private readonly List<string> validStatuses = new List<string> { "success", "ok" };
 
     public MavapayApiClientService(IHttpClientFactory httpClientFactory, NairaCheckoutDbContextFactory dbContextFactory, 
