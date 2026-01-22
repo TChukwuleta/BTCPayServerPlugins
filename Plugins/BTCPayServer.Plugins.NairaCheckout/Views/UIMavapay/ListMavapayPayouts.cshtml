@@ -1,5 +1,6 @@
 ﻿@using BTCPayServer.Abstractions.Contracts
 @using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
 @using BTCPayServer.Plugins.NairaCheckout
 @using BTCPayServer.Plugins.NairaCheckout.ViewModels
 @using BTCPayServer.Plugins.NairaCheckout.Views
@@ -7,7 +8,7 @@
 @inject IScopeProvider ScopeProvider
 @model PayoutListViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Mavapay Payout");
+    ViewData.SetLayoutModel(new LayoutModel("Mavapay-Payout", "Mavapay Payout") { ActiveCategory = "Mavapay" });
     var storeId = ScopeProvider.GetCurrentStoreId();
 }
 
