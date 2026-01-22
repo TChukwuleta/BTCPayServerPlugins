@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
 using BTCPayServer.Events;
@@ -23,7 +24,6 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
 {
     private readonly StoreRepository _storeRepository;
     private readonly InvoiceRepository _invoiceRepository;
-    private readonly CurrencyNameTable _currencyNameTable;
     private readonly GeneralCheckoutService _generalCheckoutService;
     private readonly NairaCheckoutDbContextFactory _dbContextFactory;
     private readonly MavapayApiClientService _mavapayApiClientService;
@@ -31,7 +31,6 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
     public NairaCheckoutHostedService(EventAggregator eventAggregator,
         StoreRepository storeRepository,
         InvoiceRepository invoiceRepository,
-        CurrencyNameTable currencyNameTable,
         GeneralCheckoutService generalCheckoutService,
         NairaCheckoutDbContextFactory dbContextFactory,
         MavapayApiClientService mavapayApiClientService,
@@ -39,7 +38,6 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
     {
         _storeRepository = storeRepository;
         _dbContextFactory = dbContextFactory;
-        _currencyNameTable = currencyNameTable;
         _invoiceRepository = invoiceRepository;
         _mavapayApiClientService = mavapayApiClientService;
         _generalCheckoutService = generalCheckoutService;
@@ -144,20 +142,26 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
                 var bidRate = await _mavapayApiClientService.GetUSDToBidRate(payoutCurrency);
                 if (bidRate <= 0) return;
 
-                splitAmount = Math.Round(splitAmount * bidRate, _currencyNameTable.GetNumberFormatInfo(payoutCurrency.ToString())?.CurrencyDecimalDigits ?? 2);
+                splitAmount = splitAmount * bidRate;
             }
+            if (splitAmount <= 0) return;
+
+            splitAmount = Math.Round(splitAmount, 2);
 
             CreatePayoutResponseModel payoutResponse = null;
             string accountIdentifier = null;
             switch (payoutCurrency)
             {
                 case SupportedCurrency.NGN:
+                    var nameEnquiry = await _mavapayApiClientService.NGNNameEnquiry(settings.NGNBankCode, settings.NGNAccountNumber, mavapaySetting.ApiKey);
+                    if (nameEnquiry == null || string.IsNullOrEmpty(nameEnquiry.accountName)) return;
+
                     accountIdentifier = settings.NGNAccountNumber;
                     payoutResponse = await _mavapayApiClientService.MavapayNairaPayout(new PayoutNGNViewModel
                     {
-                        AccountName = settings.NGNAccountName,
+                        AccountName = nameEnquiry.accountName,
                         BankCode = settings.NGNBankCode,
-                        BankName = settings.NGNBankName,
+                        BankName = settings.NGNBankCode,
                         AccountNumber = settings.NGNAccountNumber,
                         Amount = splitAmount
                     }, mavapaySetting.ApiKey);
@@ -189,7 +193,6 @@ public class NairaCheckoutHostedService : EventHostedServiceBase
                 default:
                     return;
             }
-
             if (string.IsNullOrEmpty(payoutResponse.ErrorMessage)) return;
 
             if (lightningBalance <= payoutResponse.totalAmountInSourceCurrency) return;

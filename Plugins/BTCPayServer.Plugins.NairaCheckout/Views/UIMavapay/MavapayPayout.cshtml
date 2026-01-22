@@ -16,7 +16,6 @@
 @inject LinkGenerator LinkGenerator
 @model MavapayPayoutViewModel
 @{
-
     ViewData.SetLayoutModel(new LayoutModel("Mavapay-Payout", "Mavapay Payout") { ActiveCategory = "Mavapay" });
     var storeId = ScopeProvider.GetCurrentStoreId();
     PayoutMethodId pmi = PayoutTypes.LN.GetPayoutMethodId("BTC");
