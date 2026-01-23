@@ -1,0 +1,28 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using Microsoft.AspNetCore.Mvc.TagHelpers
+@inject IScopeProvider ScopeProvider
+@{
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+
+@if (!string.IsNullOrEmpty(storeId))
+{
+    <li class="nav-item">
+        <a layout-menu-item="StoreBridge-Export" asp-controller="UIStoreBridge" asp-action="ExportStore" asp-route-storeId="@storeId">
+            
+            <span>Store Bridge</span>
+        </a>
+    </li>
+}
+@if (ViewData.IsCategory("StoreBridge"))
+{
+    <li class="nav-item nav-item-sub">
+        <a layout-menu-item="StoreBridge-Export" asp-controller="UIStoreBridge" asp-action="ExportStore" asp-route-storeId="@storeId"
+           text-translate="true">Export Store</a>
+    </li>
+    <li class="nav-item nav-item-sub">
+        <a layout-menu-item="StoreBridge-Import" asp-controller="UIStoreBridge" asp-action="ExportStore" asp-route-storeId="@storeId"
+           text-translate="true">Import Store</a>
+    </li>
+}

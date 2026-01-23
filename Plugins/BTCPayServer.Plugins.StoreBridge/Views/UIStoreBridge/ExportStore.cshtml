@@ -1,0 +1,71 @@
+@model ExportViewModel
+@{
+    ViewData["Title"] = "Export Store";
+    Layout = "_LayoutWizard";
+}
+
+<header class="text-center">
+    <h1>@ViewData["Title"]</h1>
+    <p class="lead text-secondary mt-3">Export your store configuration to move it to another BTCPay Server instance</p>
+</header>
+
+<div class="row justify-content-center mt-4">
+    <div class="col-xxl-8 col-xl-10">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">What will be exported?</h5>
+                <ul class="list-unstyled mt-3">
+                    <li class="mb-2">
+                        <i class="fa fa-check text-success me-2"></i>
+                        <strong>Store Settings:</strong> Name, website, default currency, speed policy, etc.
+                    </li>
+                    <li class="mb-2">
+                        <i class="fa fa-check text-success me-2"></i>
+                        <strong>Wallet Configurations:</strong> Extended public keys (xpubs) only - never private keys
+                    </li>
+                    <li class="mb-2">
+                        <i class="fa fa-check text-success me-2"></i>
+                        <strong>Payment Methods:</strong> On-chain and Lightning Network configurations
+                    </li>
+                    <li class="mb-2">
+                        <i class="fa fa-check text-success me-2"></i>
+                        <strong>Webhooks:</strong> URLs, events, and secrets
+                    </li>
+                    <li class="mb-2">
+                        <i class="fa fa-check text-success me-2"></i>
+                        <strong>Store Users:</strong> Email addresses and roles (users must exist on target server)
+                    </li>
+                    <li class="mb-2">
+                        <i class="fa fa-check text-success me-2"></i>
+                        <strong>Apps:</strong> Point of Sale, Crowdfund, and other app configurations
+                    </li>
+                </ul>
+
+                <div class="alert alert-info mt-4" role="alert">
+                    <i class="fa fa-info-circle me-2"></i>
+                    <strong>Security Note:</strong> The export file contains sensitive information including webhook secrets and wallet xpubs. Store it securely and only share it with trusted parties.
+                </div>
+
+                <div class="alert alert-warning mt-3" role="alert">
+                    <i class="fa fa-exclamation-triangle me-2"></i>
+                    <strong>Privacy Keys:</strong> Private keys, seeds, and lightning node credentials are NEVER exported for security reasons.
+                </div>
+
+                <form method="post" asp-action="ExportStore" class="mt-4">
+                    <input type="hidden" name="storeId" value="@Model.StoreId" />
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fa fa-download me-2"></i>
+                            Download Store Export
+                        </button>
+                        <a asp-controller="UIStores" asp-action="Dashboard" asp-route-storeId="@Model.StoreId"
+                           class="btn btn-secondary">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
