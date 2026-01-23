@@ -1,7 +1,10 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.StoreBridge.ViewModels
 @model ExportViewModel
 @{
-    ViewData["Title"] = "Export Store";
-    Layout = "_LayoutWizard";
+    Layout = "_Layout";
+    ViewData.SetLayoutModel(new LayoutModel("StoreBridge-Export", "Shopify Bridge - Export") { ActiveCategory = "StoreBridge" });
 }
 
 <header class="text-center">

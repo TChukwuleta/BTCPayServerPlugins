@@ -6,53 +6,49 @@ using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Client;
 using BTCPayServer.Data;
+using BTCPayServer.Plugins.StoreBridge.Services;
 using BTCPayServer.Plugins.StoreBridge.ViewModels;
-using BTCPayServer.Services.Rates;
-using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.StoreBridge;
 
-[Route("~/plugins/storesgenerator")]
+[Route("~/plugins/storebridge/{storeId}/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIStoreBridgeController : Controller
 {
-    private readonly RateFetcher _rateFactory;
-    private readonly StoreRepository _storeRepository;
-    private readonly IAuthorizationService _authorizationService;
+    private readonly ILogger<UIStoreBridgeController> _logger;
+    private readonly StoreImportExportService _service;
     private readonly UserManager<ApplicationUser> _userManager;
     public UIStoreBridgeController
-        (RateFetcher rateFactory, StoreRepository storeRepository,
-        UserManager<ApplicationUser> userManager,IAuthorizationService authorizationService)
+        (StoreImportExportService service,UserManager<ApplicationUser> userManager, ILogger<UIStoreBridgeController> logger)
     {
+        _logger = logger;
+        _service = service;
         _userManager = userManager;
-        _rateFactory = rateFactory;
-        _storeRepository = storeRepository;
-        _authorizationService = authorizationService;
     }
-    public Data.StoreData CurrentStore => HttpContext.GetStoreData();
+    private StoreData CurrentStore => HttpContext.GetStoreData();
+    private string GetBaseUrl() => $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
     private string GetUserId() => _userManager.GetUserId(User);
 
 
     [HttpGet("export")]
-    public IActionResult Export()
+    public IActionResult ExportStore(string storeId)
     {
-        var storeId = HttpContext.GetStoreData()?.Id;
-        if (string.IsNullOrEmpty(storeId))
-            return NotFound();
-
+        _logger.LogInformation(JsonConvert.SerializeObject(CurrentStore));
         return View(new ExportViewModel { StoreId = storeId });
     }
 
     [HttpPost("export")]
-    public async Task<IActionResult> ExportStore(string storeId)
+    public async Task<IActionResult> ExportStorePost(string storeId)
     {
         try
         {
-            var exportData = await _service.ExportStoreAsync(storeId);
+            var exportData = await _service.ExportStoreAsync(storeId, GetBaseUrl());
             var json = _service.SerializeExport(exportData);
             var bytes = Encoding.UTF8.GetBytes(json);
 
@@ -63,17 +59,13 @@ public class UIStoreBridgeController : Controller
         catch (Exception ex)
         {
             TempData[WellKnownTempData.ErrorMessage] = $"Export failed: {ex.Message}";
-            return RedirectToAction(nameof(Export));
+            return RedirectToAction(nameof(ExportStore));
         }
     }
 
     [HttpGet("import")]
-    public IActionResult Import()
+    public IActionResult ImportStore(string storeId)
     {
-        var storeId = HttpContext.GetStoreData()?.Id;
-        if (string.IsNullOrEmpty(storeId))
-            return NotFound();
-
         return View(new ImportViewModel
         {
             Options = new StoreImportOptions()
@@ -82,18 +74,18 @@ public class UIStoreBridgeController : Controller
 
 
     [HttpPost("import")]
-    public async Task<IActionResult> ImportStore(IFormFile importFile, StoreImportOptions options)
+    public async Task<IActionResult> ImportStorePost(IFormFile importFile, StoreImportOptions options)
     {
         if (importFile == null || importFile.Length == 0)
         {
             ModelState.AddModelError(nameof(importFile), "Please select a file to import");
-            return View(nameof(Import), new ImportViewModel { Options = options });
+            return View(nameof(ImportStore), new ImportViewModel { Options = options });
         }
 
         if (!importFile.FileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
         {
             ModelState.AddModelError(nameof(importFile), "Only JSON files are supported");
-            return View(nameof(Import), new ImportViewModel { Options = options });
+            return View(nameof(ImportStore), new ImportViewModel { Options = options });
         }
 
         try
@@ -139,13 +131,13 @@ public class UIStoreBridgeController : Controller
             {
                 var errorMessage = "Import failed:\n" + string.Join("\n", result.Errors);
                 TempData[WellKnownTempData.ErrorMessage] = errorMessage;
-                return View(nameof(Import), new ImportViewModel { Options = options });
+                return View(nameof(ImportStore), new ImportViewModel { Options = options });
             }
         }
         catch (Exception ex)
         {
             TempData[WellKnownTempData.ErrorMessage] = $"Import failed: {ex.Message}";
-            return View(nameof(Import), new ImportViewModel { Options = options });
+            return View(nameof(ImportStore), new ImportViewModel { Options = options });
         }
     }
 }

@@ -10,9 +10,7 @@ public class StoreExportData
     public int Version { get; set; } = 1;
     public DateTime ExportedAt { get; set; }
     public string ExportedFrom { get; set; } = string.Empty;
-    public StoreData Store { get; set; } = new();
-    public List<WalletData> Wallets { get; set; } = new();
-    public List<PaymentMethodData> PaymentMethods { get; set; } = new();
+    public StoreBridgeData Store { get; set; } = new();
     public List<WebhookData> Webhooks { get; set; } = new();
     public List<StoreUserData> Users { get; set; } = new();
     public List<AppData> Apps { get; set; } = new();
@@ -20,28 +18,19 @@ public class StoreExportData
 }
 
 
-/// <summary>
-/// Core store configuration
-/// </summary>
-public class StoreData
+public class StoreBridgeData
 {
     public string Id { get; set; } = string.Empty;
     public string StoreName { get; set; } = string.Empty;
-    public string? StoreWebsite { get; set; }
     public string DefaultCurrency { get; set; } = "USD";
-    public int SpeedPolicy { get; set; }
-    public string? NetworkFeeMode { get; set; }
-    public decimal? Spread { get; set; }
+    public string StoreBlob { get; set; }
+    public string SpeedPolicy { get; set; }
+    public string DerivationStrategies { get; set; }
+    public string StoreWebsite { get; set; }
+    public decimal Spread { get; set; }
     public Dictionary<string, decimal>? RateRules { get; set; }
     public bool PayJoinEnabled { get; set; }
-    public bool AnyoneCanCreateInvoice { get; set; }
-    public bool RequiresRefundEmail { get; set; }
-    public string? CustomLogo { get; set; }
-    public string? CustomCSS { get; set; }
-    public string? DefaultLang { get; set; }
-    public bool InvoiceExpiration { get; set; }
-    public int InvoiceExpirationMinutes { get; set; }
-    public int MonitoringExpiration { get; set; }
+    public string DefaultLang { get; set; }
     public Dictionary<string, string> AdditionalSettings { get; set; } = new();
 }
 

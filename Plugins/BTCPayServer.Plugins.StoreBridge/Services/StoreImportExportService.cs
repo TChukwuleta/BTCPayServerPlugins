@@ -1,32 +1,28 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using BTCPayServer.Data;
 using BTCPayServer.Plugins.StoreBridge.ViewModels;
+using BTCPayServer.Services;
 using BTCPayServer.Services.Stores;
-using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.StoreBridge.Services;
 
 public class StoreImportExportService
 {
-    private readonly StoreRepository _storeRepository;
     private readonly ApplicationDbContext _dbContext;
+    private readonly StoreRepository _storeRepository;
+    private readonly SettingsRepository _settingsRepository;
 
-    public StoreImportExportService(
-        StoreRepository storeRepository,
-        ApplicationDbContext dbContext)
+    public StoreImportExportService(ApplicationDbContext dbContext,
+        StoreRepository storeRepository, SettingsRepository settingsRepository)
     {
-        _storeRepository = storeRepository;
         _dbContext = dbContext;
+        _storeRepository = storeRepository;
+        _settingsRepository = settingsRepository;
     }
 
-
-    /// <summary>
-    /// Export a complete store configuration
-    /// </summary>
-    public async Task<StoreExportData> ExportStoreAsync(string storeId)
+    public async Task<StoreExportData> ExportStoreAsync(string storeId, string sourceInstanceUrl)
     {
         var store = await _storeRepository.FindStore(storeId);
         if (store == null)
@@ -35,24 +31,18 @@ public class StoreImportExportService
         var exportData = new StoreExportData
         {
             ExportedAt = DateTime.UtcNow,
-            ExportedFrom = "BTCPay Server",
-            Store = await MapStoreDataAsync(store)
+            ExportedFrom = sourceInstanceUrl,
+            Store = MapStoreData(store)
         };
 
-        // Export wallets (xpubs only)
-        exportData.Wallets = await ExportWalletsAsync(storeId);
-
-        // Export payment methods
-        exportData.PaymentMethods = await ExportPaymentMethodsAsync(storeId);
-
         // Export webhooks
-        exportData.Webhooks = await ExportWebhooksAsync(storeId);
+        //exportData.Webhooks = await ExportWebhooksAsync(storeId);
 
         // Export users and roles
-        exportData.Users = await ExportStoreUsersAsync(storeId);
+        //exportData.Users = await ExportStoreUsersAsync(storeId);
 
         // Export apps
-        exportData.Apps = await ExportAppsAsync(storeId);
+        //exportData.Apps = await ExportAppsAsync(storeId);
 
         return exportData;
     }
@@ -67,7 +57,7 @@ public class StoreImportExportService
     {
         var result = new StoreImportResult();
 
-        try
+        /*try
         {
             using var transaction = await _dbContext.Database.BeginTransactionAsync();
 
@@ -125,7 +115,7 @@ public class StoreImportExportService
         {
             result.Success = false;
             result.Errors.Add($"Transaction error: {ex.Message}");
-        }
+        }*/
 
         return result;
     }
@@ -167,53 +157,33 @@ public class StoreImportExportService
             throw new InvalidOperationException("Store name is required");
 
         // Validate wallet data doesn't contain private keys
-        foreach (var wallet in data.Wallets)
+        /*foreach (var wallet in data.Wallets)
         {
             if (wallet.DerivationScheme.Contains("xprv", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Private keys detected in wallet data. Only xpubs are allowed.");
-        }
+        }*/
     }
 
-    // Private helper methods for data mapping
-
-    private async Task<StoreData> MapStoreDataAsync(Data.StoreData store)
+    private StoreBridgeData MapStoreData(StoreData store)
     {
         var blob = store.GetStoreBlob();
-
-        return new StoreData
+        return new StoreBridgeData
         {
             Id = store.Id,
             StoreName = store.StoreName,
-            StoreWebsite = blob.StoreWebsite,
+            StoreBlob = store.StoreBlob,
+            SpeedPolicy = store.SpeedPolicy.ToString(),
+            DerivationStrategies = store.DerivationStrategies,
+            StoreWebsite = store.StoreWebsite,
             DefaultCurrency = blob.DefaultCurrency,
-            SpeedPolicy = (int)blob.SpeedPolicy,
-            NetworkFeeMode = blob.NetworkFeeMode?.ToString(),
             Spread = blob.Spread,
             PayJoinEnabled = blob.PayJoinEnabled,
-            AnyoneCanCreateInvoice = blob.AnyoneCanCreateInvoice,
-            CustomLogo = blob.CustomLogo,
-            CustomCSS = blob.CustomCSS,
-            DefaultLang = blob.DefaultLang,
-            InvoiceExpiration = blob.InvoiceExpiration.HasValue,
-            InvoiceExpirationMinutes = (int)(blob.InvoiceExpiration?.TotalMinutes ?? 15),
-            MonitoringExpiration = (int)blob.MonitoringExpiration.TotalMinutes
+            DefaultLang = blob.DefaultLang
         };
     }
 
-    private async Task<List<WalletData>> ExportWalletsAsync(string storeId)
-    {
-        // Implementation would query wallet configurations
-        // This is a placeholder - actual implementation depends on BTCPay's wallet storage
-        return new List<WalletData>();
-    }
 
-    private async Task<List<PaymentMethodData>> ExportPaymentMethodsAsync(string storeId)
-    {
-        // Implementation would query payment method configurations
-        return new List<PaymentMethodData>();
-    }
-
-    private async Task<List<WebhookData>> ExportWebhooksAsync(string storeId)
+    /*private async Task<List<WebhookData>> ExportWebhooksAsync(string storeId)
     {
         var webhooks = await _dbContext.Webhooks
             .Where(w => w.StoreId == storeId)
@@ -256,9 +226,9 @@ public class StoreImportExportService
             Settings = JsonConvert.DeserializeObject<Dictionary<string, object>>(a.Settings)
                 ?? new Dictionary<string, object>()
         }).ToList();
-    }
+    }*/
 
-    private async Task<string> ImportStoreDataAsync(
+    /*private async Task<string> ImportStoreDataAsync(
         StoreData storeData,
         StoreImportOptions options,
         string currentUserId)
@@ -287,19 +257,6 @@ public class StoreImportExportService
 
         await _storeRepository.CreateStore(currentUserId, store);
         return store.Id;
-    }
-
-    private async Task<int> ImportWalletsAsync(string storeId, List<WalletData> wallets)
-    {
-        // Implementation for importing wallet configurations
-        // This would use BTCPay's wallet derivation scheme setup
-        return 0;
-    }
-
-    private async Task<int> ImportPaymentMethodsAsync(string storeId, List<PaymentMethodData> paymentMethods)
-    {
-        // Implementation for importing payment method configurations
-        return 0;
     }
 
     private async Task<int> ImportWebhooksAsync(string storeId, List<WebhookData> webhooks)
@@ -387,5 +344,5 @@ public class StoreImportExportService
 
         await _dbContext.SaveChangesAsync();
         return count;
-    }
+    }*/
 }
