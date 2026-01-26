@@ -1,62 +1,182 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using BTCPayServer.Data;
+using BTCPayServer.Forms;
 using BTCPayServer.Plugins.StoreBridge.ViewModels;
+using BTCPayServer.Services;
+using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Stores;
-using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.StoreBridge.Services;
 
 public class StoreImportExportService
 {
-    private readonly StoreRepository _storeRepository;
+    private readonly AppService _appService;
     private readonly ApplicationDbContext _dbContext;
+    private readonly StoreRepository _storeRepository;
+    private readonly FormDataService _formDataService;
+    private readonly StoreExportService _exportService;
+    private readonly SettingsRepository _settingsRepository;
 
-    public StoreImportExportService(
-        StoreRepository storeRepository,
-        ApplicationDbContext dbContext)
+    public StoreImportExportService(ApplicationDbContext dbContext, StoreRepository storeRepository, 
+        SettingsRepository settingsRepository, AppService appService, FormDataService formDataService, StoreExportService exportService)
     {
-        _storeRepository = storeRepository;
         _dbContext = dbContext;
+        _appService = appService;
+        _exportService = exportService;
+        _storeRepository = storeRepository;
+        _formDataService = formDataService;
+        _settingsRepository = settingsRepository;
     }
 
-
-    /// <summary>
-    /// Export a complete store configuration
-    /// </summary>
-    public async Task<StoreExportData> ExportStoreAsync(string storeId)
+    public async Task<byte[]> ExportStore(string sourceInstanceUrl, string userId, StoreData store, List<string> selectedOptions)
     {
-        var store = await _storeRepository.FindStore(storeId);
-        if (store == null)
-            throw new InvalidOperationException($"Store {storeId} not found");
+        // Settings... Payment
+        var originalBlob = store.GetStoreBlob();
+        var blob = DefaultStoreBlobSettings(originalBlob);
 
         var exportData = new StoreExportData
         {
-            ExportedAt = DateTime.UtcNow,
-            ExportedFrom = "BTCPay Server",
-            Store = await MapStoreDataAsync(store)
+            Version = 1,
+            ExportDate = DateTime.UtcNow,
+            ExportedFrom = sourceInstanceUrl,
+            Store = new StoreBridgeData
+            {
+                Id = store.Id,
+                Spread = blob.Spread,
+                StoreName = store.StoreName,
+                DefaultLang = blob.DefaultLang,
+                StoreWebsite = store.StoreWebsite,
+                DefaultCurrency = blob.DefaultCurrency,
+                SpeedPolicy = store.SpeedPolicy.ToString(),
+                StoreBlob = JsonConvert.SerializeObject(blob),
+                DerivationStrategies = store.DerivationStrategies
+            }
         };
 
-        // Export wallets (xpubs only)
-        exportData.Wallets = await ExportWalletsAsync(storeId);
+        if (selectedOptions.Contains("BrandingSettings"))
+        {
+            blob.LogoUrl = originalBlob.LogoUrl;
+            blob.CssUrl = originalBlob.CssUrl;
+            blob.BrandColor = originalBlob.BrandColor;
+            blob.ApplyBrandColorToBackend = originalBlob.ApplyBrandColorToBackend;
+            exportData.Store ??= new();
+            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+        }
+        if (selectedOptions.Contains("EmailSettings"))
+        {
+            blob.PrimaryRateSettings = originalBlob.PrimaryRateSettings;
+            blob.FallbackRateSettings = originalBlob.FallbackRateSettings;
+            exportData.Store ??= new();
+            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+        }
+        if (selectedOptions.Contains("RateSettings"))
+        {
+            blob.EmailSettings = originalBlob.EmailSettings;
+            exportData.Store ??= new();
+            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+        }
+        if (selectedOptions.Contains("CheckoutSettings"))
+        {
+            blob.ShowPayInWalletButton = originalBlob.ShowPayInWalletButton;
+            blob.ShowStoreHeader = originalBlob.ShowStoreHeader;
+            blob.CelebratePayment = originalBlob.CelebratePayment;
+            blob.PlaySoundOnPayment = originalBlob.PlaySoundOnPayment;
+            blob.OnChainWithLnInvoiceFallback = originalBlob.OnChainWithLnInvoiceFallback;
+            blob.LightningAmountInSatoshi = originalBlob.LightningAmountInSatoshi;
+            blob.LazyPaymentMethods = originalBlob.LazyPaymentMethods;
+            blob.RedirectAutomatically = originalBlob.RedirectAutomatically;
+            blob.ReceiptOptions = originalBlob.ReceiptOptions;
+            blob.HtmlTitle = originalBlob.HtmlTitle;
+            blob.StoreSupportUrl = originalBlob.StoreSupportUrl;
+            blob.DisplayExpirationTimer = originalBlob.DisplayExpirationTimer;
+            blob.AutoDetectLanguage = originalBlob.AutoDetectLanguage;
+            blob.DefaultLang = originalBlob.DefaultLang;
+            exportData.Store ??= new();
+            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+        }
+        if (selectedOptions.Contains("Webhooks"))
+        {
+            var webhooks = await _storeRepository.GetWebhooks(store.Id);
+            exportData.Webhooks = webhooks.Select(wh => new WebhookExport
+            {
+                Blob2Json = wh.Blob2,
+                BlobJson = JsonConvert.SerializeObject(wh.GetBlob())
+            }).ToList();
+        }
+        if (selectedOptions.Contains("Roles"))
+        {
+            var roles = await _storeRepository.GetStoreRoles(store.Id);
+            exportData.Roles = roles.Select(r => new RoleExport
+            {
+                Role = r.Role,
+                Permissions = r.Permissions?.ToList()
+            }).ToList();
+        }
+        if (selectedOptions.Contains("Forms"))
+        {
+            var forms = await _formDataService.GetForms(store.Id);
+            forms.Select(c => new FormExport
+            {
+                Public = c.Public,
+                Name = c.Name,
+                Config = c.Config
+            });
+        }
+        if (selectedOptions.Contains("PaymentMethods"))
+        {
+            var paymentMethodConfig = store.GetPaymentMethodConfigs(true);
 
-        // Export payment methods
-        exportData.PaymentMethods = await ExportPaymentMethodsAsync(storeId);
-
-        // Export webhooks
-        exportData.Webhooks = await ExportWebhooksAsync(storeId);
-
-        // Export users and roles
-        exportData.Users = await ExportStoreUsersAsync(storeId);
-
-        // Export apps
-        exportData.Apps = await ExportAppsAsync(storeId);
-
-        return exportData;
+            paymentMethodConfig.Select(pm => new PaymentMethodExport
+            {
+                PaymentMethodId = pm.Key.ToString(),
+                ConfigJson = JsonConvert.SerializeObject(pm.Value)
+            }).ToList();
+        }
+        if (selectedOptions.Contains("Apps"))
+        {
+            var apps = await _appService.GetAllApps(userId: userId, storeId: store.Id);
+            exportData.Apps = apps.Select(app => new AppExport
+            {
+                AppId = app.Id,
+                AppName = app.AppName,
+                AppType = app.AppType,
+                Created = app.Created,
+                SettingsJson = JsonConvert.SerializeObject(app.App)
+            }).ToList();
+        }
+        var encryptedData = _exportService.CreateExport(exportData, store.Id, compress: true);
+        return encryptedData;
     }
 
+
+    private StoreBlob DefaultStoreBlobSettings(StoreBlob blob)
+    {
+        blob.EmailSettings = null;
+        blob.PrimaryRateSettings = null;
+        blob.FallbackRateSettings = null;
+        blob.ShowPayInWalletButton = false;
+        blob.ShowStoreHeader = false;
+        blob.CelebratePayment = false;
+        blob.PlaySoundOnPayment = false;
+        blob.OnChainWithLnInvoiceFallback = false;
+        blob.LightningAmountInSatoshi = false;
+        blob.LazyPaymentMethods = false;
+        blob.RedirectAutomatically = false;
+        blob.ReceiptOptions = null;
+        blob.HtmlTitle = string.Empty;
+        blob.StoreSupportUrl = string.Empty;
+        blob.AutoDetectLanguage = false;
+        blob.DefaultLang = string.Empty;
+        blob.LogoUrl = null;
+        blob.CssUrl = null;
+        blob.BrandColor = string.Empty;
+        blob.ApplyBrandColorToBackend = false;
+        return blob;
+    }
     /// <summary>
     /// Import a store configuration
     /// </summary>
@@ -67,7 +187,7 @@ public class StoreImportExportService
     {
         var result = new StoreImportResult();
 
-        try
+        /*try
         {
             using var transaction = await _dbContext.Database.BeginTransactionAsync();
 
@@ -125,7 +245,7 @@ public class StoreImportExportService
         {
             result.Success = false;
             result.Errors.Add($"Transaction error: {ex.Message}");
-        }
+        }*/
 
         return result;
     }
@@ -167,53 +287,32 @@ public class StoreImportExportService
             throw new InvalidOperationException("Store name is required");
 
         // Validate wallet data doesn't contain private keys
-        foreach (var wallet in data.Wallets)
+        /*foreach (var wallet in data.Wallets)
         {
             if (wallet.DerivationScheme.Contains("xprv", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Private keys detected in wallet data. Only xpubs are allowed.");
-        }
+        }*/
     }
 
-    // Private helper methods for data mapping
-
-    private async Task<StoreData> MapStoreDataAsync(Data.StoreData store)
+    private StoreBridgeData MapStoreData(StoreData store)
     {
         var blob = store.GetStoreBlob();
-
-        return new StoreData
+        return new StoreBridgeData
         {
             Id = store.Id,
             StoreName = store.StoreName,
-            StoreWebsite = blob.StoreWebsite,
+            StoreBlob = store.StoreBlob,
+            SpeedPolicy = store.SpeedPolicy.ToString(),
+            DerivationStrategies = store.DerivationStrategies,
+            StoreWebsite = store.StoreWebsite,
             DefaultCurrency = blob.DefaultCurrency,
-            SpeedPolicy = (int)blob.SpeedPolicy,
-            NetworkFeeMode = blob.NetworkFeeMode?.ToString(),
             Spread = blob.Spread,
-            PayJoinEnabled = blob.PayJoinEnabled,
-            AnyoneCanCreateInvoice = blob.AnyoneCanCreateInvoice,
-            CustomLogo = blob.CustomLogo,
-            CustomCSS = blob.CustomCSS,
-            DefaultLang = blob.DefaultLang,
-            InvoiceExpiration = blob.InvoiceExpiration.HasValue,
-            InvoiceExpirationMinutes = (int)(blob.InvoiceExpiration?.TotalMinutes ?? 15),
-            MonitoringExpiration = (int)blob.MonitoringExpiration.TotalMinutes
+            DefaultLang = blob.DefaultLang
         };
     }
 
-    private async Task<List<WalletData>> ExportWalletsAsync(string storeId)
-    {
-        // Implementation would query wallet configurations
-        // This is a placeholder - actual implementation depends on BTCPay's wallet storage
-        return new List<WalletData>();
-    }
 
-    private async Task<List<PaymentMethodData>> ExportPaymentMethodsAsync(string storeId)
-    {
-        // Implementation would query payment method configurations
-        return new List<PaymentMethodData>();
-    }
-
-    private async Task<List<WebhookData>> ExportWebhooksAsync(string storeId)
+    /*private async Task<List<WebhookData>> ExportWebhooksAsync(string storeId)
     {
         var webhooks = await _dbContext.Webhooks
             .Where(w => w.StoreId == storeId)
@@ -256,9 +355,9 @@ public class StoreImportExportService
             Settings = JsonConvert.DeserializeObject<Dictionary<string, object>>(a.Settings)
                 ?? new Dictionary<string, object>()
         }).ToList();
-    }
+    }*/
 
-    private async Task<string> ImportStoreDataAsync(
+    /*private async Task<string> ImportStoreDataAsync(
         StoreData storeData,
         StoreImportOptions options,
         string currentUserId)
@@ -287,19 +386,6 @@ public class StoreImportExportService
 
         await _storeRepository.CreateStore(currentUserId, store);
         return store.Id;
-    }
-
-    private async Task<int> ImportWalletsAsync(string storeId, List<WalletData> wallets)
-    {
-        // Implementation for importing wallet configurations
-        // This would use BTCPay's wallet derivation scheme setup
-        return 0;
-    }
-
-    private async Task<int> ImportPaymentMethodsAsync(string storeId, List<PaymentMethodData> paymentMethods)
-    {
-        // Implementation for importing payment method configurations
-        return 0;
     }
 
     private async Task<int> ImportWebhooksAsync(string storeId, List<WebhookData> webhooks)
@@ -387,5 +473,5 @@ public class StoreImportExportService
 
         await _dbContext.SaveChangesAsync();
         return count;
-    }
+    }*/
 }

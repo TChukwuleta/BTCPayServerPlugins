@@ -1,7 +1,10 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.StoreBridge.ViewModels
 @model ImportViewModel
 @{
-    ViewData["Title"] = "Import Store";
-    Layout = "_LayoutWizard";
+    Layout = "_Layout";
+    ViewData.SetLayoutModel(new LayoutModel("StoreBridge-Import", "Shopify Bridge - Export") { ActiveCategory = "StoreBridge" });
 }
 
 <header class="text-center">
@@ -16,7 +19,7 @@
                 <div class="card-body">
                     <h5 class="card-title">Upload Export File</h5>
 
-                    <div class="mb-4 mt-3">
+                    @* <div class="mb-4 mt-3">
                         <label for="importFile" class="form-label">Store Export File (JSON)</label>
                         <input type="file" class="form-control" id="importFile" name="importFile"
                                accept=".json" required />
@@ -24,7 +27,7 @@
                             Select the JSON file exported from another BTCPay Server instance
                         </div>
                         <span asp-validation-for="importFile" class="text-danger"></span>
-                    </div>
+                    </div> *@
 
                     <hr class="my-4" />
 
@@ -122,7 +125,3 @@
         </form>
     </div>
 </div>
-
-@section Scripts {
-    <partial name="_ValidationScriptsPartial" />
-}
