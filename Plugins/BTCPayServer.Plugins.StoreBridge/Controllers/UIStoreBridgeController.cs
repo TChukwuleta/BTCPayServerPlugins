@@ -9,6 +9,7 @@ using BTCPayServer.Client;
 using BTCPayServer.Data;
 using BTCPayServer.Plugins.StoreBridge.Services;
 using BTCPayServer.Plugins.StoreBridge.ViewModels;
+using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -21,15 +22,17 @@ namespace BTCPayServer.Plugins.StoreBridge;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIStoreBridgeController : Controller
 {
-    private readonly ILogger<UIStoreBridgeController> _logger;
+    private readonly StoreRepository _storeRepository;
     private readonly StoreImportExportService _service;
+    private readonly ILogger<UIStoreBridgeController> _logger;
     private readonly UserManager<ApplicationUser> _userManager;
-    public UIStoreBridgeController
-        (StoreImportExportService service,UserManager<ApplicationUser> userManager, ILogger<UIStoreBridgeController> logger)
+    public UIStoreBridgeController(StoreImportExportService service,UserManager<ApplicationUser> userManager,
+        StoreRepository storeRepository, ILogger<UIStoreBridgeController> logger)
     {
         _logger = logger;
         _service = service;
         _userManager = userManager;
+        _storeRepository = storeRepository;
     }
     private StoreData CurrentStore => HttpContext.GetStoreData();
     private string GetBaseUrl() => $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
@@ -49,22 +52,21 @@ public class UIStoreBridgeController : Controller
     }
 
     [HttpPost("export")]
-    public async Task<IActionResult> ExportStorePost(string storeId)
+    public async Task<IActionResult> ExportStorePost(string storeId, ExportViewModel vm)
     {
         try
         {
-            var exportData = await _service.ExportStore(storeId, GetBaseUrl());
-            var json = _service.SerializeExport(exportData);
-            var bytes = Encoding.UTF8.GetBytes(json);
+            if (CurrentStore == null) return NotFound();
 
-            var fileName = $"store-export-{exportData.Store.StoreName.Replace(" ", "-")}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json";
-
-            return File(bytes, "application/json", fileName);
+            var store = await _storeRepository.FindStore(CurrentStore.Id);
+            var encryptedData = await _service.ExportStore(GetBaseUrl(), GetUserId(), store, vm.SelectedOptions);
+            var filename = $"btcpay-store-{store.StoreName}-{DateTime.UtcNow:yyyyMMddHHmmss}.btcpayexport";
+            return File(encryptedData, "application/octet-stream", filename);
         }
         catch (Exception ex)
         {
             TempData[WellKnownTempData.ErrorMessage] = $"Export failed: {ex.Message}";
-            return RedirectToAction(nameof(ExportStore));
+            return RedirectToAction(nameof(ExportStore), new { storeId });
         }
     }
 

@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Data;
+using BTCPayServer.Forms;
 using BTCPayServer.Plugins.StoreBridge.ViewModels;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Apps;
@@ -17,21 +17,24 @@ public class StoreImportExportService
     private readonly AppService _appService;
     private readonly ApplicationDbContext _dbContext;
     private readonly StoreRepository _storeRepository;
+    private readonly FormDataService _formDataService;
+    private readonly StoreExportService _exportService;
     private readonly SettingsRepository _settingsRepository;
 
-    public StoreImportExportService(ApplicationDbContext dbContext,
-        StoreRepository storeRepository, SettingsRepository settingsRepository, AppService appService)
+    public StoreImportExportService(ApplicationDbContext dbContext, StoreRepository storeRepository, 
+        SettingsRepository settingsRepository, AppService appService, FormDataService formDataService, StoreExportService exportService)
     {
         _dbContext = dbContext;
         _appService = appService;
+        _exportService = exportService;
         _storeRepository = storeRepository;
+        _formDataService = formDataService;
         _settingsRepository = settingsRepository;
     }
 
-    public async Task<StoreExportData> ExportStore(string sourceInstanceUrl, string userId, StoreData store, List<string> selectedOptions)
+    public async Task<byte[]> ExportStore(string sourceInstanceUrl, string userId, StoreData store, List<string> selectedOptions)
     {
-        // Settings... Branding, Payment
-        // Forms
+        // Settings... Payment
         var originalBlob = store.GetStoreBlob();
         var blob = DefaultStoreBlobSettings(originalBlob);
 
@@ -54,6 +57,15 @@ public class StoreImportExportService
             }
         };
 
+        if (selectedOptions.Contains("BrandingSettings"))
+        {
+            blob.LogoUrl = originalBlob.LogoUrl;
+            blob.CssUrl = originalBlob.CssUrl;
+            blob.BrandColor = originalBlob.BrandColor;
+            blob.ApplyBrandColorToBackend = originalBlob.ApplyBrandColorToBackend;
+            exportData.Store ??= new();
+            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+        }
         if (selectedOptions.Contains("EmailSettings"))
         {
             blob.PrimaryRateSettings = originalBlob.PrimaryRateSettings;
@@ -104,29 +116,16 @@ public class StoreImportExportService
                 Permissions = r.Permissions?.ToList()
             }).ToList();
         }
-
-
-        // Export Checkout Settings
-        if (selectedOptions.Contains("CheckoutSettings"))
+        if (selectedOptions.Contains("Forms"))
         {
-            exportData.CheckoutSettings = new CheckoutSettingsExport
+            var forms = await _formDataService.GetForms(store.Id);
+            forms.Select(c => new FormExport
             {
-                SpeedPolicy = store.SpeedPolicy.ToString(),
-                CheckoutType = blob.CheckoutType?.ToString(),
-                DefaultPaymentMethod = blob.DefaultPaymentMethod,
-                LazyPaymentMethods = blob.LazyPaymentMethods,
-                RedirectAutomatically = blob.RedirectAutomatically,
-                ShowRecommendedFee = blob.ShowRecommendedFee,
-                RecommendedFeeBlockTarget = blob.RecommendedFeeBlockTarget,
-                DisplayExpirationTimer = blob.DisplayExpirationTimer,
-                RequiresRefundEmail = blob.RequiresRefundEmail,
-                CheckoutFormId = blob.CheckoutFormId
-            };
+                Public = c.Public,
+                Name = c.Name,
+                Config = c.Config
+            });
         }
-
-
-
-
         if (selectedOptions.Contains("PaymentMethods"))
         {
             var paymentMethodConfig = store.GetPaymentMethodConfigs(true);
@@ -137,7 +136,6 @@ public class StoreImportExportService
                 ConfigJson = JsonConvert.SerializeObject(pm.Value)
             }).ToList();
         }
-
         if (selectedOptions.Contains("Apps"))
         {
             var apps = await _appService.GetAllApps(userId: userId, storeId: store.Id);
@@ -150,16 +148,8 @@ public class StoreImportExportService
                 SettingsJson = JsonConvert.SerializeObject(app.App)
             }).ToList();
         }
-
-
-
-        // Create encrypted export file
         var encryptedData = _exportService.CreateExport(exportData, store.Id, compress: true);
-        var filename = $"btcpay-store-{store.Id}-{DateTime.UtcNow:yyyyMMddHHmmss}.btcpayexport";
-
-        return File(encryptedData, "application/octet-stream", filename);
-
-        return exportData;
+        return encryptedData;
     }
 
 
@@ -181,6 +171,10 @@ public class StoreImportExportService
         blob.StoreSupportUrl = string.Empty;
         blob.AutoDetectLanguage = false;
         blob.DefaultLang = string.Empty;
+        blob.LogoUrl = null;
+        blob.CssUrl = null;
+        blob.BrandColor = string.Empty;
+        blob.ApplyBrandColorToBackend = false;
         return blob;
     }
     /// <summary>
@@ -313,7 +307,6 @@ public class StoreImportExportService
             StoreWebsite = store.StoreWebsite,
             DefaultCurrency = blob.DefaultCurrency,
             Spread = blob.Spread,
-            PayJoinEnabled = blob.PayJoinEnabled,
             DefaultLang = blob.DefaultLang
         };
     }

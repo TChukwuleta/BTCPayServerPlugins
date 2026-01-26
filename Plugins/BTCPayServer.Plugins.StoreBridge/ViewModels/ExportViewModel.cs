@@ -8,26 +8,28 @@ public class ExportViewModel
 
     public static readonly List<string> AllOptions = new List<string>
     {
-        "StoreSettings",
-        "PaymentMethods",
-        "Apps",
-        "Webhooks",
+        "BrandingSettings",
         "EmailSettings",
+        "RateSettings",
         "CheckoutSettings",
-        "Rates",
-        "Policies"
+        "Webhooks",
+        "Roles",
+        "Forms",
+        "PaymentMethods",
+        "Apps"
     };
     public bool IsSelected(string option) => SelectedOptions?.Contains(option) ?? false;
 
     public static readonly Dictionary<string, (string Title, string Description)> OptionMetadata = new()
     {
-        ["StoreSettings"] = ("Store Settings", "Name, website, default currency, speed policy, etc."),
-        ["PaymentMethods"] = ("Payment Methods", "On-chain and Lightning Network configurations"),
-        ["Apps"] = ("Apps", "Point of Sale, Crowdfund, and other app configurations"),
+        ["BrandingSettings"] = ("Branding Settings", "Logo, CSS, brand colors and backend appearance"),
+        ["EmailSettings"] = ("Email Settings", "Primary and fallback rate settings configuration"),
+        ["RateSettings"] = ("Rate Settings", "Exchange rate providers and preferences"),
+        ["CheckoutSettings"] = ("Checkout Settings", "Payment UI, language, timers, and user experience options"),
         ["Webhooks"] = ("Webhooks", "Webhook configurations and endpoints"),
-        ["EmailSettings"] = ("Email Settings", "SMTP configuration and email templates"),
-        ["CheckoutSettings"] = ("Checkout Settings", "Checkout appearance, forms, and behavior"),
-        ["Rates"] = ("Rate Sources", "Exchange rate providers and preferences"),
-        ["Policies"] = ("Policies", "Access policies and user permissions")
+        ["Roles"] = ("Roles & Permissions", "Store roles and user access permissions"),
+        ["Forms"] = ("Forms", "Custom forms and their configurations"),
+        ["PaymentMethods"] = ("Payment Methods", "On-chain and Lightning Network configurations"),
+        ["Apps"] = ("Apps", "Point of Sale, Crowdfund, and other app configurations")
     };
 }
