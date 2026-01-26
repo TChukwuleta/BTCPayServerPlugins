@@ -1,8 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Data;
 using BTCPayServer.Plugins.StoreBridge.ViewModels;
 using BTCPayServer.Services;
+using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Stores;
 using Newtonsoft.Json;
 
@@ -10,43 +14,175 @@ namespace BTCPayServer.Plugins.StoreBridge.Services;
 
 public class StoreImportExportService
 {
+    private readonly AppService _appService;
     private readonly ApplicationDbContext _dbContext;
     private readonly StoreRepository _storeRepository;
     private readonly SettingsRepository _settingsRepository;
 
     public StoreImportExportService(ApplicationDbContext dbContext,
-        StoreRepository storeRepository, SettingsRepository settingsRepository)
+        StoreRepository storeRepository, SettingsRepository settingsRepository, AppService appService)
     {
         _dbContext = dbContext;
+        _appService = appService;
         _storeRepository = storeRepository;
         _settingsRepository = settingsRepository;
     }
 
-    public async Task<StoreExportData> ExportStoreAsync(string storeId, string sourceInstanceUrl)
+    public async Task<StoreExportData> ExportStore(string sourceInstanceUrl, string userId, StoreData store, List<string> selectedOptions)
     {
-        var store = await _storeRepository.FindStore(storeId);
-        if (store == null)
-            throw new InvalidOperationException($"Store {storeId} not found");
+        // Settings... Branding, Payment
+        // Forms
+        var originalBlob = store.GetStoreBlob();
+        var blob = DefaultStoreBlobSettings(originalBlob);
 
         var exportData = new StoreExportData
         {
-            ExportedAt = DateTime.UtcNow,
+            Version = 1,
+            ExportDate = DateTime.UtcNow,
             ExportedFrom = sourceInstanceUrl,
-            Store = MapStoreData(store)
+            Store = new StoreBridgeData
+            {
+                Id = store.Id,
+                Spread = blob.Spread,
+                StoreName = store.StoreName,
+                DefaultLang = blob.DefaultLang,
+                StoreWebsite = store.StoreWebsite,
+                DefaultCurrency = blob.DefaultCurrency,
+                SpeedPolicy = store.SpeedPolicy.ToString(),
+                StoreBlob = JsonConvert.SerializeObject(blob),
+                DerivationStrategies = store.DerivationStrategies
+            }
         };
 
-        // Export webhooks
-        //exportData.Webhooks = await ExportWebhooksAsync(storeId);
+        if (selectedOptions.Contains("EmailSettings"))
+        {
+            blob.PrimaryRateSettings = originalBlob.PrimaryRateSettings;
+            blob.FallbackRateSettings = originalBlob.FallbackRateSettings;
+            exportData.Store ??= new();
+            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+        }
+        if (selectedOptions.Contains("RateSettings"))
+        {
+            blob.EmailSettings = originalBlob.EmailSettings;
+            exportData.Store ??= new();
+            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+        }
+        if (selectedOptions.Contains("CheckoutSettings"))
+        {
+            blob.ShowPayInWalletButton = originalBlob.ShowPayInWalletButton;
+            blob.ShowStoreHeader = originalBlob.ShowStoreHeader;
+            blob.CelebratePayment = originalBlob.CelebratePayment;
+            blob.PlaySoundOnPayment = originalBlob.PlaySoundOnPayment;
+            blob.OnChainWithLnInvoiceFallback = originalBlob.OnChainWithLnInvoiceFallback;
+            blob.LightningAmountInSatoshi = originalBlob.LightningAmountInSatoshi;
+            blob.LazyPaymentMethods = originalBlob.LazyPaymentMethods;
+            blob.RedirectAutomatically = originalBlob.RedirectAutomatically;
+            blob.ReceiptOptions = originalBlob.ReceiptOptions;
+            blob.HtmlTitle = originalBlob.HtmlTitle;
+            blob.StoreSupportUrl = originalBlob.StoreSupportUrl;
+            blob.DisplayExpirationTimer = originalBlob.DisplayExpirationTimer;
+            blob.AutoDetectLanguage = originalBlob.AutoDetectLanguage;
+            blob.DefaultLang = originalBlob.DefaultLang;
+            exportData.Store ??= new();
+            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+        }
+        if (selectedOptions.Contains("Webhooks"))
+        {
+            var webhooks = await _storeRepository.GetWebhooks(store.Id);
+            exportData.Webhooks = webhooks.Select(wh => new WebhookExport
+            {
+                Blob2Json = wh.Blob2,
+                BlobJson = JsonConvert.SerializeObject(wh.GetBlob())
+            }).ToList();
+        }
+        if (selectedOptions.Contains("Roles"))
+        {
+            var roles = await _storeRepository.GetStoreRoles(store.Id);
+            exportData.Roles = roles.Select(r => new RoleExport
+            {
+                Role = r.Role,
+                Permissions = r.Permissions?.ToList()
+            }).ToList();
+        }
 
-        // Export users and roles
-        //exportData.Users = await ExportStoreUsersAsync(storeId);
 
-        // Export apps
-        //exportData.Apps = await ExportAppsAsync(storeId);
+        // Export Checkout Settings
+        if (selectedOptions.Contains("CheckoutSettings"))
+        {
+            exportData.CheckoutSettings = new CheckoutSettingsExport
+            {
+                SpeedPolicy = store.SpeedPolicy.ToString(),
+                CheckoutType = blob.CheckoutType?.ToString(),
+                DefaultPaymentMethod = blob.DefaultPaymentMethod,
+                LazyPaymentMethods = blob.LazyPaymentMethods,
+                RedirectAutomatically = blob.RedirectAutomatically,
+                ShowRecommendedFee = blob.ShowRecommendedFee,
+                RecommendedFeeBlockTarget = blob.RecommendedFeeBlockTarget,
+                DisplayExpirationTimer = blob.DisplayExpirationTimer,
+                RequiresRefundEmail = blob.RequiresRefundEmail,
+                CheckoutFormId = blob.CheckoutFormId
+            };
+        }
+
+
+
+
+        if (selectedOptions.Contains("PaymentMethods"))
+        {
+            var paymentMethodConfig = store.GetPaymentMethodConfigs(true);
+
+            paymentMethodConfig.Select(pm => new PaymentMethodExport
+            {
+                PaymentMethodId = pm.Key.ToString(),
+                ConfigJson = JsonConvert.SerializeObject(pm.Value)
+            }).ToList();
+        }
+
+        if (selectedOptions.Contains("Apps"))
+        {
+            var apps = await _appService.GetAllApps(userId: userId, storeId: store.Id);
+            exportData.Apps = apps.Select(app => new AppExport
+            {
+                AppId = app.Id,
+                AppName = app.AppName,
+                AppType = app.AppType,
+                Created = app.Created,
+                SettingsJson = JsonConvert.SerializeObject(app.App)
+            }).ToList();
+        }
+
+
+
+        // Create encrypted export file
+        var encryptedData = _exportService.CreateExport(exportData, store.Id, compress: true);
+        var filename = $"btcpay-store-{store.Id}-{DateTime.UtcNow:yyyyMMddHHmmss}.btcpayexport";
+
+        return File(encryptedData, "application/octet-stream", filename);
 
         return exportData;
     }
 
+
+    private StoreBlob DefaultStoreBlobSettings(StoreBlob blob)
+    {
+        blob.EmailSettings = null;
+        blob.PrimaryRateSettings = null;
+        blob.FallbackRateSettings = null;
+        blob.ShowPayInWalletButton = false;
+        blob.ShowStoreHeader = false;
+        blob.CelebratePayment = false;
+        blob.PlaySoundOnPayment = false;
+        blob.OnChainWithLnInvoiceFallback = false;
+        blob.LightningAmountInSatoshi = false;
+        blob.LazyPaymentMethods = false;
+        blob.RedirectAutomatically = false;
+        blob.ReceiptOptions = null;
+        blob.HtmlTitle = string.Empty;
+        blob.StoreSupportUrl = string.Empty;
+        blob.AutoDetectLanguage = false;
+        blob.DefaultLang = string.Empty;
+        return blob;
+    }
     /// <summary>
     /// Import a store configuration
     /// </summary>

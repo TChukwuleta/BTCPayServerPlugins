@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace BTCPayServer.Plugins.StoreBridge;
 
-public class Plugin : BaseBTCPayServerPlugin
+public class StoreBridgePlugin : BaseBTCPayServerPlugin
 {
     public override IBTCPayServerPlugin.PluginDependency[] Dependencies { get; } =
     {

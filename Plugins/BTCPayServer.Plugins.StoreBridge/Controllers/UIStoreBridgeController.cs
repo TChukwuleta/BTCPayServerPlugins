@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -13,11 +14,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.StoreBridge;
 
-[Route("~/plugins/storebridge/{storeId}/")]
+[Route("~/plugins/{storeId}/storebridge/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIStoreBridgeController : Controller
 {
@@ -39,8 +39,13 @@ public class UIStoreBridgeController : Controller
     [HttpGet("export")]
     public IActionResult ExportStore(string storeId)
     {
-        _logger.LogInformation(JsonConvert.SerializeObject(CurrentStore));
-        return View(new ExportViewModel { StoreId = storeId });
+        if (CurrentStore == null) return NotFound();
+
+        return View(new ExportViewModel
+        {
+            StoreId = CurrentStore.Id,
+            SelectedOptions = new List<string>(ExportViewModel.AllOptions)
+        });
     }
 
     [HttpPost("export")]
@@ -48,7 +53,7 @@ public class UIStoreBridgeController : Controller
     {
         try
         {
-            var exportData = await _service.ExportStoreAsync(storeId, GetBaseUrl());
+            var exportData = await _service.ExportStore(storeId, GetBaseUrl());
             var json = _service.SerializeExport(exportData);
             var bytes = Encoding.UTF8.GetBytes(json);
 
@@ -68,6 +73,7 @@ public class UIStoreBridgeController : Controller
     {
         return View(new ImportViewModel
         {
+            StoreId = CurrentStore.Id,
             Options = new StoreImportOptions()
         });
     }
