@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Client;
@@ -60,7 +59,7 @@ public class UIStoreBridgeController : Controller
 
             var store = await _storeRepository.FindStore(CurrentStore.Id);
             var encryptedData = await _service.ExportStore(GetBaseUrl(), GetUserId(), store, vm.SelectedOptions);
-            var filename = $"btcpay-store-{store.StoreName}-{DateTime.UtcNow:yyyyMMddHHmmss}.btcpayexport";
+            var filename = $"btcpay-store-{store.StoreName}-{DateTime.UtcNow:yyyyMMddHHmmss}.storebridge";
             return File(encryptedData, "application/octet-stream", filename);
         }
         catch (Exception ex)
@@ -73,79 +72,167 @@ public class UIStoreBridgeController : Controller
     [HttpGet("import")]
     public IActionResult ImportStore(string storeId)
     {
+        if (CurrentStore == null) return NotFound();
+
         return View(new ImportViewModel
         {
             StoreId = CurrentStore.Id,
-            Options = new StoreImportOptions()
+            ShowPreview = false
         });
     }
 
 
-    [HttpPost("import")]
-    public async Task<IActionResult> ImportStorePost(IFormFile importFile, StoreImportOptions options)
+    [HttpPost("import/preview")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ImportStorePreview(ImportViewModel vm)
     {
-        if (importFile == null || importFile.Length == 0)
-        {
-            ModelState.AddModelError(nameof(importFile), "Please select a file to import");
-            return View(nameof(ImportStore), new ImportViewModel { Options = options });
-        }
+        if (CurrentStore == null) return NotFound();
 
-        if (!importFile.FileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        if (vm.ImportFile == null || vm.ImportFile.Length == 0)
         {
-            ModelState.AddModelError(nameof(importFile), "Only JSON files are supported");
-            return View(nameof(ImportStore), new ImportViewModel { Options = options });
+            TempData[WellKnownTempData.ErrorMessage] = "Please select a file to import";
+            return View(nameof(ImportStore), vm);
+        }
+        if (!vm.ImportFile.FileName.EndsWith(".storebridge", StringComparison.OrdinalIgnoreCase))
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Invalid file format. Please upload a .storebridge file";
+            return View(nameof(ImportStore), vm);
+        }
+        if (vm.ImportFile.Length > 1 * 1024 * 1024)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "File size exceeds 1MB limit";
+            return View(nameof(ImportStore), vm);
         }
 
         try
         {
-            string json;
-            using (var reader = new StreamReader(importFile.OpenReadStream()))
+            byte[] fileBytes;
+            using (var ms = new MemoryStream())
             {
-                json = await reader.ReadToEndAsync();
+                await vm.ImportFile.CopyToAsync(ms);
+                fileBytes = ms.ToArray();
             }
 
-            var exportData = _service.DeserializeImport(json);
-            var currentUserId = HttpContext.User.Claims
-                .FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-
-            if (string.IsNullOrEmpty(currentUserId))
-                throw new InvalidOperationException("User not authenticated");
-
-            var result = await _service.ImportStoreAsync(exportData, options, currentUserId);
-
-            if (result.Success)
+            StoreExportData exportData = _service.GetExportPreview(fileBytes, CurrentStore.Id);
+            if (exportData == null)
             {
-                var message = new StringBuilder();
-                message.AppendLine($"Store imported successfully! New Store ID: {result.NewStoreId}");
-                message.AppendLine($"Wallets: {result.Statistics.WalletsImported}");
-                message.AppendLine($"Payment Methods: {result.Statistics.PaymentMethodsImported}");
-                message.AppendLine($"Webhooks: {result.Statistics.WebhooksImported}");
-                message.AppendLine($"Users: {result.Statistics.UsersImported}");
-                message.AppendLine($"Apps: {result.Statistics.AppsImported}");
+                TempData[WellKnownTempData.ErrorMessage] = $"Failed to decrypt export file. This file may be corrupted or encrypted for a different store";
+                return View(nameof(ImportStore), vm);
+            }
 
-                if (result.Warnings.Any())
+            // Validate version
+            if (exportData.Version != 1)
+            {
+                TempData[WellKnownTempData.ErrorMessage] = $"Unsupported export version: {exportData.Version}. Please use a compatible export file.";
+                return View(nameof(ImportStore), vm);
+            }
+
+            var availableOptions = _service.GetAvailableImportOptions(fileBytes, CurrentStore.Id);
+            if (!availableOptions.Any())
+            {
+                TempData[WellKnownTempData.ErrorMessage] = "The export file contains no importable data";
+                return View(nameof(ImportStore), vm);
+            }
+
+            var previewModel = new ImportViewModel
+            {
+                StoreId = CurrentStore.Id,
+                ShowPreview = true,
+                ExportedFrom = exportData.ExportedFrom,
+                ExportDate = exportData.ExportDate,
+                OriginalStoreName = exportData.Store?.StoreName,
+                AvailableOptions = availableOptions,
+                SelectedOptions = new List<string>(availableOptions) 
+            };
+
+            TempData["ImportFileData"] = Convert.ToBase64String(fileBytes);
+            TempData[WellKnownTempData.SuccessMessage] = "Export file validated successfully. Review and select what to import.";
+
+            return View(nameof(ImportStore), vm);
+        }
+        catch (Exception ex)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = $"Failed to process export file: {ex.Message}";
+            return View(nameof(ImportStore), vm);
+        }
+    }
+
+    [HttpPost("import/confirm")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ImportStoreConfirm(ImportViewModel vm)
+    {
+        if (CurrentStore == null) return NotFound();
+
+        var store = await _storeRepository.FindStore(CurrentStore.Id);
+        // Retrieve the stored file data
+        var fileDataBase64 = TempData["ImportFileData"] as string;
+        if (string.IsNullOrEmpty(fileDataBase64))
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Import session expired. Please upload the file again.";
+            return RedirectToAction(nameof(ImportStore));
+        }
+
+        // Validate that at least one option is selected
+        if (vm.SelectedOptions == null || !vm.SelectedOptions.Any())
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Please select at least one item to import";
+
+            // Restore TempData for retry
+            TempData["ImportFileData"] = fileDataBase64;
+
+            // Recreate the preview
+            try
+            {
+                var fileBytes = Convert.FromBase64String(fileDataBase64);
+                StoreExportData exportData = _service.GetExportPreview(fileBytes, CurrentStore.Id);
+                if (exportData == null)
                 {
-                    message.AppendLine("\nWarnings:");
-                    foreach (var warning in result.Warnings)
-                    {
-                        message.AppendLine($"- {warning}");
-                    }
+                    TempData[WellKnownTempData.ErrorMessage] = $"Failed to decrypt export file. This file may be corrupted or encrypted for a different store";
+                    return RedirectToAction(nameof(ImportStore));
+                }
+                var availableOptions = _service.GetAvailableImportOptions(fileBytes, CurrentStore.Id);
+                if (!availableOptions.Any())
+                {
+                    TempData[WellKnownTempData.ErrorMessage] = "The export file contains no importable data";
+                    return View(nameof(ImportStore), vm);
                 }
 
-                TempData[WellKnownTempData.SuccessMessage] = message.ToString();
-                return RedirectToAction("Dashboard", "UIStores", new { storeId = result.NewStoreId });
+                vm.ShowPreview = true;
+                vm.ExportedFrom = exportData.ExportedFrom;
+                vm.ExportDate = exportData.ExportDate;
+                vm.OriginalStoreName = exportData.Store?.StoreName;
+                vm.AvailableOptions = availableOptions;
+
+                return View("ImportStore", vm);
+            }
+            catch
+            {
+                return RedirectToAction(nameof(ImportStore));
+            }
+        }
+
+        try
+        {
+            var fileBytes = Convert.FromBase64String(fileDataBase64);
+
+            // Perform the import
+            var (success, message) = await _service.ImportStore(store, fileBytes, GetUserId(), vm.SelectedOptions);
+
+            if (success)
+            {
+                TempData[WellKnownTempData.SuccessMessage] = message;
+                return RedirectToAction("Dashboard", "UIStores", new { storeId = CurrentStore.Id });
             }
             else
             {
-                var errorMessage = "Import failed:\n" + string.Join("\n", result.Errors);
-                TempData[WellKnownTempData.ErrorMessage] = errorMessage;
-                return View(nameof(ImportStore), new ImportViewModel { Options = options });
+                TempData[WellKnownTempData.ErrorMessage] = message;
+                return RedirectToAction(nameof(ImportStore));
             }
         }
         catch (Exception ex)
         {
             TempData[WellKnownTempData.ErrorMessage] = $"Import failed: {ex.Message}";
-            return View(nameof(ImportStore), new ImportViewModel { Options = options });
+            return RedirectToAction(nameof(ImportStore));
         }
     }
 }

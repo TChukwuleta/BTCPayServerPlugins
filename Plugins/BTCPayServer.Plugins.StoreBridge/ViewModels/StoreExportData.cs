@@ -6,6 +6,7 @@ namespace BTCPayServer.Plugins.StoreBridge.ViewModels;
 public class StoreExportData
 {
     public int Version { get; set; } = 1;
+    public string SelectedOptions { get; set; }
     public DateTime ExportDate { get; set; }
     public string ExportedFrom { get; set; } = string.Empty;
     public List<PaymentMethodExport> PaymentMethods { get; set; }
@@ -26,7 +27,6 @@ public class AppExport
     public string AppId { get; set; }
     public string AppName { get; set; }
     public string AppType { get; set; }
-    public DateTimeOffset Created { get; set; }
     public string SettingsJson { get; set; }
 }
 public class WebhookExport
@@ -47,50 +47,8 @@ public class FormExport
 }
 public class StoreBridgeData
 {
-    public string Id { get; set; } = string.Empty;
-    public string StoreName { get; set; } = string.Empty;
-    public string DefaultCurrency { get; set; } = "USD";
+    public string StoreName { get; set; }
     public string StoreBlob { get; set; }
     public string SpeedPolicy { get; set; }
     public string DerivationStrategies { get; set; }
-    public string StoreWebsite { get; set; }
-    public decimal Spread { get; set; }
-    public string DefaultLang { get; set; }
-}
-
-
-/// <summary>
-/// Import options
-/// </summary>
-public class StoreImportOptions
-{
-    public bool ImportWallets { get; set; } = true;
-    public bool ImportPaymentMethods { get; set; } = true;
-    public bool ImportWebhooks { get; set; } = true;
-    public bool ImportUsers { get; set; } = false; // Default false for security
-    public bool ImportApps { get; set; } = true;
-    public bool OverwriteExisting { get; set; } = false;
-    public string? NewStoreId { get; set; } // If null, keeps original or generates new
-    public string? NewStoreName { get; set; } // If null, keeps original
-}
-
-/// <summary>
-/// Import result
-/// </summary>
-public class StoreImportResult
-{
-    public bool Success { get; set; }
-    public string? NewStoreId { get; set; }
-    public List<string> Warnings { get; set; } = new();
-    public List<string> Errors { get; set; } = new();
-    public ImportStatistics Statistics { get; set; } = new();
-}
-
-public class ImportStatistics
-{
-    public int WalletsImported { get; set; }
-    public int PaymentMethodsImported { get; set; }
-    public int WebhooksImported { get; set; }
-    public int UsersImported { get; set; }
-    public int AppsImported { get; set; }
 }
