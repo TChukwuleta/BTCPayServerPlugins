@@ -13,7 +13,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using static BTCPayServer.Plugins.Monetization.Views.SelectExistingOfferingModalViewModel;
 
 namespace BTCPayServer.Plugins.StoreBridge;
 
@@ -23,12 +24,10 @@ public class UIStoreBridgeController : Controller
 {
     private readonly StoreRepository _storeRepository;
     private readonly StoreImportExportService _service;
-    private readonly ILogger<UIStoreBridgeController> _logger;
     private readonly UserManager<ApplicationUser> _userManager;
     public UIStoreBridgeController(StoreImportExportService service,UserManager<ApplicationUser> userManager,
-        StoreRepository storeRepository, ILogger<UIStoreBridgeController> logger)
+        StoreRepository storeRepository)
     {
-        _logger = logger;
         _service = service;
         _userManager = userManager;
         _storeRepository = storeRepository;
@@ -42,21 +41,19 @@ public class UIStoreBridgeController : Controller
     public IActionResult ExportStore(string storeId)
     {
         if (CurrentStore == null) return NotFound();
-
         return View(new ExportViewModel
         {
             StoreId = CurrentStore.Id,
-            SelectedOptions = new List<string>(ExportViewModel.AllOptions)
+            SelectedOptions = ExportViewModel.AllOptions
         });
     }
 
     [HttpPost("export")]
     public async Task<IActionResult> ExportStorePost(string storeId, ExportViewModel vm)
     {
+        if (CurrentStore == null) return NotFound();
         try
         {
-            if (CurrentStore == null) return NotFound();
-
             var store = await _storeRepository.FindStore(CurrentStore.Id);
             var encryptedData = await _service.ExportStore(GetBaseUrl(), GetUserId(), store, vm.SelectedOptions);
             var filename = $"btcpay-store-{store.StoreName}-{DateTime.UtcNow:yyyyMMddHHmmss}.storebridge";
@@ -67,6 +64,21 @@ public class UIStoreBridgeController : Controller
             TempData[WellKnownTempData.ErrorMessage] = $"Export failed: {ex.Message}";
             return RedirectToAction(nameof(ExportStore), new { storeId });
         }
+    }
+
+    [HttpPost("export/preview")]
+    public async Task<IActionResult> ExportStorePreview(string storeId, ExportViewModel vm)
+    {
+        if (CurrentStore == null) return NotFound();
+
+        if (vm.SelectedOptions == null || !vm.SelectedOptions.Any())
+        {
+            TempData[WellKnownTempData.ErrorMessage] = $"Please select at least one item to export";
+            return RedirectToAction(nameof(ExportStore), new { storeId });
+        }
+        var store = await _storeRepository.FindStore(CurrentStore.Id);
+        var exportData = await _service.GetExportDataPreview(GetBaseUrl(), GetUserId(), store, vm.SelectedOptions);
+        return Content(JsonConvert.SerializeObject(exportData, Formatting.Indented), "application/json");
     }
 
     [HttpGet("import")]
@@ -81,29 +93,26 @@ public class UIStoreBridgeController : Controller
         });
     }
 
-
     [HttpPost("import/preview")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ImportStorePreview(ImportViewModel vm)
     {
         if (CurrentStore == null) return NotFound();
-
         if (vm.ImportFile == null || vm.ImportFile.Length == 0)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Please select a file to import";
-            return View(nameof(ImportStore), vm);
+            return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
         }
         if (!vm.ImportFile.FileName.EndsWith(".storebridge", StringComparison.OrdinalIgnoreCase))
         {
             TempData[WellKnownTempData.ErrorMessage] = "Invalid file format. Please upload a .storebridge file";
-            return View(nameof(ImportStore), vm);
+            return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
         }
         if (vm.ImportFile.Length > 1 * 1024 * 1024)
         {
             TempData[WellKnownTempData.ErrorMessage] = "File size exceeds 1MB limit";
-            return View(nameof(ImportStore), vm);
+            return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
         }
-
         try
         {
             byte[] fileBytes;
@@ -112,48 +121,20 @@ public class UIStoreBridgeController : Controller
                 await vm.ImportFile.CopyToAsync(ms);
                 fileBytes = ms.ToArray();
             }
-
-            StoreExportData exportData = _service.GetExportPreview(fileBytes, CurrentStore.Id);
-            if (exportData == null)
+            var getPreview = GetImportPreview(fileBytes);
+            if (!string.IsNullOrEmpty(getPreview.errorMessage))
             {
-                TempData[WellKnownTempData.ErrorMessage] = $"Failed to decrypt export file. This file may be corrupted or encrypted for a different store";
-                return View(nameof(ImportStore), vm);
+                TempData[WellKnownTempData.ErrorMessage] = getPreview.errorMessage;
+                return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
             }
-
-            // Validate version
-            if (exportData.Version != 1)
-            {
-                TempData[WellKnownTempData.ErrorMessage] = $"Unsupported export version: {exportData.Version}. Please use a compatible export file.";
-                return View(nameof(ImportStore), vm);
-            }
-
-            var availableOptions = _service.GetAvailableImportOptions(fileBytes, CurrentStore.Id);
-            if (!availableOptions.Any())
-            {
-                TempData[WellKnownTempData.ErrorMessage] = "The export file contains no importable data";
-                return View(nameof(ImportStore), vm);
-            }
-
-            var previewModel = new ImportViewModel
-            {
-                StoreId = CurrentStore.Id,
-                ShowPreview = true,
-                ExportedFrom = exportData.ExportedFrom,
-                ExportDate = exportData.ExportDate,
-                OriginalStoreName = exportData.Store?.StoreName,
-                AvailableOptions = availableOptions,
-                SelectedOptions = new List<string>(availableOptions) 
-            };
-
             TempData["ImportFileData"] = Convert.ToBase64String(fileBytes);
-            TempData[WellKnownTempData.SuccessMessage] = "Export file validated successfully. Review and select what to import.";
-
-            return View(nameof(ImportStore), vm);
+            TempData[WellKnownTempData.SuccessMessage] = "Export file validated successfully. Review and select what to import";
+            return View(nameof(ImportStore), getPreview.model);
         }
         catch (Exception ex)
         {
             TempData[WellKnownTempData.ErrorMessage] = $"Failed to process export file: {ex.Message}";
-            return View(nameof(ImportStore), vm);
+            return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
         }
     }
 
@@ -164,60 +145,31 @@ public class UIStoreBridgeController : Controller
         if (CurrentStore == null) return NotFound();
 
         var store = await _storeRepository.FindStore(CurrentStore.Id);
-        // Retrieve the stored file data
+
         var fileDataBase64 = TempData["ImportFileData"] as string;
         if (string.IsNullOrEmpty(fileDataBase64))
         {
             TempData[WellKnownTempData.ErrorMessage] = "Import session expired. Please upload the file again.";
-            return RedirectToAction(nameof(ImportStore));
+            return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
         }
 
-        // Validate that at least one option is selected
+        var fileBytes = Convert.FromBase64String(fileDataBase64);
+
         if (vm.SelectedOptions == null || !vm.SelectedOptions.Any())
         {
+            var getPreview = GetImportPreview(fileBytes, vm);
+            if (!string.IsNullOrEmpty(getPreview.errorMessage))
+            {
+                TempData[WellKnownTempData.ErrorMessage] = getPreview.errorMessage;
+                return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
+            }
             TempData[WellKnownTempData.ErrorMessage] = "Please select at least one item to import";
-
-            // Restore TempData for retry
             TempData["ImportFileData"] = fileDataBase64;
-
-            // Recreate the preview
-            try
-            {
-                var fileBytes = Convert.FromBase64String(fileDataBase64);
-                StoreExportData exportData = _service.GetExportPreview(fileBytes, CurrentStore.Id);
-                if (exportData == null)
-                {
-                    TempData[WellKnownTempData.ErrorMessage] = $"Failed to decrypt export file. This file may be corrupted or encrypted for a different store";
-                    return RedirectToAction(nameof(ImportStore));
-                }
-                var availableOptions = _service.GetAvailableImportOptions(fileBytes, CurrentStore.Id);
-                if (!availableOptions.Any())
-                {
-                    TempData[WellKnownTempData.ErrorMessage] = "The export file contains no importable data";
-                    return View(nameof(ImportStore), vm);
-                }
-
-                vm.ShowPreview = true;
-                vm.ExportedFrom = exportData.ExportedFrom;
-                vm.ExportDate = exportData.ExportDate;
-                vm.OriginalStoreName = exportData.Store?.StoreName;
-                vm.AvailableOptions = availableOptions;
-
-                return View("ImportStore", vm);
-            }
-            catch
-            {
-                return RedirectToAction(nameof(ImportStore));
-            }
+            return View(nameof(ImportStore), getPreview.model);
         }
-
         try
         {
-            var fileBytes = Convert.FromBase64String(fileDataBase64);
-
-            // Perform the import
             var (success, message) = await _service.ImportStore(store, fileBytes, GetUserId(), vm.SelectedOptions);
-
             if (success)
             {
                 TempData[WellKnownTempData.SuccessMessage] = message;
@@ -226,13 +178,55 @@ public class UIStoreBridgeController : Controller
             else
             {
                 TempData[WellKnownTempData.ErrorMessage] = message;
-                return RedirectToAction(nameof(ImportStore));
+                return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
             }
         }
         catch (Exception ex)
         {
             TempData[WellKnownTempData.ErrorMessage] = $"Import failed: {ex.Message}";
-            return RedirectToAction(nameof(ImportStore));
+            return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
         }
+    }
+
+    private (string errorMessage, ImportViewModel model) GetImportPreview(byte[] fileBytes, ImportViewModel vm = null)
+    {
+        StoreExportData exportData = _service.GetExportPreview(fileBytes);
+        if (exportData == null)
+        {
+            return ("Failed to decrypt export file. This file may be corrupted or encrypted for a different store", null);
+        }
+        if (exportData.Store.StoreId == CurrentStore.Id)
+        {
+            return ("Cannot import store configuration into the same store", null);
+        }
+        var availableOptions = _service.GetAvailableImportOptions(fileBytes, CurrentStore.Id);
+        if (!availableOptions.Any())
+        {
+            return ("The export file contains no importable data", null);
+        }
+        ImportViewModel previewModel;
+        if (vm == null)
+        {
+            previewModel = new ImportViewModel
+            {
+                StoreId = CurrentStore.Id,
+                ShowPreview = true,
+                ExportedFrom = exportData.ExportedFrom,
+                ExportDate = exportData.ExportDate,
+                OriginalStoreName = exportData.Store?.StoreName,
+                AvailableOptions = availableOptions,
+                SelectedOptions = availableOptions
+            };
+        }
+        else
+        {
+            previewModel = vm;
+            previewModel.ShowPreview = true;
+            previewModel.ExportedFrom = exportData.ExportedFrom;
+            previewModel.ExportDate = exportData.ExportDate;
+            previewModel.OriginalStoreName = exportData.Store?.StoreName;
+            previewModel.AvailableOptions = availableOptions;
+        }
+        return (string.Empty, previewModel);
     }
 }

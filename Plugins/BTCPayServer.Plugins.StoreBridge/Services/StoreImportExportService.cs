@@ -14,6 +14,7 @@ using BTCPayServer.Forms;
 using BTCPayServer.Plugins.StoreBridge.ViewModels;
 using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Stores;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.StoreBridge.Services;
@@ -23,6 +24,7 @@ public class StoreImportExportService
     private readonly AppService _appService;
     private readonly StoreRepository _storeRepository;
     private readonly FormDataService _formDataService;
+    private readonly ILogger<StoreImportExportService> _logger;
     private const string MAGIC_HEADER = "BTCPAY_STOREBRIDGE_V1";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -31,19 +33,20 @@ public class StoreImportExportService
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
-    public StoreImportExportService(StoreRepository storeRepository, AppService appService, FormDataService formDataService)
+    public StoreImportExportService(StoreRepository storeRepository, AppService appService, 
+        FormDataService formDataService, ILogger<StoreImportExportService> logger)
     {
+        _logger = logger;
         _appService = appService;
         _storeRepository = storeRepository;
         _formDataService = formDataService;
     }
 
-    public async Task<byte[]> ExportStore(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
+    public async Task<StoreExportData> GetExportDataPreview(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
     {
         // Settings... Payment
         var originalBlob = store.GetStoreBlob();
         var blob = DefaultStoreBlobSettings(originalBlob);
-
         var exportData = new StoreExportData
         {
             Version = 1,
@@ -52,9 +55,9 @@ public class StoreImportExportService
             SelectedOptions = JsonConvert.SerializeObject(selectedOptions),
             Store = new StoreBridgeData
             {
+                StoreId = store.Id,
                 StoreName = store.StoreName,
                 SpeedPolicy = store.SpeedPolicy.ToString(),
-                StoreBlob = JsonConvert.SerializeObject(blob),
                 DerivationStrategies = store.DerivationStrategies
             }
         };
@@ -70,16 +73,12 @@ public class StoreImportExportService
         }
         if (selectedOptions.Contains("EmailSettings"))
         {
-            blob.PrimaryRateSettings = originalBlob.PrimaryRateSettings;
-            blob.FallbackRateSettings = originalBlob.FallbackRateSettings;
-            exportData.Store ??= new();
-            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+            blob.EmailSettings = originalBlob.EmailSettings;
         }
         if (selectedOptions.Contains("RateSettings"))
         {
-            blob.EmailSettings = originalBlob.EmailSettings;
-            exportData.Store ??= new();
-            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+            blob.PrimaryRateSettings = originalBlob.PrimaryRateSettings;
+            blob.FallbackRateSettings = originalBlob.FallbackRateSettings;
         }
         if (selectedOptions.Contains("CheckoutSettings"))
         {
@@ -97,8 +96,6 @@ public class StoreImportExportService
             blob.DisplayExpirationTimer = originalBlob.DisplayExpirationTimer;
             blob.AutoDetectLanguage = originalBlob.AutoDetectLanguage;
             blob.DefaultLang = originalBlob.DefaultLang;
-            exportData.Store ??= new();
-            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
         }
         if (selectedOptions.Contains("Webhooks"))
         {
@@ -121,18 +118,17 @@ public class StoreImportExportService
         if (selectedOptions.Contains("Forms"))
         {
             var forms = await _formDataService.GetForms(store.Id);
-            forms.Select(c => new FormExport
+            exportData.Forms = forms.Select(c => new FormExport
             {
                 Public = c.Public,
                 Name = c.Name,
                 Config = c.Config
-            });
+            }).ToList();
         }
         if (selectedOptions.Contains("PaymentMethods"))
         {
             var paymentMethodConfig = store.GetPaymentMethodConfigs(true);
-
-            paymentMethodConfig.Select(pm => new PaymentMethodExport
+            exportData.PaymentMethods = paymentMethodConfig.Select(pm => new PaymentMethodExport
             {
                 PaymentMethodId = pm.Key.ToString(),
                 ConfigJson = JsonConvert.SerializeObject(pm.Value)
@@ -149,7 +145,14 @@ public class StoreImportExportService
                 SettingsJson = JsonConvert.SerializeObject(app.App)
             }).ToList();
         }
-        var encryptedData = CreateExport(exportData, store.Id, compress: true);
+        exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+        return exportData;
+    }
+
+    public async Task<byte[]> ExportStore(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
+    {
+        var exportData = await GetExportDataPreview(sourceInstanceUrl, userId, store, selectedOptions);
+        var encryptedData = CreateExport(exportData, store.Id);
         return encryptedData;
     }
 
@@ -160,12 +163,8 @@ public class StoreImportExportService
         {
             bool storeModified = false;
             var destinationStoreBlob = destinationStore.GetStoreBlob();
-
-            var exportData = ParseExport(encryptedData, destinationStore.Id);
-            if (exportData.Version != 1)
-            {
-                return (false, $"Unsupported export version: {exportData.Version}");
-            }
+            var exportData = ParseExport(encryptedData);
+            // In the future... factory method based on versions..
 
             var exportedOptions = !string.IsNullOrEmpty(exportData.SelectedOptions)
                 ? JsonConvert.DeserializeObject<List<string>>(exportData.SelectedOptions) : new List<string>();
@@ -177,8 +176,6 @@ public class StoreImportExportService
             {
                 return (false, "No valid options selected for import");
             }
-
-            // Include store settings...
 
             if (exportData.Store != null && !string.IsNullOrEmpty(exportData.Store.StoreBlob))
             {
@@ -200,6 +197,10 @@ public class StoreImportExportService
                 {
                     destinationStoreBlob.PrimaryRateSettings = importedBlob.PrimaryRateSettings;
                     destinationStoreBlob.FallbackRateSettings = importedBlob.FallbackRateSettings;
+                    if (Enum.TryParse<SpeedPolicy>(exportData.Store.SpeedPolicy, out var speedPolicy))
+                    {
+                        destinationStore.SpeedPolicy = speedPolicy;
+                    }
                     storeModified = true;
                 }
                 if (optionsToImport.Contains("CheckoutSettings"))
@@ -220,19 +221,9 @@ public class StoreImportExportService
                     destinationStoreBlob.DefaultLang = importedBlob.DefaultLang;
                     storeModified = true;
                 }
-
                 if (storeModified)
                 {
                     destinationStore.SetStoreBlob(destinationStoreBlob);
-                }
-
-                // This should come with store settings.. 
-                if (optionsToImport.Contains("RateSettings"))
-                {
-                    if (Enum.TryParse<SpeedPolicy>(exportData.Store.SpeedPolicy, out var speedPolicy))
-                    {
-                        destinationStore.SpeedPolicy = speedPolicy;
-                    }
                 }
             }
 
@@ -319,27 +310,28 @@ public class StoreImportExportService
 
     private StoreBlob DefaultStoreBlobSettings(StoreBlob blob)
     {
-        blob.EmailSettings = null;
-        blob.PrimaryRateSettings = null;
-        blob.FallbackRateSettings = null;
-        blob.ShowPayInWalletButton = false;
-        blob.ShowStoreHeader = false;
-        blob.CelebratePayment = false;
-        blob.PlaySoundOnPayment = false;
-        blob.OnChainWithLnInvoiceFallback = false;
-        blob.LightningAmountInSatoshi = false;
-        blob.LazyPaymentMethods = false;
-        blob.RedirectAutomatically = false;
-        blob.ReceiptOptions = null;
-        blob.HtmlTitle = string.Empty;
-        blob.StoreSupportUrl = string.Empty;
-        blob.AutoDetectLanguage = false;
-        blob.DefaultLang = string.Empty;
-        blob.LogoUrl = null;
-        blob.CssUrl = null;
-        blob.BrandColor = string.Empty;
-        blob.ApplyBrandColorToBackend = false;
-        return blob;
+        var newBlob = JsonConvert.DeserializeObject<StoreBlob>(JsonConvert.SerializeObject(blob));
+        newBlob.EmailSettings = null;
+        newBlob.PrimaryRateSettings = null;
+        newBlob.FallbackRateSettings = null;
+        newBlob.ShowPayInWalletButton = false;
+        newBlob.ShowStoreHeader = false;
+        newBlob.CelebratePayment = false;
+        newBlob.PlaySoundOnPayment = false;
+        newBlob.OnChainWithLnInvoiceFallback = false;
+        newBlob.LightningAmountInSatoshi = false;
+        newBlob.LazyPaymentMethods = false;
+        newBlob.RedirectAutomatically = false;
+        newBlob.ReceiptOptions = null;
+        newBlob.HtmlTitle = string.Empty;
+        newBlob.StoreSupportUrl = string.Empty;
+        newBlob.AutoDetectLanguage = false;
+        newBlob.DefaultLang = string.Empty;
+        newBlob.LogoUrl = null;
+        newBlob.CssUrl = null;
+        newBlob.BrandColor = string.Empty;
+        newBlob.ApplyBrandColorToBackend = false;
+        return newBlob;
     }
 
     public byte[] CreateExport(StoreExportData exportData, string storeId, bool compress = true)
@@ -349,18 +341,18 @@ public class StoreImportExportService
         return EncryptData(dataToEncrypt, storeId, compress);
     }
 
-    public StoreExportData ParseExport(byte[] encryptedData, string storeId)
+    public StoreExportData ParseExport(byte[] encryptedData)
     {
-        var (data, wasCompressed) = DecryptData(encryptedData, storeId);
+        var (data, wasCompressed) = DecryptData(encryptedData);
         var jsonBytes = wasCompressed ? DecompressData(data) : data;
         return System.Text.Json.JsonSerializer.Deserialize<StoreExportData>(Encoding.UTF8.GetString(jsonBytes), JsonOptions);
     }
 
-    public StoreExportData GetExportPreview(byte[] encryptedData, string storeId)
+    public StoreExportData GetExportPreview(byte[] encryptedData)
     {
         try
         {
-            return ParseExport(encryptedData, storeId);
+            return ParseExport(encryptedData);
         }
         catch (Exception){ return null; }
     }
@@ -369,7 +361,7 @@ public class StoreImportExportService
     {
         try
         {
-            var exportData = ParseExport(encryptedData, storeId);
+            var exportData = ParseExport(encryptedData);
             if (!string.IsNullOrEmpty(exportData.SelectedOptions))
             {
                 return System.Text.Json.JsonSerializer.Deserialize<List<string>>(exportData.SelectedOptions,
@@ -417,6 +409,9 @@ public class StoreImportExportService
         using var writer = new BinaryWriter(output);
         writer.Write(Encoding.ASCII.GetBytes(MAGIC_HEADER));
         writer.Write((byte)(compressed ? 1 : 0));
+        var storeIdBytes = Encoding.UTF8.GetBytes(storeId);
+        writer.Write(storeIdBytes.Length);
+        writer.Write(storeIdBytes);
         writer.Write(aes.IV.Length);
         writer.Write(aes.IV);
         writer.Write(encrypted.Length);
@@ -424,7 +419,7 @@ public class StoreImportExportService
         return output.ToArray();
     }
 
-    private (byte[] data, bool compressed) DecryptData(byte[] encryptedData, string storeId)
+    private (byte[] data, bool compressed) DecryptData(byte[] encryptedData)
     {
         using var input = new MemoryStream(encryptedData);
         using var reader = new BinaryReader(input);
@@ -434,10 +429,15 @@ public class StoreImportExportService
         var header = Encoding.ASCII.GetString(headerBytes);
 
         if (header != MAGIC_HEADER)
-            throw new InvalidDataException("Invalid export file format. This file may be corrupted or not a valid BTCPay export.");
+            throw new InvalidDataException("Invalid export file format. This file may be corrupted or not a valid BTCPay storebridge plugin export");
 
         // Read flags
         var compressed = reader.ReadByte() == 1;
+
+        // Read original store ID
+        var storeIdLength = reader.ReadInt32();
+        var storeIdBytes = reader.ReadBytes(storeIdLength);
+        var originalStoreId = Encoding.UTF8.GetString(storeIdBytes);
 
         // Read IV
         var ivLength = reader.ReadInt32();
@@ -448,7 +448,7 @@ public class StoreImportExportService
         var encrypted = reader.ReadBytes(dataLength);
 
         // Decrypt
-        var key = DeriveKey(storeId);
+        var key = DeriveKey(originalStoreId);
 
         using var aes = Aes.Create();
         aes.KeySize = 256;

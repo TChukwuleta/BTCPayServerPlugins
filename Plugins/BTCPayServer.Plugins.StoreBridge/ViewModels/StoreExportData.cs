@@ -47,6 +47,7 @@ public class FormExport
 }
 public class StoreBridgeData
 {
+    public string StoreId { get; set; }
     public string StoreName { get; set; }
     public string StoreBlob { get; set; }
     public string SpeedPolicy { get; set; }
