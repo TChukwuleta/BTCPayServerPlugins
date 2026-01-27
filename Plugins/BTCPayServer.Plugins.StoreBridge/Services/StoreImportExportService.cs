@@ -1,11 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
+using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
 using BTCPayServer.Forms;
 using BTCPayServer.Plugins.StoreBridge.ViewModels;
-using BTCPayServer.Services;
 using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Stores;
 using Newtonsoft.Json;
@@ -15,44 +21,39 @@ namespace BTCPayServer.Plugins.StoreBridge.Services;
 public class StoreImportExportService
 {
     private readonly AppService _appService;
-    private readonly ApplicationDbContext _dbContext;
     private readonly StoreRepository _storeRepository;
     private readonly FormDataService _formDataService;
-    private readonly StoreExportService _exportService;
-    private readonly SettingsRepository _settingsRepository;
-
-    public StoreImportExportService(ApplicationDbContext dbContext, StoreRepository storeRepository, 
-        SettingsRepository settingsRepository, AppService appService, FormDataService formDataService, StoreExportService exportService)
+    private const string MAGIC_HEADER = "BTCPAY_STOREBRIDGE";
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        _dbContext = dbContext;
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
+    public StoreImportExportService(StoreRepository storeRepository, AppService appService, 
+        FormDataService formDataService)
+    {
         _appService = appService;
-        _exportService = exportService;
         _storeRepository = storeRepository;
         _formDataService = formDataService;
-        _settingsRepository = settingsRepository;
     }
 
-    public async Task<byte[]> ExportStore(string sourceInstanceUrl, string userId, StoreData store, List<string> selectedOptions)
+    public async Task<StoreExportData> GetExportDataPreview(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
     {
-        // Settings... Payment
         var originalBlob = store.GetStoreBlob();
         var blob = DefaultStoreBlobSettings(originalBlob);
-
         var exportData = new StoreExportData
         {
             Version = 1,
             ExportDate = DateTime.UtcNow,
             ExportedFrom = sourceInstanceUrl,
+            SelectedOptions = JsonConvert.SerializeObject(selectedOptions),
             Store = new StoreBridgeData
             {
-                Id = store.Id,
-                Spread = blob.Spread,
+                StoreId = store.Id,
                 StoreName = store.StoreName,
-                DefaultLang = blob.DefaultLang,
-                StoreWebsite = store.StoreWebsite,
-                DefaultCurrency = blob.DefaultCurrency,
                 SpeedPolicy = store.SpeedPolicy.ToString(),
-                StoreBlob = JsonConvert.SerializeObject(blob),
                 DerivationStrategies = store.DerivationStrategies
             }
         };
@@ -68,16 +69,12 @@ public class StoreImportExportService
         }
         if (selectedOptions.Contains("EmailSettings"))
         {
-            blob.PrimaryRateSettings = originalBlob.PrimaryRateSettings;
-            blob.FallbackRateSettings = originalBlob.FallbackRateSettings;
-            exportData.Store ??= new();
-            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+            blob.EmailSettings = originalBlob.EmailSettings;
         }
         if (selectedOptions.Contains("RateSettings"))
         {
-            blob.EmailSettings = originalBlob.EmailSettings;
-            exportData.Store ??= new();
-            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+            blob.PrimaryRateSettings = originalBlob.PrimaryRateSettings;
+            blob.FallbackRateSettings = originalBlob.FallbackRateSettings;
         }
         if (selectedOptions.Contains("CheckoutSettings"))
         {
@@ -95,8 +92,6 @@ public class StoreImportExportService
             blob.DisplayExpirationTimer = originalBlob.DisplayExpirationTimer;
             blob.AutoDetectLanguage = originalBlob.AutoDetectLanguage;
             blob.DefaultLang = originalBlob.DefaultLang;
-            exportData.Store ??= new();
-            exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
         }
         if (selectedOptions.Contains("Webhooks"))
         {
@@ -119,21 +114,11 @@ public class StoreImportExportService
         if (selectedOptions.Contains("Forms"))
         {
             var forms = await _formDataService.GetForms(store.Id);
-            forms.Select(c => new FormExport
+            exportData.Forms = forms.Select(c => new FormExport
             {
                 Public = c.Public,
                 Name = c.Name,
                 Config = c.Config
-            });
-        }
-        if (selectedOptions.Contains("PaymentMethods"))
-        {
-            var paymentMethodConfig = store.GetPaymentMethodConfigs(true);
-
-            paymentMethodConfig.Select(pm => new PaymentMethodExport
-            {
-                PaymentMethodId = pm.Key.ToString(),
-                ConfigJson = JsonConvert.SerializeObject(pm.Value)
             }).ToList();
         }
         if (selectedOptions.Contains("Apps"))
@@ -144,334 +129,300 @@ public class StoreImportExportService
                 AppId = app.Id,
                 AppName = app.AppName,
                 AppType = app.AppType,
-                Created = app.Created,
                 SettingsJson = JsonConvert.SerializeObject(app.App)
             }).ToList();
         }
-        var encryptedData = _exportService.CreateExport(exportData, store.Id, compress: true);
+        exportData.Store.StoreBlob = JsonConvert.SerializeObject(blob);
+        return exportData;
+    }
+
+    public async Task<byte[]> ExportStore(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
+    {
+        var exportData = await GetExportDataPreview(sourceInstanceUrl, userId, store, selectedOptions);
+        var encryptedData = CreateExport(exportData, store.Id);
         return encryptedData;
     }
 
-
-    private StoreBlob DefaultStoreBlobSettings(StoreBlob blob)
+    public async Task<(bool Success, string Message)> ImportStore(Data.StoreData destinationStore, byte[] encryptedData,
+    string userId, List<string> userSelectedOptions = null)
     {
-        blob.EmailSettings = null;
-        blob.PrimaryRateSettings = null;
-        blob.FallbackRateSettings = null;
-        blob.ShowPayInWalletButton = false;
-        blob.ShowStoreHeader = false;
-        blob.CelebratePayment = false;
-        blob.PlaySoundOnPayment = false;
-        blob.OnChainWithLnInvoiceFallback = false;
-        blob.LightningAmountInSatoshi = false;
-        blob.LazyPaymentMethods = false;
-        blob.RedirectAutomatically = false;
-        blob.ReceiptOptions = null;
-        blob.HtmlTitle = string.Empty;
-        blob.StoreSupportUrl = string.Empty;
-        blob.AutoDetectLanguage = false;
-        blob.DefaultLang = string.Empty;
-        blob.LogoUrl = null;
-        blob.CssUrl = null;
-        blob.BrandColor = string.Empty;
-        blob.ApplyBrandColorToBackend = false;
-        return blob;
-    }
-    /// <summary>
-    /// Import a store configuration
-    /// </summary>
-    public async Task<StoreImportResult> ImportStoreAsync(
-        StoreExportData exportData,
-        StoreImportOptions options,
-        string currentUserId)
-    {
-        var result = new StoreImportResult();
-
-        /*try
+        try
         {
-            using var transaction = await _dbContext.Database.BeginTransactionAsync();
+            bool storeModified = false;
+            var destinationStoreBlob = destinationStore.GetStoreBlob();
+            var exportData = ParseExport(encryptedData);
+            // In the future... factory method based on versions..
 
-            try
+            var exportedOptions = !string.IsNullOrEmpty(exportData.SelectedOptions)
+                ? JsonConvert.DeserializeObject<List<string>>(exportData.SelectedOptions) : new List<string>();
+
+            var optionsToImport = userSelectedOptions != null
+                ? userSelectedOptions.Intersect(exportedOptions).ToList() : exportedOptions;
+
+            if (!optionsToImport.Any())
             {
-                // Create or update store
-                var storeId = await ImportStoreDataAsync(exportData.Store, options, currentUserId);
-                result.NewStoreId = storeId;
-
-                // Import wallets
-                if (options.ImportWallets && exportData.Wallets.Any())
-                {
-                    result.Statistics.WalletsImported = await ImportWalletsAsync(storeId, exportData.Wallets);
-                }
-
-                // Import payment methods
-                if (options.ImportPaymentMethods && exportData.PaymentMethods.Any())
-                {
-                    result.Statistics.PaymentMethodsImported =
-                        await ImportPaymentMethodsAsync(storeId, exportData.PaymentMethods);
-                }
-
-                // Import webhooks
-                if (options.ImportWebhooks && exportData.Webhooks.Any())
-                {
-                    result.Statistics.WebhooksImported =
-                        await ImportWebhooksAsync(storeId, exportData.Webhooks);
-                }
-
-                // Import users (with caution)
-                if (options.ImportUsers && exportData.Users.Any())
-                {
-                    var userResult = await ImportStoreUsersAsync(storeId, exportData.Users);
-                    result.Statistics.UsersImported = userResult.imported;
-                    result.Warnings.AddRange(userResult.warnings);
-                }
-
-                // Import apps
-                if (options.ImportApps && exportData.Apps.Any())
-                {
-                    result.Statistics.AppsImported = await ImportAppsAsync(storeId, exportData.Apps);
-                }
-
-                await transaction.CommitAsync();
-                result.Success = true;
+                return (false, "No valid options selected for import");
             }
-            catch (Exception ex)
+
+            if (exportData.Store != null && !string.IsNullOrEmpty(exportData.Store.StoreBlob))
             {
-                await transaction.RollbackAsync();
-                result.Success = false;
-                result.Errors.Add($"Import failed: {ex.Message}");
+                var importedBlob = JsonConvert.DeserializeObject<StoreBlob>(exportData.Store.StoreBlob);
+                if (optionsToImport.Contains("BrandingSettings"))
+                {
+                    destinationStoreBlob.LogoUrl = importedBlob.LogoUrl;
+                    destinationStoreBlob.CssUrl = importedBlob.CssUrl;
+                    destinationStoreBlob.BrandColor = importedBlob.BrandColor;
+                    destinationStoreBlob.ApplyBrandColorToBackend = importedBlob.ApplyBrandColorToBackend;
+                    storeModified = true;
+                }
+                if (optionsToImport.Contains("EmailSettings"))
+                {
+                    destinationStoreBlob.EmailSettings = importedBlob.EmailSettings;
+                    storeModified = true;
+                }
+                if (optionsToImport.Contains("RateSettings"))
+                {
+                    destinationStoreBlob.PrimaryRateSettings = importedBlob.PrimaryRateSettings;
+                    destinationStoreBlob.FallbackRateSettings = importedBlob.FallbackRateSettings;
+                    if (Enum.TryParse<SpeedPolicy>(exportData.Store.SpeedPolicy, out var speedPolicy))
+                    {
+                        destinationStore.SpeedPolicy = speedPolicy;
+                    }
+                    storeModified = true;
+                }
+                if (optionsToImport.Contains("CheckoutSettings"))
+                {
+                    destinationStoreBlob.ShowPayInWalletButton = importedBlob.ShowPayInWalletButton;
+                    destinationStoreBlob.ShowStoreHeader = importedBlob.ShowStoreHeader;
+                    destinationStoreBlob.CelebratePayment = importedBlob.CelebratePayment;
+                    destinationStoreBlob.PlaySoundOnPayment = importedBlob.PlaySoundOnPayment;
+                    destinationStoreBlob.OnChainWithLnInvoiceFallback = importedBlob.OnChainWithLnInvoiceFallback;
+                    destinationStoreBlob.LightningAmountInSatoshi = importedBlob.LightningAmountInSatoshi;
+                    destinationStoreBlob.LazyPaymentMethods = importedBlob.LazyPaymentMethods;
+                    destinationStoreBlob.RedirectAutomatically = importedBlob.RedirectAutomatically;
+                    destinationStoreBlob.ReceiptOptions = importedBlob.ReceiptOptions;
+                    destinationStoreBlob.HtmlTitle = importedBlob.HtmlTitle;
+                    destinationStoreBlob.StoreSupportUrl = importedBlob.StoreSupportUrl;
+                    destinationStoreBlob.DisplayExpirationTimer = importedBlob.DisplayExpirationTimer;
+                    destinationStoreBlob.AutoDetectLanguage = importedBlob.AutoDetectLanguage;
+                    destinationStoreBlob.DefaultLang = importedBlob.DefaultLang;
+                    storeModified = true;
+                }
+                if (storeModified)
+                {
+                    destinationStore.SetStoreBlob(destinationStoreBlob);
+                }
             }
+
+            if (optionsToImport.Contains("Webhooks") && exportData.Webhooks?.Any() == true)
+            {
+                foreach (var webhookExport in exportData.Webhooks.Where(c => !string.IsNullOrEmpty(c.BlobJson)))
+                {
+                    var webhookBlob = JsonConvert.DeserializeObject<WebhookBlob>(webhookExport.BlobJson);
+                    await _storeRepository.CreateWebhook(destinationStore.Id, webhookBlob);
+                }
+            }
+            if (optionsToImport.Contains("Roles") && exportData.Roles?.Any() == true)
+            {
+                foreach (var roleExport in exportData.Roles)
+                {
+                    StoreRoleId roleId = new StoreRoleId(destinationStore.Id, roleExport.Role);
+                    await _storeRepository.AddOrUpdateStoreRole(roleId, roleExport.Permissions);
+                }
+            }
+            if (optionsToImport.Contains("Forms") && exportData.Forms?.Any() == true)
+            {
+                foreach (var formExport in exportData.Forms)
+                {
+                    await _formDataService.AddOrUpdateForm(new FormData
+                    {
+                        StoreId = destinationStore.Id,
+                        Name = formExport.Name,
+                        Config = formExport.Config,
+                        Public = formExport.Public
+                    });
+                }
+            }
+
+            if (optionsToImport.Contains("Apps") && exportData.Apps?.Any() == true)
+            {
+                foreach (var appExport in exportData.Apps)
+                {
+                    var appData = JsonConvert.DeserializeObject<AppData>(appExport.SettingsJson);
+                    appData.StoreDataId = destinationStore.Id;
+                    appData.Name = appExport.AppName;
+                    appData.AppType = appExport.AppType;
+                    appData.Id = null;
+                    appData.Created = DateTime.UtcNow;
+                    await _appService.UpdateOrCreateApp(appData);
+                }
+            }
+            await _storeRepository.UpdateStore(destinationStore);
+
+            var importedCount = optionsToImport.Count;
+            var importedItems = string.Join(", ", optionsToImport.Select(o =>
+                ImportViewModel.OptionMetadata.ContainsKey(o) ? ImportViewModel.OptionMetadata[o].Title : o));
+
+            return (true, $"Successfully imported {importedCount} configuration(s): {importedItems}");
         }
         catch (Exception ex)
         {
-            result.Success = false;
-            result.Errors.Add($"Transaction error: {ex.Message}");
-        }*/
-
-        return result;
-    }
-
-    /// <summary>
-    /// Serialize export data to JSON
-    /// </summary>
-    public string SerializeExport(StoreExportData exportData)
-    {
-        return JsonConvert.SerializeObject(exportData, Formatting.Indented, new JsonSerializerSettings
-        {
-            NullValueHandling = NullValueHandling.Ignore,
-            DefaultValueHandling = DefaultValueHandling.Ignore
-        });
-    }
-
-    /// <summary>
-    /// Deserialize import data from JSON
-    /// </summary>
-    public StoreExportData DeserializeImport(string json)
-    {
-        var data = JsonConvert.DeserializeObject<StoreExportData>(json);
-        if (data == null)
-            throw new InvalidOperationException("Failed to deserialize import data");
-
-        ValidateImportData(data);
-        return data;
-    }
-
-    /// <summary>
-    /// Validate import data before processing
-    /// </summary>
-    private void ValidateImportData(StoreExportData data)
-    {
-        if (data.Version > 1)
-            throw new InvalidOperationException($"Unsupported export version: {data.Version}");
-
-        if (string.IsNullOrEmpty(data.Store.StoreName))
-            throw new InvalidOperationException("Store name is required");
-
-        // Validate wallet data doesn't contain private keys
-        /*foreach (var wallet in data.Wallets)
-        {
-            if (wallet.DerivationScheme.Contains("xprv", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Private keys detected in wallet data. Only xpubs are allowed.");
-        }*/
-    }
-
-    private StoreBridgeData MapStoreData(StoreData store)
-    {
-        var blob = store.GetStoreBlob();
-        return new StoreBridgeData
-        {
-            Id = store.Id,
-            StoreName = store.StoreName,
-            StoreBlob = store.StoreBlob,
-            SpeedPolicy = store.SpeedPolicy.ToString(),
-            DerivationStrategies = store.DerivationStrategies,
-            StoreWebsite = store.StoreWebsite,
-            DefaultCurrency = blob.DefaultCurrency,
-            Spread = blob.Spread,
-            DefaultLang = blob.DefaultLang
-        };
-    }
-
-
-    /*private async Task<List<WebhookData>> ExportWebhooksAsync(string storeId)
-    {
-        var webhooks = await _dbContext.Webhooks
-            .Where(w => w.StoreId == storeId)
-            .ToListAsync();
-
-        return webhooks.Select(w => new WebhookData
-        {
-            Enabled = w.Enabled,
-            AutomaticRedelivery = w.AutomaticRedelivery,
-            Url = w.Url,
-            AuthorizedEvents = w.GetBlob().AuthorizedEvents.ToList(),
-            Secret = w.Secret
-        }).ToList();
-    }
-
-    private async Task<List<StoreUserData>> ExportStoreUsersAsync(string storeId)
-    {
-        var storeUsers = await _dbContext.UserStore
-            .Include(us => us.ApplicationUser)
-            .Where(us => us.StoreDataId == storeId)
-            .ToListAsync();
-
-        return storeUsers.Select(us => new StoreUserData
-        {
-            Email = us.ApplicationUser.Email ?? string.Empty,
-            Role = us.Role
-        }).ToList();
-    }
-
-    private async Task<List<AppData>> ExportAppsAsync(string storeId)
-    {
-        var apps = await _dbContext.Apps
-            .Where(a => a.StoreDataId == storeId)
-            .ToListAsync();
-
-        return apps.Select(a => new AppData
-        {
-            AppType = a.AppType,
-            AppName = a.Name,
-            Settings = JsonConvert.DeserializeObject<Dictionary<string, object>>(a.Settings)
-                ?? new Dictionary<string, object>()
-        }).ToList();
-    }*/
-
-    /*private async Task<string> ImportStoreDataAsync(
-        StoreData storeData,
-        StoreImportOptions options,
-        string currentUserId)
-    {
-        var store = new Data.StoreData
-        {
-            Id = options.NewStoreId ?? Guid.NewGuid().ToString(),
-            StoreName = options.NewStoreName ?? storeData.StoreName
-        };
-
-        var blob = store.GetStoreBlob();
-        blob.StoreWebsite = storeData.StoreWebsite;
-        blob.DefaultCurrency = storeData.DefaultCurrency;
-        blob.PayJoinEnabled = storeData.PayJoinEnabled;
-        blob.AnyoneCanCreateInvoice = storeData.AnyoneCanCreateInvoice;
-        blob.CustomLogo = storeData.CustomLogo;
-        blob.CustomCSS = storeData.CustomCSS;
-        blob.DefaultLang = storeData.DefaultLang;
-
-        if (storeData.InvoiceExpiration)
-            blob.InvoiceExpiration = TimeSpan.FromMinutes(storeData.InvoiceExpirationMinutes);
-
-        blob.MonitoringExpiration = TimeSpan.FromMinutes(storeData.MonitoringExpiration);
-
-        store.SetStoreBlob(blob);
-
-        await _storeRepository.CreateStore(currentUserId, store);
-        return store.Id;
-    }
-
-    private async Task<int> ImportWebhooksAsync(string storeId, List<WebhookData> webhooks)
-    {
-        int count = 0;
-        foreach (var webhookData in webhooks)
-        {
-            var webhook = new WebhookData
-            {
-                StoreId = storeId,
-                Enabled = webhookData.Enabled,
-                AutomaticRedelivery = webhookData.AutomaticRedelivery,
-                Url = webhookData.Url,
-                Secret = webhookData.Secret
-            };
-
-            var blob = new WebhookBlob
-            {
-                AuthorizedEvents = webhookData.AuthorizedEvents.ToHashSet()
-            };
-
-            webhook.SetBlob(blob);
-
-            _dbContext.Webhooks.Add(webhook);
-            count++;
+            return (false, $"Import failed: {ex.Message}");
         }
-
-        await _dbContext.SaveChangesAsync();
-        return count;
     }
 
-    private async Task<(int imported, List<string> warnings)> ImportStoreUsersAsync(
-        string storeId,
-        List<StoreUserData> users)
+    private StoreBlob DefaultStoreBlobSettings(StoreBlob blob)
     {
-        var warnings = new List<string>();
-        int imported = 0;
+        var newBlob = JsonConvert.DeserializeObject<StoreBlob>(JsonConvert.SerializeObject(blob));
+        newBlob.EmailSettings = null;
+        newBlob.PrimaryRateSettings = null;
+        newBlob.FallbackRateSettings = null;
+        newBlob.ShowPayInWalletButton = false;
+        newBlob.ShowStoreHeader = false;
+        newBlob.CelebratePayment = false;
+        newBlob.PlaySoundOnPayment = false;
+        newBlob.OnChainWithLnInvoiceFallback = false;
+        newBlob.LightningAmountInSatoshi = false;
+        newBlob.LazyPaymentMethods = false;
+        newBlob.RedirectAutomatically = false;
+        newBlob.ReceiptOptions = null;
+        newBlob.HtmlTitle = string.Empty;
+        newBlob.StoreSupportUrl = string.Empty;
+        newBlob.AutoDetectLanguage = false;
+        newBlob.DefaultLang = string.Empty;
+        newBlob.LogoUrl = null;
+        newBlob.CssUrl = null;
+        newBlob.BrandColor = string.Empty;
+        newBlob.ApplyBrandColorToBackend = false;
+        return newBlob;
+    }
 
-        foreach (var userData in users)
+    public byte[] CreateExport(StoreExportData exportData, string storeId, bool compress = true)
+    {
+        var jsonBytes = Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(exportData, JsonOptions));
+        byte[] dataToEncrypt = compress ? CompressData(jsonBytes) : jsonBytes;
+        return EncryptData(dataToEncrypt, storeId, compress);
+    }
+
+    public StoreExportData ParseExport(byte[] encryptedData)
+    {
+        var (data, wasCompressed) = DecryptData(encryptedData);
+        var jsonBytes = wasCompressed ? DecompressData(data) : data;
+        return System.Text.Json.JsonSerializer.Deserialize<StoreExportData>(Encoding.UTF8.GetString(jsonBytes), JsonOptions);
+    }
+
+    public StoreExportData GetExportPreview(byte[] encryptedData)
+    {
+        try
         {
-            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == userData.Email);
-            if (user == null)
+            return ParseExport(encryptedData);
+        }
+        catch (Exception){ return null; }
+    }
+
+    public List<string> GetAvailableImportOptions(byte[] encryptedData, string storeId)
+    {
+        try
+        {
+            var exportData = ParseExport(encryptedData);
+            if (!string.IsNullOrEmpty(exportData.SelectedOptions))
             {
-                warnings.Add($"User {userData.Email} not found on this server - skipped");
-                continue;
+                return System.Text.Json.JsonSerializer.Deserialize<List<string>>(exportData.SelectedOptions,
+                    JsonOptions) ?? new List<string>();
             }
-
-            var existingUserStore = await _dbContext.UserStore
-                .FirstOrDefaultAsync(us => us.StoreDataId == storeId && us.ApplicationUserId == user.Id);
-
-            if (existingUserStore == null)
-            {
-                _dbContext.UserStore.Add(new UserStore
-                {
-                    StoreDataId = storeId,
-                    ApplicationUserId = user.Id,
-                    Role = userData.Role
-                });
-                imported++;
-            }
+            return new();
         }
-
-        await _dbContext.SaveChangesAsync();
-        return (imported, warnings);
+        catch (Exception){ return new(); }
     }
 
-    private async Task<int> ImportAppsAsync(string storeId, List<AppData> apps)
+    private byte[] CompressData(byte[] data)
     {
-        int count = 0;
-        foreach (var appData in apps)
+        using var output = new MemoryStream();
+        using (var gzip = new GZipStream(output, CompressionLevel.Optimal))
         {
-            var app = new AppData
-            {
-                Id = Guid.NewGuid().ToString(),
-                StoreDataId = storeId,
-                AppType = appData.AppType,
-                Name = appData.AppName,
-                Settings = JsonConvert.SerializeObject(appData.Settings),
-                Created = DateTime.UtcNow
-            };
-
-            _dbContext.Apps.Add(app);
-            count++;
+            gzip.Write(data, 0, data.Length);
         }
+        return output.ToArray();
+    }
 
-        await _dbContext.SaveChangesAsync();
-        return count;
-    }*/
+    private byte[] DecompressData(byte[] compressedData)
+    {
+        using var input = new MemoryStream(compressedData);
+        using var output = new MemoryStream();
+        using (var gzip = new GZipStream(input, CompressionMode.Decompress))
+        {
+            gzip.CopyTo(output);
+        }
+        return output.ToArray();
+    }
+
+    private byte[] EncryptData(byte[] data, string storeId, bool compressed)
+    {
+        using var aes = Aes.Create();
+        aes.KeySize = 256;
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.PKCS7;
+        var key = DeriveKey(storeId);
+        aes.GenerateIV();
+        using var encryptor = aes.CreateEncryptor(key, aes.IV);
+        var encrypted = encryptor.TransformFinalBlock(data, 0, data.Length);
+
+        // Build file: HEADER + FLAGS + IV_LENGTH + IV + DATA_LENGTH + DATA
+        using var output = new MemoryStream();
+        using var writer = new BinaryWriter(output);
+        writer.Write(Encoding.ASCII.GetBytes(MAGIC_HEADER));
+        writer.Write((byte)(compressed ? 1 : 0));
+        var storeIdBytes = Encoding.UTF8.GetBytes(storeId);
+        writer.Write(storeIdBytes.Length);
+        writer.Write(storeIdBytes);
+        writer.Write(aes.IV.Length);
+        writer.Write(aes.IV);
+        writer.Write(encrypted.Length);
+        writer.Write(encrypted);
+        return output.ToArray();
+    }
+
+    private (byte[] data, bool compressed) DecryptData(byte[] encryptedData)
+    {
+        using var input = new MemoryStream(encryptedData);
+        using var reader = new BinaryReader(input);
+
+        var headerBytes = reader.ReadBytes(MAGIC_HEADER.Length);
+        var header = Encoding.ASCII.GetString(headerBytes);
+
+        if (header != MAGIC_HEADER)
+            throw new InvalidDataException("Invalid export file format. This file may be corrupted or not a valid BTCPay storebridge plugin export");
+
+        var compressed = reader.ReadByte() == 1;
+
+        var storeIdLength = reader.ReadInt32();
+        var storeIdBytes = reader.ReadBytes(storeIdLength);
+        var originalStoreId = Encoding.UTF8.GetString(storeIdBytes);
+
+        var ivLength = reader.ReadInt32();
+        var iv = reader.ReadBytes(ivLength);
+
+        var dataLength = reader.ReadInt32();
+        var encrypted = reader.ReadBytes(dataLength);
+
+        var key = DeriveKey(originalStoreId);
+
+        using var aes = Aes.Create();
+        aes.KeySize = 256;
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.PKCS7;
+        aes.Key = key;
+        aes.IV = iv;
+
+        using var decryptor = aes.CreateDecryptor();
+        var decrypted = decryptor.TransformFinalBlock(encrypted, 0, encrypted.Length);
+
+        return (decrypted, compressed);
+    }
+
+    private byte[] DeriveKey(string storeId)
+    {
+        using var pbkdf2 = new Rfc2898DeriveBytes(storeId, Encoding.UTF8.GetBytes("BTCPayServerStoreBridge_v1"), 600000, HashAlgorithmName.SHA256);
+        return pbkdf2.GetBytes(32);
+    }
 }

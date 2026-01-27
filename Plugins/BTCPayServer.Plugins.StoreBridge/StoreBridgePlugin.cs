@@ -17,6 +17,5 @@ public class StoreBridgePlugin : BaseBTCPayServerPlugin
     {
         services.AddSingleton<IUIExtension>(new UIExtension("StoreBridgeNav", "header-nav"));
         services.AddScoped<StoreImportExportService>();
-        services.AddScoped<StoreExportService>();
     }
 }
