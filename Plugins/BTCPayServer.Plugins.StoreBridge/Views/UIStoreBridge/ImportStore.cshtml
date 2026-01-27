@@ -83,7 +83,7 @@ else
                     var isChecked = Model.IsSelected(option);
 
                     <div class="form-check form-switch mb-3">
-                        <input class="form-check-input import-toggle" type="checkbox" name="SelectedOptions" 
+                        <input class="btcpay-toggle me-3 import-toggle" type="checkbox" name="SelectedOptions" 
                             value="@option" id="import@option" checked="@isChecked" />
 
                         <label class="form-check-label" for="import@option">
@@ -104,14 +104,10 @@ else
             document.addEventListener('DOMContentLoaded', function () {
                 const toggles = document.querySelectorAll('.import-toggle');
                 const selectedCount = document.getElementById('selectedCount');
-                const selectedCountDetail = document.getElementById('selectedCountDetail');
-
                 function updateCount() {
                     const count = document.querySelectorAll('.import-toggle:checked').length;
                     selectedCount.textContent = count;
-                    selectedCountDetail.textContent = count;
                 }
-
                 toggles.forEach(t => t.addEventListener('change', updateCount));
                 updateCount();
             });

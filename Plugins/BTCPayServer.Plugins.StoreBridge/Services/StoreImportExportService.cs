@@ -423,7 +423,7 @@ public class StoreImportExportService
 
     private byte[] DeriveKey(string storeId)
     {
-        using var pbkdf2 = new Rfc2898DeriveBytes(storeId, Encoding.UTF8.GetBytes("BTCPayServerStoreBridge_v1"), 100000, HashAlgorithmName.SHA256);
+        using var pbkdf2 = new Rfc2898DeriveBytes(storeId, Encoding.UTF8.GetBytes("BTCPayServerStoreBridge_v1"), 600000, HashAlgorithmName.SHA256);
         return pbkdf2.GetBytes(32);
     }
 }

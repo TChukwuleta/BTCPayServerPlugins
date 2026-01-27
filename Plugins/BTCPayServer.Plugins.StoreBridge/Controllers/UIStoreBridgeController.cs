@@ -56,7 +56,7 @@ public class UIStoreBridgeController : Controller
         {
             var store = await _storeRepository.FindStore(CurrentStore.Id);
             var encryptedData = await _service.ExportStore(GetBaseUrl(), GetUserId(), store, vm.SelectedOptions);
-            var filename = $"btcpay-store-{store.StoreName}-{DateTime.UtcNow:yyyyMMddHHmmss}.storebridge";
+            var filename = $"btcpay-store-{DateTime.UtcNow.Ticks}.storebridge";
             return File(encryptedData, "application/octet-stream", filename);
         }
         catch (Exception ex)
