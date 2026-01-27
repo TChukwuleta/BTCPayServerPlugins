@@ -28,8 +28,8 @@ public class ImportViewModel
         "Webhooks",
         "Roles",
         "Forms",
-        "PaymentMethods",
-        "Apps"
+        "PaymentMethods"
+        //"Apps"
     };
 
     public static readonly Dictionary<string, (string Title, string Description)> OptionMetadata = new()
@@ -41,8 +41,8 @@ public class ImportViewModel
         ["Webhooks"] = ("Webhooks", "Webhook configurations and endpoints"),
         ["Roles"] = ("Roles & Permissions", "Store roles and user access permissions"),
         ["Forms"] = ("Forms", "Custom forms and their configurations"),
-        ["PaymentMethods"] = ("Payment Methods", "On-chain and Lightning Network configurations"),
-        ["Apps"] = ("Apps", "Point of Sale, Crowdfund, and other app configurations")
+        ["PaymentMethods"] = ("Payment Methods", "On-chain and Lightning Network configurations")
+        //["Apps"] = ("Apps", "Point of Sale, Crowdfund, and other app configurations")
     };
 
     public string FormattedExportDate => ExportDate?.ToString("MMMM dd, yyyy 'at' HH:mm 'UTC'") ?? "Unknown";

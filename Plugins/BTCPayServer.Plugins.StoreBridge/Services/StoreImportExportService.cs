@@ -24,8 +24,7 @@ public class StoreImportExportService
     private readonly AppService _appService;
     private readonly StoreRepository _storeRepository;
     private readonly FormDataService _formDataService;
-    private readonly ILogger<StoreImportExportService> _logger;
-    private const string MAGIC_HEADER = "BTCPAY_STOREBRIDGE_V1";
+    private const string MAGIC_HEADER = "BTCPAY_STOREBRIDGE";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -34,9 +33,8 @@ public class StoreImportExportService
     };
 
     public StoreImportExportService(StoreRepository storeRepository, AppService appService, 
-        FormDataService formDataService, ILogger<StoreImportExportService> logger)
+        FormDataService formDataService)
     {
-        _logger = logger;
         _appService = appService;
         _storeRepository = storeRepository;
         _formDataService = formDataService;
@@ -44,7 +42,6 @@ public class StoreImportExportService
 
     public async Task<StoreExportData> GetExportDataPreview(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
     {
-        // Settings... Payment
         var originalBlob = store.GetStoreBlob();
         var blob = DefaultStoreBlobSettings(originalBlob);
         var exportData = new StoreExportData
@@ -123,15 +120,6 @@ public class StoreImportExportService
                 Public = c.Public,
                 Name = c.Name,
                 Config = c.Config
-            }).ToList();
-        }
-        if (selectedOptions.Contains("PaymentMethods"))
-        {
-            var paymentMethodConfig = store.GetPaymentMethodConfigs(true);
-            exportData.PaymentMethods = paymentMethodConfig.Select(pm => new PaymentMethodExport
-            {
-                PaymentMethodId = pm.Key.ToString(),
-                ConfigJson = JsonConvert.SerializeObject(pm.Value)
             }).ToList();
         }
         if (selectedOptions.Contains("Apps"))
@@ -229,20 +217,10 @@ public class StoreImportExportService
 
             if (optionsToImport.Contains("Webhooks") && exportData.Webhooks?.Any() == true)
             {
-                foreach (var webhookExport in exportData.Webhooks)
+                foreach (var webhookExport in exportData.Webhooks.Where(c => !string.IsNullOrEmpty(c.BlobJson)))
                 {
-                    var webhook = new WebhookData
-                    {
-                        Blob2 = webhookExport.Blob2Json
-                        // Find a way to handle blob...
-                    };
-                    if (!string.IsNullOrEmpty(webhookExport.BlobJson))
-                    {
-                        var webhookBlob = JsonConvert.DeserializeObject<WebhookBlob>(webhookExport.BlobJson);
-                        webhook.SetBlob(webhookBlob);
-                    }
-                    // Create webhook
-                    //await _storeRepository.CreateWebhook(destinationStore.Id, webhook);
+                    var webhookBlob = JsonConvert.DeserializeObject<WebhookBlob>(webhookExport.BlobJson);
+                    await _storeRepository.CreateWebhook(destinationStore.Id, webhookBlob);
                 }
             }
             if (optionsToImport.Contains("Roles") && exportData.Roles?.Any() == true)
@@ -253,7 +231,6 @@ public class StoreImportExportService
                     await _storeRepository.AddOrUpdateStoreRole(roleId, roleExport.Permissions);
                 }
             }
-
             if (optionsToImport.Contains("Forms") && exportData.Forms?.Any() == true)
             {
                 foreach (var formExport in exportData.Forms)
@@ -268,16 +245,6 @@ public class StoreImportExportService
                 }
             }
 
-            if (optionsToImport.Contains("PaymentMethods") && exportData.PaymentMethods?.Any() == true)
-            {
-                foreach (var pmExport in exportData.PaymentMethods)
-                {
-                    // Payment method import logic here
-                    // This depends on your payment method structure
-                }
-            }
-
-            // Still needs to be checked
             if (optionsToImport.Contains("Apps") && exportData.Apps?.Any() == true)
             {
                 foreach (var appExport in exportData.Apps)
@@ -291,15 +258,12 @@ public class StoreImportExportService
                     await _appService.UpdateOrCreateApp(appData);
                 }
             }
-
             await _storeRepository.UpdateStore(destinationStore);
 
             var importedCount = optionsToImport.Count;
             var importedItems = string.Join(", ", optionsToImport.Select(o =>
                 ImportViewModel.OptionMetadata.ContainsKey(o) ? ImportViewModel.OptionMetadata[o].Title : o));
 
-            
-            await _storeRepository.UpdateStore(destinationStore);
             return (true, $"Successfully imported {importedCount} configuration(s): {importedItems}");
         }
         catch (Exception ex)
@@ -424,30 +388,24 @@ public class StoreImportExportService
         using var input = new MemoryStream(encryptedData);
         using var reader = new BinaryReader(input);
 
-        // Verify header
         var headerBytes = reader.ReadBytes(MAGIC_HEADER.Length);
         var header = Encoding.ASCII.GetString(headerBytes);
 
         if (header != MAGIC_HEADER)
             throw new InvalidDataException("Invalid export file format. This file may be corrupted or not a valid BTCPay storebridge plugin export");
 
-        // Read flags
         var compressed = reader.ReadByte() == 1;
 
-        // Read original store ID
         var storeIdLength = reader.ReadInt32();
         var storeIdBytes = reader.ReadBytes(storeIdLength);
         var originalStoreId = Encoding.UTF8.GetString(storeIdBytes);
 
-        // Read IV
         var ivLength = reader.ReadInt32();
         var iv = reader.ReadBytes(ivLength);
 
-        // Read encrypted data
         var dataLength = reader.ReadInt32();
         var encrypted = reader.ReadBytes(dataLength);
 
-        // Decrypt
         var key = DeriveKey(originalStoreId);
 
         using var aes = Aes.Create();
@@ -465,15 +423,7 @@ public class StoreImportExportService
 
     private byte[] DeriveKey(string storeId)
     {
-        // Use PBKDF2 to derive a consistent encryption key from store ID
-        // This allows the same store to decrypt its own exports
-        using var pbkdf2 = new Rfc2898DeriveBytes(
-            storeId,
-            Encoding.UTF8.GetBytes("BTCPayServerStoreBridge_v1"), // Salt
-            100000, // Iterations
-            HashAlgorithmName.SHA256
-        );
-
-        return pbkdf2.GetBytes(32); // 256-bit key
+        using var pbkdf2 = new Rfc2898DeriveBytes(storeId, Encoding.UTF8.GetBytes("BTCPayServerStoreBridge_v1"), 100000, HashAlgorithmName.SHA256);
+        return pbkdf2.GetBytes(32);
     }
 }

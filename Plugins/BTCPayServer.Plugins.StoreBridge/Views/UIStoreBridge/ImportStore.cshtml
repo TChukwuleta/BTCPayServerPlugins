@@ -54,15 +54,12 @@ else
 
                     <dt class="col-sm-4 text-muted fw-normal">Date of export:</dt>
                     <dd class="col-sm-8">@Model.FormattedExportDate</dd>
-
-                    <dt class="col-sm-4 text-muted fw-normal">Current Store Id:</dt>
-                    <dd class="col-sm-8">@storeId</dd>
                 </dl>
             </div>
 
             <hr class="my-4" />
 
-            <form method="post" asp-action="ImportStoreConfirm" id="importConfirmForm">
+            <form method="post" asp-action="ImportStoreConfirm" asp-route-storeId="@storeId" id="importConfirmForm">
                 <input type="hidden" asp-for="StoreId" />
 
                 <div class="d-flex justify-content-between align-items-end mb-3">

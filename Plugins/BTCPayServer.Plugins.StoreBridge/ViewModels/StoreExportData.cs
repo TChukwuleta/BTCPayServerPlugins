@@ -9,7 +9,6 @@ public class StoreExportData
     public string SelectedOptions { get; set; }
     public DateTime ExportDate { get; set; }
     public string ExportedFrom { get; set; } = string.Empty;
-    public List<PaymentMethodExport> PaymentMethods { get; set; }
     public List<AppExport> Apps { get; set; }
     public List<WebhookExport> Webhooks { get; set; }
     public List<RoleExport> Roles { get; set; }
@@ -17,11 +16,6 @@ public class StoreExportData
     public StoreBridgeData Store { get; set; } = new();
 }
 
-public class PaymentMethodExport
-{
-    public string PaymentMethodId { get; set; }
-    public string ConfigJson { get; set; }
-}
 public class AppExport
 {
     public string AppId { get; set; }
