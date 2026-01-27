@@ -25,7 +25,7 @@ in the same instance or across other instance.
 
 
 Go to `Export Plugin Config` of the Store Bridge plugin. There you would see all the store configuration that are open to be exported. 
-Toggle off the settings/cofiguration you dont want to export. Once done, click the `Export Store` button and it would download
+Toggle off the settings/configuration you don't want to export. Once done, click the `Export Store` button and it would download
 .storebridge file on your local computer. 
 
 Log in to the store you want to import the configuration to. Go to the Store bridge plugin > `Import Store Config`, and upload the 

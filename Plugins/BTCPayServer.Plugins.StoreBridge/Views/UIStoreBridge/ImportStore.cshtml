@@ -67,7 +67,7 @@ else
                 </div>
                 @foreach (var option in Model.AvailableOptions)
                 {
-                    var metadata = ImportViewModel.OptionMetadata[option];
+                    if (!ImportViewModel.OptionMetadata.TryGetValue(option, out var metadata)) continue;
                     var isChecked = Model.IsSelected(option);
                     <div class="d-flex align-items-start mb-3">
                         <input class="btcpay-toggle me-3 import-toggle" type="checkbox" name="SelectedOptions"

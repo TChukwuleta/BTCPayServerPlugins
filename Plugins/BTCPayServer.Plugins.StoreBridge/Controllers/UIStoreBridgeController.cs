@@ -64,21 +64,6 @@ public class UIStoreBridgeController : Controller
         }
     }
 
-    [HttpPost("export/preview")]
-    public async Task<IActionResult> ExportStorePreview(string storeId, ExportViewModel vm)
-    {
-        if (CurrentStore == null) return NotFound();
-
-        if (vm.SelectedOptions == null || !vm.SelectedOptions.Any())
-        {
-            TempData[WellKnownTempData.ErrorMessage] = $"Please select at least one item to export";
-            return RedirectToAction(nameof(ExportStore), new { storeId });
-        }
-        var store = await _storeRepository.FindStore(CurrentStore.Id);
-        var exportData = await _service.GetExportDataPreview(GetBaseUrl(), GetUserId(), store, vm.SelectedOptions);
-        return Content(JsonConvert.SerializeObject(exportData, Formatting.Indented), "application/json");
-    }
-
     [HttpGet("import")]
     public IActionResult ImportStore(string storeId)
     {
