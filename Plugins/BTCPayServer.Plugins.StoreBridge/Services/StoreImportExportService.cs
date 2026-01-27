@@ -14,7 +14,6 @@ using BTCPayServer.Forms;
 using BTCPayServer.Plugins.StoreBridge.ViewModels;
 using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Stores;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.StoreBridge.Services;

@@ -128,30 +128,29 @@ public class UIStoreBridgeController : Controller
         if (CurrentStore == null) return NotFound();
 
         var store = await _storeRepository.FindStore(CurrentStore.Id);
-
-        var fileDataBase64 = TempData["ImportFileData"] as string;
-        if (string.IsNullOrEmpty(fileDataBase64))
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Import session expired. Please upload the file again.";
-            return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
-        }
-
-        var fileBytes = Convert.FromBase64String(fileDataBase64);
-
-        if (vm.SelectedOptions == null || !vm.SelectedOptions.Any())
-        {
-            var getPreview = GetImportPreview(fileBytes, vm);
-            if (!string.IsNullOrEmpty(getPreview.errorMessage))
-            {
-                TempData[WellKnownTempData.ErrorMessage] = getPreview.errorMessage;
-                return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
-            }
-            TempData[WellKnownTempData.ErrorMessage] = "Please select at least one item to import";
-            TempData["ImportFileData"] = fileDataBase64;
-            return View(nameof(ImportStore), getPreview.model);
-        }
         try
         {
+            var fileDataBase64 = TempData["ImportFileData"] as string;
+            if (string.IsNullOrEmpty(fileDataBase64))
+            {
+                TempData[WellKnownTempData.ErrorMessage] = "Import session expired. Please upload the file again.";
+                return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
+            }
+
+            var fileBytes = Convert.FromBase64String(fileDataBase64);
+
+            if (vm.SelectedOptions == null || !vm.SelectedOptions.Any())
+            {
+                var getPreview = GetImportPreview(fileBytes, vm);
+                if (!string.IsNullOrEmpty(getPreview.errorMessage))
+                {
+                    TempData[WellKnownTempData.ErrorMessage] = getPreview.errorMessage;
+                    return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
+                }
+                TempData[WellKnownTempData.ErrorMessage] = "Please select at least one item to import";
+                TempData["ImportFileData"] = fileDataBase64;
+                return View(nameof(ImportStore), getPreview.model);
+            }
             var (success, message) = await _service.ImportStore(store, fileBytes, GetUserId(), vm.SelectedOptions);
             if (success)
             {

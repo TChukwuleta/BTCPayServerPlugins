@@ -23,7 +23,6 @@ Export and import store configurations in BTCPay Server.
 Now that you have installed the plugin, you can go ahead and export store settings and configuration and import into either a different store
 in the same instance or across other instance. 
 
-
 Go to `Export Plugin Config` of the Store Bridge plugin. There you would see all the store configuration that are open to be exported. 
 Toggle off the settings/configuration you don't want to export. Once done, click the `Export Store` button and it would download
 .storebridge file on your local computer. 
