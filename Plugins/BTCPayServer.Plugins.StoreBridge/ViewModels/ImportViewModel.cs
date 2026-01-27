@@ -27,22 +27,18 @@ public class ImportViewModel
         "CheckoutSettings",
         "Webhooks",
         "Roles",
-        "Forms",
-        "PaymentMethods"
-        //"Apps"
+        "Forms"
     };
 
     public static readonly Dictionary<string, (string Title, string Description)> OptionMetadata = new()
     {
         ["BrandingSettings"] = ("Branding Settings", "Logo, CSS, brand colors and backend appearance"),
-        ["EmailSettings"] = ("Email Settings", "SMTP configuration and email templates"),
-        ["RateSettings"] = ("Rate Settings", "Exchange rate providers and preferences"),
+        ["EmailSettings"] = ("Email Settings", "Settings details"),
+        ["RateSettings"] = ("Rate Settings", "Primary and fallback rate settings configuration"),
         ["CheckoutSettings"] = ("Checkout Settings", "Payment UI, language, timers, and user experience options"),
         ["Webhooks"] = ("Webhooks", "Webhook configurations and endpoints"),
-        ["Roles"] = ("Roles & Permissions", "Store roles and user access permissions"),
-        ["Forms"] = ("Forms", "Custom forms and their configurations"),
-        ["PaymentMethods"] = ("Payment Methods", "On-chain and Lightning Network configurations")
-        //["Apps"] = ("Apps", "Point of Sale, Crowdfund, and other app configurations")
+        ["Roles"] = ("Roles & Permissions", "Store roles and access permissions"),
+        ["Forms"] = ("Forms", "Custom forms and their configurations")
     };
 
     public string FormattedExportDate => ExportDate?.ToString("MMMM dd, yyyy 'at' HH:mm 'UTC'") ?? "Unknown";

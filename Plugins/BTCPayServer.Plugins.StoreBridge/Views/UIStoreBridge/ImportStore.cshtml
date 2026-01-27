@@ -51,42 +51,28 @@ else
 
                     <dt class="col-sm-4 text-muted fw-normal">Source Store name:</dt>
                     <dd class="col-sm-8">@Model.OriginalStoreName</dd>
-
-                    <dt class="col-sm-4 text-muted fw-normal">Date of export:</dt>
-                    <dd class="col-sm-8">@Model.FormattedExportDate</dd>
                 </dl>
             </div>
 
             <hr class="my-4" />
-
             <form method="post" asp-action="ImportStoreConfirm" asp-route-storeId="@storeId" id="importConfirmForm">
                 <input type="hidden" asp-for="StoreId" />
-
                 <div class="d-flex justify-content-between align-items-end mb-3">
                     <div>
-                        <h5 class="mb-1">Import options</h5>
                         <p class="text-muted mb-0">Choose which settings you want to import into this store</p>
                     </div>
                     <small class="text-muted">
                         <span id="selectedCount">@Model.SelectedCount</span> / @Model.AvailableCount selected
                     </small>
                 </div>
-
-                <p class="text-muted small mb-4">
-                    <strong>Note:</strong> Importing will overwrite existing configuration for the selected options.
-                    Payment methods, webhooks, and apps will be merged. Other store settings will be replaced.
-                </p>
-
                 @foreach (var option in Model.AvailableOptions)
                 {
                     var metadata = ImportViewModel.OptionMetadata[option];
                     var isChecked = Model.IsSelected(option);
-
-                    <div class="form-check form-switch mb-3">
-                        <input class="btcpay-toggle me-3 import-toggle" type="checkbox" name="SelectedOptions" 
-                            value="@option" id="import@option" checked="@isChecked" />
-
-                        <label class="form-check-label" for="import@option">
+                    <div class="d-flex align-items-start mb-3">
+                        <input class="btcpay-toggle me-3 import-toggle" type="checkbox" name="SelectedOptions"
+                               value="@option" id="import@option" checked="@isChecked" style="margin-top: 2px;" />
+                        <label class="form-check-label" for="import@option" style="cursor: pointer;">
                             <div class="fw-semibold">@metadata.Title</div>
                             <div class="text-muted small">@metadata.Description</div>
                         </label>

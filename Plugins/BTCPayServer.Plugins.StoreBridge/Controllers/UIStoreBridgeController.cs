@@ -191,7 +191,7 @@ public class UIStoreBridgeController : Controller
     private (string errorMessage, ImportViewModel model) GetImportPreview(byte[] fileBytes, ImportViewModel vm = null)
     {
         StoreExportData exportData = _service.GetExportPreview(fileBytes);
-        if (exportData == null)
+        if (exportData == null || exportData?.Store == null)
         {
             return ("Failed to decrypt export file. This file may be corrupted or encrypted for a different store", null);
         }
