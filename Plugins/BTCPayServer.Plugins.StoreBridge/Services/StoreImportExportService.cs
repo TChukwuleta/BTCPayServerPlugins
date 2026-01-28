@@ -10,10 +10,16 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
+using BTCPayServer.Events;
 using BTCPayServer.Forms;
+using BTCPayServer.Payments;
 using BTCPayServer.Plugins.StoreBridge.ViewModels;
 using BTCPayServer.Services.Apps;
+using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
+using BTCPayServer.Services.Wallets;
+using Microsoft.Extensions.Logging;
+using NBitcoin;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.StoreBridge.Services;
@@ -21,8 +27,13 @@ namespace BTCPayServer.Plugins.StoreBridge.Services;
 public class StoreImportExportService
 {
     private readonly AppService _appService;
+    private readonly EventAggregator _eventAggregator;
     private readonly StoreRepository _storeRepository;
     private readonly FormDataService _formDataService;
+    private readonly BTCPayWalletProvider _walletProvider;
+    private readonly BTCPayNetworkProvider _networkProvider;
+    private readonly PaymentMethodHandlerDictionary _handlers;
+    private readonly ILogger<StoreImportExportService> _logger;
     private const string MAGIC_HEADER = "BTCPAY_STOREBRIDGE";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -31,10 +42,16 @@ public class StoreImportExportService
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
-    public StoreImportExportService(StoreRepository storeRepository, AppService appService, 
-        FormDataService formDataService)
+    public StoreImportExportService(StoreRepository storeRepository, AppService appService, FormDataService formDataService, 
+        ILogger<StoreImportExportService> logger, BTCPayNetworkProvider networkProvider, PaymentMethodHandlerDictionary handlers,
+        EventAggregator eventAggregator, BTCPayWalletProvider walletProvider)
     {
+        _logger = logger;
+        _handlers = handlers;   
         _appService = appService;
+        _walletProvider = walletProvider;
+        _eventAggregator = eventAggregator;
+        _networkProvider = networkProvider;
         _storeRepository = storeRepository;
         _formDataService = formDataService;
     }
@@ -93,6 +110,61 @@ public class StoreImportExportService
             blob.AutoDetectLanguage = originalBlob.AutoDetectLanguage;
             blob.DefaultLang = originalBlob.DefaultLang;
         }
+        if (selectedOptions.Contains("PaymentMethods"))
+        {
+            var paymentMethods = new List<PaymentMethodExportData>();
+            var configs = store.GetPaymentMethodConfigs(_handlers, onlyEnabled: true);
+
+            var excludedMethods = originalBlob.GetExcludedPaymentMethods();
+            foreach (var (paymentMethodId, config) in configs)
+            {
+                var pmData = new PaymentMethodExportData
+                {
+                    PaymentMethodId = paymentMethodId.ToString()
+                };
+                if (config is DerivationSchemeSettings derivation)
+                {
+                    var accountDerivationString = derivation.AccountDerivation?.ToString();
+                    if (string.IsNullOrWhiteSpace(accountDerivationString)) continue;
+
+                    var accountDerivationLower = accountDerivationString.ToLowerInvariant();
+                    if (accountDerivationLower.Contains("prv") || !IsPublicKey(accountDerivationLower)) continue;
+
+                    if (derivation.AccountKeySettings is { Length: > 0 })
+                    {
+                        pmData.AccountKeySettings = new List<AccountKeySettingsData>();
+                        foreach (var aks in derivation.AccountKeySettings)
+                        {
+                            var accountKeyString = aks.AccountKey?.ToString();
+                            if (string.IsNullOrWhiteSpace(accountKeyString)) continue;
+
+                            var accountKeyLower = accountKeyString.ToLowerInvariant();
+                            if (accountKeyLower.Contains("prv") || !IsPublicKey(accountKeyLower)) continue;
+
+                            pmData.AccountKeySettings.Add(new AccountKeySettingsData
+                            {
+                                RootFingerprint = aks.RootFingerprint?.ToString(),
+                                AccountKeyPath = aks.AccountKeyPath?.ToString(),
+                                AccountKey = accountKeyString
+                            });
+                        }
+                        if (pmData.AccountKeySettings.Count == 0) continue;
+                    }
+                    pmData.AccountDerivation = derivation.AccountDerivation?.ToString();
+                    pmData.AccountOriginal = derivation.AccountOriginal;
+                    pmData.Label = derivation.Label;
+                    pmData.IsHotWallet = derivation.IsHotWallet;
+                    pmData.Source = derivation.Source;
+                }
+                paymentMethods.Add(pmData);
+            }
+            exportData.PaymentMethods = paymentMethods;
+            _logger.LogInformation(JsonConvert.SerializeObject(paymentMethods));
+        }
+        /*if (selectedOptions.Contains("Subscriptions"))
+        {
+            exportData.SubscriptionPlans = await ExportSubscriptionPlans(storeId);
+        }*/
         if (selectedOptions.Contains("Webhooks"))
         {
             var webhooks = await _storeRepository.GetWebhooks(store.Id);
@@ -214,6 +286,82 @@ public class StoreImportExportService
                 }
             }
 
+            if (optionsToImport.Contains("PaymentMethods") && exportData.PaymentMethods?.Any() == true)
+            {
+                var excludedPaymentMethods = destinationStoreBlob.GetExcludedPaymentMethods();
+                foreach (var pm in exportData.PaymentMethods)
+                {
+                    if (!PaymentMethodId.TryParse(pm.PaymentMethodId, out var paymentMethodId)) continue;
+
+                    if (!_handlers.TryGetValue(paymentMethodId, out var handler)) continue;
+
+                    if (string.IsNullOrEmpty(pm.AccountDerivation)) continue;
+
+                    var cryptoCode = pm.PaymentMethodId.Contains('-') ? pm.PaymentMethodId.Split('-')[0] : pm.PaymentMethodId;
+                    var network = _networkProvider.GetNetwork<BTCPayNetwork>(cryptoCode);
+                    if (network == null) continue;
+
+                    var wallet = _walletProvider.GetWallet(network);
+                    if (wallet == null) continue;
+
+                    DerivationSchemeSettings strategy;
+                    try
+                    {
+                        strategy = DerivationSchemeSettings.Parse(pm.AccountDerivation, network);
+                    }
+                    catch (Exception){ continue; }
+
+
+                    var derivationSchemeSettings = DerivationSchemeSettings.Parse(pm.AccountDerivation, network);
+                    _logger.LogInformation("Derivation scheme settings");
+                    _logger.LogInformation(JsonConvert.SerializeObject(derivationSchemeSettings));
+                    var derivationScheme = network.NBXplorerNetwork.DerivationStrategyFactory.Parse(pm.AccountDerivation);
+                    _logger.LogInformation("Derivation scheme");
+                    _logger.LogInformation(JsonConvert.SerializeObject(derivationScheme));
+
+
+                    strategy.AccountOriginal = pm.AccountOriginal ?? pm.AccountDerivation;
+                    strategy.Label = pm.Label;
+                    strategy.IsHotWallet = false; // Always false - we don't import private keys
+                    strategy.Source = pm.Source;
+                    if (pm.AccountKeySettings is { Count: > 0 })
+                    {
+                        var firstKey = pm.AccountKeySettings[0];
+                        if (!string.IsNullOrWhiteSpace(firstKey.AccountKey))
+                        {
+                            var accountKey = network.NBitcoinNetwork.Parse<BitcoinExtPubKey>(firstKey.AccountKey);
+                            var accountSettings = strategy.AccountKeySettings.FirstOrDefault(a => a.AccountKey == accountKey);
+                            if (accountSettings != null)
+                            {
+                                if (!string.IsNullOrWhiteSpace(firstKey.AccountKeyPath))
+                                {
+                                    accountSettings.AccountKeyPath = KeyPath.Parse(firstKey.AccountKeyPath);
+                                }
+
+                                if (!string.IsNullOrWhiteSpace(firstKey.RootFingerprint) &&
+                                    HDFingerprint.TryParse(firstKey.RootFingerprint, out var fp))
+                                {
+                                    accountSettings.RootFingerprint = fp;
+                                }
+                            }
+                        }
+                    }
+
+                    try
+                    {
+                        await wallet.TrackAsync(strategy.AccountDerivation);
+                    }
+                    catch (Exception) { continue; }
+
+                    destinationStore.SetPaymentMethodConfig(handler, strategy);
+                    destinationStoreBlob.SetExcluded(paymentMethodId, false);
+                    destinationStoreBlob.PayJoinEnabled = false;
+                    _eventAggregator.Publish(new WalletChangedEvent
+                    {
+                        WalletId = new WalletId(destinationStore.Id, cryptoCode)
+                    });
+                }
+            }
             if (optionsToImport.Contains("Webhooks") && exportData.Webhooks?.Any() == true)
             {
                 foreach (var webhookExport in exportData.Webhooks.Where(c => !string.IsNullOrEmpty(c.BlobJson)))
@@ -335,6 +483,11 @@ public class StoreImportExportService
         catch (Exception){ return new(); }
     }
 
+    private bool IsPublicKey(string key)
+    {
+        return key.StartsWith("xpub") || key.StartsWith("ypub") || key.StartsWith("zpub") ||
+                      key.StartsWith("tpub") || key.StartsWith("upub") || key.StartsWith("vpub");   // testnet
+    }
     private byte[] CompressData(byte[] data)
     {
         using var output = new MemoryStream();
