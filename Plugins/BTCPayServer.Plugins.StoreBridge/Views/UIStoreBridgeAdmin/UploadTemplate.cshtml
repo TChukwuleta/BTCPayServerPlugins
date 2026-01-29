@@ -1,0 +1,51 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.StoreBridge.ViewModels
+@inject IScopeProvider ScopeProvider
+@model UploadTemplateViewModel
+@{
+    Layout = "_Layout";
+    var storeId = ScopeProvider.GetCurrentStoreId();
+    ViewData.SetLayoutModel(new LayoutModel("StoreBridge-ManageTemplates", "Upload Store Bridge Template") { ActiveCategory = "StoreBridge" });
+}
+<div class="sticky-header">
+    <h2>@ViewData["Title"]</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <button type="submit" form="upload-template-form" class="btn btn-primary">Upload Template </button>
+    </div>
+</div>
+
+
+<partial name="_StatusMessage" />
+
+<div class="row">
+    <div class="col-lg-8 col-xl-6">
+        <form id="upload-template-form" asp-action="UploadTemplate" asp-route-storeId="@storeId" method="post" enctype="multipart/form-data">
+            <div class="form-group">
+                <label asp-for="Name">Template Name</label>
+                <input asp-for="Name" class="form-control" required />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Description">Description</label>
+                <textarea asp-for="Description" class="form-control" rows="3" maxlength="100"></textarea>
+                <small class="form-text text-muted">Maximum 100 characters</small>
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Tags">Tags (comma-separated)</label>
+                <input asp-for="Tags" class="form-control" placeholder="retail, subscriptions, saas" />
+            </div>
+
+            <div class="form-group">
+                <label asp-for="TemplateFile">Template File</label>
+                <input asp-for="TemplateFile" type="file" class="form-control" accept=".storebridge" required />
+                <small class="form-text text-muted">Upload a .storebridge file exported from Store Bridge</small>
+                <span asp-validation-for="TemplateFile" class="text-danger"></span>
+            </div>
+        </form>
+    </div>
+</div>
