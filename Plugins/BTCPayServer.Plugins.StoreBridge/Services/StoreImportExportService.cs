@@ -468,11 +468,6 @@ public class StoreImportExportService
         catch (Exception){ return new(); }
     }
 
-    private bool IsPublicKey(string key)
-    {
-        return key.StartsWith("xpub") || key.StartsWith("ypub") || key.StartsWith("zpub") ||
-                      key.StartsWith("tpub") || key.StartsWith("upub") || key.StartsWith("vpub");   // testnet
-    }
     private byte[] CompressData(byte[] data)
     {
         using var output = new MemoryStream();
