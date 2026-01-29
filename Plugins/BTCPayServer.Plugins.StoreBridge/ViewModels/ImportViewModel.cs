@@ -42,7 +42,7 @@ public class ImportViewModel
         ["Webhooks"] = ("Webhooks", "Webhook configurations and endpoints"),
         ["Roles"] = ("Roles & Permissions", "Store roles and access permissions"),
         ["Forms"] = ("Forms", "Custom forms and their configurations"),
-        ["Subscriptions"] = ("Subscription Plans", "Subscription offerings and plan configurations")
+        ["Subscriptions"] = ("Subscription Offerings & Plans", "Subscription offerings, plans, and features")
     };
 
     public string FormattedExportDate => ExportDate?.ToString("MMMM dd, yyyy 'at' HH:mm 'UTC'") ?? "Unknown";

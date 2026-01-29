@@ -30,6 +30,6 @@ public class ExportViewModel
         ["Webhooks"] = ("Webhooks", "Webhook configurations and endpoints"),
         ["Roles"] = ("Roles & Permissions", "Store roles and access permissions"),
         ["Forms"] = ("Forms", "Custom forms and their configurations"),
-        ["Subscriptions"] = ("Subscription Plans", "Subscription offerings and plan configurations")
+        ["Subscriptions"] = ("Subscription Offerings & Plans", "Subscription offerings, plans, and features")
     };
 }

@@ -10,14 +10,17 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
+using BTCPayServer.Data.Subscriptions;
 using BTCPayServer.Events;
 using BTCPayServer.Forms;
 using BTCPayServer.Payments;
 using BTCPayServer.Plugins.StoreBridge.ViewModels;
+using BTCPayServer.Plugins.Subscriptions;
 using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
 using BTCPayServer.Services.Wallets;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NBitcoin;
 using Newtonsoft.Json;
@@ -31,6 +34,7 @@ public class StoreImportExportService
     private readonly StoreRepository _storeRepository;
     private readonly FormDataService _formDataService;
     private readonly BTCPayWalletProvider _walletProvider;
+    private readonly ApplicationDbContextFactory _dbContext;
     private readonly BTCPayNetworkProvider _networkProvider;
     private readonly PaymentMethodHandlerDictionary _handlers;
     private readonly ILogger<StoreImportExportService> _logger;
@@ -44,10 +48,11 @@ public class StoreImportExportService
 
     public StoreImportExportService(StoreRepository storeRepository, AppService appService, FormDataService formDataService, 
         ILogger<StoreImportExportService> logger, BTCPayNetworkProvider networkProvider, PaymentMethodHandlerDictionary handlers,
-        EventAggregator eventAggregator, BTCPayWalletProvider walletProvider)
+        EventAggregator eventAggregator, BTCPayWalletProvider walletProvider, ApplicationDbContextFactory dbContext)
     {
         _logger = logger;
-        _handlers = handlers;   
+        _handlers = handlers;
+        _dbContext = dbContext;
         _appService = appService;
         _walletProvider = walletProvider;
         _eventAggregator = eventAggregator;
@@ -56,7 +61,7 @@ public class StoreImportExportService
         _formDataService = formDataService;
     }
 
-    public async Task<StoreExportData> GetExportDataPreview(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
+    public async Task<StoreExportData> GetExportData(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
     {
         var originalBlob = store.GetStoreBlob();
         var blob = DefaultStoreBlobSettings(originalBlob);
@@ -110,6 +115,52 @@ public class StoreImportExportService
             blob.AutoDetectLanguage = originalBlob.AutoDetectLanguage;
             blob.DefaultLang = originalBlob.DefaultLang;
         }
+        if (selectedOptions.Contains("Subscriptions"))
+        {
+            var offerings = new List<SubscriptionOfferingExportData>();
+            await using var ctx = _dbContext.CreateContext();
+            var offeringDataList = await ctx.Offerings.Include(o => o.App).Include(o => o.Features).Include(o => o.Plans)
+                .Where(o => o.App.StoreDataId == store.Id).ToListAsync();
+
+            foreach (var offering in offeringDataList)
+            {
+                var offeringExport = new SubscriptionOfferingExportData
+                {
+                    AppName = offering.App.Name,
+                    SuccessRedirectUrl = offering.SuccessRedirectUrl,
+                    DefaultPaymentRemindersDays = offering.DefaultPaymentRemindersDays,
+                    Metadata = offering.Metadata,
+                    Features = offering.Features?
+                        .Select(f => new OfferingFeatureData
+                        {
+                            CustomId = f.CustomId,
+                            Description = f.Description
+                        }).ToList(),
+                    Plans = new List<SubscriptionPlanExportData>()
+                };
+                await ctx.Plans.FetchPlanFeaturesAsync(offering.Plans.ToArray());
+                foreach (var plan in offering.Plans)
+                {
+                    var planExport = new SubscriptionPlanExportData
+                    {
+                        Name = plan.Name,
+                        Description = plan.Description,
+                        Price = plan.Price,
+                        Currency = plan.Currency,
+                        RecurringType = plan.RecurringType.ToString(),
+                        TrialDays = plan.TrialDays,
+                        GracePeriodDays = plan.GracePeriodDays,
+                        OptimisticActivation = plan.OptimisticActivation,
+                        Renewable = plan.Renewable,
+                        Metadata = plan.Metadata,
+                        FeatureIds = plan.PlanFeatures?.Select(f => f.Feature.CustomId).ToList()
+                    };
+                    offeringExport.Plans.Add(planExport);
+                }
+                offerings.Add(offeringExport);
+            }
+            exportData.SubscriptionOfferings = offerings;
+        }
         if (selectedOptions.Contains("PaymentMethods"))
         {
             var paymentMethods = new List<PaymentMethodExportData>();
@@ -161,10 +212,6 @@ public class StoreImportExportService
             exportData.PaymentMethods = paymentMethods;
             _logger.LogInformation(JsonConvert.SerializeObject(paymentMethods));
         }
-        /*if (selectedOptions.Contains("Subscriptions"))
-        {
-            exportData.SubscriptionPlans = await ExportSubscriptionPlans(storeId);
-        }*/
         if (selectedOptions.Contains("Webhooks"))
         {
             var webhooks = await _storeRepository.GetWebhooks(store.Id);
@@ -210,7 +257,7 @@ public class StoreImportExportService
 
     public async Task<byte[]> ExportStore(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
     {
-        var exportData = await GetExportDataPreview(sourceInstanceUrl, userId, store, selectedOptions);
+        var exportData = await GetExportData(sourceInstanceUrl, userId, store, selectedOptions);
         var encryptedData = CreateExport(exportData, store.Id);
         return encryptedData;
     }
@@ -286,20 +333,112 @@ public class StoreImportExportService
                 }
             }
 
+            if (optionsToImport.Contains("Subscriptions") && exportData.SubscriptionOfferings?.Any() == true)
+            {
+                await using var ctx = _dbContext.CreateContext();
+                foreach (var offeringExport in exportData.SubscriptionOfferings)
+                {
+                    try
+                    {
+                        var offering = await _appService.CreateOffering(destinationStore.Id, offeringExport.AppName);
+                        var offeringData = await ctx.Offerings.Include(o => o.Features).Include(o => o.Plans)
+                            .FirstOrDefaultAsync(o => o.Id == offering.OfferingId);
+
+                        if (offeringData == null) continue;
+
+                        offeringData.SuccessRedirectUrl = offeringExport.SuccessRedirectUrl;
+                        offeringData.Metadata = offeringExport.Metadata;
+                        offeringData.DefaultPaymentRemindersDays = offeringExport.DefaultPaymentRemindersDays;
+                        await ctx.SaveChangesAsync();
+
+                        if (offeringExport.Features != null && offeringExport.Features.Any())
+                        {
+                            foreach (var featureExport in offeringExport.Features)
+                            {
+                                var feature = new FeatureData
+                                {
+                                    OfferingId = offeringData.Id,
+                                    CustomId = featureExport.CustomId,
+                                    Description = featureExport.Description
+                                };
+                                ctx.Features.Add(feature);
+                            }
+                            await ctx.SaveChangesAsync();
+                        }
+
+                        await ctx.Entry(offeringData).Collection(o => o.Features).LoadAsync();
+
+                        if (offeringExport.Plans != null && offeringExport.Plans.Any())
+                        {
+                            foreach (var planExport in offeringExport.Plans)
+                            {
+                                var planData = new PlanData
+                                {
+                                    OfferingId = offeringData.Id,
+                                    Name = planExport.Name,
+                                    Description = planExport.Description,
+                                    Price = planExport.Price,
+                                    Currency = planExport.Currency,
+                                    RecurringType = Enum.Parse<PlanData.RecurringInterval>(planExport.RecurringType),
+                                    Status = Enum.Parse<PlanData.PlanStatus>(planExport.Status ?? "Active"),
+                                    TrialDays = planExport.TrialDays,
+                                    GracePeriodDays = planExport.GracePeriodDays,
+                                    OptimisticActivation = planExport.OptimisticActivation,
+                                    Renewable = planExport.Renewable,
+                                    Metadata = planExport.Metadata,
+                                    MemberCount = 0,
+                                    MonthlyRevenue = 0m
+                                };
+                                ctx.Plans.Add(planData);
+                                await ctx.SaveChangesAsync();
+
+                                if (planExport.FeatureIds != null && planExport.FeatureIds.Any())
+                                {
+                                    foreach (var featureCustomId in planExport.FeatureIds)
+                                    {
+                                        var feature = offeringData.Features.FirstOrDefault(f => f.CustomId == featureCustomId);
+                                        if (feature != null)
+                                        {
+                                            ctx.PlanFeatures.Add(new PlanFeatureData
+                                            {
+                                                PlanId = planData.Id,
+                                                FeatureId = feature.Id
+                                            });
+                                        }
+                                    }
+                                    await ctx.SaveChangesAsync();
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception){ continue; }
+                }
+            }
             if (optionsToImport.Contains("PaymentMethods") && exportData.PaymentMethods?.Any() == true)
             {
                 var excludedPaymentMethods = destinationStoreBlob.GetExcludedPaymentMethods();
                 foreach (var pm in exportData.PaymentMethods)
                 {
-                    if (!PaymentMethodId.TryParse(pm.PaymentMethodId, out var paymentMethodId)) continue;
+                    /*if (!PaymentMethodId.TryParse(pm.PaymentMethodId, out var paymentMethodId)) continue;
 
-                    if (!_handlers.TryGetValue(paymentMethodId, out var handler)) continue;
+                    if (!_handlers.TryGetValue(paymentMethodId, out var handler)) continue;*/
+                    if (!PaymentMethodId.TryParse(pm.PaymentMethodId, out var paymentMethodId))
+                    {
+                        _logger.LogWarning($"Invalid payment method ID: {pm.PaymentMethodId}");
+                        continue;
+                    }
+
+                    if (!_handlers.TryGetValue(paymentMethodId, out var handler))
+                    {
+                        _logger.LogWarning($"No handler found for payment method: {pm.PaymentMethodId}");
+                        continue;
+                    }
 
                     if (string.IsNullOrEmpty(pm.AccountDerivation)) continue;
 
                     var cryptoCode = pm.PaymentMethodId.Contains('-') ? pm.PaymentMethodId.Split('-')[0] : pm.PaymentMethodId;
                     var network = _networkProvider.GetNetwork<BTCPayNetwork>(cryptoCode);
-                    if (network == null) continue;
+                    /*if (network == null) continue;
 
                     var wallet = _walletProvider.GetWallet(network);
                     if (wallet == null) continue;
@@ -309,7 +448,31 @@ public class StoreImportExportService
                     {
                         strategy = DerivationSchemeSettings.Parse(pm.AccountDerivation, network);
                     }
-                    catch (Exception){ continue; }
+                    catch (Exception){ continue; }*/
+                    if (network == null)
+                    {
+                        _logger.LogWarning($"Network not found for {cryptoCode}");
+                        continue;
+                    }
+
+                    var wallet = _walletProvider.GetWallet(network);
+                    if (wallet == null)
+                    {
+                        _logger.LogWarning($"Wallet provider not found for {cryptoCode}");
+                        continue;
+                    }
+
+                    // Parse the derivation scheme
+                    DerivationSchemeSettings strategy;
+                    try
+                    {
+                        strategy = DerivationSchemeSettings.Parse(pm.AccountDerivation, network);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Failed to parse derivation scheme for {pm.PaymentMethodId}");
+                        continue;
+                    }
 
 
                     var derivationSchemeSettings = DerivationSchemeSettings.Parse(pm.AccountDerivation, network);
@@ -347,11 +510,58 @@ public class StoreImportExportService
                         }
                     }
 
+                    // Import account key settings
+                    /*if (pm.AccountKeySettings != null && pm.AccountKeySettings.Count > 0)
+                    {
+                        foreach (var exportedKey in pm.AccountKeySettings)
+                        {
+                            if (string.IsNullOrEmpty(exportedKey.AccountKey)) continue;
+                            try
+                            {
+                                var accountKey = network.NBitcoinNetwork.Parse<BitcoinExtPubKey>(exportedKey.AccountKey);
+                                var accountSettings = strategy.AccountKeySettings.FirstOrDefault(a => a.AccountKey == accountKey);
+
+                                if (accountSettings != null)
+                                {
+                                    if (!string.IsNullOrEmpty(exportedKey.AccountKeyPath))
+                                    {
+                                        accountSettings.AccountKeyPath = KeyPath.Parse(exportedKey.AccountKeyPath);
+                                    }
+
+                                    if (!string.IsNullOrEmpty(exportedKey.RootFingerprint) &&
+                                        HDFingerprint.TryParse(exportedKey.RootFingerprint, out var fp))
+                                    {
+                                        accountSettings.RootFingerprint = fp;
+                                    }
+
+                                    _logger.LogInformation($"Imported account key settings for {exportedKey.AccountKey.Substring(0, 10)}... on {pm.PaymentMethodId}");
+                                }
+                                else
+                                {
+                                    _logger.LogWarning($"AccountKey {exportedKey.AccountKey.Substring(0, 10)}... not found in parsed derivation scheme for {pm.PaymentMethodId}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, $"Failed to import account key settings for {pm.PaymentMethodId}");
+                            }
+                        }
+                    }*/
+
+                    /*try
+                    {
+                        await wallet.TrackAsync(strategy.AccountDerivation);
+                    }
+                    catch (Exception) { continue; }*/
                     try
                     {
                         await wallet.TrackAsync(strategy.AccountDerivation);
                     }
-                    catch (Exception) { continue; }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"NBXplorer is unable to track derivation scheme for {pm.PaymentMethodId}");
+                        continue;
+                    }
 
                     destinationStore.SetPaymentMethodConfig(handler, strategy);
                     destinationStoreBlob.SetExcluded(paymentMethodId, false);
