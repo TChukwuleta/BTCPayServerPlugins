@@ -11,18 +11,12 @@ using System.Threading.Tasks;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
 using BTCPayServer.Data.Subscriptions;
-using BTCPayServer.Events;
 using BTCPayServer.Forms;
-using BTCPayServer.Payments;
 using BTCPayServer.Plugins.StoreBridge.ViewModels;
 using BTCPayServer.Plugins.Subscriptions;
 using BTCPayServer.Services.Apps;
-using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
-using BTCPayServer.Services.Wallets;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using NBitcoin;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.StoreBridge.Services;
@@ -30,14 +24,9 @@ namespace BTCPayServer.Plugins.StoreBridge.Services;
 public class StoreImportExportService
 {
     private readonly AppService _appService;
-    private readonly EventAggregator _eventAggregator;
     private readonly StoreRepository _storeRepository;
     private readonly FormDataService _formDataService;
-    private readonly BTCPayWalletProvider _walletProvider;
     private readonly ApplicationDbContextFactory _dbContext;
-    private readonly BTCPayNetworkProvider _networkProvider;
-    private readonly PaymentMethodHandlerDictionary _handlers;
-    private readonly ILogger<StoreImportExportService> _logger;
     private const string MAGIC_HEADER = "BTCPAY_STOREBRIDGE";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -47,16 +36,10 @@ public class StoreImportExportService
     };
 
     public StoreImportExportService(StoreRepository storeRepository, AppService appService, FormDataService formDataService, 
-        ILogger<StoreImportExportService> logger, BTCPayNetworkProvider networkProvider, PaymentMethodHandlerDictionary handlers,
-        EventAggregator eventAggregator, BTCPayWalletProvider walletProvider, ApplicationDbContextFactory dbContext)
+        ApplicationDbContextFactory dbContext)
     {
-        _logger = logger;
-        _handlers = handlers;
         _dbContext = dbContext;
         _appService = appService;
-        _walletProvider = walletProvider;
-        _eventAggregator = eventAggregator;
-        _networkProvider = networkProvider;
         _storeRepository = storeRepository;
         _formDataService = formDataService;
     }
