@@ -50,6 +50,7 @@ public class UIStoreBridgeController : Controller
     }
 
     [HttpPost("export")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ExportStorePost(string storeId, ExportViewModel vm)
     {
         if (CurrentStore == null) return NotFound();
@@ -84,6 +85,7 @@ public class UIStoreBridgeController : Controller
     public async Task<IActionResult> ImportStorePreview(ImportViewModel vm)
     {
         if (CurrentStore == null) return NotFound();
+
         if (vm.ImportFile == null || vm.ImportFile.Length == 0)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Please select a file to import";
@@ -186,7 +188,6 @@ public class UIStoreBridgeController : Controller
                 Id = t.Id,
                 Name = t.Name,
                 Description = t.Description,
-                Category = t.Category,
                 Tags = t.Tags?.Split(',').Select(tag => tag.Trim()).ToList() ?? new(),
                 UploadedBy = t.UploadedBy,
                 UploadedAt = t.UploadedAt,
@@ -210,7 +211,6 @@ public class UIStoreBridgeController : Controller
             Id = template.Id,
             Name = template.Name,
             Description = template.Description,
-            Category = template.Category,
             Tags = template.Tags?.Split(',').Select(tag => tag.Trim()).ToList() ?? new(),
             UploadedBy = template.UploadedBy,
             UploadedAt = template.UploadedAt,
@@ -227,6 +227,7 @@ public class UIStoreBridgeController : Controller
     }
 
     [HttpPost("templates/{id}/use")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> UseTemplate(string storeId, string id)
     {
         if (CurrentStore == null) return NotFound();

@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.StoreBridge.Data.Migrations
 {
     [DbContext(typeof(StoreBridgeDbContext))]
-    [Migration("20260129131758_initialMigration")]
+    [Migration("20260129151728_initialMigration")]
     partial class initialMigration
     {
         /// <inheritdoc />
@@ -29,11 +29,6 @@ namespace BTCPayServer.Plugins.StoreBridge.Data.Migrations
             modelBuilder.Entity("BTCPayServer.Plugins.StoreBridge.Data.TemplateData", b =>
                 {
                     b.Property<string>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Description")
@@ -51,9 +46,6 @@ namespace BTCPayServer.Plugins.StoreBridge.Data.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("StoreId")
                         .HasColumnType("text");
 
                     b.Property<string>("Tags")

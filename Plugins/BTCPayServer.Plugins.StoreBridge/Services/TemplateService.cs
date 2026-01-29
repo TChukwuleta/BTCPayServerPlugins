@@ -29,9 +29,9 @@ public class TemplateService
         var includedOptions = _bridgeService.GetAvailableImportOptions(vm.FileData);
         var template = new TemplateData
         {
+            Id = Guid.NewGuid().ToString(),
             Name = vm.Name,
             Description = vm.Description,
-            Category = vm.Category,
             Tags = vm.Tags,
             UploadedBy = vm.UploadedBy,
             UploadedAt = DateTimeOffset.UtcNow,
@@ -51,12 +51,11 @@ public class TemplateService
         return ctx.StoreBridgeTemplates.OrderByDescending(t => t.UploadedAt).ToList();
     }
 
-    public async Task<TemplateData?> GetTemplate(string id)
+    public async Task<TemplateData> GetTemplate(string id)
     {
         await using var ctx = _dbContextFactory.CreateContext();
         return ctx.StoreBridgeTemplates.FirstOrDefault(t => t.Id == id);
     }
-
 
     public async Task DeleteTemplate(string id)
     {
@@ -71,10 +70,11 @@ public class TemplateService
 
     public async Task IncrementDownloadCount(string id)
     {
-        var template = await GetTemplate(id);
+        await using var ctx = _dbContextFactory.CreateContext();
+        var template = await ctx.Set<TemplateData>().FindAsync(id);
+
         if (template != null)
         {
-            await using var ctx = _dbContextFactory.CreateContext();
             template.DownloadCount++;
             await ctx.SaveChangesAsync();
         }

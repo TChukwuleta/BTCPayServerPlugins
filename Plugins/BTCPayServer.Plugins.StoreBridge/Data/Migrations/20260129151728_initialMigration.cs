@@ -20,12 +20,10 @@ namespace BTCPayServer.Plugins.StoreBridge.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "text", nullable: false),
-                    StoreId = table.Column<string>(type: "text", nullable: true),
                     Description = table.Column<string>(type: "text", nullable: true),
                     Tags = table.Column<string>(type: "text", nullable: true),
                     Version = table.Column<string>(type: "text", nullable: true),
                     Name = table.Column<string>(type: "text", nullable: false),
-                    Category = table.Column<string>(type: "text", nullable: false),
                     UploadedBy = table.Column<string>(type: "text", nullable: false),
                     UploadedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     FileData = table.Column<byte[]>(type: "bytea", nullable: false),

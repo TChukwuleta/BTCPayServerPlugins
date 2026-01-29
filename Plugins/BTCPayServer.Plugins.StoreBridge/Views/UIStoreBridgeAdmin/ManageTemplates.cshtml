@@ -9,40 +9,49 @@
     var storeId = ScopeProvider.GetCurrentStoreId();
     ViewData.SetLayoutModel(new LayoutModel("StoreBridge-ManageTemplates", "Manage Store Bridge Templates") { ActiveCategory = "StoreBridge" });
 }
+
 <div class="sticky-header d-flex justify-content-between align-items-center">
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <a asp-action="UploadTemplate" asp-route-storeId="@storeId" class="btn btn-primary">Upload New Template</a>
 </div>
+
 <partial name="_StatusMessage" />
 
 @if (!Model.Templates.Any())
 {
-    <div class="alert alert-info">No templates uploaded yet. Upload templates to make them available to all users on this server</div>
+    <div class="alert alert-info">
+        No templates uploaded yet. Upload templates to make them available to all users on this server.
+    </div>
 }
 else
 {
     <div class="table-responsive">
-        <table class="table" style="table-layout: fixed; width: 100%;">
+        <table class="table table-hover">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th class="text-center" style="width: 120px;">Downloads</th>
-                    <th class="text-center" style="width: 100px;">Actions</th>
+                    <th style="width: 50%;">Name</th>
+                    <th class="text-center" style="width: 10%;">Downloads</th>
+                    <th class="text-end" style="width: 10%;">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var template in Model.Templates)
                 {
                     <tr>
-                        <td>
-                            <strong class="d-block">@template.Name</strong>
-                            <small class="text-muted d-block text-break">@template.Description</small>
+                        <td class="align-middle">
+                            <strong>@template.Name</strong>
+                            @if (!string.IsNullOrEmpty(template.Description))
+                            {
+                                <br />
+                                <small class="text-muted">@template.Description</small>
+                            }
                         </td>
-
-                        <td class="text-center align-middle">@template.DownloadCount</td>
                         <td class="text-center align-middle">
-                            <form method="post" asp-action="DeleteTemplate" asp-route-storeId="@storeId" asp-route-id="@template.Id" class="m-0">
-                                <button type="submit" class="btn btn-link link-danger p-0">Delete</button>
+                            @template.DownloadCount
+                        </td>
+                        <td class="text-end align-middle">
+                            <form method="post" asp-action="DeleteTemplate" asp-route-storeId="@storeId" asp-route-id="@template.Id" class="d-inline">
+                                <button type="submit" class="btn btn-link link-danger p-0 border-0">Delete</button>
                             </form>
                         </td>
                     </tr>

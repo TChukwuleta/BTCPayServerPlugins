@@ -10,7 +10,6 @@ public class TemplateDataViewModel
 {
     public string Name { get; set; }
     public string Description { get; set; }
-    public string Category { get; set; }
     public string Tags { get; set; }
     public string UploadedBy { get; set; }
     public byte[] FileData { get; set; }
@@ -26,7 +25,6 @@ public class TemplateViewModel
     public string Id { get; set; }
     public string Name { get; set; }
     public string Description { get; set; }
-    public string Category { get; set; }
     public List<string> Tags { get; set; } = new();
     public string UploadedBy { get; set; }
     public DateTimeOffset UploadedAt { get; set; }
@@ -39,7 +37,6 @@ public class TemplateDetailsViewModel
     public string Id { get; set; }
     public string Name { get; set; }
     public string Description { get; set; }
-    public string Category { get; set; }
     public List<string> Tags { get; set; } = new();
     public string UploadedBy { get; set; }
     public DateTimeOffset UploadedAt { get; set; }
@@ -65,12 +62,8 @@ public class UploadTemplateViewModel
     [Display(Name = "Template Name")]
     public string Name { get; set; }
 
-    [Display(Name = "Description")]
+    [StringLength(100, ErrorMessage = "Description cannot exceed 100 characters")]
     public string Description { get; set; }
-
-    [Required]
-    [Display(Name = "Category")]
-    public string Category { get; set; }
 
     [Display(Name = "Tags")]
     public string Tags { get; set; }
@@ -78,16 +71,4 @@ public class UploadTemplateViewModel
     [Required]
     [Display(Name = "Template File")]
     public IFormFile TemplateFile { get; set; }
-}
-
-public class ImportTemplateViewModel
-{
-    public string StoreId { get; set; }
-    public string StoreName { get; set; }
-    public string TemplateName { get; set; }
-    public string TemplateDescription { get; set; }
-    public string TemplateCategory { get; set; }
-    public List<string> Tags { get; set; } = new();
-    public List<string> AvailableOptions { get; set; } = new();
-    public string FileData { get; set; } // Base64 encoded
 }

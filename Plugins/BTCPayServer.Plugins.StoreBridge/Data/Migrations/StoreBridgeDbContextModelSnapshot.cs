@@ -26,11 +26,6 @@ namespace BTCPayServer.Plugins.StoreBridge.Data.Migrations
             modelBuilder.Entity("BTCPayServer.Plugins.StoreBridge.Data.TemplateData", b =>
                 {
                     b.Property<string>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Description")
@@ -48,9 +43,6 @@ namespace BTCPayServer.Plugins.StoreBridge.Data.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("StoreId")
                         .HasColumnType("text");
 
                     b.Property<string>("Tags")

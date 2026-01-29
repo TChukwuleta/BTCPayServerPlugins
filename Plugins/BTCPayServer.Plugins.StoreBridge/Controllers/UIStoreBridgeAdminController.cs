@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
@@ -48,6 +49,7 @@ public class UIStoreBridgeAdminController : Controller
     }
 
     [HttpPost("templates/upload")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> UploadTemplate(string storeId, UploadTemplateViewModel vm)
     {
         if (CurrentStore == null) return NotFound();
@@ -59,7 +61,7 @@ public class UIStoreBridgeAdminController : Controller
             ModelState.AddModelError(nameof(vm.TemplateFile), "Please select a template file");
             return View(vm);
         }
-        if (!vm.TemplateFile.FileName.EndsWith(".storebridge"))
+        if (!vm.TemplateFile.FileName.EndsWith(".storebridge", StringComparison.OrdinalIgnoreCase))
         {
             ModelState.AddModelError(nameof(vm.TemplateFile), "Invalid file format. Must be .storebridge");
             return View(vm);
@@ -73,7 +75,6 @@ public class UIStoreBridgeAdminController : Controller
         }
         var template = await _templateService.UploadTemplate(new TemplateDataViewModel
         {
-            Category = vm.Category,
             FileData = fileBytes,
             Description = vm.Description,
             Name = vm.Name,
@@ -89,7 +90,8 @@ public class UIStoreBridgeAdminController : Controller
         return RedirectToAction(nameof(ManageTemplates), new { storeId });
     }
 
-    [HttpPost("/templates/{id}/delete")]
+    [HttpPost("templates/{id}/delete")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteTemplate(string storeId, string id)
     {
         if (CurrentStore == null) return NotFound();
