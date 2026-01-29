@@ -1,6 +1,8 @@
+using System;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
+using BTCPayServer.Plugins.StoreBridge.Data;
 using BTCPayServer.Plugins.StoreBridge.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +18,20 @@ public class StoreBridgePlugin : BaseBTCPayServerPlugin
     public override void Execute(IServiceCollection services)
     {
         services.AddSingleton<IUIExtension>(new UIExtension("StoreBridgeNav", "header-nav"));
+        services.AddScoped<TemplateService>();
         services.AddScoped<StoreImportExportService>();
+        services.AddSingleton<StoreBridgeDbContextFactory>();
+        services.AddDbContext<StoreBridgeDbContext>((provider, o) =>
+        {
+            var factory = provider.GetRequiredService<StoreBridgeDbContextFactory>();
+            factory.ConfigureBuilder(o);
+        });
+        services.AddHostedService<PluginMigrationRunner>();
+        services.AddSession(options =>
+        {
+            options.IdleTimeout = TimeSpan.FromMinutes(30);
+            options.Cookie.HttpOnly = true;
+            options.Cookie.IsEssential = true;
+        });
     }
 }

@@ -44,7 +44,7 @@ public class StoreImportExportService
         _formDataService = formDataService;
     }
 
-    public async Task<StoreExportData> GetExportData(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
+    public async Task<StoreExportData> GetExportData(string sourceInstanceUrl, string userId, BTCPayServer.Data.StoreData store, List<string> selectedOptions)
     {
         var originalBlob = store.GetStoreBlob();
         var blob = DefaultStoreBlobSettings(originalBlob);
@@ -187,14 +187,14 @@ public class StoreImportExportService
         return exportData;
     }
 
-    public async Task<byte[]> ExportStore(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
+    public async Task<byte[]> ExportStore(string sourceInstanceUrl, string userId, BTCPayServer.Data.StoreData store, List<string> selectedOptions)
     {
         var exportData = await GetExportData(sourceInstanceUrl, userId, store, selectedOptions);
         var encryptedData = CreateExport(exportData, store.Id);
         return encryptedData;
     }
 
-    public async Task<(bool Success, string Message)> ImportStore(Data.StoreData destinationStore, byte[] encryptedData,
+    public async Task<(bool Success, string Message)> ImportStore(BTCPayServer.Data.StoreData destinationStore, byte[] encryptedData,
     string userId, List<string> userSelectedOptions = null)
     {
         try
@@ -453,7 +453,7 @@ public class StoreImportExportService
         catch (Exception){ return null; }
     }
 
-    public List<string> GetAvailableImportOptions(byte[] encryptedData, string storeId)
+    public List<string> GetAvailableImportOptions(byte[] encryptedData)
     {
         try
         {

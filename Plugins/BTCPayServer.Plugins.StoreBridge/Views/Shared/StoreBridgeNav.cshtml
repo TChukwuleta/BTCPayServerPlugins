@@ -1,9 +1,14 @@
 @using BTCPayServer.Abstractions.Contracts
 @using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Client
+@using BTCPayServer.Security
+@using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Mvc.TagHelpers
 @inject IScopeProvider ScopeProvider
+@inject IAuthorizationService AuthorizationService
 @{
     var storeId = ScopeProvider.GetCurrentStoreId();
+    var isServerAdmin = (await AuthorizationService.AuthorizeAsync(User, null, new PolicyRequirement(Policies.CanModifyServerSettings))).Succeeded;
 }
 
 @if (!string.IsNullOrEmpty(storeId))
@@ -28,4 +33,15 @@
         <a layout-menu-item="StoreBridge-Import" asp-controller="UIStoreBridge" asp-action="ImportStore" asp-route-storeId="@storeId"
            text-translate="true">Import Store Config</a>
     </li>
+    <li class="nav-item nav-item-sub">
+        <a layout-menu-item="StoreBridge-Template" asp-controller="UIStoreBridge" asp-action="TemplateGallery" asp-route-storeId="@storeId"
+           text-translate="true">Template Gallery</a>
+    </li>
+    @if (isServerAdmin)
+    {
+        <li class="nav-item nav-item-sub">
+            <a layout-menu-item="StoreBridge-ManageTemplates" asp-controller="UIStoreBridgeAdmin" asp-action="ManageTemplates" asp-route-storeId="@storeId"
+               text-translate="true">Manage Templates</a>
+        </li>
+    }
 }

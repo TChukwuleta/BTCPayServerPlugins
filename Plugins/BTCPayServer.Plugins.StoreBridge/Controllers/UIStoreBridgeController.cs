@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,6 +13,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.StoreBridge;
 
@@ -19,15 +21,17 @@ namespace BTCPayServer.Plugins.StoreBridge;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIStoreBridgeController : Controller
 {
+    private readonly TemplateService _templateService;
     private readonly StoreRepository _storeRepository;
     private readonly StoreImportExportService _service;
     private readonly UserManager<ApplicationUser> _userManager;
     public UIStoreBridgeController(StoreImportExportService service,UserManager<ApplicationUser> userManager,
-        StoreRepository storeRepository)
+        StoreRepository storeRepository, TemplateService templateService)
     {
         _service = service;
         _userManager = userManager;
         _storeRepository = storeRepository;
+        _templateService = templateService;
     }
     private StoreData CurrentStore => HttpContext.GetStoreData();
     private string GetBaseUrl() => $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
@@ -169,6 +173,80 @@ public class UIStoreBridgeController : Controller
         }
     }
 
+    [HttpGet("templates")]
+    public async Task<IActionResult> TemplateGallery(string storeId)
+    {
+        if (CurrentStore == null) return NotFound();
+
+        var templates = await _templateService.GetAllTemplates();
+        var vm = new TemplateGalleryViewModel
+        {
+            Templates = templates.Select(t => new TemplateViewModel
+            {
+                Id = t.Id,
+                Name = t.Name,
+                Description = t.Description,
+                Category = t.Category,
+                Tags = t.Tags?.Split(',').Select(tag => tag.Trim()).ToList() ?? new(),
+                UploadedBy = t.UploadedBy,
+                UploadedAt = t.UploadedAt,
+                DownloadCount = t.DownloadCount,
+                IncludedOptions = JsonConvert.DeserializeObject<List<string>>(t.IncludedOptions ?? "[]")
+            }).ToList()
+        };
+        return View(vm);
+    }
+
+    [HttpGet("templates/{id}")]
+    public async Task<IActionResult> TemplateDetails(string storeId, string id)
+    {
+        if (CurrentStore == null) return NotFound();
+
+        var template = await _templateService.GetTemplate(id);
+        if (template == null) return NotFound();
+
+        var vm = new TemplateDetailsViewModel
+        {
+            Id = template.Id,
+            Name = template.Name,
+            Description = template.Description,
+            Category = template.Category,
+            Tags = template.Tags?.Split(',').Select(tag => tag.Trim()).ToList() ?? new(),
+            UploadedBy = template.UploadedBy,
+            UploadedAt = template.UploadedAt,
+            DownloadCount = template.DownloadCount,
+            IncludedOptions = JsonConvert.DeserializeObject<List<string>>(template.IncludedOptions ?? "[]")
+                .Select(opt => new IncludedOptionViewModel
+                {
+                    Key = opt,
+                    Title = ImportViewModel.OptionMetadata[opt].Title,
+                    Description = ImportViewModel.OptionMetadata[opt].Description
+                }).ToList()
+        };
+        return View(vm);
+    }
+
+    [HttpPost("templates/{id}/use")]
+    public async Task<IActionResult> UseTemplate(string storeId, string id)
+    {
+        if (CurrentStore == null) return NotFound();
+
+        var template = await _templateService.GetTemplate(id);
+        if (template == null) return NotFound();
+
+        await _templateService.IncrementDownloadCount(id);
+
+        var getPreview = GetImportPreview(template.FileData);
+        if (!string.IsNullOrEmpty(getPreview.errorMessage))
+        {
+            TempData[WellKnownTempData.ErrorMessage] = getPreview.errorMessage;
+            return RedirectToAction(nameof(ImportStore), new { storeId = CurrentStore.Id });
+        }
+        TempData["ImportFileData"] = Convert.ToBase64String(template.FileData);
+        TempData[WellKnownTempData.SuccessMessage] = "Export file validated successfully. Review and select what to import";
+        return View(nameof(ImportStore), getPreview.model);
+    }
+
     private (string errorMessage, ImportViewModel model) GetImportPreview(byte[] fileBytes, ImportViewModel vm = null)
     {
         StoreExportData exportData = _service.GetExportPreview(fileBytes);
@@ -180,7 +258,7 @@ public class UIStoreBridgeController : Controller
         {
             return ("Cannot import store configuration into the same store", null);
         }
-        var availableOptions = _service.GetAvailableImportOptions(fileBytes, CurrentStore.Id);
+        var availableOptions = _service.GetAvailableImportOptions(fileBytes);
         if (!availableOptions.Any())
         {
             return ("The export file contains no importable data", null);

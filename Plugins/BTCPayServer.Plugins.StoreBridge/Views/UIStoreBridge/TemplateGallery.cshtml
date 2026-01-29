@@ -1,0 +1,141 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.StoreBridge.ViewModels
+@inject IScopeProvider ScopeProvider
+@model TemplateGalleryViewModel
+@{
+    Layout = "_Layout";
+    var storeId = ScopeProvider.GetCurrentStoreId();
+    ViewData.SetLayoutModel(new LayoutModel("StoreBridge-Template", "Template Gallery") { ActiveCategory = "StoreBridge" });
+}
+
+<div class="sticky-header d-flex justify-content-between align-items-center">
+    <h2>@ViewData["Title"]</h2>
+</div>
+
+<partial name="_StatusMessage" />
+
+<div class="container">
+    
+    <p class="lead">Pre-configured stores ready to import into your store</p>
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <input type="text" id="searchTemplates" class="form-control" placeholder="Search templates..." />
+        </div>
+    </div>
+    
+    @if (!Model.Templates.Any())
+    {
+        <div class="alert alert-info">
+            <i class="fa fa-info-circle"></i>
+            No templates available yet. Server administrators can upload templates.
+        </div>
+    }
+    else
+    {
+        <div class="row" id="templateGrid">
+            @foreach (var template in Model.Templates)
+            {
+                <div class="col-md-4 mb-4 template-card" data-category="@template.Category">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">@template.Name</h5>
+                            <p class="text-muted small mb-2">
+                                <span class="badge bg-secondary">@template.Category</span>
+                            </p>
+                            <p class="card-text">@template.Description</p>
+                            
+                            @if (template.Tags.Any())
+                            {
+                                <div class="mb-2">
+                                    @foreach (var tag in template.Tags)
+                                    {
+                                        <span class="badge bg-light text-dark">@tag</span>
+                                    }
+                                </div>
+                            }
+                            
+                            <small class="text-muted">
+                                <i class="fa fa-download"></i> @template.DownloadCount uses
+                            </small>
+                        </div>
+                        <div class="card-footer">
+                            <a asp-action="TemplateDetails" asp-route-id="@template.Id" class="btn btn-sm btn-outline-primary">
+                                <i class="fa fa-eye"></i> Details
+                            </a>
+                            
+                            @if (User.Identity.IsAuthenticated)
+                            {
+                                <button type="button" class="btn btn-sm btn-primary" 
+                                        onclick="selectStore('@template.Id')">
+                                    <i class="fa fa-download"></i> Use Template
+                                </button>
+                            }
+                            else
+                            {
+                                <a asp-controller="UIAccount" asp-action="Login" class="btn btn-sm btn-primary">
+                                    Login to Use
+                                </a>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@* Store Selection Modal *@
+<div class="modal fade" id="storeSelectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Store</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Select which store to import this template into:</p>
+                <form id="useTemplateForm" method="post">
+                    <input type="hidden" id="templateId" name="id" />
+                    <div class="form-group">
+                        <select name="storeId" class="form-control" required>
+                            <option value="">-- Select Store --</option>
+                            @* Populate with user's stores *@
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-3">Import Template</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section PageFootContent {
+    <script>
+        function selectStore(templateId) {
+            document.getElementById('templateId').value = templateId;
+            document.getElementById('useTemplateForm').action = `/plugins/storebridge/templates/${templateId}/use`;
+            new bootstrap.Modal(document.getElementById('storeSelectModal')).show();
+        }
+        
+        // Search and filter logic
+        document.getElementById('searchTemplates').addEventListener('input', filterTemplates);
+        document.getElementById('filterCategory').addEventListener('change', filterTemplates);
+        
+        function filterTemplates() {
+            const search = document.getElementById('searchTemplates').value.toLowerCase();
+            const category = document.getElementById('filterCategory').value;
+            
+            document.querySelectorAll('.template-card').forEach(card => {
+                const text = card.textContent.toLowerCase();
+                const cardCategory = card.dataset.category;
+                
+                const matchesSearch = text.includes(search);
+                const matchesCategory = !category || cardCategory === category;
+                
+                card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
+            });
+        }
+    </script>
+}
