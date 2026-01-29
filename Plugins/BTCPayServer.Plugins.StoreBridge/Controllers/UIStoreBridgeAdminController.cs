@@ -83,7 +83,7 @@ public class UIStoreBridgeAdminController : Controller
         });
         if (!template.success)
         {
-            TempData[WellKnownTempData.ErrorMessage] = $"An error occured while uploading template. {template.message}";
+            TempData[WellKnownTempData.ErrorMessage] = $"An error occurred while uploading template. {template.message}";
             return RedirectToAction(nameof(UploadTemplate), new { storeId });
         }
         TempData[WellKnownTempData.SuccessMessage] = "Template uploaded successfully";

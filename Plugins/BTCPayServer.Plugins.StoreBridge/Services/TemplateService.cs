@@ -59,10 +59,10 @@ public class TemplateService
 
     public async Task DeleteTemplate(string id)
     {
-        var template = await GetTemplate(id);
+        await using var ctx = _dbContextFactory.CreateContext();
+        var template = await ctx.Set<TemplateData>().FindAsync(id);
         if (template != null)
         {
-            await using var ctx = _dbContextFactory.CreateContext();
             ctx.StoreBridgeTemplates.Remove(template);
             await ctx.SaveChangesAsync();
         }
@@ -72,7 +72,6 @@ public class TemplateService
     {
         await using var ctx = _dbContextFactory.CreateContext();
         var template = await ctx.Set<TemplateData>().FindAsync(id);
-
         if (template != null)
         {
             template.DownloadCount++;
