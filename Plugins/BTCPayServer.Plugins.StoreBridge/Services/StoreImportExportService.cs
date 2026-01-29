@@ -10,10 +10,13 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
+using BTCPayServer.Data.Subscriptions;
 using BTCPayServer.Forms;
 using BTCPayServer.Plugins.StoreBridge.ViewModels;
+using BTCPayServer.Plugins.Subscriptions;
 using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Stores;
+using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.StoreBridge.Services;
@@ -23,6 +26,7 @@ public class StoreImportExportService
     private readonly AppService _appService;
     private readonly StoreRepository _storeRepository;
     private readonly FormDataService _formDataService;
+    private readonly ApplicationDbContextFactory _dbContext;
     private const string MAGIC_HEADER = "BTCPAY_STOREBRIDGE";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -31,15 +35,16 @@ public class StoreImportExportService
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
-    public StoreImportExportService(StoreRepository storeRepository, AppService appService, 
-        FormDataService formDataService)
+    public StoreImportExportService(StoreRepository storeRepository, AppService appService, FormDataService formDataService, 
+        ApplicationDbContextFactory dbContext)
     {
+        _dbContext = dbContext;
         _appService = appService;
         _storeRepository = storeRepository;
         _formDataService = formDataService;
     }
 
-    public async Task<StoreExportData> GetExportDataPreview(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
+    public async Task<StoreExportData> GetExportData(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
     {
         var originalBlob = store.GetStoreBlob();
         var blob = DefaultStoreBlobSettings(originalBlob);
@@ -93,6 +98,52 @@ public class StoreImportExportService
             blob.AutoDetectLanguage = originalBlob.AutoDetectLanguage;
             blob.DefaultLang = originalBlob.DefaultLang;
         }
+        if (selectedOptions.Contains("Subscriptions"))
+        {
+            var offerings = new List<SubscriptionOfferingExportData>();
+            await using var ctx = _dbContext.CreateContext();
+            var offeringDataList = await ctx.Offerings.Include(o => o.App).Include(o => o.Features).Include(o => o.Plans)
+                .Where(o => o.App.StoreDataId == store.Id).ToListAsync();
+
+            foreach (var offering in offeringDataList)
+            {
+                var offeringExport = new SubscriptionOfferingExportData
+                {
+                    AppName = offering.App.Name,
+                    SuccessRedirectUrl = offering.SuccessRedirectUrl,
+                    DefaultPaymentRemindersDays = offering.DefaultPaymentRemindersDays,
+                    Metadata = offering.Metadata,
+                    Features = offering.Features?
+                        .Select(f => new OfferingFeatureData
+                        {
+                            CustomId = f.CustomId,
+                            Description = f.Description
+                        }).ToList(),
+                    Plans = new List<SubscriptionPlanExportData>()
+                };
+                await ctx.Plans.FetchPlanFeaturesAsync(offering.Plans.ToArray());
+                foreach (var plan in offering.Plans)
+                {
+                    var planExport = new SubscriptionPlanExportData
+                    {
+                        Name = plan.Name,
+                        Description = plan.Description,
+                        Price = plan.Price,
+                        Currency = plan.Currency,
+                        RecurringType = plan.RecurringType.ToString(),
+                        TrialDays = plan.TrialDays,
+                        GracePeriodDays = plan.GracePeriodDays,
+                        OptimisticActivation = plan.OptimisticActivation,
+                        Renewable = plan.Renewable,
+                        Metadata = plan.Metadata,
+                        FeatureIds = plan.PlanFeatures?.Select(f => f.Feature.CustomId).ToList()
+                    };
+                    offeringExport.Plans.Add(planExport);
+                }
+                offerings.Add(offeringExport);
+            }
+            exportData.SubscriptionOfferings = offerings;
+        }
         if (selectedOptions.Contains("Webhooks"))
         {
             var webhooks = await _storeRepository.GetWebhooks(store.Id);
@@ -138,7 +189,7 @@ public class StoreImportExportService
 
     public async Task<byte[]> ExportStore(string sourceInstanceUrl, string userId, Data.StoreData store, List<string> selectedOptions)
     {
-        var exportData = await GetExportDataPreview(sourceInstanceUrl, userId, store, selectedOptions);
+        var exportData = await GetExportData(sourceInstanceUrl, userId, store, selectedOptions);
         var encryptedData = CreateExport(exportData, store.Id);
         return encryptedData;
     }
@@ -151,6 +202,7 @@ public class StoreImportExportService
             bool storeModified = false;
             var destinationStoreBlob = destinationStore.GetStoreBlob();
             var exportData = ParseExport(encryptedData);
+
             // In the future... factory method based on versions..
 
             var exportedOptions = !string.IsNullOrEmpty(exportData.SelectedOptions)
@@ -214,6 +266,87 @@ public class StoreImportExportService
                 }
             }
 
+            if (optionsToImport.Contains("Subscriptions") && exportData.SubscriptionOfferings?.Any() == true)
+            {
+                await using var ctx = _dbContext.CreateContext();
+                foreach (var offeringExport in exportData.SubscriptionOfferings)
+                {
+                    try
+                    {
+                        var offering = await _appService.CreateOffering(destinationStore.Id, offeringExport.AppName);
+                        var offeringData = await ctx.Offerings.Include(o => o.Features).Include(o => o.Plans)
+                            .FirstOrDefaultAsync(o => o.Id == offering.OfferingId);
+
+                        if (offeringData == null) continue;
+
+                        offeringData.SuccessRedirectUrl = offeringExport.SuccessRedirectUrl;
+                        offeringData.Metadata = offeringExport.Metadata;
+                        offeringData.DefaultPaymentRemindersDays = offeringExport.DefaultPaymentRemindersDays;
+                        await ctx.SaveChangesAsync();
+
+                        if (offeringExport.Features != null && offeringExport.Features.Any())
+                        {
+                            foreach (var featureExport in offeringExport.Features)
+                            {
+                                var feature = new FeatureData
+                                {
+                                    OfferingId = offeringData.Id,
+                                    CustomId = featureExport.CustomId,
+                                    Description = featureExport.Description
+                                };
+                                ctx.Features.Add(feature);
+                            }
+                            await ctx.SaveChangesAsync();
+                        }
+
+                        await ctx.Entry(offeringData).Collection(o => o.Features).LoadAsync();
+
+                        if (offeringExport.Plans != null && offeringExport.Plans.Any())
+                        {
+                            foreach (var planExport in offeringExport.Plans)
+                            {
+                                var planData = new PlanData
+                                {
+                                    OfferingId = offeringData.Id,
+                                    Name = planExport.Name,
+                                    Description = planExport.Description,
+                                    Price = planExport.Price,
+                                    Currency = planExport.Currency,
+                                    RecurringType = Enum.Parse<PlanData.RecurringInterval>(planExport.RecurringType),
+                                    Status = Enum.Parse<PlanData.PlanStatus>(planExport.Status ?? "Active"),
+                                    TrialDays = planExport.TrialDays,
+                                    GracePeriodDays = planExport.GracePeriodDays,
+                                    OptimisticActivation = planExport.OptimisticActivation,
+                                    Renewable = planExport.Renewable,
+                                    Metadata = planExport.Metadata,
+                                    MemberCount = 0,
+                                    MonthlyRevenue = 0m
+                                };
+                                ctx.Plans.Add(planData);
+                                await ctx.SaveChangesAsync();
+
+                                if (planExport.FeatureIds != null && planExport.FeatureIds.Any())
+                                {
+                                    foreach (var featureCustomId in planExport.FeatureIds)
+                                    {
+                                        var feature = offeringData.Features.FirstOrDefault(f => f.CustomId == featureCustomId);
+                                        if (feature != null)
+                                        {
+                                            ctx.PlanFeatures.Add(new PlanFeatureData
+                                            {
+                                                PlanId = planData.Id,
+                                                FeatureId = feature.Id
+                                            });
+                                        }
+                                    }
+                                    await ctx.SaveChangesAsync();
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception){ continue; }
+                }
+            }
             if (optionsToImport.Contains("Webhooks") && exportData.Webhooks?.Any() == true)
             {
                 foreach (var webhookExport in exportData.Webhooks.Where(c => !string.IsNullOrEmpty(c.BlobJson)))

@@ -45,6 +45,7 @@ You can go ahead and import all settings, or select specific configuration you w
 5. Webhook: All existing webhook configuration
 6. Forms: All created custom forms. 
 7. Roles and Permission: All roles together with their corresponding permissions
+8. Subscription offerings, plans, and features
 
 
 ## Roadmap

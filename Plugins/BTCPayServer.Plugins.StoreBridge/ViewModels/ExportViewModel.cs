@@ -14,7 +14,8 @@ public class ExportViewModel
         "CheckoutSettings",
         "Webhooks",
         "Roles",
-        "Forms"
+        "Forms",
+        "Subscriptions"
     };
     public bool IsSelected(string option) => SelectedOptions?.Contains(option) ?? false;
 
@@ -26,6 +27,7 @@ public class ExportViewModel
         ["CheckoutSettings"] = ("Checkout Settings", "Payment UI, language, timers, and user experience options"),
         ["Webhooks"] = ("Webhooks", "Webhook configurations and endpoints"),
         ["Roles"] = ("Roles & Permissions", "Store roles and access permissions"),
-        ["Forms"] = ("Forms", "Custom forms and their configurations")
+        ["Forms"] = ("Forms", "Custom forms and their configurations"),
+        ["Subscriptions"] = ("Subscription Offerings & Plans", "Subscription offerings, plans, and features")
     };
 }
