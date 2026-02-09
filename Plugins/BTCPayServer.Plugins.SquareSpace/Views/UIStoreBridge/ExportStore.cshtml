@@ -1,0 +1,42 @@
+@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.StoreBridge.ViewModels
+@inject IScopeProvider ScopeProvider
+@model ExportViewModel
+@{
+    Layout = "_Layout";
+    var storeId = ScopeProvider.GetCurrentStoreId();
+    ViewData.SetLayoutModel(new LayoutModel("StoreBridge-Export", "Store Bridge - Export") { ActiveCategory = "StoreBridge" });
+}
+<div class="sticky-header">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <button type="submit" form="exportForm" class="btn btn-primary">Export Store</button>
+    </div>
+</div>
+<partial name="_StatusMessage" />
+<form method="post" asp-action="ExportStorePost" asp-route-storeId="@storeId" id="exportForm">
+    <input type="hidden" asp-for="StoreId" />
+    <p class="mb-4" style="font-size: 1.1rem;">Export store configuration for this store. Toggle off any items you don't want to include</p>
+    <div class="mb-4">
+        @foreach (var option in ExportViewModel.AllOptions)
+        {
+            var metadata = ExportViewModel.OptionMetadata[option];
+            var isChecked = Model.IsSelected(option);
+            <div class="form-group d-flex align-items-center mb-3" style="padding: 0.5rem 0;">
+                <input type="checkbox"
+                       name="SelectedOptions"
+                       value="@option"
+                       id="export@option"
+                       checked="@isChecked"
+                       class="btcpay-toggle me-3"
+                       style="transform: scale(1.15);" />
+                <label for="export@option" class="mb-0" style="font-size: 1.05rem;">
+                    <strong style="font-size: 1.1rem;">@metadata.Title</strong>
+                    <small class="d-block text-muted" style="font-size: 0.95rem; margin-top: 0.2rem;">@metadata.Description</small>
+                </label>
+            </div>
+        }
+    </div>
+</form>
