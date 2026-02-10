@@ -54,7 +54,7 @@ public class UISquarespacePublicController : Controller
         string jsVariables = $"var BTCPAYSERVER_URL = '{Request.GetAbsoluteRoot()}'; var BTCPAYSERVER_STORE_ID = '{store.Id}'; var STORE_CURRENCY = '{storeBlob.DefaultCurrency}';";
         combinedJavascript.Insert(0, jsVariables + Environment.NewLine);
         var jsFile = combinedJavascript.ToString();
-        return Content(jsFile, "text/javascript");
+        return Content(jsFile, "application/javascript; charset=utf-8");
     }
 
     [HttpPost("webhook")]

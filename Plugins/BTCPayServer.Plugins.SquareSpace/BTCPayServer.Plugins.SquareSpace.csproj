@@ -48,7 +48,10 @@
 	<ProjectReference Include="..\..\btcpayserver\BTCPayServer\BTCPayServer.csproj" />
   </ItemGroup>
 
-	
+    <ItemGroup>
+	    <EmbeddedResource Include="Resources\js\*.js" />
+    </ItemGroup>
+
   <ItemGroup>
     <Folder Include="Resources\" />
   </ItemGroup>

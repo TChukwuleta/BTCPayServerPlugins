@@ -40,7 +40,7 @@ public class UISquarespaceController : Controller
         var squareSpaceSettings = ctx.SquareSpaceSettings.FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new();
         var vm = squareSpaceSettings.SquareSpaceSettingsToViewModel();
         vm.CodeInjectionUrl = Url.Action(nameof(UISquarespacePublicController.GetBtcPayJavascript), "UISquarespacePublic", new { storeId }, Request.Scheme);
-        return View(squareSpaceSettings.SquareSpaceSettingsToViewModel());
+        return View(vm);
     }
 
     [HttpPost("settings/update")]

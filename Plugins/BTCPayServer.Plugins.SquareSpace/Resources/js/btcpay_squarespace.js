@@ -1,69 +1,82 @@
+(function () {
+    console.log("[BTCPay][Init] Script loaded");
 
-(function() {
-  // Only run on checkout page
-  // if (!window.location.pathname.includes("/checkout")) return;
-
-    // Avoid double injection
     if (window.__btcpay_injected) return;
     window.__btcpay_injected = true;
 
-  document.addEventListener("DOMContentLoaded", () => {
-    // Locate the checkout confirm button
-    const confirmBtn = document.querySelector('button[type="submit"]');
+    function injectButton() {
+        const checkoutContainer = document.querySelector('.cart-checkout');
+        if (!checkoutContainer) return;
 
-    if (!confirmBtn) return;
+        if (document.querySelector("#btcpay-bitcoin-btn")) return; 
 
-    // Create Pay with Bitcoin button
-    const btcBtn = document.createElement("button");
-    btcBtn.innerText = "Pay with Bitcoin";
-    btcBtn.style.background = "#f7931a";
-    btcBtn.style.color = "#fff";
-    btcBtn.style.padding = "10px 20px";
-    btcBtn.style.marginLeft = "10px";
-    btcBtn.style.border = "none";
-    btcBtn.style.borderRadius = "4px";
-    btcBtn.style.cursor = "pointer";
+        const btcBtn = document.createElement("button");
+        btcBtn.type = "button";
+        btcBtn.id = "btcpay-bitcoin-btn";
 
-    // Insert next to confirm button
-    confirmBtn.parentNode.insertBefore(btcBtn, confirmBtn.nextSibling);
-
-    // Click handler
-    btcBtn.onclick = async (e) => {
-        e.preventDefault();
-
-    // Scrape cart details
-    const cartItems = [];
-      document.querySelectorAll('.sqs-cart-item').forEach(item => {
-        const name = item.querySelector('.sqs-cart-item-title')?.innerText || 'Unknown';
-    const qty = parseInt(item.querySelector('.sqs-cart-item-quantity')?.innerText || '1', 10);
-    const price = parseFloat(item.querySelector('.sqs-cart-item-price')?.innerText.replace(/[^0-9.]/g, '') || '0');
-    cartItems.push({name, qty, price});
-      });
-
-    const totalAmount = parseFloat(document.querySelector('.sqs-cart-total .sqs-money')?.innerText.replace(/[^0-9.]/g, '') || '0');
-
-    // Send to backend to create BTCPay invoice
-    try {
-        const response = await fetch("https://yourserver.com/create-invoice", {
-        method: "POST",
-    headers: {"Content-Type": "application/json" },
-    body: JSON.stringify({
-        items: cartItems,
-    total: totalAmount,
-    currency: "USD",  // optional: dynamically detect
-    checkoutUrl: window.location.href
-          })
-        });
-    const data = await response.json();
-    if (data.invoiceUrl) {
-        window.location.href = data.invoiceUrl;
-        } else {
-        alert("Failed to create Bitcoin invoice.");
+        const checkoutBtn = checkoutContainer.querySelector('a, button');
+        if (checkoutBtn) {
+            const styles = window.getComputedStyle(checkoutBtn);
+            btcBtn.style.background = "#51B13E";
+            btcBtn.style.color = "#FFFFFF";
+            btcBtn.style.fontSize = styles.fontSize;
+            btcBtn.style.fontWeight = styles.fontWeight;
+            btcBtn.style.fontFamily = styles.fontFamily;
+            btcBtn.style.padding = styles.padding;
+            btcBtn.style.borderRadius = styles.borderRadius;
+            btcBtn.style.border = styles.border;
+            btcBtn.style.width = "100%";
+            btcBtn.style.cursor = "pointer";
+            btcBtn.style.textAlign = "center";
+            btcBtn.style.marginBottom = "12px";
         }
-      } catch (err) {
-        console.error(err);
-    alert("Error connecting to Bitcoin payment.");
-      }
-    };
-  });
+        btcBtn.innerText = "Pay with BTCPay";
+
+        checkoutContainer.prepend(btcBtn);
+
+        btcBtn.addEventListener("click", async (e) => {
+            e.preventDefault();
+            btcBtn.innerText = "Loading...";
+            btcBtn.disabled = true;
+
+            console.log("[BTCPay][Click] BTCPay button clicked");
+
+            const cartScript = document.querySelector('#sqs-cart-root > script[type="application/json"]');
+            if (!cartScript) {
+                alert("Unable to read cart data");
+                btcBtn.innerText = "Pay with BTCPay";
+                btcBtn.disabled = false;
+                return;
+            }
+
+            const cartData = JSON.parse(cartScript.innerText).cart;
+            console.log("[BTCPay][Cart]", cartData);
+
+            // TODO: send cartData to backend to create BTCPay invoice
+            // Example: fetch('/create-invoice', { method: 'POST', body: JSON.stringify(cartData) })
+
+            // Reset button after request (for testing)
+            setTimeout(() => {
+                btcBtn.innerText = "Pay with BTCPay";
+                btcBtn.disabled = false;
+            }, 3000);
+        });
+
+        console.log("[BTCPay][UI] BTCPay button injected");
+    }
+
+    function waitForBody(callback) {
+        if (document.body) {
+            callback();
+        } else {
+            document.addEventListener("DOMContentLoaded", () => callback());
+        }
+    }
+
+    waitForBody(() => {
+        const observer = new MutationObserver(() => injectButton());
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        injectButton();
+    });
 })();
