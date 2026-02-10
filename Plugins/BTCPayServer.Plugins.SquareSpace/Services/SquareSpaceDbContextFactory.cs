@@ -1,13 +1,13 @@
 ﻿using System;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
-using BTCPayServer.Plugins.StoreBridge.Data;
+using BTCPayServer.Plugins.SquareSpace.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Options;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 
-namespace BTCPayServer.Plugins.StoreBridge.Services;
+namespace BTCPayServer.Plugins.SquareSpace.Services;
 
 public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<SquareSpaceDbContext>
 {
@@ -25,7 +25,7 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<SquareSpac
 
 public class SquareSpaceDbContextFactory : BaseDbContextFactory<SquareSpaceDbContext>
 {
-    public SquareSpaceDbContextFactory(IOptions<DatabaseOptions> options) : base(options, "BTCPayServer.Plugins.StoreBridge")
+    public SquareSpaceDbContextFactory(IOptions<DatabaseOptions> options) : base(options, "BTCPayServer.Plugins.SquareSpace")
     {
     }
 

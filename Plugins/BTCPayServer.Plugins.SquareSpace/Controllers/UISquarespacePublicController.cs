@@ -1,84 +1,60 @@
+using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
+using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Client;
 using BTCPayServer.Data;
-using BTCPayServer.Plugins.SquareSpace.Helper;
 using BTCPayServer.Plugins.SquareSpace.Services;
 using BTCPayServer.Plugins.SquareSpace.ViewModels;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using static BTCPayServer.Plugins.Monetization.Views.SelectExistingOfferingModalViewModel;
 
 namespace BTCPayServer.Plugins.SquareSpace;
 
-[Route("~/plugins/{storeId}/squarespace/")]
+[AllowAnonymous]
+[Route("~/plugins/{storeId}/squarespace/public/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
-public class UISquarespaceController : Controller
+public class UISquarespacePublicController : Controller
 {
     private readonly StoreRepository _storeRepository;
     private readonly SquarespaceService _squarespaceService;
     private readonly SquareSpaceDbContextFactory _dbContextFactory;
-    public UISquarespaceController(SquareSpaceDbContextFactory dbContextFactory, StoreRepository storeRepository, 
+    public UISquarespacePublicController(SquareSpaceDbContextFactory dbContextFactory, StoreRepository storeRepository, 
         SquarespaceService squarespaceService)
     {
         _storeRepository = storeRepository;
         _dbContextFactory = dbContextFactory;
         _squarespaceService = squarespaceService;
     }
-    private StoreData CurrentStore => HttpContext.GetStoreData();
 
-    [HttpGet("settings")]
-    public async Task<IActionResult> Index(string storeId)
+    [HttpGet("btcpay-ghost.js")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> GetBtcPayJavascript(string storeId)
     {
-        if (CurrentStore == null) return NotFound();
+        var store = await _storeRepository.FindStore(storeId);
+        if (store == null) return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var squareSpaceSettings = ctx.SquareSpaceSettings.FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new();
-        var vm = squareSpaceSettings.SquareSpaceSettingsToViewModel();
-        vm.CodeInjectionUrl = Url.Action(nameof(UISquarespacePublicController.GetBtcPayJavascript), "UISquarespacePublic", new { storeId }, Request.Scheme);
-        return View(squareSpaceSettings.SquareSpaceSettingsToViewModel());
-    }
+        var settings = ctx.SquareSpaceSettings.FirstOrDefault(c => c.StoreId == store.Id);
 
-    [HttpPost("settings/update")]
-    public async Task<IActionResult> UpdateSettings(string storeId, SquarespaceSettingsVm vm)
-    {
-        if (CurrentStore == null) return NotFound();
 
-        if (!ModelState.IsValid) 
-            return View("/Views/UISquareSpace/Index.cshtml", vm);
 
-        await using var ctx = _dbContextFactory.CreateContext();
-        var squareSpaceSettings = ctx.SquareSpaceSettings.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+        var storeBlob = store.GetStoreBlob();
+        StringBuilder combinedJavascript = new StringBuilder();
+        var fileContent = _squarespaceService.GetEmbeddedResourceContent("Resources.js.btcpay_squarespace.js");
 
-        // If OAuth token or webhook endpoint changed, recreate webhook subscription
-        if (squareSpaceSettings == null || squareSpaceSettings.OAuthToken != vm.OAuthToken 
-            || squareSpaceSettings.WebhookEndpointUrl != vm.WebhookEndpointUrl)
-        {
-            if (!string.IsNullOrEmpty(squareSpaceSettings?.WebhookSubscriptionId) && !string.IsNullOrEmpty(squareSpaceSettings?.OAuthToken))
-            {
-                await _squarespaceService.DeleteWebhookSubscription(squareSpaceSettings.OAuthToken, squareSpaceSettings.WebhookSubscriptionId);
-            }
-
-            vm.WebhookEndpointUrl = Url.Action(nameof(UISquarespacePublicController.Webhook), "UISquarespacePublic", new { storeId }, Request.Scheme); // use nameOf
-
-            var createWebhookSubscription = await _squarespaceService.CreateWebhookSubscription(vm.OAuthToken, vm.WebhookEndpointUrl);
-            if (createWebhookSubscription  == null)
-            {
-                TempData[WellKnownTempData.ErrorMessage] = "Failed to create webhook";
-                return View("/Views/UISquareSpace/Index.cshtml", vm);
-            }
-            vm.WebhookSubscriptionId = createWebhookSubscription.SubscriptionId;
-            vm.WebhookSecret = createWebhookSubscription.Secret;
-            squareSpaceSettings = vm.SquareSpaceViewModelToSettings();
-        }
-        ctx.Update(squareSpaceSettings);
-        await ctx.SaveChangesAsync();
-        TempData[WellKnownTempData.SuccessMessage] = "Squarespace settings updated successfully";
-        return RedirectToAction(nameof(Index), new { storeId });
+        combinedJavascript.AppendLine(fileContent);
+        string jsVariables = $"var BTCPAYSERVER_URL = '{Request.GetAbsoluteRoot()}'; var BTCPAYSERVER_STORE_ID = '{store.Id}'; var STORE_CURRENCY = '{storeBlob.DefaultCurrency}';";
+        combinedJavascript.Insert(0, jsVariables + Environment.NewLine);
+        var jsFile = combinedJavascript.ToString();
+        return Content(jsFile, "text/javascript");
     }
 
     [HttpPost("webhook")]
@@ -89,7 +65,7 @@ public class UISquarespaceController : Controller
         if (store == null) return NotFound();
 
         await using var ctx = _dbContextFactory.CreateContext();
-        var settings = ctx.SquareSpaceSettings.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
+        var settings = ctx.SquareSpaceSettings.FirstOrDefault(c => c.StoreId == store.Id);
         if (settings == null || string.IsNullOrEmpty(settings.WebhookSecret))
             return BadRequest("Squarespace not configured");
 

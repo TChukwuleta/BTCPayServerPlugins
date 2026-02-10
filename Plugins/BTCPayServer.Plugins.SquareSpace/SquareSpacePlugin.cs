@@ -3,10 +3,10 @@ using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
 using BTCPayServer.Plugins.SquareSpace.Data;
-using BTCPayServer.Plugins.StoreBridge.Services;
+using BTCPayServer.Plugins.SquareSpace.Services;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace BTCPayServer.Plugins.StoreBridge;
+namespace BTCPayServer.Plugins.SquareSpace;
 
 public class SquareSpacePlugin : BaseBTCPayServerPlugin
 {
@@ -18,7 +18,7 @@ public class SquareSpacePlugin : BaseBTCPayServerPlugin
     public override void Execute(IServiceCollection services)
     {
         services.AddSingleton<IUIExtension>(new UIExtension("SquareSpaceNav", "header-nav"));
-        services.AddScoped<StoreImportExportService>();
+        services.AddScoped<SquarespaceService>();
         services.AddSingleton<SquareSpaceDbContextFactory>();
         services.AddDbContext<SquareSpaceDbContext>((provider, o) =>
         {

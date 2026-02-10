@@ -1,10 +1,12 @@
 ﻿using System;
+using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using BTCPayServer.Plugins.SquareSpace.Data;
 using BTCPayServer.Plugins.SquareSpace.ViewModels;
 using Newtonsoft.Json;
 
@@ -77,6 +79,33 @@ public class SquarespaceService
         catch (Exception) { return null; }
     }
 
+    public bool VerifyWebhookSignature(string payload, string signature, string secret)
+    {
+        try
+        {
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
+            var computedSignature = BitConverter.ToString(hash).Replace("-", "").ToLower();
+            return signature.Equals(computedSignature, StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
+
+    public string GetEmbeddedResourceContent(string resourceName)
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var fullResourceName = assembly.GetManifestResourceNames()
+                                       .FirstOrDefault(r => r.EndsWith(resourceName, StringComparison.OrdinalIgnoreCase));
+
+        if (fullResourceName == null)
+        {
+            throw new FileNotFoundException($"Resource '{resourceName}' not found in assembly.");
+        }
+        using var stream = assembly.GetManifestResourceStream(fullResourceName);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
     private HttpRequestMessage CreateRequest(HttpMethod method, string relativeUrl)
     {
         return new HttpRequestMessage(method, $"{BaseApiUrl}/{relativeUrl}");
@@ -89,17 +118,5 @@ public class SquarespaceService
         var response = await _httpClient.SendAsync(req);
         var responseContent = await response.Content.ReadAsStringAsync();
         return new GenericResponse { Message = responseContent, Success = response.IsSuccessStatusCode };
-    }
-
-    private bool VerifyWebhookSignature(string payload, string signature, string secret)
-    {
-        try
-        {
-            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
-            var computedSignature = BitConverter.ToString(hash).Replace("-", "").ToLower();
-            return signature.Equals(computedSignature, StringComparison.OrdinalIgnoreCase);
-        }
-        catch { return false; }
     }
 }

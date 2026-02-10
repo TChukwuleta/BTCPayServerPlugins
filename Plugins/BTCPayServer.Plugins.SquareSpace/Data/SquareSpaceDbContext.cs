@@ -14,6 +14,7 @@ public class SquareSpaceDbContext : DbContext
     }
 
     public DbSet<SquareSpaceOrder> SquareSpaceOrders { get; set; }
+    public DbSet<SquareSpaceSetting> SquareSpaceSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

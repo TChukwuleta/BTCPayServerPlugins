@@ -2,13 +2,9 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-namespace BTCPayServer.Plugins.SquareSpace.Data;
+namespace BTCPayServer.Plugins.SquareSpace.ViewModels;
 
-internal class SquarespaceModels
-{
-}
-
-public class SquarespaceSettings
+public class SquarespaceSettingsVm
 {
     [Required]
     [Display(Name = "Squarespace OAuth Token")]
@@ -20,6 +16,7 @@ public class SquarespaceSettings
 
     [Display(Name = "Webhook Endpoint URL")]
     public string WebhookEndpointUrl { get; set; }
+    public string CodeInjectionUrl { get; set; }
 
     [Display(Name = "Webhook Secret")]
     public string WebhookSecret { get; set; }
@@ -29,10 +26,6 @@ public class SquarespaceSettings
 
     [Display(Name = "Automatically Create Invoices")]
     public bool AutoCreateInvoices { get; set; } = true;
-
-    [Display(Name = "Invoice Expiration (minutes)")]
-    [Range(1, 1440)]
-    public int InvoiceExpirationMinutes { get; set; } = 15;
 
     [Display(Name = "Order Status After Payment")]
     public string OrderStatusAfterPayment { get; set; } = "FULFILLED";

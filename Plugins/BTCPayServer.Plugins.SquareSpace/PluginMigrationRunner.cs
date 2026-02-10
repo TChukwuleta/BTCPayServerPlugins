@@ -1,10 +1,10 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
-using BTCPayServer.Plugins.StoreBridge.Services;
+using BTCPayServer.Plugins.SquareSpace.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 
-namespace BTCPayServer.Plugins.StoreBridge;
+namespace BTCPayServer.Plugins.SquareSpace;
 
 public class PluginMigrationRunner : IHostedService
 {

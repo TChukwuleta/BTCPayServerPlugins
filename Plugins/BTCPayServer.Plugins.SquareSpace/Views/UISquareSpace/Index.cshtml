@@ -1,4 +1,5 @@
-@model BTCPayServer.Plugins.Squarespace.Models.SquarespaceSettings
+@using BTCPayServer.Plugins.SquareSpace.ViewModels
+@model SquarespaceSettingsVm
 @{
     ViewData["Title"] = "Squarespace Integration";
     Layout = "_Layout";
@@ -43,6 +44,12 @@
             </div>
 
             <div class="form-group">
+                <label asp-for="CodeInjectionUrl" class="form-label"></label>
+                <input asp-for="CodeInjectionUrl" class="form-control" />
+                <span asp-validation-for="CodeInjectionUrl" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
                 <label asp-for="WebhookEndpointUrl" class="form-label"></label>
                 <input asp-for="WebhookEndpointUrl" class="form-control" readonly />
                 <div class="form-text">
@@ -60,15 +67,6 @@
                 <label asp-for="AutoCreateInvoices" class="form-check-label"></label>
                 <div class="form-text">
                     Automatically create BTCPay invoices when new orders are placed on Squarespace.
-                </div>
-            </div>
-
-            <div class="form-group mt-3">
-                <label asp-for="InvoiceExpirationMinutes" class="form-label"></label>
-                <input asp-for="InvoiceExpirationMinutes" class="form-control" type="number" min="1" max="1440" />
-                <span asp-validation-for="InvoiceExpirationMinutes" class="text-danger"></span>
-                <div class="form-text">
-                    How long customers have to pay before the invoice expires (1-1440 minutes).
                 </div>
             </div>
 
@@ -158,7 +156,3 @@
         </div>
     </div>
 </div>
-
-@section Scripts {
-    <partial name="_ValidationScriptsPartial" />
-}
