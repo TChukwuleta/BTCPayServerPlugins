@@ -1,23 +1,23 @@
 ﻿using Microsoft.EntityFrameworkCore;
 
-namespace BTCPayServer.Plugins.StoreBridge.Data;
+namespace BTCPayServer.Plugins.SquareSpace.Data;
 
-public class StoreBridgeDbContext : DbContext
+public class SquareSpaceDbContext : DbContext
 {
     // dotnet ef migrations add initialMigration -o Data/Migrations
     private readonly bool _designTime;
 
-    public StoreBridgeDbContext(DbContextOptions<StoreBridgeDbContext> options, bool designTime = false)
+    public SquareSpaceDbContext(DbContextOptions<SquareSpaceDbContext> options, bool designTime = false)
         : base(options)
     {
         _designTime = designTime;
     }
 
-    public DbSet<TemplateData> StoreBridgeTemplates { get; set; }
+    public DbSet<SquareSpaceOrder> SquareSpaceOrders { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.StoreBridge");
+        modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.SquareSpace");
     }
 }

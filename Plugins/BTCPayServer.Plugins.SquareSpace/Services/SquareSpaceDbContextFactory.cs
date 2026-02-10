@@ -9,30 +9,30 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 
 namespace BTCPayServer.Plugins.StoreBridge.Services;
 
-public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<StoreBridgeDbContext>
+public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<SquareSpaceDbContext>
 {
-    public StoreBridgeDbContext CreateDbContext(string[] args)
+    public SquareSpaceDbContext CreateDbContext(string[] args)
     {
-        var builder = new DbContextOptionsBuilder<StoreBridgeDbContext>();
+        var builder = new DbContextOptionsBuilder<SquareSpaceDbContext>();
 
         // FIXME: Somehow the DateTimeOffset column types get messed up when not using Postgres
         // https://docs.microsoft.com/en-us/ef/core/managing-schemas/migrations/providers?tabs=dotnet-core-cli
         builder.UseNpgsql("User ID=postgres;Host=127.0.0.1;Port=39372;Database=designtimebtcpay");
 
-        return new StoreBridgeDbContext(builder.Options, true);
+        return new SquareSpaceDbContext(builder.Options, true);
     }
 }
 
-public class SquareSpaceDbContextFactory : BaseDbContextFactory<StoreBridgeDbContext>
+public class SquareSpaceDbContextFactory : BaseDbContextFactory<SquareSpaceDbContext>
 {
     public SquareSpaceDbContextFactory(IOptions<DatabaseOptions> options) : base(options, "BTCPayServer.Plugins.StoreBridge")
     {
     }
 
-    public override StoreBridgeDbContext CreateContext(Action<NpgsqlDbContextOptionsBuilder> npgsqlOptionsAction = null)
+    public override SquareSpaceDbContext CreateContext(Action<NpgsqlDbContextOptionsBuilder> npgsqlOptionsAction = null)
     {
-        var builder = new DbContextOptionsBuilder<StoreBridgeDbContext>();
+        var builder = new DbContextOptionsBuilder<SquareSpaceDbContext>();
         ConfigureBuilder(builder, npgsqlOptionsAction);
-        return new StoreBridgeDbContext(builder.Options);
+        return new SquareSpaceDbContext(builder.Options);
     }
 }
