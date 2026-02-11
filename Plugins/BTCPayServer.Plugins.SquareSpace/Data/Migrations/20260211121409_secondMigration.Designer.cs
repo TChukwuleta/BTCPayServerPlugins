@@ -3,6 +3,7 @@ using System;
 using BTCPayServer.Plugins.SquareSpace.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.SquareSpace.Data.Migrations
 {
     [DbContext(typeof(SquareSpaceDbContext))]
-    partial class SquareSpaceDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260211121409_secondMigration")]
+    partial class secondMigration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
