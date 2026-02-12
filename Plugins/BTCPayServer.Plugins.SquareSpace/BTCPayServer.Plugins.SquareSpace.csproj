@@ -54,5 +54,6 @@
 
   <ItemGroup>
     <Folder Include="Resources\" />
+    <Folder Include="Views\UISquarespacePublic\" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -21,7 +22,6 @@ namespace BTCPayServer.Plugins.SquareSpace;
 
 [AllowAnonymous]
 [Route("~/plugins/{storeId}/squarespace/public/")]
-[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UISquarespacePublicController : Controller
 {
     private readonly ILogger<UISquarespacePublicController> _logger;
@@ -46,13 +46,12 @@ public class UISquarespacePublicController : Controller
 
         await using var ctx = _dbContextFactory.CreateContext();
         var settings = ctx.SquareSpaceSettings.FirstOrDefault(c => c.StoreId == store.Id);
-
-
+        /*if (settings == null || string.IsNullOrEmpty(settings.WebhookSecret))
+            return BadRequest("Squarespace not configured");*/
 
         var storeBlob = store.GetStoreBlob();
         StringBuilder combinedJavascript = new StringBuilder();
         var fileContent = _squarespaceService.GetEmbeddedResourceContent("Resources.js.btcpay_squarespace.js");
-
         combinedJavascript.AppendLine(fileContent);
         string jsVariables = $"var BTCPAYSERVER_URL = '{Request.GetAbsoluteRoot()}'; var BTCPAYSERVER_STORE_ID = '{store.Id}'; var STORE_CURRENCY = '{storeBlob.DefaultCurrency}';";
         combinedJavascript.Insert(0, jsVariables + Environment.NewLine);
@@ -62,7 +61,7 @@ public class UISquarespacePublicController : Controller
 
     [HttpPost("cart")]
     [EnableCors("AllowAllOrigins")]
-    public async Task<IActionResult> Checkout(string storeId, [FromBody] SquareSpaceCheckoutRequest request)
+    public async Task<IActionResult> Cart(string storeId, [FromBody] SquareSpaceCheckoutRequest request)
     {
         _logger.LogInformation(JsonConvert.SerializeObject(request));
         var store = await _storeRepository.FindStore(storeId);
@@ -72,6 +71,11 @@ public class UISquarespacePublicController : Controller
         var settings = ctx.SquareSpaceSettings.FirstOrDefault(c => c.StoreId == store.Id);
         /*if (settings == null || string.IsNullOrEmpty(settings.WebhookSecret))
             return BadRequest("Squarespace not configured");*/
+
+        var paymentUrl = Url.Action(nameof(CompleteCheckout), "UISquarespacePublic", new { storeId, cartToken = request.CartToken }, Request.Scheme);
+        var existingOrder = ctx.SquareSpaceOrders.FirstOrDefault(c => c.CartToken == request.CartToken && c.StoreId == store.Id);
+        if (existingOrder != null)
+            return Ok(new { paymentUrl });
 
         var squareSpaceOrder = new SquareSpaceOrder
         {
@@ -84,10 +88,10 @@ public class UISquarespacePublicController : Controller
         };
         ctx.SquareSpaceOrders.Add(squareSpaceOrder);
         await ctx.SaveChangesAsync();
-        return Ok();
+        return Ok(new { paymentUrl });
     }
 
-    [HttpPost("{cartToken}/complete-checkout")]
+    [HttpGet("{cartToken}/complete-checkout")]
     public async Task<IActionResult> CompleteCheckout(string storeId, string cartToken)
     {
         var store = await _storeRepository.FindStore(storeId);
@@ -98,11 +102,55 @@ public class UISquarespacePublicController : Controller
         /*if (settings == null || string.IsNullOrEmpty(settings.WebhookSecret))
             return NotFound();*/
 
-        var squareSpaceOrder = ctx.SquareSpaceOrders.FirstOrDefault(c => c.StoreId == store.Id && c.CartToken == cartToken);
-        if (squareSpaceOrder == null) return NotFound();
+        var order = ctx.SquareSpaceOrders.FirstOrDefault(c => c.StoreId == store.Id && c.CartToken == cartToken);
+        if (order == null) return NotFound();
 
-        return Ok();
+        return View(new SquareSpaceCheckoutViewModel
+        {
+            StoreId = storeId,
+            CartToken = cartToken,
+            Amount = order.Amount,
+            Items = JsonConvert.DeserializeObject<List<InvoiceItem>>(order.Items)
+        });
     }
+
+    [HttpPost("{cartToken}/complete-checkout")]
+    public async Task<IActionResult> CompleteCheckout(string storeId, string cartToken, SquareSpaceCheckoutViewModel model)
+    {
+        var store = await _storeRepository.FindStore(storeId);
+        if (store == null) return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var settings = ctx.SquareSpaceSettings.FirstOrDefault(c => c.StoreId == store.Id);
+        /*if (settings == null || string.IsNullOrEmpty(settings.WebhookSecret))
+            return NotFound();*/
+
+        var order = ctx.SquareSpaceOrders.FirstOrDefault(c => c.StoreId == store.Id && c.CartToken == cartToken);
+        if (order == null) return NotFound();
+
+        order.CustomerEmail = model.Email;
+        order.ShippingAddress = JsonConvert.SerializeObject(new ShippingAddress
+        {
+            Address1 = model.Address1,
+            Address2 = model.Address2,
+            ShippingName = model.ShippingName,
+            City = model.City,
+            PostalCode = model.PostalCode,
+            Country = model.Country,
+        });
+        await ctx.SaveChangesAsync();
+
+        // Create Order... on square.. space..
+
+        // Create BTCPay server
+
+
+        //model.InvoiceUrl = invoiceUrl;
+        model.Items = JsonConvert.DeserializeObject<List<InvoiceItem>>(order.Items);
+        model.Amount = order.Amount;
+        return View("/Views/UISquarespacePublic/CompleteCheckout.cshtml", model);
+    }
+
 
 
     [HttpPost("webhook")]

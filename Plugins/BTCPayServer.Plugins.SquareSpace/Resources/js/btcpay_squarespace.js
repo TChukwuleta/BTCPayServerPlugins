@@ -80,7 +80,7 @@
             console.log("[BTCPay][Payload]", payload);
 
             try {
-                const url = BTCPAYSERVER_URL + "/plugins/" + BTCPAYSERVER_STORE_ID + "/squarespace/public/checkout";
+                const url = BTCPAYSERVER_URL + "/plugins/" + BTCPAYSERVER_STORE_ID + "/squarespace/public/cart";
                 const res = await fetch(url, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -92,10 +92,10 @@
                 }
                 const data = await res.json();
                 console.log(data);
-                if (data.invoiceUrl) {
-                    window.location.href = data.invoiceUrl;
+                if (data.paymentUrl) {
+                    window.location.href = data.paymentUrl;
                 } else {
-                    throw new Error("Missing invoiceUrl");
+                    throw new Error("Missing paymentUrl");
                 }
 
             } catch (err) {
@@ -105,7 +105,6 @@
                 btcBtn.disabled = false;
             }
         });
-
         console.log("[BTCPay][UI] BTCPay button injected");
     }
 

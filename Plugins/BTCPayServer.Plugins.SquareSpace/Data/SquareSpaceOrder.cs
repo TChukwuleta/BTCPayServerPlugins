@@ -1,11 +1,11 @@
 ﻿using System;
-using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BTCPayServer.Plugins.SquareSpace.Data;
 
 public class SquareSpaceOrder
 {
-    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public string Id { get; set; }
     public string StoreId { get; set; }
     public string CartData { get; set; }
@@ -14,6 +14,7 @@ public class SquareSpaceOrder
     public string SquarespaceOrderId { get; set; }
     public string SquarespaceOrderNumber { get; set; }
     public string InvoiceId { get; set; }
+    public string ShippingAddress { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? PaidAt { get; set; }
     public string Status { get; set; } = "Pending";

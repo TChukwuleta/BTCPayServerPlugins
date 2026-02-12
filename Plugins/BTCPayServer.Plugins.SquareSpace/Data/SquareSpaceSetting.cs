@@ -1,10 +1,10 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BTCPayServer.Plugins.SquareSpace.Data;
 
 public class SquareSpaceSetting
 {
-    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public string Id { get; set; }
     public string OAuthToken { get; set; }
     public string WebsiteId { get; set; }
