@@ -11,6 +11,7 @@ using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NBitpayClient;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -46,13 +47,13 @@ public class UISaleorPublicAppController : Controller
 
     static AsyncDuplicateLock OrderLocks = new AsyncDuplicateLock();
     [HttpPost("create-invoice")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateInvoice(string storeId, CreateInvoiceViewModel vm)
+    public async Task<IActionResult> CreateInvoice(string storeId, [FromBody] CreateInvoiceViewModel vm)
     {
+        Console.WriteLine(JsonConvert.SerializeObject(vm, Formatting.Indented));
+        Console.WriteLine(storeId);
         var store = await _storeRepository.FindStore(storeId);
         if (store == null) return NotFound();
 
-        Console.WriteLine(JsonConvert.SerializeObject(vm, Formatting.Indented));
         var searchTerm = $"{Extensions.SALEOR_ORDER_ID_PREFIX}{vm.TransactionId}";
         var invoices = await _invoiceRepository.GetInvoices(new InvoiceQuery()
         {
@@ -64,7 +65,14 @@ public class UISaleorPublicAppController : Controller
 
         var orderInvoices = invoices.Where(e => e.GetSaleorOrderId() == vm.TransactionId).ToArray();
         var currentInvoice = orderInvoices.FirstOrDefault();
-        if (currentInvoice != null) return Ok();
+        if (currentInvoice != null)
+        {
+            return Ok(new
+            {
+                id = currentInvoice.Id,
+                checkoutLink = CheckoutUrl(currentInvoice.Id)
+            });
+        }
 
         InvoiceEntity invoice;
         try
@@ -77,7 +85,7 @@ public class UISaleorPublicAppController : Controller
                     Metadata = new JObject
                     {
                         ["orderId"] = vm.TransactionId,
-                        ["saleorMetaData"] = JToken.FromObject(vm.MetaData)
+                        //["saleorMetaData"] = JToken.FromObject(vm.MetaData)
                     },
                     AdditionalSearchTerms =
                     [
@@ -94,7 +102,11 @@ public class UISaleorPublicAppController : Controller
         {
             return BadRequest(e.Message);
         }
-        return Ok();
+        return Ok(new
+        {
+            id = invoice.Id,
+            checkoutLink = CheckoutUrl(invoice.Id)
+        });
     }
 
 
@@ -104,4 +116,5 @@ public class UISaleorPublicAppController : Controller
                     new { invoiceId });
     }
 
+    private string CheckoutUrl(string invoiceId) => Url.Action(nameof(UIInvoiceController.Checkout), "UIInvoice", new { invoiceId }, Request.Scheme);
 }
