@@ -18,6 +18,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
 
+/// <summary>
+/// Greenfield API controller for managing tickets, orders, check-ins, and exports.
+/// </summary>
 [ApiController]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield, Policy = Policies.CanModifyStoreSettings)]
 [EnableCors(CorsPolicies.All)]
@@ -42,6 +45,9 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
 
     private string CurrentStoreId => HttpContext.GetStoreData()?.Id;
 
+    /// <summary>
+    /// List settled tickets for an event, with optional text search.
+    /// </summary>
     [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/tickets")]
     [Authorize(Policy = Policies.CanViewStoreSettings)]
     public async Task<IActionResult> GetTickets(string storeId, string eventId, [FromQuery] string searchText = null)
@@ -72,6 +78,9 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Export settled tickets as a CSV file download.
+    /// </summary>
     [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/tickets/export")]
     [Authorize(Policy = Policies.CanViewStoreSettings)]
     public async Task<IActionResult> ExportTickets(string storeId, string eventId)
@@ -114,6 +123,9 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
         return File(fileBytes, "text/csv", fileName);
     }
 
+    /// <summary>
+    /// Check in a ticket by ticket number or short transaction number.
+    /// </summary>
     [HttpPost("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/tickets/{ticketNumber}/check-in")]
     public async Task<IActionResult> CheckinTicket(string storeId, string eventId, string ticketNumber)
     {
@@ -135,6 +147,9 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// List settled orders for an event, with optional text search. Includes nested tickets.
+    /// </summary>
     [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/orders")]
     [Authorize(Policy = Policies.CanViewStoreSettings)]
     public async Task<IActionResult> GetOrders(string storeId, string eventId, [FromQuery] string searchText = null)
@@ -166,6 +181,9 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Re-send the ticket confirmation email to a specific ticket holder.
+    /// </summary>
     [HttpPost("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/orders/{orderId}/tickets/{ticketId}/send-reminder")]
     public async Task<IActionResult> SendReminder(string storeId, string eventId, string orderId, string ticketId)
     {

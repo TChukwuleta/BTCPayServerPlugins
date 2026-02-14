@@ -14,6 +14,9 @@ using EntityState = BTCPayServer.Plugins.SatoshiTickets.Data.EntityState;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
 
+/// <summary>
+/// Greenfield API controller for managing ticket types (pricing tiers) within events.
+/// </summary>
 [ApiController]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield, Policy = Policies.CanModifyStoreSettings)]
 [EnableCors(CorsPolicies.All)]
@@ -28,6 +31,9 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
 
     private string CurrentStoreId => HttpContext.GetStoreData()?.Id;
 
+    /// <summary>
+    /// List all ticket types for an event, with optional sorting.
+    /// </summary>
     [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/ticket-types")]
     [Authorize(Policy = Policies.CanViewStoreSettings)]
     public async Task<IActionResult> GetTicketTypes(string storeId, string eventId,
@@ -51,6 +57,9 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Get a single ticket type by ID.
+    /// </summary>
     [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/ticket-types/{ticketTypeId}")]
     [Authorize(Policy = Policies.CanViewStoreSettings)]
     public async Task<IActionResult> GetTicketType(string storeId, string eventId, string ticketTypeId)
@@ -68,6 +77,9 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
         return Ok(ToTicketTypeData(entity));
     }
 
+    /// <summary>
+    /// Create a new ticket type for an event.
+    /// </summary>
     [HttpPost("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/ticket-types")]
     public async Task<IActionResult> CreateTicketType(string storeId, string eventId,
         [FromBody] CreateTicketTypeRequest request)
@@ -126,6 +138,9 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
             ToTicketTypeData(entity));
     }
 
+    /// <summary>
+    /// Update an existing ticket type.
+    /// </summary>
     [HttpPut("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/ticket-types/{ticketTypeId}")]
     public async Task<IActionResult> UpdateTicketType(string storeId, string eventId, string ticketTypeId,
         [FromBody] UpdateTicketTypeRequest request)
@@ -182,6 +197,9 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
         return Ok(ToTicketTypeData(entity));
     }
 
+    /// <summary>
+    /// Delete a ticket type.
+    /// </summary>
     [HttpDelete("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/ticket-types/{ticketTypeId}")]
     public async Task<IActionResult> DeleteTicketType(string storeId, string eventId, string ticketTypeId)
     {
@@ -201,6 +219,9 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
         return Ok();
     }
 
+    /// <summary>
+    /// Toggle ticket type status between Active and Disabled.
+    /// </summary>
     [HttpPut("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/ticket-types/{ticketTypeId}/toggle")]
     public async Task<IActionResult> ToggleTicketTypeStatus(string storeId, string eventId, string ticketTypeId)
     {

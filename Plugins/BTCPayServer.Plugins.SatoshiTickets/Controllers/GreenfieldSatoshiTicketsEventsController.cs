@@ -21,6 +21,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
 
+/// <summary>
+/// Greenfield API controller for managing SatoshiTickets events.
+/// Provides CRUD operations, status toggling, and logo upload/delete.
+/// </summary>
 [ApiController]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield, Policy = Policies.CanModifyStoreSettings)]
 [EnableCors(CorsPolicies.All)]
@@ -48,6 +52,9 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
 
     private string CurrentStoreId => HttpContext.GetStoreData()?.Id;
 
+    /// <summary>
+    /// List all events for a store. Optionally filter to expired events only.
+    /// </summary>
     [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events")]
     [Authorize(Policy = Policies.CanViewStoreSettings)]
     public async Task<IActionResult> GetEvents(string storeId, [FromQuery] bool expired = false)
@@ -74,6 +81,9 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Get a single event by ID.
+    /// </summary>
     [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}")]
     [Authorize(Policy = Policies.CanViewStoreSettings)]
     public async Task<IActionResult> GetEvent(string storeId, string eventId)
@@ -90,6 +100,9 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         return Ok(await ToEventData(entity, ticketsSold));
     }
 
+    /// <summary>
+    /// Create a new event. Events are created in Disabled state.
+    /// </summary>
     [HttpPost("~/api/v1/stores/{storeId}/satoshi-tickets/events")]
     public async Task<IActionResult> CreateEvent(string storeId, [FromBody] CreateEventRequest request)
     {
@@ -149,6 +162,9 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         return CreatedAtAction(nameof(GetEvent), new { storeId, eventId = entity.Id }, await ToEventData(entity, 0));
     }
 
+    /// <summary>
+    /// Update an existing event.
+    /// </summary>
     [HttpPut("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}")]
     public async Task<IActionResult> UpdateEvent(string storeId, string eventId, [FromBody] UpdateEventRequest request)
     {
@@ -213,6 +229,9 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         return Ok(await ToEventData(entity, ticketsSold));
     }
 
+    /// <summary>
+    /// Delete an event and its ticket types and tickets (if event is past).
+    /// </summary>
     [HttpDelete("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}")]
     public async Task<IActionResult> DeleteEvent(string storeId, string eventId)
     {
@@ -241,6 +260,9 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         return Ok();
     }
 
+    /// <summary>
+    /// Toggle event status between Active and Disabled.
+    /// </summary>
     [HttpPut("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/toggle")]
     public async Task<IActionResult> ToggleEventStatus(string storeId, string eventId)
     {
@@ -270,6 +292,9 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         return Ok(await ToEventData(entity, ticketsSold));
     }
 
+    /// <summary>
+    /// Upload an image as the event logo. Accepts multipart/form-data.
+    /// </summary>
     [HttpPost("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/logo")]
     public async Task<IActionResult> UploadEventLogo(string storeId, string eventId, IFormFile file)
     {
@@ -302,6 +327,9 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         return Ok(await ToEventData(entity, ticketsSold));
     }
 
+    /// <summary>
+    /// Remove the logo from an event.
+    /// </summary>
     [HttpDelete("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/logo")]
     public async Task<IActionResult> DeleteEventLogo(string storeId, string eventId)
     {
