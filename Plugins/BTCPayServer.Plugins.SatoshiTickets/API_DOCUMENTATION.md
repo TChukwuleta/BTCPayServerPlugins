@@ -264,9 +264,11 @@ If you already have a file uploaded via the BTCPay Server core Files API (`POST 
 DELETE /api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}
 ```
 
-**Response: `200 OK`** - Empty body. Deletes event, all its ticket types, and all tickets (if event is past).
+**Response: `200 OK`** - Empty body. Deletes the event along with all its ticket types and all associated tickets.
 
-**Error: `422`** - `{"code": "event-has-active-tickets", "message": "Cannot delete event as there are active ticket purchases and the event is in the future"}` - Cannot delete future events with sold tickets.
+**Blocking condition:** Deletion is blocked if the event is **in the future** and has **sold tickets**. Past events can always be deleted regardless of ticket sales.
+
+**Error: `422`** - `{"code": "event-has-active-tickets", "message": "Cannot delete event as there are active ticket purchases and the event is in the future"}`
 
 ---
 

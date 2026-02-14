@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Models.Api;
 
@@ -8,6 +9,7 @@ namespace BTCPayServer.Plugins.SatoshiTickets.Models.Api;
 public class UpdateEventRequest
 {
     /// <summary>Event title (required).</summary>
+    [Required]
     public string Title { get; set; }
     /// <summary>Event description (HTML allowed).</summary>
     public string Description { get; set; }
@@ -15,8 +17,9 @@ public class UpdateEventRequest
     public string EventType { get; set; }
     /// <summary>Event venue or location.</summary>
     public string Location { get; set; }
-    /// <summary>Event start date in ISO 8601 format.</summary>
-    public DateTime StartDate { get; set; }
+    /// <summary>Event start date in ISO 8601 format (required).</summary>
+    [Required]
+    public DateTime? StartDate { get; set; }
     /// <summary>Event end date in ISO 8601 format. Must be after StartDate if provided.</summary>
     public DateTime? EndDate { get; set; }
     /// <summary>Three-letter currency code.</summary>

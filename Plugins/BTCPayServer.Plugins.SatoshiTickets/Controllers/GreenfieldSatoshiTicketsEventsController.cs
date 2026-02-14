@@ -182,7 +182,9 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
 
         if (string.IsNullOrWhiteSpace(request.Title))
             ModelState.AddModelError(nameof(request.Title), "Title is required");
-        if (request.EndDate.HasValue && request.EndDate.Value < request.StartDate)
+        if (!request.StartDate.HasValue)
+            ModelState.AddModelError(nameof(request.StartDate), "Start date is required");
+        if (request.EndDate.HasValue && request.StartDate.HasValue && request.EndDate.Value < request.StartDate.Value)
             ModelState.AddModelError(nameof(request.EndDate), "Event end date cannot be before start date");
         if (request.HasMaximumCapacity)
         {
@@ -200,7 +202,7 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         entity.Title = request.Title;
         entity.Description = request.Description;
         entity.Location = request.Location;
-        entity.StartDate = request.StartDate;
+        entity.StartDate = request.StartDate.Value;
         entity.EndDate = request.EndDate;
         entity.RedirectUrl = request.RedirectUrl;
         entity.EmailSubject = request.EmailSubject;
@@ -338,6 +340,12 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
         if (entity == null)
             return EventNotFound();
+
+        if (!string.IsNullOrEmpty(entity.EventLogo))
+        {
+            var userId = _userManager.GetUserId(User);
+            await _fileService.RemoveFile(entity.EventLogo, userId);
+        }
 
         entity.EventLogo = null;
         ctx.Events.Update(entity);

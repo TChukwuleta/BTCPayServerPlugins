@@ -115,8 +115,16 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
         csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency,Attended Event");
         foreach (var ticket in ordersWithTickets)
         {
-            csvData.AppendLine(
-                $"{ticket.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{ticket.Currency},{ticket.UsedAt.HasValue}");
+            csvData.AppendLine(string.Join(",",
+                EscapeCsvField(ticket.PurchaseDate?.ToString("MM/dd/yy HH:mm")),
+                EscapeCsvField(ticket.TxnNumber),
+                EscapeCsvField(ticket.FirstName),
+                EscapeCsvField(ticket.LastName),
+                EscapeCsvField(ticket.Email),
+                EscapeCsvField(ticket.TicketTypeName),
+                EscapeCsvField(ticket.Amount.ToString()),
+                EscapeCsvField(ticket.Currency),
+                EscapeCsvField(ticket.UsedAt.HasValue.ToString())));
         }
 
         byte[] fileBytes = Encoding.UTF8.GetBytes(csvData.ToString());
@@ -219,6 +227,14 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
                 ctx.Orders.Update(order);
                 await ctx.SaveChangesAsync();
             }
+            else
+            {
+                var failedList = emailResponse.FailedRecipients?.Count > 0
+                    ? string.Join(", ", emailResponse.FailedRecipients)
+                    : ticket.Email;
+                return this.CreateAPIError(500, "email-send-failed",
+                    $"Failed to send ticket email to: {failedList}");
+            }
         }
         catch (Exception ex)
         {
@@ -267,6 +283,18 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
             PurchaseDate = entity.PurchaseDate,
             Tickets = entity.Tickets?.Select(ToTicketData).ToList() ?? new()
         };
+    }
+
+    /// <summary>
+    /// Escapes a string value for safe inclusion in a CSV field per RFC 4180.
+    /// </summary>
+    private static string EscapeCsvField(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return "";
+        if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
+            return $"\"{value.Replace("\"", "\"\"")}\"";
+        return value;
     }
 
     private IActionResult EventNotFound()

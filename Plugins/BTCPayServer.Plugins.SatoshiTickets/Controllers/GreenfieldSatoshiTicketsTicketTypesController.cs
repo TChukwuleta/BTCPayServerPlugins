@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
 using EntityState = BTCPayServer.Plugins.SatoshiTickets.Data.EntityState;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
@@ -41,7 +42,7 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
     {
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStoreId && c.Id == eventId);
+        var ticketEvent = await ctx.Events.FirstOrDefaultAsync(c => c.StoreId == CurrentStoreId && c.Id == eventId);
         if (ticketEvent == null)
             return EventNotFound();
 
@@ -53,7 +54,8 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
             _ => query.OrderBy(t => t.Name)
         };
 
-        var result = query.ToList().Select(ToTicketTypeData).ToArray();
+        var list = await query.ToListAsync();
+        var result = list.Select(ToTicketTypeData).ToArray();
         return Ok(result);
     }
 
@@ -66,11 +68,11 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
     {
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStoreId && c.Id == eventId);
+        var ticketEvent = await ctx.Events.FirstOrDefaultAsync(c => c.StoreId == CurrentStoreId && c.Id == eventId);
         if (ticketEvent == null)
             return EventNotFound();
 
-        var entity = ctx.TicketTypes.FirstOrDefault(c => c.EventId == eventId && c.Id == ticketTypeId);
+        var entity = await ctx.TicketTypes.FirstOrDefaultAsync(c => c.EventId == eventId && c.Id == ticketTypeId);
         if (entity == null)
             return TicketTypeNotFound();
 
@@ -92,7 +94,7 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
 
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
+        var ticketEvent = await ctx.Events.FirstOrDefaultAsync(c => c.Id == eventId && c.StoreId == CurrentStoreId);
         if (ticketEvent == null)
             return EventNotFound();
 
@@ -104,7 +106,7 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
             ModelState.AddModelError(nameof(request.Quantity), "Quantity must be greater than zero");
         if (ticketEvent.HasMaximumCapacity)
         {
-            var usedQuantity = ctx.TicketTypes.Where(t => t.EventId == eventId).Sum(c => c.Quantity);
+            var usedQuantity = await ctx.TicketTypes.Where(t => t.EventId == eventId).SumAsync(c => c.Quantity);
             if (request.Quantity > (ticketEvent.MaximumEventCapacity - usedQuantity))
                 ModelState.AddModelError(nameof(request.Quantity),
                     "Quantity specified is higher than available event capacity");
@@ -124,11 +126,22 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
             TicketTypeState = EntityState.Active
         };
 
-        var currentDefault = ctx.TicketTypes.FirstOrDefault(c => c.EventId == eventId && c.IsDefault);
-        if (currentDefault is not null && entity.IsDefault)
-            currentDefault.IsDefault = false;
-        else
+        var currentDefault = await ctx.TicketTypes.FirstOrDefaultAsync(c => c.EventId == eventId && c.IsDefault);
+        if (currentDefault == null)
+        {
+            // No existing default — first ticket type always becomes default
             entity.IsDefault = true;
+        }
+        else if (request.IsDefault)
+        {
+            // Caller explicitly requests this to be the new default
+            currentDefault.IsDefault = false;
+            entity.IsDefault = true;
+        }
+        else
+        {
+            entity.IsDefault = false;
+        }
 
         ctx.TicketTypes.Add(entity);
         await ctx.SaveChangesAsync();
@@ -153,11 +166,11 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
 
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
+        var ticketEvent = await ctx.Events.FirstOrDefaultAsync(c => c.Id == eventId && c.StoreId == CurrentStoreId);
         if (ticketEvent == null)
             return EventNotFound();
 
-        var entity = ctx.TicketTypes.FirstOrDefault(c => c.Id == ticketTypeId && c.EventId == eventId);
+        var entity = await ctx.TicketTypes.FirstOrDefaultAsync(c => c.Id == ticketTypeId && c.EventId == eventId);
         if (entity == null)
             return TicketTypeNotFound();
 
@@ -169,9 +182,9 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
             ModelState.AddModelError(nameof(request.Quantity), "Quantity must be greater than zero");
         if (ticketEvent.HasMaximumCapacity)
         {
-            var usedQuantity = ctx.TicketTypes
+            var usedQuantity = await ctx.TicketTypes
                 .Where(t => t.EventId == eventId && t.Id != ticketTypeId)
-                .Sum(c => c.Quantity);
+                .SumAsync(c => c.Quantity);
             if (request.Quantity > (ticketEvent.MaximumEventCapacity - usedQuantity))
                 ModelState.AddModelError(nameof(request.Quantity),
                     "Quantity specified is higher than available event capacity");
@@ -188,7 +201,7 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
 
         if (!entity.IsDefault)
         {
-            var anyDefault = ctx.TicketTypes.Any(t => t.EventId == eventId && t.Id != ticketTypeId && t.IsDefault);
+            var anyDefault = await ctx.TicketTypes.AnyAsync(t => t.EventId == eventId && t.Id != ticketTypeId && t.IsDefault);
             if (!anyDefault) entity.IsDefault = true;
         }
 
@@ -198,22 +211,34 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
     }
 
     /// <summary>
-    /// Delete a ticket type.
+    /// Delete a ticket type. Reassigns default to another type if the deleted type was the default.
     /// </summary>
     [HttpDelete("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/ticket-types/{ticketTypeId}")]
     public async Task<IActionResult> DeleteTicketType(string storeId, string eventId, string ticketTypeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStoreId && c.Id == eventId);
+        var ticketEvent = await ctx.Events.FirstOrDefaultAsync(c => c.StoreId == CurrentStoreId && c.Id == eventId);
         if (ticketEvent == null)
             return EventNotFound();
 
-        var entity = ctx.TicketTypes.FirstOrDefault(c => c.EventId == eventId && c.Id == ticketTypeId);
+        var entity = await ctx.TicketTypes.FirstOrDefaultAsync(c => c.EventId == eventId && c.Id == ticketTypeId);
         if (entity == null)
             return TicketTypeNotFound();
 
         ctx.TicketTypes.Remove(entity);
+
+        // If we're deleting the default, reassign default to another ticket type
+        if (entity.IsDefault)
+        {
+            var newDefault = await ctx.TicketTypes
+                .Where(t => t.EventId == eventId && t.Id != ticketTypeId)
+                .OrderBy(t => t.Name)
+                .FirstOrDefaultAsync();
+            if (newDefault != null)
+                newDefault.IsDefault = true;
+        }
+
         await ctx.SaveChangesAsync();
 
         return Ok();
@@ -227,11 +252,11 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
     {
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStoreId && c.Id == eventId);
+        var ticketEvent = await ctx.Events.FirstOrDefaultAsync(c => c.StoreId == CurrentStoreId && c.Id == eventId);
         if (ticketEvent == null)
             return EventNotFound();
 
-        var entity = ctx.TicketTypes.FirstOrDefault(c => c.EventId == eventId && c.Id == ticketTypeId);
+        var entity = await ctx.TicketTypes.FirstOrDefaultAsync(c => c.EventId == eventId && c.Id == ticketTypeId);
         if (entity == null)
             return TicketTypeNotFound();
 
