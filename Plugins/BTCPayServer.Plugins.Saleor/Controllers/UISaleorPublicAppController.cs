@@ -43,12 +43,28 @@ public class UISaleorPublicAppController : Controller
     }
 
 
+    [HttpGet("invoice/{invoiceId}/verify/{transactionId}")]
+    public async Task<IActionResult> VerifyInvoice(string storeId, string invoiceId, string transactionId)
+    {
+        var store = await _storeRepository.FindStore(storeId);
+        if (store == null) return NotFound();
+
+        var invoice = await _invoiceRepository.GetInvoice(invoiceId);
+        if (invoice == null) return NotFound();
+
+        return Ok(new
+        {
+            id = invoice.Id,
+            checkoutLink = CheckoutUrl(invoice.Id),
+            status = invoice.Status.ToString()
+        });
+    }
+
+
     static AsyncDuplicateLock OrderLocks = new AsyncDuplicateLock();
     [HttpPost("create-invoice")]
     public async Task<IActionResult> CreateInvoice(string storeId, [FromBody] CreateInvoiceViewModel vm)
     {
-        Console.WriteLine(JsonConvert.SerializeObject(vm, Formatting.Indented));
-        Console.WriteLine(storeId);
         var store = await _storeRepository.FindStore(storeId);
         if (store == null) return NotFound();
 
