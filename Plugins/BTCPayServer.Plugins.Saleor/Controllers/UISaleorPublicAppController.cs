@@ -33,16 +33,14 @@ public class UISaleorPublicAppController : Controller
     }
 
 
-    /*[HttpGet("export")]
-    public IActionResult ExportStore(string storeId)
+    [HttpGet("health-check")]
+    public async Task<IActionResult> HealthCheck(string storeId)
     {
-        if (CurrentStore == null) return NotFound();
-        return View(new ExportViewModel
-        {
-            StoreId = CurrentStore.Id,
-            SelectedOptions = ExportViewModel.AllOptions
-        });
-    }*/
+        var store = await _storeRepository.FindStore(storeId);
+        if (store == null) return BadRequest();
+
+        return Ok();
+    }
 
 
     static AsyncDuplicateLock OrderLocks = new AsyncDuplicateLock();
