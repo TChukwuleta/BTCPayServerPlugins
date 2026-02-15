@@ -452,3 +452,8 @@ $RECYCLE.BIN/
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Plugin build/package output
+plugin-output/
+packaged/
+/BTCPayServer.Plugins.SatoshiTickets/
