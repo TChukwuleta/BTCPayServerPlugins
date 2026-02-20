@@ -56,11 +56,7 @@ public class UISaleorPublicAppController : Controller
     [HttpGet("api/manifest")]
     public IActionResult GetManifest(string storeId)
     {
-        var baseUrl = $"{Request.Scheme}://{Request.Host}/plugins/{storeId}/saleor";
-
         string Endpoint(string action) => Url.Action(action, "UISaleorPublicApp", new { storeId }, Request.Scheme);
-
-        // var logoUrl = Endpoint(nameof(Logo));
         var manifest = new AppManifest
         {
             Id = "saleor.app.btcpay",
@@ -73,7 +69,7 @@ public class UISaleorPublicAppController : Controller
             TokenTargetUrl = Endpoint(nameof(Register)),
             Brand = new BrandManifest
             {
-                Logo = new LogoManifest { Default = $"{baseUrl}/btcpay_logo.png" }
+                Logo = new LogoManifest { Default = Endpoint(nameof(Logo)) }
             },
             Webhooks =
             [
@@ -109,8 +105,14 @@ public class UISaleorPublicAppController : Controller
                                     transaction { id pspReference }
                                     action { amount currency actionType }
                                     sourceObject {
-                                        ... on Checkout { channel { slug } }
-                                        ... on Order { channel { slug } }
+                                        ... on Checkout { 
+                                            channel { slug }
+                                            userEmail: email
+                                        }
+                                        ... on Order { 
+                                            channel { slug }
+                                            userEmail
+                                        }
                                     }
                                     data
                                 }
@@ -138,7 +140,6 @@ public class UISaleorPublicAppController : Controller
             ],
             Extensions = []
         };
-
         return Ok(manifest);
     }
 
@@ -146,6 +147,17 @@ public class UISaleorPublicAppController : Controller
 
 
     #region App
+
+    [HttpGet("btcpay_logo.png")]
+    public IActionResult Logo()
+    {
+        var assembly = GetType().Assembly;
+        var resourceName = assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("btcpay_logo.png"));
+        if (resourceName is null) return NotFound();
+
+        var stream = assembly.GetManifestResourceStream(resourceName);
+        return File(stream, "image/png");
+    }
 
     [HttpPost("register")]
     public async Task<IActionResult> Register(string storeId, [FromBody] SaleorRegisterRequest body)
@@ -315,7 +327,8 @@ public class UISaleorPublicAppController : Controller
                 Currency = payload.Action.Currency,
                 Metadata = new JObject
                 {
-                    ["orderId"] = payload.Transaction.Id
+                    ["orderId"] = payload.Transaction.Id,
+                    ["buyerEmail"] = payload.SourceObject?.UserEmail
                 },
                 AdditionalSearchTerms = [searchTerm]
             };

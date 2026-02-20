@@ -78,6 +78,11 @@ public class SaleorAppPageViewModel : BaseSaleorPublicViewModel
     public AplEntry? ConnectedInstance { get; set; }
 }
 
+public class SaleorDashboardViewModel : SaleorAppPageViewModel
+{
+    public string ManifestUrl { get; set; }
+}
+
 public class ConnectedInstance
 {
     public string SaleorApiUrl { get; set; } = "";

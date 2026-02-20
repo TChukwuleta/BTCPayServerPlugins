@@ -80,6 +80,9 @@ public class SourceObject
 {
     [JsonPropertyName("channel")]
     public ChannelData? Channel { get; set; }
+
+    [JsonPropertyName("userEmail")]
+    public string? UserEmail { get; set; }
 }
 
 public class ChannelData
