@@ -2,6 +2,8 @@ using System;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
+using BTCPayServer.Plugins.Saleor;
+using BTCPayServer.Plugins.Saleor.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BTCPayServer.Plugins.StoreBridge;
@@ -15,6 +17,12 @@ public class SaleorPlugin : BaseBTCPayServerPlugin
 
     public override void Execute(IServiceCollection services)
     {
+        services.AddSingleton<SaleorAplService>();
+        services.AddSingleton<SaleorConfigService>();
+        services.AddHttpClient<SaleorGraphQLService>();
+        services.AddSingleton<SaleorWebhookVerifier>();
+        services.AddHostedService<SaleorHostedService>();
+        //services.AddHostedService<SaleorPluginMigrationRunner>();
         services.AddSingleton<IUIExtension>(new UIExtension("SaleorNav", "header-nav"));
         services.AddSession(options =>
         {
