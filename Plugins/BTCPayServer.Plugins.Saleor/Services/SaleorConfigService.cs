@@ -20,9 +20,9 @@ public class SaleorConfigService
         _graphql = graphql;
         _logger = logger;
     }
-    public async Task<BtcpayConfig?> GetConfigAsync(string saleorApiUrl)
+    public async Task<BtcpayConfig?> GetConfigAsync(string saleorApiUrl, string storeId)
     {
-        var authData = await _apl.GetAsync(saleorApiUrl);
+        var authData = await _apl.Get(storeId);
         if (authData is null)
         {
             _logger.LogWarning("No APL entry for {Url}", saleorApiUrl);
@@ -31,17 +31,17 @@ public class SaleorConfigService
         return await _graphql.GetConfigAsync(saleorApiUrl, authData.Token);
     }
 
-    public async Task SetConfigAsync(string saleorApiUrl, BtcpayConfig config)
+    public async Task SetConfigAsync(string saleorApiUrl, string storeId, BtcpayConfig config)
     {
-        var authData = await _apl.GetAsync(saleorApiUrl);
+        var authData = await _apl.Get(storeId);
         if (authData is null) throw new Exception($"Saleor instance not registered: {saleorApiUrl}");
         await _graphql.SetConfigAsync(saleorApiUrl, authData.Token, config);
     }
 
-    public async Task DeleteConfigAsync(string saleorApiUrl)
+    public async Task DeleteConfigAsync(string saleorApiUrl, string storeId)
     {
-        var authData = await _apl.GetAsync(saleorApiUrl);
-        if (authData is null) throw new Exception($"Saleor instance not registered: {saleorApiUrl}");
+        var authData = await _apl.Get(storeId);
+        if (authData is null) throw new Exception($"Saleor instance not registered: {storeId}");
         await _graphql.DeleteConfigAsync(saleorApiUrl, authData.Token);
     }
 }

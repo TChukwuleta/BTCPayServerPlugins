@@ -1,4 +1,6 @@
-﻿using System.Text.Json.Serialization;
+﻿using System;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace BTCPayServer.Plugins.Saleor.ViewModels;
 
@@ -69,4 +71,20 @@ public class WebhookManifest
 
     [JsonPropertyName("isActive")]
     public bool IsActive { get; set; } = true;
+}
+
+public class SaleorAppPageViewModel : BaseSaleorPublicViewModel
+{
+    public AplEntry? ConnectedInstance { get; set; }
+}
+
+public class ConnectedInstance
+{
+    public string SaleorApiUrl { get; set; } = "";
+    public DateTimeOffset RegisteredAt { get; set; }
+}
+
+public class DisconnectRequest
+{
+    public string SaleorApiUrl { get; set; } = "";
 }

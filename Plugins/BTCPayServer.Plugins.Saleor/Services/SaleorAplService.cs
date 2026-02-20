@@ -20,50 +20,66 @@ public class SaleorAplService
         _logger = logger;
     }
 
-    public async Task SetAsync(string saleorApiUrl, string token, string appId = "")
+    public async Task Set(string saleorApiUrl, string token, string storeId, string appId = "")
     {
-        var store = await LoadAsync();
-        store[saleorApiUrl] = new AplEntry
+        var store = await Load();
+        store[storeId] = new AplEntry
         {
+            StoreId = storeId,
             SaleorApiUrl = saleorApiUrl,
             Token = token,
             AppId = appId,
             RegisteredAt = DateTime.UtcNow
         };
-        await SaveAsync(store);
+        await Save(store);
         _logger.LogInformation("APL: Registered Saleor instance {Url}", saleorApiUrl);
     }
 
-    public async Task<AplEntry?> GetAsync(string saleorApiUrl)
+    public async Task<AplEntry?> Get(string storeId)
     {
-        var store = await LoadAsync();
-        return store.TryGetValue(saleorApiUrl, out var entry) ? entry : null;
+        var store = await Load();
+        return store.TryGetValue(storeId, out var entry) ? entry : null;
     }
 
-    public async Task DeleteAsync(string saleorApiUrl)
+    public async Task Delete(string storeId)
     {
-        var store = await LoadAsync();
-        store.Remove(saleorApiUrl);
-        await SaveAsync(store);
+        var entry = await Load();
+        entry.Remove(storeId);
+        await Save(entry);
     }
 
-    public async Task<IEnumerable<AplEntry>> GetAllAsync()
+    public async Task<bool> Delete(string storeId, string saleorApiUrl)
     {
-        var store = await LoadAsync();
-        return store.Values.ToList();
+        var store = await Load();
+        if (!store.TryGetValue(storeId, out var entry))
+            return false;
+
+        if (!string.Equals(entry.SaleorApiUrl, saleorApiUrl, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        store.Remove(storeId);
+        await Save(store);
+        return true;
     }
 
-    private async Task<Dictionary<string, AplEntry>> LoadAsync()
+    public async Task<IEnumerable<AplEntry>> GetAll()
+    {
+        var entries = await Load();
+        return entries.Values.ToList();
+    }
+
+    private async Task<Dictionary<string, AplEntry>> Load()
     {
         var settings = await _settingsRepository.GetSettingAsync<SaleorAplSettings>(SettingsKey);
         return settings?.Entries ?? new Dictionary<string, AplEntry>();
     }
 
-    private async Task SaveAsync(Dictionary<string, AplEntry> store)
+    private async Task Save(Dictionary<string, AplEntry> entry)
     {
-        await _settingsRepository.UpdateSetting(new SaleorAplSettings { Entries = store }, SettingsKey);
+        await _settingsRepository.UpdateSetting(new SaleorAplSettings { Entries = entry }, SettingsKey);
     }
 }
+
 public class SaleorAplSettings
 {
     public Dictionary<string, AplEntry> Entries { get; set; } = new();

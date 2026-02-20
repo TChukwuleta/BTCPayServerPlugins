@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -8,9 +9,12 @@ using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Controllers;
+using BTCPayServer.Data;
 using BTCPayServer.Lightning.LndHub;
+using BTCPayServer.Models;
 using BTCPayServer.Plugins.Saleor.Services;
 using BTCPayServer.Plugins.Saleor.ViewModels;
+using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
@@ -25,6 +29,7 @@ namespace BTCPayServer.Plugins.Saleor;
 public class UISaleorPublicAppController : Controller
 {
     private readonly SaleorAplService _apl;
+    private readonly UriResolver _uriResolver;
     private readonly SaleorWebhookVerifier _verifier;
     private readonly StoreRepository _storeRepository;
     private readonly InvoiceRepository _invoiceRepository;
@@ -33,12 +38,13 @@ public class UISaleorPublicAppController : Controller
     private readonly ILogger<UISaleorPublicAppController> _logger;
     public UISaleorPublicAppController(SaleorAplService apl, SaleorWebhookVerifier verifier,  StoreRepository storeRepository, 
         InvoiceRepository invoiceRepository, UIInvoiceController invoiceController, ILogger<UISaleorPublicAppController> logger,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory, UriResolver uriResolver)
     {
 
         _apl = apl;
-        _verifier = verifier;
         _logger = logger;
+        _verifier = verifier;
+        _uriResolver = uriResolver;
         _storeRepository = storeRepository;
         _httpClientFactory = httpClientFactory;
         _invoiceRepository = invoiceRepository;
@@ -48,10 +54,13 @@ public class UISaleorPublicAppController : Controller
     #region Manifest 
 
     [HttpGet("api/manifest")]
-    public IActionResult GetManifest()
+    public IActionResult GetManifest(string storeId)
     {
-        var baseUrl = $"{Request.Scheme}://{Request.Host}/plugins/btcpay-saleor";
+        var baseUrl = $"{Request.Scheme}://{Request.Host}/plugins/{storeId}/saleor";
 
+        string Endpoint(string action) => Url.Action(action, "UISaleorPublicApp", new { storeId }, Request.Scheme);
+
+        // var logoUrl = Endpoint(nameof(Logo));
         var manifest = new AppManifest
         {
             Id = "saleor.app.btcpay",
@@ -59,15 +68,12 @@ public class UISaleorPublicAppController : Controller
             Name = "BTCPay Server",
             Author = "BTCPay Server",
             About = "Accept Bitcoin payments via your self-hosted BTCPay Server",
-            Permissions = ["MANAGE_ORDERS", "HANDLE_PAYMENTS"],
-            AppUrl = baseUrl,
-            TokenTargetUrl = $"{baseUrl}/register",
+            Permissions = ["HANDLE_PAYMENTS"],
+            AppUrl = Endpoint(nameof(AppPage)),
+            TokenTargetUrl = Endpoint(nameof(Register)),
             Brand = new BrandManifest
             {
-                Logo = new LogoManifest
-                {
-                    Default = $"{baseUrl}/btcpay_logo.png"
-                }
+                Logo = new LogoManifest { Default = $"{baseUrl}/btcpay_logo.png" }
             },
             Webhooks =
             [
@@ -75,7 +81,7 @@ public class UISaleorPublicAppController : Controller
                 {
                     Name = "Payment Gateway Initialize Session",
                     SyncEvents = ["PAYMENT_GATEWAY_INITIALIZE_SESSION"],
-                    TargetUrl = $"{baseUrl}/webhooks/payment-gateway-initialize-session",
+                    TargetUrl = Endpoint(nameof(PaymentGatewayInitializeSession)),
                     Query = """
                         subscription {
                             event {
@@ -95,7 +101,7 @@ public class UISaleorPublicAppController : Controller
                 {
                     Name = "Transaction Initialize Session",
                     SyncEvents = ["TRANSACTION_INITIALIZE_SESSION"],
-                    TargetUrl = $"{baseUrl}/webhooks/transaction-initialize-session",
+                    TargetUrl = Endpoint(nameof(TransactionInitializeSession)),
                     Query = """
                         subscription {
                             event {
@@ -116,7 +122,7 @@ public class UISaleorPublicAppController : Controller
                 {
                     Name = "Transaction Process Session",
                     SyncEvents = ["TRANSACTION_PROCESS_SESSION"],
-                    TargetUrl = $"{baseUrl}/webhooks/transaction-process-session",
+                    TargetUrl = Endpoint(nameof(TransactionProcessSession)),
                     Query = """
                         subscription {
                             event {
@@ -139,10 +145,120 @@ public class UISaleorPublicAppController : Controller
     #endregion
 
 
+    #region App
+
+    [HttpPost("register")]
+    public async Task<IActionResult> Register(string storeId, [FromBody] SaleorRegisterRequest body)
+    {
+        var saleorApiUrl = Request.Headers["saleor-api-url"].FirstOrDefault();
+
+        if (string.IsNullOrEmpty(saleorApiUrl))
+            return BadRequest(new { error = "Missing saleor-api-url header" });
+
+        if (string.IsNullOrEmpty(body.AuthToken))
+            return BadRequest(new { error = "Missing auth_token" });
+
+        try
+        {
+            var appId = await FetchAppIdAsync(saleorApiUrl, body.AuthToken);
+            await _apl.Set(saleorApiUrl, body.AuthToken, storeId, appId ?? "");
+            _logger.LogInformation("Registered Saleor instance: {Url}", saleorApiUrl);
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to verify token for {Url}", saleorApiUrl);
+            return StatusCode(500, new { error = "Failed to verify token with Saleor" });
+        }
+    }
+
+    [HttpGet("app")]
+    public async Task<IActionResult> AppPage(string storeId)
+    {
+        var store = await _storeRepository.FindStore(storeId);
+        if (store == null) return NotFound();
+
+        var entry = await _apl.Get(storeId);
+        var vm = new SaleorAppPageViewModel
+        {
+            StoreId = storeId,
+            StoreName = store.StoreName,
+            ConnectedInstance = entry,
+            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, store.GetStoreBlob()),
+        };
+        return View(vm);
+    }
+
+    [HttpGet("api/status")]
+    public async Task<IActionResult> GetStatus(string storeId)
+    {
+        var store = await _storeRepository.FindStore(storeId);
+        if (store == null) return NotFound();
+
+        var entry = await _apl.Get(storeId);
+
+        return Ok(new
+        {
+            storeId,
+            storeName = store.StoreName,
+            connected = entry is not null,
+            saleorApiUrl = entry?.SaleorApiUrl,
+            registeredAt = entry?.RegisteredAt
+        });
+    }
+
+    [HttpPost("api/disconnect")]
+    public async Task<IActionResult> Disconnect(string storeId, [FromBody] DisconnectRequest body)
+    {
+        if (string.IsNullOrEmpty(body.SaleorApiUrl))
+            return BadRequest(new { error = "Missing saleorApiUrl" });
+
+        var deleted = await _apl.Delete(storeId, body.SaleorApiUrl);
+        if (!deleted)
+            return NotFound(new { error = "Connection not found or saleorApiUrl mismatch" });
+
+        _logger.LogInformation("Disconnected Saleor instance {Url} from store {StoreId}", body.SaleorApiUrl, storeId);
+        return Ok(new { ok = true });
+    }
+
+    #endregion
+
+
     #region Transaction Webhook
 
     static AsyncDuplicateLock OrderLocks = new AsyncDuplicateLock();
-    [HttpPost("webhook/transaction-initialize-session")]
+
+    [HttpPost("webhooks/payment-gateway-initialize-session")]
+    public async Task<IActionResult> PaymentGatewayInitializeSession(string storeId)
+    {
+        var saleorApiUrl = Request.Headers["saleor-api-url"].FirstOrDefault();
+        var signature = Request.Headers["saleor-signature"].FirstOrDefault();
+
+        if (string.IsNullOrEmpty(saleorApiUrl))
+            return BadRequest("Missing saleor-api-url header");
+
+        var authData = await _apl.Get(storeId);
+        if (authData is null || !authData.SaleorApiUrl.Equals(saleorApiUrl, StringComparison.OrdinalIgnoreCase))
+            return Unauthorized("Saleor instance not registered or URL mismatch");
+
+        var rawBody = await _verifier.ReadRawBodyAsync(Request);
+        if (!_verifier.Verify(rawBody, signature ?? "", authData.Token))
+            return Unauthorized("Invalid webhook signature");
+
+        var store = await _storeRepository.FindStore(storeId);
+        if (store == null) return NotFound();
+
+        return Ok(new
+        {
+            data = new {
+                provider = "btcpay",
+                name = "Bitcoin (BTCPay Server)",
+                errors = new ArrayList()
+            }
+        });
+    }
+
+    [HttpPost("webhooks/transaction-initialize-session")]
     public async Task<IActionResult> TransactionInitializeSession(string storeId)
     {
         var saleorApiUrl = Request.Headers["saleor-api-url"].FirstOrDefault();
@@ -151,9 +267,9 @@ public class UISaleorPublicAppController : Controller
         if (string.IsNullOrEmpty(saleorApiUrl))
             return BadRequest("Missing saleor-api-url header");
 
-        var authData = await _apl.GetAsync(saleorApiUrl);
-        if (authData is null)
-            return Unauthorized("Saleor instance not registered");
+        var authData = await _apl.Get(storeId);
+        if (authData is null || !authData.SaleorApiUrl.Equals(saleorApiUrl, StringComparison.OrdinalIgnoreCase))
+            return Unauthorized("Saleor instance not registered or URL mismatch");
 
         var rawBody = await _verifier.ReadRawBodyAsync(Request);
         if (!_verifier.Verify(rawBody, signature ?? "", authData.Token))
@@ -239,7 +355,7 @@ public class UISaleorPublicAppController : Controller
         }
     }
 
-    [HttpPost("webhook/transaction-process-session")]
+    [HttpPost("webhooks/transaction-process-session")]
     public async Task<IActionResult> TransactionProcessSession(string storeId)
     {
         var saleorApiUrl = Request.Headers["saleor-api-url"].FirstOrDefault();
@@ -248,9 +364,9 @@ public class UISaleorPublicAppController : Controller
         if (string.IsNullOrEmpty(saleorApiUrl))
             return BadRequest("Missing saleor-api-url header");
 
-        var authData = await _apl.GetAsync(saleorApiUrl);
-        if (authData is null)
-            return Unauthorized("Saleor instance not registered");
+        var authData = await _apl.Get(storeId);
+        if (authData is null || !authData.SaleorApiUrl.Equals(saleorApiUrl, StringComparison.OrdinalIgnoreCase))
+            return Unauthorized("Saleor instance not registered or URL mismatch");
 
         var rawBody = await _verifier.ReadRawBodyAsync(Request);
         if (!_verifier.Verify(rawBody, signature ?? "", authData.Token))
@@ -323,41 +439,10 @@ public class UISaleorPublicAppController : Controller
 
     #endregion
 
-    #region Register
-
-
-    [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] SaleorRegisterRequest body)
-    {
-        var saleorApiUrl = Request.Headers["saleor-api-url"].FirstOrDefault();
-
-        if (string.IsNullOrEmpty(saleorApiUrl))
-            return BadRequest(new { error = "Missing saleor-api-url header" });
-
-        if (string.IsNullOrEmpty(body.AuthToken))
-            return BadRequest(new { error = "Missing auth_token" });
-
-        // Fetch the app ID from Saleor using the token to verify it works
-        // and to store the app ID for later metadata operations
-        try
-        {
-            var appId = await FetchAppIdAsync(saleorApiUrl, body.AuthToken);
-            await _apl.SetAsync(saleorApiUrl, body.AuthToken, appId ?? "");
-            _logger.LogInformation("Registered Saleor instance: {Url}", saleorApiUrl);
-            return Ok(new { success = true });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to verify token for {Url}", saleorApiUrl);
-            return StatusCode(500, new { error = "Failed to verify token with Saleor" });
-        }
-    }
-
-    #endregion
 
     private string CheckoutUrl(string invoiceId) => Url.Action(nameof(UIInvoiceController.Checkout), "UIInvoice", new { invoiceId }, Request.Scheme);
 
-    private async Task<string?> FetchAppIdAsync(string saleorApiUrl, string token)
+    private async Task<string> FetchAppIdAsync(string saleorApiUrl, string token)
     {
         var client = _httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
