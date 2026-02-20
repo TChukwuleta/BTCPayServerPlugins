@@ -56,12 +56,14 @@ public class LogoManifest
 public class WebhookManifest
 {
     [JsonPropertyName("name")]
-    public string Name { get; set; } 
+    public string Name { get; set; }
 
-    [JsonProperty("asyncEvents", NullValueHandling = NullValueHandling.Ignore)]
+    [JsonPropertyName("asyncEvents")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string[]? AsyncEvents { get; set; }
 
-    [JsonProperty("syncEvents", NullValueHandling = NullValueHandling.Ignore)]
+    [JsonPropertyName("syncEvents")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string[]? SyncEvents { get; set; }
 
     [JsonPropertyName("query")]

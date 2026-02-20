@@ -82,7 +82,7 @@ public class SaleorHostedService : EventHostedServiceBase
         logs.Write($"Saleor transaction Id is: {saleorTransactionId}", InvoiceEventData.EventSeverity.Warning);
 
         var authData = await _apl.Get(invoice.StoreId);
-        if (authData is null) return logs;
+        if (string.IsNullOrEmpty(authData.Token)) return logs;
         try
         {
             var externalUrl = $"{invoice.ServerUrl}i/{invoice.Id}/receipt";

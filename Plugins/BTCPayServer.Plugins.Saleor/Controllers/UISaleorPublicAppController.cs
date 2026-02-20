@@ -358,7 +358,7 @@ public class UISaleorPublicAppController : Controller
                 Result = "CHARGE_FAILURE",
                 Amount = amount,
                 PspReference = Guid.NewGuid().ToString(),
-                Message = $"BTCPay error: {ex.Message}"
+                Message = "BTCPay error: failed to initialize transaction"
             });
         }
     }

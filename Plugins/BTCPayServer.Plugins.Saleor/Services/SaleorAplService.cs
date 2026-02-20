@@ -23,7 +23,7 @@ public class SaleorAplService
         entry.AppId = appId; 
         entry.StoreId = storeId;
         entry.SaleorDomain = saleorDomain;
-        entry.RegisteredAt = DateTimeOffset.Now;
+        entry.RegisteredAt = DateTimeOffset.UtcNow;
         await _storeRepository.UpdateSetting(storeId, SettingsKey, entry);
     }
 
