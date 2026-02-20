@@ -18,11 +18,9 @@ public class SaleorPlugin : BaseBTCPayServerPlugin
     public override void Execute(IServiceCollection services)
     {
         services.AddSingleton<SaleorAplService>();
-        services.AddSingleton<SaleorConfigService>();
         services.AddHttpClient<SaleorGraphQLService>();
         services.AddSingleton<SaleorWebhookVerifier>();
         services.AddHostedService<SaleorHostedService>();
-        //services.AddHostedService<SaleorPluginMigrationRunner>();
         services.AddSingleton<IUIExtension>(new UIExtension("SaleorNav", "header-nav"));
         services.AddSession(options =>
         {

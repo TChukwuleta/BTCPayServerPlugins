@@ -21,7 +21,6 @@ using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
 namespace BTCPayServer.Plugins.Saleor;
@@ -37,14 +36,11 @@ public class UISaleorPublicAppController : Controller
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly UIInvoiceController _invoiceController;
-    private readonly ILogger<UISaleorPublicAppController> _logger;
     public UISaleorPublicAppController(SaleorAplService apl, SaleorWebhookVerifier verifier,  StoreRepository storeRepository, 
-        InvoiceRepository invoiceRepository, UIInvoiceController invoiceController, ILogger<UISaleorPublicAppController> logger,
-        IHttpClientFactory httpClientFactory, UriResolver uriResolver)
+        InvoiceRepository invoiceRepository, UIInvoiceController invoiceController, IHttpClientFactory httpClientFactory, UriResolver uriResolver)
     {
 
         _apl = apl;
-        _logger = logger;
         _verifier = verifier;
         _uriResolver = uriResolver;
         _storeRepository = storeRepository;
@@ -217,12 +213,11 @@ public class UISaleorPublicAppController : Controller
         if (store == null) return NotFound();
 
         var entry = await _apl.Get(storeId);
-
         return Ok(new
         {
             storeId,
             storeName = store.StoreName,
-            connected = entry is not null,
+            connected = !string.IsNullOrEmpty(entry.Token),
             saleorApiUrl = entry?.SaleorApiUrl,
             registeredAt = entry?.RegisteredAt
         });
@@ -259,7 +254,7 @@ public class UISaleorPublicAppController : Controller
             return Unauthorized("Saleor instance not registered or URL mismatch");
 
         var rawBody = await _verifier.ReadRawBodyAsync(Request);
-        if (!_verifier.Verify(rawBody, signature ?? "", authData.Token))
+        if (!await _verifier.Verify(rawBody, signature ?? "", saleorApiUrl))
             return Unauthorized("Invalid webhook signature");
 
         var store = await _storeRepository.FindStore(storeId);
@@ -280,7 +275,6 @@ public class UISaleorPublicAppController : Controller
     {
         var saleorApiUrl = Request.Headers["saleor-api-url"].FirstOrDefault();
         var signature = Request.Headers["saleor-signature"].FirstOrDefault();
-
         if (string.IsNullOrEmpty(saleorApiUrl))
             return BadRequest("Missing saleor-api-url header");
 
@@ -289,7 +283,7 @@ public class UISaleorPublicAppController : Controller
             return Unauthorized("Saleor instance not registered or URL mismatch");
 
         var rawBody = await _verifier.ReadRawBodyAsync(Request);
-        if (!_verifier.Verify(rawBody, signature ?? "", authData.Token))
+        if (!await _verifier.Verify(rawBody, signature ?? "", saleorApiUrl))
             return Unauthorized("Invalid webhook signature");
 
         var store = await _storeRepository.FindStore(storeId);
@@ -362,7 +356,6 @@ public class UISaleorPublicAppController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create BTCPay invoice");
             return Ok(new TransactionWebhookResponse
             {
                 Result = "CHARGE_FAILURE",
@@ -387,7 +380,7 @@ public class UISaleorPublicAppController : Controller
             return Unauthorized("Saleor instance not registered or URL mismatch");
 
         var rawBody = await _verifier.ReadRawBodyAsync(Request);
-        if (!_verifier.Verify(rawBody, signature ?? "", authData.Token))
+        if (!await _verifier.Verify(rawBody, signature ?? "", saleorApiUrl))
             return Unauthorized("Invalid webhook signature");
 
         var store = await _storeRepository.FindStore(storeId);
@@ -444,7 +437,6 @@ public class UISaleorPublicAppController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to parse TransactionProcessSession payload");
             return Ok(new TransactionWebhookResponse
             {
                 Result = "CHARGE_FAILURE",
