@@ -1,0 +1,60 @@
+﻿@using BTCPayServer.Plugins.Saleor.ViewModels
+@model SaleorAppPageViewModel
+@{
+    Layout = "_SaleorPublicLayout";
+}
+
+<div class="container py-4" style="max-width: 640px;">
+    <h4 class="mb-1">BTCPay Server</h4>
+    <p class="text-muted mb-4">Saleor integration for <strong>@Model.StoreName</strong></p>
+
+    @if (Model.ConnectedInstance is null)
+    {
+        <div class="alert alert-secondary">
+            No Saleor instance connected to this store. Install this app from your Saleor Dashboard to connect.
+        </div>
+    }
+    else
+    {
+        <div class="card" id="connection-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="badge bg-success">Connected</span>
+                </div>
+                <p class="mb-1 text-muted small">Saleor store URL</p>
+                <p class="mb-2 font-monospace small">@Model.ConnectedInstance.SaleorDomain</p>
+                <p class="text-muted small mb-3">
+                    Connected @Model.ConnectedInstance.RegisteredAt.ToString("MMM dd, yyyy HH:mm") UTC
+                </p>
+                <button class="btn btn-outline-danger btn-sm" onclick="disconnect('@Model.ConnectedInstance.SaleorApiUrl')">
+                    Disconnect
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+
+@section PageFootContent {
+<script>
+    async function disconnect(saleorApiUrl) {
+        if (!confirm('Disconnect this Saleor instance?')) return;
+
+        const res = await fetch(window.location.pathname.replace('/app', '/api/disconnect'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ saleorApiUrl })
+        });
+
+        if (res.ok) {
+            document.getElementById('connection-card').remove();
+            document.querySelector('.container').innerHTML += `
+                <div class="alert alert-secondary">
+                    Disconnected. You can reinstall the app from your Saleor Dashboard.
+                </div>`;
+        } else {
+            alert('Failed to disconnect. Please try again.');
+        }
+    }
+</script>
+}
