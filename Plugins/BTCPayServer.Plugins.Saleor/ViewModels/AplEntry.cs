@@ -5,6 +5,7 @@ namespace BTCPayServer.Plugins.Saleor.ViewModels;
 
 public class AplEntry
 {
+    public string SaleorDomain { get; set; }
     public string SaleorApiUrl { get; set; }
     public string Token { get; set; }
     public string AppId { get; set; }

@@ -1,0 +1,49 @@
+﻿@using BTCPayServer.Abstractions.Contracts
+@using BTCPayServer.Plugins.Saleor.ViewModels
+@inject IScopeProvider ScopeProvider
+@model SaleorDashboardViewModel
+@{
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+<div class="sticky-header-setup"></div>
+<div class="sticky-header d-sm-flex align-items-center justify-content-between">
+    <h2 class="mb-0">Saleor</h2>
+</div>
+<partial name="_StatusMessage" />
+
+<div class="row g-4">
+    <div class="col-12">
+        <h5 class="mb-1">App Manifest URL</h5>
+        <p class="text-muted small mb-2">Paste this into your Saleor Store Dashboard under <strong>Extension → Explore → Add Extension → Install from Manifest</strong> to connect.</p>
+        <div class="input-group w-auto">
+            <input type="text" class="form-control font-monospace small bg-transparent" value="@Model.ManifestUrl" readonly id="manifestUrl" />
+            <button class="btn btn-outline-secondary btn-sm" type="button" onclick="copyManifestUrl()">Copy</button>
+        </div>
+    </div>
+
+    <div class="col-12">
+        @if (!string.IsNullOrEmpty(Model.ConnectedInstance?.Token))
+        {
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-success">Connected</span>
+                <span class="font-monospace small">@Model.ConnectedInstance.SaleorDomain</span>
+                <span class="text-muted small">· Since @Model.ConnectedInstance.RegisteredAt.ToString("MMM dd, yyyy HH:mm") UTC</span>
+            </div>
+        }
+        else
+        {
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-secondary">Not Connected</span>
+                <span class="text-muted small">No Saleor instance connected to this store.</span>
+            </div>
+        }
+    </div>
+</div>
+
+@section PageFootContent {
+    <script>
+        function copyManifestUrl() {
+            navigator.clipboard.writeText(document.getElementById('manifestUrl').value);
+        }
+    </script>
+}

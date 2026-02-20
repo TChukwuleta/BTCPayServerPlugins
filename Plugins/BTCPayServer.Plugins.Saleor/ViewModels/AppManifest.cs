@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.Saleor.ViewModels;
 
@@ -57,10 +58,10 @@ public class WebhookManifest
     [JsonPropertyName("name")]
     public string Name { get; set; } = "";
 
-    [JsonPropertyName("asyncEvents")]
+    [JsonProperty("asyncEvents", NullValueHandling = NullValueHandling.Ignore)]
     public string[]? AsyncEvents { get; set; }
 
-    [JsonPropertyName("syncEvents")]
+    [JsonProperty("syncEvents", NullValueHandling = NullValueHandling.Ignore)]
     public string[]? SyncEvents { get; set; }
 
     [JsonPropertyName("query")]

@@ -4,12 +4,14 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Controllers;
 using BTCPayServer.Data;
+using BTCPayServer.Filters;
 using BTCPayServer.Lightning.LndHub;
 using BTCPayServer.Models;
 using BTCPayServer.Plugins.Saleor.Services;
@@ -51,6 +53,8 @@ public class UISaleorPublicAppController : Controller
         _invoiceController = invoiceController;
     }
 
+    static string FlattenQuery(string query) => Regex.Replace(query.Trim(), @"\s+", " ");
+
     #region Manifest 
 
     [HttpGet("api/manifest")]
@@ -65,11 +69,15 @@ public class UISaleorPublicAppController : Controller
             Author = "BTCPay Server",
             About = "Accept Bitcoin payments via your self-hosted BTCPay Server",
             Permissions = ["HANDLE_PAYMENTS"],
-            AppUrl = Endpoint(nameof(AppPage)),
-            TokenTargetUrl = Endpoint(nameof(Register)),
+            /*AppUrl = Endpoint(nameof(AppPage)),
+            TokenTargetUrl = Endpoint(nameof(Register)),*/
+            AppUrl= "https://1679-102-88-111-17.ngrok-free.app/plugins/862r7xnfBaYs42w2DUeStXg95ffsMw2NPkqp6jL28SZi/saleor/app",
+            TokenTargetUrl = "https://1679-102-88-111-17.ngrok-free.app/plugins/862r7xnfBaYs42w2DUeStXg95ffsMw2NPkqp6jL28SZi/saleor/register",
             Brand = new BrandManifest
             {
-                Logo = new LogoManifest { Default = Endpoint(nameof(Logo)) }
+                Logo = new LogoManifest { 
+                    Default = "https://1679-102-88-111-17.ngrok-free.app/plugins/862r7xnfBaYs42w2DUeStXg95ffsMw2NPkqp6jL28SZi/saleor/btcpay_logo.png" //Endpoint(nameof(Logo)) 
+                }
             },
             Webhooks =
             [
@@ -77,8 +85,8 @@ public class UISaleorPublicAppController : Controller
                 {
                     Name = "Payment Gateway Initialize Session",
                     SyncEvents = ["PAYMENT_GATEWAY_INITIALIZE_SESSION"],
-                    TargetUrl = Endpoint(nameof(PaymentGatewayInitializeSession)),
-                    Query = """
+                    TargetUrl = "https://1679-102-88-111-17.ngrok-free.app/plugins/862r7xnfBaYs42w2DUeStXg95ffsMw2NPkqp6jL28SZi/saleor/webhooks/payment-gateway-initialize-session", //Endpoint(nameof(PaymentGatewayInitializeSession)),
+                    Query = FlattenQuery("""
                         subscription {
                             event {
                                 ... on PaymentGatewayInitializeSession {
@@ -91,14 +99,14 @@ public class UISaleorPublicAppController : Controller
                                 }
                             }
                         }
-                        """
+                    """)
                 },
                 new WebhookManifest
                 {
                     Name = "Transaction Initialize Session",
                     SyncEvents = ["TRANSACTION_INITIALIZE_SESSION"],
-                    TargetUrl = Endpoint(nameof(TransactionInitializeSession)),
-                    Query = """
+                    TargetUrl = "https://1679-102-88-111-17.ngrok-free.app/plugins/862r7xnfBaYs42w2DUeStXg95ffsMw2NPkqp6jL28SZi/saleor/webhooks/transaction-initialize-session", //Endpoint(nameof(TransactionInitializeSession)),
+                    Query = FlattenQuery("""
                         subscription {
                             event {
                                 ... on TransactionInitializeSession {
@@ -118,14 +126,14 @@ public class UISaleorPublicAppController : Controller
                                 }
                             }
                         }
-                        """
+                    """)
                 },
                 new WebhookManifest
                 {
                     Name = "Transaction Process Session",
                     SyncEvents = ["TRANSACTION_PROCESS_SESSION"],
-                    TargetUrl = Endpoint(nameof(TransactionProcessSession)),
-                    Query = """
+                    TargetUrl = "https://1679-102-88-111-17.ngrok-free.app/plugins/862r7xnfBaYs42w2DUeStXg95ffsMw2NPkqp6jL28SZi/saleor/webhooks/transaction-process-session",  //Endpoint(nameof(TransactionProcessSession)),
+                    Query = FlattenQuery("""
                         subscription {
                             event {
                                 ... on TransactionProcessSession {
@@ -135,7 +143,7 @@ public class UISaleorPublicAppController : Controller
                                 }
                             }
                         }
-                        """
+                    """)
                 }
             ],
             Extensions = []
@@ -160,31 +168,32 @@ public class UISaleorPublicAppController : Controller
     }
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register(string storeId, [FromBody] SaleorRegisterRequest body)
+    public async Task<IActionResult> Register(string storeId, [FromBody] JObject body)
     {
-        var saleorApiUrl = Request.Headers["saleor-api-url"].FirstOrDefault();
+        var saleorApiUrl = Request.Headers["Saleor-Api-Url"].FirstOrDefault();
+        var saleorDomain = Request.Headers["Saleor-Domain"].FirstOrDefault();
+        var authToken = body["auth_token"]?.ToString();
 
         if (string.IsNullOrEmpty(saleorApiUrl))
             return BadRequest(new { error = "Missing saleor-api-url header" });
 
-        if (string.IsNullOrEmpty(body.AuthToken))
+        if (string.IsNullOrEmpty(authToken))
             return BadRequest(new { error = "Missing auth_token" });
 
         try
         {
-            var appId = await FetchAppIdAsync(saleorApiUrl, body.AuthToken);
-            await _apl.Set(saleorApiUrl, body.AuthToken, storeId, appId ?? "");
-            _logger.LogInformation("Registered Saleor instance: {Url}", saleorApiUrl);
+            var appId = await FetchAppIdAsync(saleorApiUrl, authToken);
+            await _apl.Set(saleorApiUrl, authToken, storeId, saleorDomain, appId ?? "");
             return Ok(new { success = true });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogError(ex, "Failed to verify token for {Url}", saleorApiUrl);
             return StatusCode(500, new { error = "Failed to verify token with Saleor" });
         }
     }
 
     [HttpGet("app")]
+    [XFrameOptions(XFrameOptionsAttribute.XFrameOptions.Unset)]
     public async Task<IActionResult> AppPage(string storeId)
     {
         var store = await _storeRepository.FindStore(storeId);
@@ -225,11 +234,7 @@ public class UISaleorPublicAppController : Controller
         if (string.IsNullOrEmpty(body.SaleorApiUrl))
             return BadRequest(new { error = "Missing saleorApiUrl" });
 
-        var deleted = await _apl.Delete(storeId, body.SaleorApiUrl);
-        if (!deleted)
-            return NotFound(new { error = "Connection not found or saleorApiUrl mismatch" });
-
-        _logger.LogInformation("Disconnected Saleor instance {Url} from store {StoreId}", body.SaleorApiUrl, storeId);
+        await _apl.Delete(storeId);
         return Ok(new { ok = true });
     }
 
@@ -294,7 +299,7 @@ public class UISaleorPublicAppController : Controller
         decimal amount = 0;
         try
         {
-            payload = JsonSerializer.Deserialize<TransactionInitializeSessionPayload>(rawBody) ?? throw new Exception("Empty payload");
+            payload = System.Text.Json.JsonSerializer.Deserialize<TransactionInitializeSessionPayload>(rawBody) ?? throw new Exception("Empty payload");
 
             amount = payload.Action.Amount;
             var transactionId = payload.Transaction.Id;
@@ -328,7 +333,7 @@ public class UISaleorPublicAppController : Controller
                 Metadata = new JObject
                 {
                     ["orderId"] = payload.Transaction.Id,
-                    ["buyerEmail"] = payload.SourceObject?.UserEmail
+                    ["buyerEmail"] = payload.SourceObject?.UserEmail,
                 },
                 AdditionalSearchTerms = [searchTerm]
             };
@@ -391,7 +396,7 @@ public class UISaleorPublicAppController : Controller
         decimal amount = 0;
         try
         {
-            var payload = JsonSerializer.Deserialize<TransactionProcessSessionPayload>(rawBody);
+            var payload = System.Text.Json.JsonSerializer.Deserialize<TransactionProcessSessionPayload>(rawBody);
             if (payload is null) return BadRequest("Empty payload");
 
             amount = payload.Action.Amount;
@@ -460,7 +465,7 @@ public class UISaleorPublicAppController : Controller
         var client = _httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var query = JsonSerializer.Serialize(new { query = "query { app { id } }" });
+        var query = System.Text.Json.JsonSerializer.Serialize(new { query = "query { app { id } }" });
         var content = new StringContent(query, System.Text.Encoding.UTF8, "application/json");
 
         var response = await client.PostAsync(saleorApiUrl, content);
