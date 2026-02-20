@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace BTCPayServer.Plugins.Saleor.Services;
@@ -16,24 +17,32 @@ namespace BTCPayServer.Plugins.Saleor.Services;
 public class SaleorWebhookVerifier
 {
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<SaleorWebhookVerifier> _logger;
     private readonly Dictionary<string, (JsonWebKeySet Jwks, DateTime FetchedAt)> _jwksCache = new();
     private readonly SemaphoreSlim _cacheLock = new(1, 1);
     private static readonly TimeSpan JwksCacheDuration = TimeSpan.FromHours(1);
 
-    public SaleorWebhookVerifier(IHttpClientFactory httpClientFactory)
+    public SaleorWebhookVerifier(IHttpClientFactory httpClientFactory, ILogger<SaleorWebhookVerifier> logger)
     {
+        _logger = logger;
         _httpClientFactory = httpClientFactory;
     }
 
     public async Task<bool> Verify(byte[] rawBody, string jwsSignature, string saleorApiUrl)
     {
+        _logger.LogInformation("JWS: {Jws}", jwsSignature);
+        _logger.LogInformation("Body bytes: {Len}", rawBody.Length);
+        _logger.LogInformation("Body preview: {Preview}", Encoding.UTF8.GetString(rawBody[..Math.Min(100, rawBody.Length)]));
+
         if (string.IsNullOrEmpty(jwsSignature)) return false;
         try
         {
             var parts = jwsSignature.Split('.');
+            _logger.LogInformation("JWS parts count: {Count}, part[1] empty: {Empty}", parts.Length, parts[1] == "");
             if (parts.Length != 3 || parts[1] != "") return false;
 
             var headerJson = Encoding.UTF8.GetString(Base64UrlDecode(parts[0]));
+            _logger.LogInformation("JWS header: {Header}", headerJson);
             using var headerDoc = JsonDocument.Parse(headerJson);
             var kid = headerDoc.RootElement.GetProperty("kid").GetString();
             var alg = headerDoc.RootElement.GetProperty("alg").GetString();
@@ -41,6 +50,7 @@ public class SaleorWebhookVerifier
 
             var jwks = await GetJwksAsync(saleorApiUrl);
             var key = jwks.Keys.FirstOrDefault(k => k.Kid == kid);
+            _logger.LogInformation("Key found: {Kid}", key?.Kid);
             if (key is null)
             {
                 jwks = await GetJwksAsync(saleorApiUrl, forceRefresh: true);
@@ -59,6 +69,8 @@ public class SaleorWebhookVerifier
                 var headerPrefix = Encoding.ASCII.GetBytes($"{parts[0]}.");
                 signingInput = headerPrefix.Concat(rawBody).ToArray();
             }
+            _logger.LogInformation("SigningInput length: {Len}", signingInput.Length);
+            _logger.LogInformation("b64 flag: {B64}", b64);
             var signatureBytes = Base64UrlDecode(parts[2]);
 
             using var rsa = RSA.Create();

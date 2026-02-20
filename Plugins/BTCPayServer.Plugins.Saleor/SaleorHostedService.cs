@@ -8,23 +8,28 @@ using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
 using BTCPayServer.Plugins.Saleor.Services;
 using BTCPayServer.Services.Invoices;
+using BTCPayServer.Services.Rates;
 using Microsoft.Extensions.Logging;
 
 namespace BTCPayServer.Plugins.Saleor;
 
 public class SaleorHostedService : EventHostedServiceBase
 {
+    private readonly SaleorAplService _apl;
     private readonly SaleorGraphQLService _graphql;
     private readonly InvoiceRepository _invoiceRepository;
-    public SaleorHostedService(EventAggregator eventAggregator, 
-        SaleorGraphQLService graphql,
-        InvoiceRepository invoiceRepository, Logs logs) : base(eventAggregator, logs)
+    private readonly CurrencyNameTable _currencyNameTable;
+    public SaleorHostedService(EventAggregator eventAggregator, SaleorGraphQLService graphql,
+        InvoiceRepository invoiceRepository, Logs logs, SaleorAplService apl, CurrencyNameTable currencyNameTable) : base(eventAggregator, logs)
     {
+        _apl = apl;
         _graphql = graphql;
         _invoiceRepository = invoiceRepository;
+        _currencyNameTable = currencyNameTable;
     }
 
     protected override void SubscribeToEvents()
+
     {
         Subscribe<InvoiceEvent>();
         base.SubscribeToEvents();
@@ -64,10 +69,9 @@ public class SaleorHostedService : EventHostedServiceBase
     }
 
 
-    async Task<InvoiceLogs> Process(string saleorOrderId, InvoiceEntity invoice)
+    async Task<InvoiceLogs> Process(string saleorTransactionId, InvoiceEntity invoice)
     {
         var logs = new InvoiceLogs();
-
         string result = invoice switch
         {
             { Status: InvoiceStatus.Settled } => "CHARGE_SUCCESS",
@@ -75,66 +79,26 @@ public class SaleorHostedService : EventHostedServiceBase
             { Status: InvoiceStatus.Invalid } => "CHARGE_FAILURE",
             _ => "CHARGE_ACTION_REQUIRED"
         };
+        logs.Write($"Saleor transaction Id is: {saleorTransactionId}", InvoiceEventData.EventSeverity.Warning);
 
-
-        /*if (btcpayPaid is not null)
+        var authData = await _apl.Get(invoice.StoreId);
+        if (authData is null) return logs;
+        try
         {
-            var capture = btcpayPaid.Value - shopifyPaid;
-            if (capture > 0m)
-            {
-                if (order.CancelledAt is not null)
-                {
-                    logs.Write("The shopify order has already been cancelled, but the BTCPay Server has been successfully paid.",
-                        InvoiceEventData.EventSeverity.Warning);
-                    return logs;
-                }
-
-                if (saleTx.ManuallyCapturable)
-                {
-                    try
-                    {
-                        await client.CaptureOrder(new()
-                        {
-                            Currency = invoice.Currency,
-                            Amount = capture,
-                            Id = order.Id,
-                            ParentTransactionId = saleTx.Id
-                        });
-                        logs.Write(
-                            $"Successfully captured the order on Shopify. ({capture} {invoice.Currency})",
-                            InvoiceEventData.EventSeverity.Info);
-                    }
-                    catch (Exception e)
-                    {
-                        logs.Write($"Failed to capture the Shopify order. ({capture} {invoice.Currency}) {e.Message} ",
-                            InvoiceEventData.EventSeverity.Error);
-                    }
-                }
-            }
+            var externalUrl = $"{invoice.ServerUrl}i/{invoice.Id}/receipt";
+            var amountPaid = Math.Round(invoice.PaidAmount.Net, _currencyNameTable.GetNumberFormatInfo(invoice.Currency)?.CurrencyDecimalDigits ?? 2);
+            logs.Write($"Reporting to Saleor: transactionId={saleorTransactionId}, amount={amountPaid}, type={result}, pspRef={invoice.Id}",
+             InvoiceEventData.EventSeverity.Info);
+            await _graphql.ReportTransactionEventAsync(authData.SaleorApiUrl, authData.Token, saleorTransactionId,
+                amountPaid, result, invoice.Id, externalUrl, $"BTCPay invoice {result}"
+            );
+            logs.Write($"Reported {result} to Saleor for transaction {saleorTransactionId}", InvoiceEventData.EventSeverity.Info);
         }
-        else if (order.CancelledAt is null)
+        catch (Exception ex)
         {
-            try
-            {
-                await client.CancelOrder(new()
-                {
-                    OrderId = order.Id,
-                    NotifyCustomer = false,
-                    Reason = OrderCancelReason.DECLINED,
-                    Restock = true,
-                    Refund = false,
-                    StaffNote = $"BTCPay Invoice {invoice.Id} is {invoice.Status}"
-                });
-                logs.Write($"Shopify order cancelled. (Invoice Status: {invoice.Status})", InvoiceEventData.EventSeverity.Warning);
-            }
-            catch (Exception e)
-            {
-                logs.Write($"Failed to cancel the Shopify order. {e.Message}",
-                    InvoiceEventData.EventSeverity.Error);
-            }
-        }*/
+            logs.Write($"Saleor error while trying to write status for transaction {saleorTransactionId}. {ex.Message}", 
+                InvoiceEventData.EventSeverity.Error);
+        }
         return logs;
     }
-
-
 }

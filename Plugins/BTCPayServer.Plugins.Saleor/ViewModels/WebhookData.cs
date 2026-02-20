@@ -1,5 +1,4 @@
 ﻿using System.Text.Json.Serialization;
-using BTCPayServer.Lightning.LNDhub.Models;
 
 namespace BTCPayServer.Plugins.Saleor.ViewModels;
 
