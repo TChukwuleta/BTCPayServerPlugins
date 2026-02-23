@@ -14,7 +14,6 @@ using BTCPayServer.Plugins.LightSpeed.ViewModels;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -51,7 +50,8 @@ public class UILightSpeedController : Controller
             StoreId = settings.StoreId,
             LightSpeedUrl = settings.LightSpeedUrl,
             LightspeedPersonalAccessToken = settings.LightspeedPersonalAccessToken,
-            Currency = settings.Currency
+            Currency = settings.Currency,
+            GatewayUrl = Url.Action(nameof(Gateway), "UILightSpeed", new { storeId }, Request.Scheme)
         });
     }
 
@@ -81,13 +81,15 @@ public class UILightSpeedController : Controller
         var settings = await _lightSpeedService.GetSettings(storeId);
         var store = await _storeRepository.FindStore(storeId);
         if (store == null || settings is null || !settings.IsConfigured)
-            return BadRequest("Plugin not configured for this store.");
+            return BadRequest("Plugin not configured for this store");
+
+        if (string.IsNullOrEmpty(currency))
+            return BadRequest("Currency not present");
 
         var expectedOrigin = settings.LightSpeedUrl.TrimEnd('/');
         if (!origin.TrimEnd('/').Equals(expectedOrigin, StringComparison.OrdinalIgnoreCase))
             return BadRequest("Invalid origin");
 
-        currency ??= settings.Currency;
         var invoice = await _invoiceController.CreateInvoiceCoreRaw(new CreateInvoiceRequest()
         {
             Amount = amount,
