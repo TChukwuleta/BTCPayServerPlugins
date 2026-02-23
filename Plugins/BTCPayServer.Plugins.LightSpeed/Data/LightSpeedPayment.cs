@@ -14,5 +14,7 @@ public class LightSpeedPayment
     public string Currency { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? PaidAt { get; set; }
-    public string Status { get; set; }
+    public LightSpeedPaymentStatus Status { get; set; }
 }
+
+public enum LightSpeedPaymentStatus { Pending, Settled, Expired, Failed }

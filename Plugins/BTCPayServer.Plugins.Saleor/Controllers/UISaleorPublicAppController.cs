@@ -291,7 +291,7 @@ public class UISaleorPublicAppController : Controller
         decimal amount = 0;
         try
         {
-            payload = System.Text.Json.JsonSerializer.Deserialize<TransactionInitializeSessionPayload>(rawBody) ?? throw new Exception("Empty payload");
+            payload = JsonSerializer.Deserialize<TransactionInitializeSessionPayload>(rawBody) ?? throw new Exception("Empty payload");
 
             amount = payload.Action.Amount;
             var transactionId = payload.Transaction.Id;

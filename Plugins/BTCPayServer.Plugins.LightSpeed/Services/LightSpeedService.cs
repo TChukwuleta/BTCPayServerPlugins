@@ -1,8 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using BTCPayServer.Client.Models;
 using BTCPayServer.Plugins.LightSpeed.Data;
+using BTCPayServer.Plugins.LightSpeed.ViewModels;
 
 namespace BTCPayServer.Plugins.LightSpeed.Services;
 
@@ -20,14 +21,22 @@ public class LightSpeedService
         return ctx.LightspeedSettings.FirstOrDefault(c => c.StoreId == storeId);
     }
 
-    public async Task SaveSettingsAsync(LightspeedSettings settings)
+    public async Task SaveSettings(LightspeedSettingsViewModel settings)
     {
         await using var ctx = _dbContextFactory.CreateContext();
         var existingSetting = ctx.LightspeedSettings.FirstOrDefault(c => c.StoreId == settings.StoreId);
         if (existingSetting is null)
-            ctx.LightspeedSettings.Add(settings);
+            ctx.LightspeedSettings.Add(new LightspeedSettings
+            {
+                StoreId = settings.StoreId,
+                LightSpeedUrl = settings.LightSpeedUrl,
+                LightspeedDomainPrefix = settings.LightspeedDomainPrefix,
+                LightspeedPersonalAccessToken = settings.LightspeedPersonalAccessToken,
+                Currency = settings.Currency    
+            });
         else
         {
+            existingSetting.LightSpeedUrl = settings.LightSpeedUrl; 
             existingSetting.LightspeedDomainPrefix = settings.LightspeedDomainPrefix;
             existingSetting.LightspeedPersonalAccessToken = settings.LightspeedPersonalAccessToken;
             existingSetting.Currency = settings.Currency;
@@ -50,6 +59,7 @@ public class LightSpeedService
     public async Task AddLightSpeedPayment(LightSpeedPayment payment)
     {
         await using var ctx = _dbContextFactory.CreateContext();
+        payment.CreatedAt = DateTimeOffset.UtcNow;
         ctx.LightSpeedPayments.Add(payment);
         await ctx.SaveChangesAsync();
     }
@@ -60,13 +70,14 @@ public class LightSpeedService
         return ctx.LightSpeedPayments.FirstOrDefault(c => c.InvoiceId == invoiceId);
     }
 
-    public async Task UpdatePaymentStatus(string invoiceId, InvoiceStatus status)
+    public async Task UpdatePaymentStatus(string invoiceId, LightSpeedPaymentStatus status)
     {
         await using var ctx = _dbContextFactory.CreateContext();
         var payment = ctx.LightSpeedPayments.FirstOrDefault(c => c.InvoiceId == invoiceId);
         if (payment is not null)
         {
-            payment.InvoiceStatus = status.ToString();
+            payment.PaidAt = DateTimeOffset.UtcNow;
+            payment.Status = status;
             await ctx.SaveChangesAsync();
         }
     }
