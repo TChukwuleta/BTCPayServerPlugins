@@ -1,58 +1,46 @@
 ﻿# BTCPay Server Store Bridge Plugin
 
-Export and import store configurations in BTCPay Server.
+Accept Bitcoin and Lightning Network payments directly from the Lightspeed Retail point of sale. When a customer chooses to pay with Bitcoin, 
+a BTCPay checkout appears inside the Lightspeed payment screen. Once the payment settles, Lightspeed automatically marks the sale as paid
 
-## What can you export/import?
+## What you need?
 
-- Branding
-- Email Settings
-- Rate Settings
-- Checkout Configuration
-- Webhooks
-- Roles and Permissions
-- Custom Forms
+- A running BTCPay Server instance (self-hosted or hosted by a third party)
+- A Lightspeed retail account (ourstore.retail.lightspeed.app)
+
+This plugin does not support Lightspeed Restaurant or Lightspeed eCom yet.
 
 
 ## Installation
 
-1. On the left navigation of BTCPay Server UI click **Manage Plugins** search for **Store Bridge** plugin
+1. On the left navigation of BTCPay Server UI click **Manage Plugins** search for **Light Speed** plugin
 2. Install the plugin, and if BTCPay Server requests that you restart the instance, go ahead and restart.
+3. Once the plugin is installed, you should see `Lightspeed HQ` in the left navigation. Click on it to open the settings page.
+4. Enter your Lightspeed store URL (https://yourstore.retail.lightspeed.app) and then save. The plugin uses to validate payment requests coming from your Lightspeed store.
+5. Copy the Gateway URL shown (https://yourbtcpay.com/plugins/STOREID/lightspeedhq/gateway)
+6. Log into your Lightspeed retail account, and go to `Settings > Payment Methods > Add Payment Method`
+7. Choose `Other psyment method`, name it whatever you choose (Pay with Bitcoin, Pay with BTCPay Server)
+8. Paste the gateway url you copied from the plugin into the `Gateway URL` field and save.
 
-### Usage
+That's it. The payment type will now appear on your Lightspeed sell screen.
 
-Now that you have installed the plugin, you can go ahead and export store settings and configuration and import into either a different store
-in the same instance or across other instance. 
+### How a payment works
 
-Go to `Export Plugin Config` of the Store Bridge plugin. There you would see all the store configuration that are open to be exported. 
-Toggle off the settings/configuration you don't want to export. Once done, click the `Export Store` button and it would download
-.storebridge file on your local computer. 
+When a customer is ready to pay, the cashier clicks `Pay` on the sale in the Lightspeed and selects your Bitcoin payment type
 
-Log in to the store you want to import the configuration to. Go to the Store bridge plugin > `Import Store Config`, and upload the 
-.storebridge file that was downloaded in the export. 
+Lightspeed opens a payment window of which BTCPay Server invoice checkout page is displayed. 
 
-There you would see all the available store configuration that you can import based on what was selected during export. 
+The customer can then go ahead and pay with any of the payment option available.
 
-You can go ahead and import all settings, or select specific configuration you want to import to the store. Once done, click on 
-`Confirm Import` button and voila.. Store configuration have now been imported to the store.
+Once payment is confirmed, the window will close and the sale will be marked as paid in Lightspeed.
 
+### Troubleshooting
 
-### What Each Setting Does
+##### The payment window opens but shows "Plugin not configured"
+The store ID in the Gateway URL doesn't match a store with the plugin configured. Double-check that you copied the Gateway URL from the correct BTCPay store.
 
-1. Branding Settings: Logo image, custom CSS, brand color scheme, backend appearance settings
-2. Email Settings: SMTP configuration
-3. Rate Settings: Primary rate, fallback rate, speed policy
-4. Checkout Settings: Default language, UI customization option, monitoring interval, invoice expiration timer e.t.c.
-5. Webhook: All existing webhook configuration
-6. Forms: All created custom forms. 
-7. Roles and Permission: All roles together with their corresponding permissions
-8. Subscription offerings, plans, and features
-
-
-## Roadmap
-
-- [ ] Support for encrypted exports with password protection
-- [ ] API endpoints for programmatic import/export
-- [ ] Support for batch operations (multiple stores)
+##### The payment window opens but shows "Invalid origin"
+The Lightspeed Store URL saved in plugin settings doesn't match the actual domain your Lightspeed account is on. Go back to plugin settings and make sure the URL matches exactly, including https://.
 
 
 ## Contribute
