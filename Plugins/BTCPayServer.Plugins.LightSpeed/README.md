@@ -1,4 +1,4 @@
-﻿# BTCPay Server Store Bridge Plugin
+﻿# BTCPay Server - Lightspeed HQ Plugin
 
 Accept Bitcoin and Lightning Network payments directly from the Lightspeed Retail point of sale. When a customer chooses to pay with Bitcoin, 
 a BTCPay checkout appears inside the Lightspeed payment screen. Once the payment settles, Lightspeed automatically marks the sale as paid
