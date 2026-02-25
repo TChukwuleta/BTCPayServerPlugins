@@ -15,35 +15,30 @@ using EntityState = BTCPayServer.Plugins.SatoshiTickets.Data.EntityState;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
 
-/// <summary>
-/// Greenfield API controller for managing ticket types (pricing tiers) within events.
-/// </summary>
+
+[Route("~/api/v1/stores/{storeId}/satoshi-tickets/")]
 [ApiController]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield, Policy = Policies.CanModifyStoreSettings)]
 [EnableCors(CorsPolicies.All)]
-public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
+public class GreenfieldSatoshiTicketTypesController : ControllerBase
 {
     private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
 
-    public GreenfieldSatoshiTicketsTicketTypesController(SimpleTicketSalesDbContextFactory dbContextFactory)
+    public GreenfieldSatoshiTicketTypesController(SimpleTicketSalesDbContextFactory dbContextFactory)
     {
         _dbContextFactory = dbContextFactory;
     }
 
     private string CurrentStoreId => HttpContext.GetStoreData()?.Id;
 
-    /// <summary>
-    /// List all ticket types for an event, with optional sorting.
-    /// </summary>
-    [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/ticket-types")]
-    [Authorize(Policy = Policies.CanViewStoreSettings)]
+    [HttpGet("events/{eventId}/ticket-types")]
     public async Task<IActionResult> GetTicketTypes(string storeId, string eventId,
         [FromQuery] string sortBy = "Name", [FromQuery] string sortDir = "asc")
     {
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var ticketEvent = await ctx.Events.FirstOrDefaultAsync(c => c.StoreId == CurrentStoreId && c.Id == eventId);
-        if (ticketEvent == null)
+        var ticketEvent = ctx.Events.Any(c => c.StoreId == CurrentStoreId && c.Id == eventId);
+        if (!ticketEvent)
             return EventNotFound();
 
         var query = ctx.TicketTypes.Where(c => c.EventId == eventId);
@@ -53,38 +48,28 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
             "Name" => sortDir == "desc" ? query.OrderByDescending(t => t.Name) : query.OrderBy(t => t.Name),
             _ => query.OrderBy(t => t.Name)
         };
-
-        var list = await query.ToListAsync();
+        var list = query.ToList();
         var result = list.Select(ToTicketTypeData).ToArray();
         return Ok(result);
     }
 
-    /// <summary>
-    /// Get a single ticket type by ID.
-    /// </summary>
-    [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/ticket-types/{ticketTypeId}")]
-    [Authorize(Policy = Policies.CanViewStoreSettings)]
+    [HttpGet("events/{eventId}/ticket-types/{ticketTypeId}")]
     public async Task<IActionResult> GetTicketType(string storeId, string eventId, string ticketTypeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-
-        var ticketEvent = await ctx.Events.FirstOrDefaultAsync(c => c.StoreId == CurrentStoreId && c.Id == eventId);
-        if (ticketEvent == null)
+        var ticketEvent = ctx.Events.Any(c => c.StoreId == CurrentStoreId && c.Id == eventId);
+        if (!ticketEvent)
             return EventNotFound();
 
-        var entity = await ctx.TicketTypes.FirstOrDefaultAsync(c => c.EventId == eventId && c.Id == ticketTypeId);
+        var entity = ctx.TicketTypes.FirstOrDefault(c => c.EventId == eventId && c.Id == ticketTypeId);
         if (entity == null)
             return TicketTypeNotFound();
 
         return Ok(ToTicketTypeData(entity));
     }
 
-    /// <summary>
-    /// Create a new ticket type for an event.
-    /// </summary>
-    [HttpPost("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/ticket-types")]
-    public async Task<IActionResult> CreateTicketType(string storeId, string eventId,
-        [FromBody] CreateTicketTypeRequest request)
+    [HttpPost("events/{eventId}/ticket-types")]
+    public async Task<IActionResult> CreateTicketType(string storeId, string eventId, [FromBody] CreateTicketTypeRequest request)
     {
         if (request == null)
         {
@@ -93,17 +78,19 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
         }
 
         await using var ctx = _dbContextFactory.CreateContext();
-
-        var ticketEvent = await ctx.Events.FirstOrDefaultAsync(c => c.Id == eventId && c.StoreId == CurrentStoreId);
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
         if (ticketEvent == null)
             return EventNotFound();
 
         if (string.IsNullOrWhiteSpace(request.Name))
             ModelState.AddModelError(nameof(request.Name), "Name is required");
+
         if (request.Price <= 0)
             ModelState.AddModelError(nameof(request.Price), "Price cannot be zero or negative");
+
         if (request.Quantity <= 0 && ticketEvent.HasMaximumCapacity)
             ModelState.AddModelError(nameof(request.Quantity), "Quantity must be greater than zero");
+
         if (ticketEvent.HasMaximumCapacity)
         {
             var usedQuantity = await ctx.TicketTypes.Where(t => t.EventId == eventId).SumAsync(c => c.Quantity);
@@ -125,16 +112,13 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
             IsDefault = request.IsDefault,
             TicketTypeState = EntityState.Active
         };
-
-        var currentDefault = await ctx.TicketTypes.FirstOrDefaultAsync(c => c.EventId == eventId && c.IsDefault);
+        var currentDefault = ctx.TicketTypes.FirstOrDefault(c => c.EventId == eventId && c.IsDefault);
         if (currentDefault == null)
         {
-            // No existing default — first ticket type always becomes default
             entity.IsDefault = true;
         }
         else if (request.IsDefault)
         {
-            // Caller explicitly requests this to be the new default
             currentDefault.IsDefault = false;
             entity.IsDefault = true;
         }
@@ -145,16 +129,10 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
 
         ctx.TicketTypes.Add(entity);
         await ctx.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetTicketType),
-            new { storeId, eventId, ticketTypeId = entity.Id },
-            ToTicketTypeData(entity));
+        return CreatedAtAction(nameof(GetTicketType), new { storeId, eventId, ticketTypeId = entity.Id }, ToTicketTypeData(entity));
     }
 
-    /// <summary>
-    /// Update an existing ticket type.
-    /// </summary>
-    [HttpPut("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/ticket-types/{ticketTypeId}")]
+    [HttpPut("events/{eventId}/ticket-types/{ticketTypeId}")]
     public async Task<IActionResult> UpdateTicketType(string storeId, string eventId, string ticketTypeId,
         [FromBody] UpdateTicketTypeRequest request)
     {
@@ -165,12 +143,11 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
         }
 
         await using var ctx = _dbContextFactory.CreateContext();
-
-        var ticketEvent = await ctx.Events.FirstOrDefaultAsync(c => c.Id == eventId && c.StoreId == CurrentStoreId);
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
         if (ticketEvent == null)
             return EventNotFound();
 
-        var entity = await ctx.TicketTypes.FirstOrDefaultAsync(c => c.Id == ticketTypeId && c.EventId == eventId);
+        var entity = ctx.TicketTypes.FirstOrDefault(c => c.Id == ticketTypeId && c.EventId == eventId);
         if (entity == null)
             return TicketTypeNotFound();
 
@@ -182,9 +159,8 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
             ModelState.AddModelError(nameof(request.Quantity), "Quantity must be greater than zero");
         if (ticketEvent.HasMaximumCapacity)
         {
-            var usedQuantity = await ctx.TicketTypes
-                .Where(t => t.EventId == eventId && t.Id != ticketTypeId)
-                .SumAsync(c => c.Quantity);
+            var usedQuantity = ctx.TicketTypes
+                .Where(t => t.EventId == eventId && t.Id != ticketTypeId).Sum(c => c.Quantity);
             if (request.Quantity > (ticketEvent.MaximumEventCapacity - usedQuantity))
                 ModelState.AddModelError(nameof(request.Quantity),
                     "Quantity specified is higher than available event capacity");
@@ -197,32 +173,36 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
         entity.Price = request.Price;
         entity.Quantity = request.Quantity;
         entity.Description = request.Description;
-        entity.IsDefault = request.IsDefault;
 
-        if (!entity.IsDefault)
+        if (request.IsDefault)
         {
-            var anyDefault = await ctx.TicketTypes.AnyAsync(t => t.EventId == eventId && t.Id != ticketTypeId && t.IsDefault);
-            if (!anyDefault) entity.IsDefault = true;
+            var currentDefault = ctx.TicketTypes.FirstOrDefault(t => t.EventId == eventId && t.Id != ticketTypeId && t.IsDefault);
+            if (currentDefault != null)
+            {
+                currentDefault.IsDefault = false;
+                entity.IsDefault = true;
+            }
         }
-
+        else
+        {
+            var anyDefault = ctx.TicketTypes.Any(t => t.EventId == eventId && t.Id != ticketTypeId && t.IsDefault);
+            entity.IsDefault = !anyDefault;
+        }
         await ctx.SaveChangesAsync();
-
         return Ok(ToTicketTypeData(entity));
     }
 
-    /// <summary>
-    /// Delete a ticket type. Reassigns default to another type if the deleted type was the default.
-    /// </summary>
-    [HttpDelete("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/ticket-types/{ticketTypeId}")]
+
+    [HttpDelete("ticket-types/{ticketTypeId}")]
     public async Task<IActionResult> DeleteTicketType(string storeId, string eventId, string ticketTypeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var ticketEvent = await ctx.Events.FirstOrDefaultAsync(c => c.StoreId == CurrentStoreId && c.Id == eventId);
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStoreId && c.Id == eventId);
         if (ticketEvent == null)
             return EventNotFound();
 
-        var entity = await ctx.TicketTypes.FirstOrDefaultAsync(c => c.EventId == eventId && c.Id == ticketTypeId);
+        var entity = ctx.TicketTypes.FirstOrDefault(c => c.EventId == eventId && c.Id == ticketTypeId);
         if (entity == null)
             return TicketTypeNotFound();
 
@@ -231,41 +211,30 @@ public class GreenfieldSatoshiTicketsTicketTypesController : ControllerBase
         // If we're deleting the default, reassign default to another ticket type
         if (entity.IsDefault)
         {
-            var newDefault = await ctx.TicketTypes
-                .Where(t => t.EventId == eventId && t.Id != ticketTypeId)
-                .OrderBy(t => t.Name)
-                .FirstOrDefaultAsync();
+            var newDefault = ctx.TicketTypes.Where(t => t.EventId == eventId && t.Id != ticketTypeId)
+                .OrderBy(t => t.Name).FirstOrDefault();
             if (newDefault != null)
                 newDefault.IsDefault = true;
         }
-
         await ctx.SaveChangesAsync();
-
         return Ok();
     }
 
-    /// <summary>
-    /// Toggle ticket type status between Active and Disabled.
-    /// </summary>
-    [HttpPut("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/ticket-types/{ticketTypeId}/toggle")]
+    [HttpPut("ticket-types/{ticketTypeId}/toggle")]
     public async Task<IActionResult> ToggleTicketTypeStatus(string storeId, string eventId, string ticketTypeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var ticketEvent = await ctx.Events.FirstOrDefaultAsync(c => c.StoreId == CurrentStoreId && c.Id == eventId);
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStoreId && c.Id == eventId);
         if (ticketEvent == null)
             return EventNotFound();
 
-        var entity = await ctx.TicketTypes.FirstOrDefaultAsync(c => c.EventId == eventId && c.Id == ticketTypeId);
+        var entity = ctx.TicketTypes.FirstOrDefault(c => c.EventId == eventId && c.Id == ticketTypeId);
         if (entity == null)
             return TicketTypeNotFound();
 
-        entity.TicketTypeState = entity.TicketTypeState == EntityState.Active
-            ? EntityState.Disabled
-            : EntityState.Active;
-
+        entity.TicketTypeState = entity.TicketTypeState == EntityState.Active ? EntityState.Disabled : EntityState.Active;
         await ctx.SaveChangesAsync();
-
         return Ok(ToTicketTypeData(entity));
     }
 

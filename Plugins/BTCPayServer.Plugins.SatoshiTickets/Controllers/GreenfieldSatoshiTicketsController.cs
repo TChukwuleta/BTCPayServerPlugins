@@ -92,7 +92,7 @@ public class GreenfieldSatoshiTicketsController : ControllerBase
         if (!ordersWithTickets.Any())
             return this.CreateAPIError(404, "no-tickets", "No settled tickets found for this event");
 
-        var fileName = $"{ticketEvent.Title}_Tickets-{DateTime.Now:yyyy_MM_dd-HH_mm_ss}.csv";
+        var fileName = $"{ticketEvent.Title}_Tickets-{DateTime.UtcNow:yyyy_MM_dd-HH_mm_ss}.csv";
         var csvData = new StringBuilder();
         csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency,Attended Event");
         foreach (var ticket in ordersWithTickets)
@@ -123,6 +123,8 @@ public class GreenfieldSatoshiTicketsController : ControllerBase
             return EventNotFound();
 
         var checkinResult = await _ticketService.CheckinTicket(eventId, ticketNumber, CurrentStoreId);
+        if (!checkinResult.Success)
+            return this.CreateAPIError(422, "checkin-failed", checkinResult.ErrorMessage);
 
         var result = new CheckinResultData
         {

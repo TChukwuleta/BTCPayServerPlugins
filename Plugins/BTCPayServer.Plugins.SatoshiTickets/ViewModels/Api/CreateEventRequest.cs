@@ -1,13 +1,16 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Models.Api;
 
 public class CreateEventRequest
 {
+    [Required]
     public string Title { get; set; }
     public string Description { get; set; }
     public string EventType { get; set; }
     public string Location { get; set; }
+    [Required]
     public DateTime StartDate { get; set; }
     public DateTime? EndDate { get; set; }
     public string Currency { get; set; }
