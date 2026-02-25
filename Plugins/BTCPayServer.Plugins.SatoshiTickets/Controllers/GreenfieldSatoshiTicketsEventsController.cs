@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
@@ -16,32 +17,24 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
 
-/// <summary>
-/// Greenfield API controller for managing SatoshiTickets events.
-/// Provides CRUD operations, status toggling, and logo upload/delete.
-/// </summary>
+[Route("~/plugins/{storeId}/satoshi-tickets/api/v1/")]
 [ApiController]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield, Policy = Policies.CanModifyStoreSettings)]
 [EnableCors(CorsPolicies.All)]
 public class GreenfieldSatoshiTicketsEventsController : ControllerBase
 {
-    private readonly StoreRepository _storeRepo;
     private readonly UriResolver _uriResolver;
     private readonly IFileService _fileService;
+    private readonly StoreRepository _storeRepo;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
 
-    public GreenfieldSatoshiTicketsEventsController(
-        StoreRepository storeRepo,
-        UriResolver uriResolver,
-        IFileService fileService,
-        UserManager<ApplicationUser> userManager,
-        SimpleTicketSalesDbContextFactory dbContextFactory)
+    public GreenfieldSatoshiTicketsEventsController(StoreRepository storeRepo, UriResolver uriResolver,
+        IFileService fileService, UserManager<ApplicationUser> userManager, SimpleTicketSalesDbContextFactory dbContextFactory)
     {
         _storeRepo = storeRepo;
         _uriResolver = uriResolver;
@@ -52,45 +45,38 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
 
     private string CurrentStoreId => HttpContext.GetStoreData()?.Id;
 
-    /// <summary>
-    /// List all events for a store. Optionally filter to expired events only.
-    /// </summary>
-    [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events")]
-    [Authorize(Policy = Policies.CanViewStoreSettings)]
+    [HttpGet("events")]
     public async Task<IActionResult> GetEvents(string storeId, [FromQuery] bool expired = false)
     {
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var eventsQuery = ctx.Events.Where(c => c.StoreId == CurrentStoreId);
-        var events = eventsQuery.ToList();
-        var eventTickets = ctx.Tickets
-            .Where(t => t.StoreId == CurrentStoreId && t.PaymentStatus == TransactionStatus.Settled.ToString())
-            .ToList();
-
-        var result = new System.Collections.Generic.List<EventData>();
-        foreach (var e in events)
-        {
-            result.Add(await ToEventData(e, eventTickets.Count(t => t.EventId == e.Id)));
-        }
-
+        var eventsQuery = ctx.Events.Where(c => c.StoreId == CurrentStoreId && c.EventState == Data.EntityState.Active);
         if (expired)
-        {
-            result = result.Where(e => e.StartDate <= DateTime.UtcNow).ToList();
-        }
+            eventsQuery = eventsQuery.Where(e => e.StartDate <= DateTime.UtcNow);
 
+        var events = eventsQuery.ToList();
+        if (!events.Any())
+            return Ok(Array.Empty<EventData>());
+
+        var eventIds = events.Select(e => e.Id).ToHashSet();
+        var ticketSoldByEvent = ctx.Tickets
+            .Where(t => t.StoreId == CurrentStoreId && eventIds.Contains(t.EventId) && t.PaymentStatus == TransactionStatus.Settled.ToString())
+            .GroupBy(t => t.EventId)
+            .Select(g => new { EventId = g.Key, Count = g.Count() })
+            .ToDictionary(x => x.EventId, x => x.Count);
+
+        var result = await Task.WhenAll(events.Select(e => ToEventData(e, ticketSoldByEvent.GetValueOrDefault(e.Id, 0))));
         return Ok(result);
     }
 
-    /// <summary>
-    /// Get a single event by ID.
-    /// </summary>
-    [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}")]
+
+    [HttpGet("events/{eventId}")]
     [Authorize(Policy = Policies.CanViewStoreSettings)]
     public async Task<IActionResult> GetEvent(string storeId, string eventId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
 
-        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
+        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId && c.EventState == Data.EntityState.Active);
         if (entity == null)
             return EventNotFound();
 
@@ -100,10 +86,8 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         return Ok(await ToEventData(entity, ticketsSold));
     }
 
-    /// <summary>
-    /// Create a new event. Events are created in Disabled state.
-    /// </summary>
-    [HttpPost("~/api/v1/stores/{storeId}/satoshi-tickets/events")]
+
+    [HttpPost("events")]
     public async Task<IActionResult> CreateEvent(string storeId, [FromBody] CreateEventRequest request)
     {
         if (request == null)
@@ -111,16 +95,20 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
             ModelState.AddModelError(nameof(request), "Request body is required");
             return this.CreateValidationError(ModelState);
         }
-
         if (string.IsNullOrWhiteSpace(request.Title))
             ModelState.AddModelError(nameof(request.Title), "Title is required");
+
         if (request.StartDate <= DateTime.UtcNow)
             ModelState.AddModelError(nameof(request.StartDate), "Event date cannot be in the past");
+
         if (request.EndDate.HasValue && request.EndDate.Value < request.StartDate)
             ModelState.AddModelError(nameof(request.EndDate), "Event end date cannot be before start date");
+
         if (request.HasMaximumCapacity && (!request.MaximumEventCapacity.HasValue || request.MaximumEventCapacity.Value <= 0))
             ModelState.AddModelError(nameof(request.MaximumEventCapacity), "Maximum event capacity must be greater than zero when capacity is enabled");
-        if (!string.IsNullOrEmpty(request.EventType) && !Enum.TryParse<EventType>(request.EventType, true, out _))
+
+        EventType parsedEventType = default;
+        if (string.IsNullOrEmpty(request.EventType) || !Enum.TryParse<EventType>(request.EventType, true, out parsedEventType))
             ModelState.AddModelError(nameof(request.EventType), "Invalid event type. Valid values: Virtual, Physical");
 
         if (!ModelState.IsValid)
@@ -132,7 +120,6 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
             var store = await _storeRepo.FindStore(storeId);
             currency = store?.GetStoreBlob()?.DefaultCurrency ?? "USD";
         }
-
         var entity = new Event
         {
             StoreId = CurrentStoreId,
@@ -145,27 +132,23 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
             RedirectUrl = request.RedirectUrl,
             EmailSubject = request.EmailSubject,
             EmailBody = request.EmailBody,
-            EventType = Enum.TryParse<EventType>(request.EventType, true, out var et) ? et : EventType.Physical,
+            EventType = parsedEventType,
             HasMaximumCapacity = request.HasMaximumCapacity,
             MaximumEventCapacity = request.MaximumEventCapacity,
-            EventState = Data.EntityState.Disabled,
+            EventState = request.Enable ? Data.EntityState.Active : Data.EntityState.Disabled,
             CreatedAt = DateTime.UtcNow
         };
-
-        if (!string.IsNullOrEmpty(request.EventLogoFileId))
-            entity.EventLogo = request.EventLogoFileId;
+        /*if (!string.IsNullOrEmpty(request.EventLogoFileId))
+            entity.EventLogo = request.EventLogoFileId;*/
 
         await using var ctx = _dbContextFactory.CreateContext();
         ctx.Events.Add(entity);
         await ctx.SaveChangesAsync();
-
         return CreatedAtAction(nameof(GetEvent), new { storeId, eventId = entity.Id }, await ToEventData(entity, 0));
     }
 
-    /// <summary>
-    /// Update an existing event.
-    /// </summary>
-    [HttpPut("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}")]
+
+    [HttpPut("events/{eventId}")]
     public async Task<IActionResult> UpdateEvent(string storeId, string eventId, [FromBody] UpdateEventRequest request)
     {
         if (request == null)
@@ -173,25 +156,25 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
             ModelState.AddModelError(nameof(request), "Request body is required");
             return this.CreateValidationError(ModelState);
         }
-
         await using var ctx = _dbContextFactory.CreateContext();
-
         var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
         if (entity == null)
             return EventNotFound();
 
         if (string.IsNullOrWhiteSpace(request.Title))
             ModelState.AddModelError(nameof(request.Title), "Title is required");
+
         if (!request.StartDate.HasValue)
             ModelState.AddModelError(nameof(request.StartDate), "Start date is required");
+
         if (request.EndDate.HasValue && request.StartDate.HasValue && request.EndDate.Value < request.StartDate.Value)
             ModelState.AddModelError(nameof(request.EndDate), "Event end date cannot be before start date");
+
         if (request.HasMaximumCapacity)
         {
             var ticketTiersCount = ctx.TicketTypes.Where(t => t.EventId == eventId).Sum(c => c.Quantity);
             if (request.MaximumEventCapacity < ticketTiersCount)
-                ModelState.AddModelError(nameof(request.MaximumEventCapacity),
-                    "Maximum capacity is less than the sum of all tiers capacity");
+                ModelState.AddModelError(nameof(request.MaximumEventCapacity), "Maximum capacity is less than the sum of all tiers capacity");
         }
         if (!string.IsNullOrEmpty(request.EventType) && !Enum.TryParse<EventType>(request.EventType, true, out _))
             ModelState.AddModelError(nameof(request.EventType), "Invalid event type. Valid values: Virtual, Physical");
@@ -212,15 +195,14 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
 
         if (!string.IsNullOrEmpty(request.Currency))
             entity.Currency = request.Currency.Trim().ToUpperInvariant();
+
         if (!string.IsNullOrEmpty(request.EventType))
             entity.EventType = Enum.Parse<EventType>(request.EventType, true);
 
-        if (request.EventLogoFileId != null)
+        /*if (request.EventLogoFileId != null)
         {
-            entity.EventLogo = string.IsNullOrEmpty(request.EventLogoFileId)
-                ? null
-                : request.EventLogoFileId;
-        }
+            entity.EventLogo = string.IsNullOrEmpty(request.EventLogoFileId) ? null : request.EventLogoFileId;
+        }*/
 
         ctx.Events.Update(entity);
         await ctx.SaveChangesAsync();
@@ -231,14 +213,11 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         return Ok(await ToEventData(entity, ticketsSold));
     }
 
-    /// <summary>
-    /// Delete an event and its ticket types and tickets (if event is past).
-    /// </summary>
-    [HttpDelete("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}")]
+
+    [HttpDelete("events/{eventId}")]
     public async Task<IActionResult> DeleteEvent(string storeId, string eventId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-
         var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
         if (entity == null)
             return EventNotFound();
@@ -253,23 +232,20 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == eventId).ToList();
         if (tickets.Any())
             ctx.Tickets.RemoveRange(tickets);
+
         if (ticketTypes.Any())
             ctx.TicketTypes.RemoveRange(ticketTypes);
 
         ctx.Events.Remove(entity);
         await ctx.SaveChangesAsync();
-
         return Ok();
     }
 
-    /// <summary>
-    /// Toggle event status between Active and Disabled.
-    /// </summary>
-    [HttpPut("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/toggle")]
+
+    [HttpPut("events/{eventId}/toggle")]
     public async Task<IActionResult> ToggleEventStatus(string storeId, string eventId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-
         var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
         if (entity == null)
             return EventNotFound();
@@ -280,11 +256,7 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
             return this.CreateAPIError(422, "no-ticket-types",
                 "Cannot activate event without ticket types. Create at least one ticket type first.");
         }
-
-        entity.EventState = entity.EventState == Data.EntityState.Active
-            ? Data.EntityState.Disabled
-            : Data.EntityState.Active;
-
+        entity.EventState = entity.EventState == Data.EntityState.Active ? Data.EntityState.Disabled : Data.EntityState.Active;
         ctx.Events.Update(entity);
         await ctx.SaveChangesAsync();
 
@@ -294,10 +266,8 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         return Ok(await ToEventData(entity, ticketsSold));
     }
 
-    /// <summary>
-    /// Upload an image as the event logo. Accepts multipart/form-data.
-    /// </summary>
-    [HttpPost("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/logo")]
+
+    [HttpPost("events/{eventId}/logo")]
     public async Task<IActionResult> UploadEventLogo(string storeId, string eventId, IFormFile file)
     {
         if (file == null)
@@ -305,7 +275,6 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
             ModelState.AddModelError(nameof(file), "No file was uploaded");
             return this.CreateValidationError(ModelState);
         }
-
         await using var ctx = _dbContextFactory.CreateContext();
 
         var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
@@ -387,8 +356,7 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
             EventLogoFileId = entity.EventLogo,
             EventLogoUrl = eventLogoUrl,
             CreatedAt = entity.CreatedAt,
-            TicketsSold = ticketsSold,
-            PurchaseLink = Url.Action("EventSummary", "UITicketSalesPublic",
+            PurchaseLink = Url.Action(nameof(UITicketSalesPublicController.EventSummary), "UITicketSalesPublic",
                 new { storeId = entity.StoreId, eventId = entity.Id }, Request.Scheme)
         };
     }

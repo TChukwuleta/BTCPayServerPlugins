@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Client;
-using BTCPayServer.Plugins.Emails;
 using BTCPayServer.Plugins.Emails.Services;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Models.Api;
@@ -13,7 +12,6 @@ using BTCPayServer.Plugins.SatoshiTickets.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
