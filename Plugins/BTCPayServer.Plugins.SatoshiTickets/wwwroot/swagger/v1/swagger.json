@@ -1,0 +1,1451 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SatoshiTickets Greenfield API",
+    "description": "REST API for the SatoshiTickets BTCPay Server plugin. Provides endpoints for managing events, ticket types, tickets, orders, and check-ins.\n\nAll endpoints are scoped to a specific store and require a Greenfield API key with appropriate permissions.\n\n**Authentication:** Pass your API key in the `Authorization` header:\n```\nAuthorization: token YOUR_API_KEY\n```\n\nCreate an API key under **Account > Manage Account > API Keys** in BTCPay Server.",
+    "version": "1.2.2",
+    "contact": {
+      "name": "SatoshiTickets",
+      "url": "https://github.com/TChukwuleta/BTCPayServerPlugins"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1/stores/{storeId}/satoshi-tickets",
+      "description": "Current BTCPay Server instance",
+      "variables": {
+        "storeId": {
+          "description": "The store ID"
+        }
+      }
+    }
+  ],
+  "tags": [
+    {
+      "name": "Events",
+      "description": "Create and manage ticketed events"
+    },
+    {
+      "name": "Event Logo",
+      "description": "Upload and remove event logo images"
+    },
+    {
+      "name": "Ticket Types",
+      "description": "Manage pricing tiers for an event (e.g. VIP, Standard, Early Bird)"
+    },
+    {
+      "name": "Tickets",
+      "description": "List sold tickets, export CSV, and check-in attendees"
+    },
+    {
+      "name": "Orders",
+      "description": "List settled orders and send ticket reminder emails"
+    }
+  ],
+  "paths": {
+    "/events": {
+      "get": {
+        "tags": ["Events"],
+        "summary": "List events",
+        "description": "Returns active events for the store. Use `expired=true` to get only past events.",
+        "operationId": "getEvents",
+        "parameters": [
+          {
+            "name": "expired",
+            "in": "query",
+            "description": "If `true`, returns only events where `startDate` is in the past.",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventData"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      },
+      "post": {
+        "tags": ["Events"],
+        "summary": "Create event",
+        "description": "Creates a new event. Events are created in `Disabled` state by default. Set `enable: true` to activate immediately.\n\nYou must create at least one ticket type before activating an event.",
+        "operationId": "createEvent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Event created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventData"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      }
+    },
+    "/events/{eventId}": {
+      "get": {
+        "tags": ["Events"],
+        "summary": "Get event",
+        "description": "Returns a single active event by ID.",
+        "operationId": "getEvent",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventData"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      },
+      "put": {
+        "tags": ["Events"],
+        "summary": "Update event",
+        "description": "Updates an existing event.\n\n**Event Logo handling:**\n- Send `eventLogoFileId: \"file-id\"` to set/change the logo\n- Send `eventLogoFileId: \"\"` (empty string) to remove it\n- Omit the field or send `null` to leave unchanged",
+        "operationId": "updateEvent",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEventRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventData"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      },
+      "delete": {
+        "tags": ["Events"],
+        "summary": "Delete event",
+        "description": "Deletes the event along with all its ticket types and tickets.\n\n**Blocking condition:** Deletion is blocked if the event is in the future and has sold tickets. Past events can always be deleted.",
+        "operationId": "deleteEvent",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event deleted"
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          },
+          "422": {
+            "description": "Cannot delete — event is in the future and has sold tickets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GreenfieldError"
+                },
+                "example": {
+                  "code": "event-has-active-tickets",
+                  "message": "Cannot delete event as there are active ticket purchases and the event is in the future"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      }
+    },
+    "/events/{eventId}/toggle": {
+      "put": {
+        "tags": ["Events"],
+        "summary": "Toggle event status",
+        "description": "Flips event state between `Active` and `Disabled`. Cannot activate an event that has no ticket types.",
+        "operationId": "toggleEventStatus",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event status toggled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventData"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          },
+          "422": {
+            "description": "Cannot activate — no ticket types exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GreenfieldError"
+                },
+                "example": {
+                  "code": "no-ticket-types",
+                  "message": "Cannot activate event without ticket types. Create at least one ticket type first."
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      }
+    },
+    "/events/{eventId}/logo": {
+      "post": {
+        "tags": ["Event Logo"],
+        "summary": "Upload event logo",
+        "description": "Uploads an image file as the event logo. Only requires store-level permissions.\n\n**Constraints:**\n- File must be an image (`image/*` content type)\n- Maximum file size: 1 MB",
+        "operationId": "uploadEventLogo",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The image file to upload"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logo uploaded — returns updated event",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventData"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          },
+          "422": {
+            "description": "Upload failed (not an image, too large, etc.)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GreenfieldError"
+                },
+                "example": {
+                  "code": "logo-upload-failed",
+                  "message": "The uploaded file is not a valid image"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      },
+      "delete": {
+        "tags": ["Event Logo"],
+        "summary": "Delete event logo",
+        "description": "Removes the logo from the event and deletes the file from storage.",
+        "operationId": "deleteEventLogo",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logo removed — returns updated event",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventData"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      }
+    },
+    "/events/{eventId}/ticket-types": {
+      "get": {
+        "tags": ["Ticket Types"],
+        "summary": "List ticket types",
+        "description": "Returns all ticket types for an event.",
+        "operationId": "getTicketTypes",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "description": "Sort field.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["Name", "Price"],
+              "default": "Name"
+            }
+          },
+          {
+            "name": "sortDir",
+            "in": "query",
+            "description": "Sort direction.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "asc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of ticket types",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TicketTypeData"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      },
+      "post": {
+        "tags": ["Ticket Types"],
+        "summary": "Create ticket type",
+        "description": "Creates a new ticket type (pricing tier) for an event. The first ticket type created automatically becomes the default.",
+        "operationId": "createTicketType",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTicketTypeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ticket type created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketTypeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      }
+    },
+    "/events/{eventId}/ticket-types/{ticketTypeId}": {
+      "get": {
+        "tags": ["Ticket Types"],
+        "summary": "Get ticket type",
+        "description": "Returns a single ticket type.",
+        "operationId": "getTicketType",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          },
+          {
+            "$ref": "#/components/parameters/ticketTypeId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ticket type details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketTypeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      },
+      "put": {
+        "tags": ["Ticket Types"],
+        "summary": "Update ticket type",
+        "description": "Updates an existing ticket type. If `isDefault` is set to `false` and no other type is default, this one remains default.",
+        "operationId": "updateTicketType",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          },
+          {
+            "$ref": "#/components/parameters/ticketTypeId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTicketTypeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ticket type updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketTypeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      }
+    },
+    "/ticket-types/{ticketTypeId}": {
+      "delete": {
+        "tags": ["Ticket Types"],
+        "summary": "Delete ticket type",
+        "description": "Deletes a ticket type. If the deleted type was the default, another type is automatically assigned as default.",
+        "operationId": "deleteTicketType",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ticketTypeId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ticket type deleted"
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      }
+    },
+    "/ticket-types/{ticketTypeId}/toggle": {
+      "put": {
+        "tags": ["Ticket Types"],
+        "summary": "Toggle ticket type status",
+        "description": "Flips ticket type state between `Active` and `Disabled`.",
+        "operationId": "toggleTicketTypeStatus",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ticketTypeId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ticket type status toggled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketTypeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      }
+    },
+    "/events/{eventId}/tickets": {
+      "get": {
+        "tags": ["Tickets"],
+        "summary": "List tickets",
+        "description": "Returns settled (paid) tickets for an event. Supports text search across ticket number, name, and email.",
+        "operationId": "getTickets",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          },
+          {
+            "name": "searchText",
+            "in": "query",
+            "description": "Search in `txnNumber`, `firstName`, `lastName`, `email`, `ticketNumber`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tickets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TicketData"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      }
+    },
+    "/events/{eventId}/tickets/export": {
+      "get": {
+        "tags": ["Tickets"],
+        "summary": "Export tickets as CSV",
+        "description": "Downloads a CSV file with all settled tickets. Columns: Purchase Date, Ticket Number, First Name, Last Name, Email, Ticket Tier, Amount, Currency, Attended Event.",
+        "operationId": "exportTickets",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV file download",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No settled tickets found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GreenfieldError"
+                },
+                "example": {
+                  "code": "no-tickets",
+                  "message": "No settled tickets found for this event"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      }
+    },
+    "/events/{eventId}/tickets/{ticketNumber}/check-in": {
+      "post": {
+        "tags": ["Tickets"],
+        "summary": "Check-in ticket",
+        "description": "Marks a ticket as checked in. Accepts either the full `ticketNumber` (e.g. `EVT-abc123-260615-xK9mP2qR`) or just the short `txnNumber` (e.g. `xK9mP2qR`).",
+        "operationId": "checkinTicket",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          },
+          {
+            "name": "ticketNumber",
+            "in": "path",
+            "description": "Full ticket number or short transaction number.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Check-in result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckinResultData"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          },
+          "422": {
+            "description": "Check-in failed (invalid ticket or already checked in)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GreenfieldError"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      }
+    },
+    "/events/{eventId}/orders": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "List orders",
+        "description": "Returns settled (paid) orders for an event, each with nested tickets.",
+        "operationId": "getOrders",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          },
+          {
+            "name": "searchText",
+            "in": "query",
+            "description": "Search in `invoiceId`, ticket `txnNumber`, `firstName`, `lastName`, `email`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of orders with tickets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderData"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/EventNotFound"
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      }
+    },
+    "/events/{eventId}/orders/{orderId}/tickets/{ticketId}/send-reminder": {
+      "post": {
+        "tags": ["Orders"],
+        "summary": "Send ticket reminder email",
+        "description": "Re-sends the ticket registration email to the ticket holder. The `ticketId` is the ticket's UUID (`id` field), not the `ticketNumber`.",
+        "operationId": "sendReminder",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/eventId"
+          },
+          {
+            "name": "orderId",
+            "in": "path",
+            "description": "The order ID.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ticketId",
+            "in": "path",
+            "description": "The ticket UUID (`id` field).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Email sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Ticket details have been sent to the recipient via email"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order or ticket not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GreenfieldError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Email SMTP not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GreenfieldError"
+                },
+                "example": {
+                  "code": "email-not-configured",
+                  "message": "Email SMTP settings are not configured. Configure email settings in the store admin."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Email sending failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GreenfieldError"
+                },
+                "example": {
+                  "code": "email-send-failed",
+                  "message": "Failed to send ticket email to: user@example.com"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "API_Key": {
+        "type": "apiKey",
+        "description": "BTCPay Server Greenfield API Key. Pass as `Authorization: token <key>`. Create under Account > Manage Account > API Keys. Required permission: `btcpay.store.canmodifystoresettings`.",
+        "name": "Authorization",
+        "in": "header"
+      }
+    },
+    "parameters": {
+      "eventId": {
+        "name": "eventId",
+        "in": "path",
+        "description": "The event ID.",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ticketTypeId": {
+        "name": "ticketTypeId",
+        "in": "path",
+        "description": "The ticket type ID.",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "EventNotFound": {
+        "description": "Event not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/GreenfieldError"
+            },
+            "example": {
+              "code": "event-not-found",
+              "message": "The event was not found"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "CreateEventRequest": {
+        "type": "object",
+        "required": ["title", "startDate"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Event title."
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Event description (HTML allowed)."
+          },
+          "eventType": {
+            "type": "string",
+            "enum": ["Physical", "Virtual"],
+            "default": "Physical",
+            "description": "Type of event."
+          },
+          "location": {
+            "type": "string",
+            "nullable": true,
+            "description": "Event venue or location."
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Event start date (ISO 8601). Must be in the future."
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Event end date. Must be after `startDate`."
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true,
+            "description": "3-letter currency code (e.g. `EUR`, `USD`, `BTC`). Defaults to store currency if omitted.",
+            "example": "EUR"
+          },
+          "redirectUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "URL to redirect customer after successful payment."
+          },
+          "emailSubject": {
+            "type": "string",
+            "nullable": true,
+            "description": "Email subject template. Supports placeholders: `{{Title}}`, `{{Location}}`, `{{Name}}`, `{{Email}}`, `{{Description}}`, `{{EventDate}}`, `{{Currency}}`."
+          },
+          "emailBody": {
+            "type": "string",
+            "nullable": true,
+            "description": "Email body template. Same placeholders as `emailSubject`."
+          },
+          "hasMaximumCapacity": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether the event has a total ticket cap."
+          },
+          "maximumEventCapacity": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Total ticket cap. Required and must be > 0 when `hasMaximumCapacity` is `true`."
+          },
+          "eventLogoFileId": {
+            "type": "string",
+            "nullable": true,
+            "description": "File ID of a previously uploaded image. Prefer using the dedicated logo upload endpoint instead."
+          },
+          "enable": {
+            "type": "boolean",
+            "default": false,
+            "description": "If `true`, activates the event immediately upon creation."
+          }
+        }
+      },
+      "UpdateEventRequest": {
+        "type": "object",
+        "required": ["title", "startDate"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Event title."
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Event description (HTML allowed)."
+          },
+          "eventType": {
+            "type": "string",
+            "enum": ["Physical", "Virtual"],
+            "description": "Type of event."
+          },
+          "location": {
+            "type": "string",
+            "nullable": true,
+            "description": "Event venue or location."
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Event start date (ISO 8601)."
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Event end date. Must be after `startDate`."
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true,
+            "description": "3-letter currency code."
+          },
+          "redirectUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "URL to redirect customer after successful payment."
+          },
+          "emailSubject": {
+            "type": "string",
+            "nullable": true,
+            "description": "Email subject template."
+          },
+          "emailBody": {
+            "type": "string",
+            "nullable": true,
+            "description": "Email body template."
+          },
+          "hasMaximumCapacity": {
+            "type": "boolean",
+            "description": "Whether the event has a total ticket cap."
+          },
+          "maximumEventCapacity": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Total ticket cap."
+          },
+          "eventLogoFileId": {
+            "type": "string",
+            "nullable": true,
+            "description": "File ID of a previously uploaded image. Send empty string to remove logo, `null` to leave unchanged."
+          }
+        }
+      },
+      "EventData": {
+        "type": "object",
+        "description": "Full event representation.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Event ID."
+          },
+          "storeId": {
+            "type": "string",
+            "description": "Store ID."
+          },
+          "title": {
+            "type": "string",
+            "description": "Event title."
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Event description."
+          },
+          "eventType": {
+            "type": "string",
+            "enum": ["Physical", "Virtual"],
+            "description": "Type of event."
+          },
+          "location": {
+            "type": "string",
+            "nullable": true,
+            "description": "Event venue or location."
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Event start date."
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Event end date."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency code.",
+            "example": "EUR"
+          },
+          "redirectUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Post-payment redirect URL."
+          },
+          "emailSubject": {
+            "type": "string",
+            "nullable": true,
+            "description": "Email subject template."
+          },
+          "emailBody": {
+            "type": "string",
+            "nullable": true,
+            "description": "Email body template."
+          },
+          "hasMaximumCapacity": {
+            "type": "boolean",
+            "description": "Whether the event has a ticket cap."
+          },
+          "maximumEventCapacity": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Total ticket cap."
+          },
+          "eventState": {
+            "type": "string",
+            "enum": ["Active", "Disabled"],
+            "description": "Current event state."
+          },
+          "eventLogoFileId": {
+            "type": "string",
+            "nullable": true,
+            "description": "File ID of the event logo."
+          },
+          "eventLogoUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Fully resolved public URL of the event logo image."
+          },
+          "purchaseLink": {
+            "type": "string",
+            "nullable": true,
+            "description": "Public ticket purchase page URL."
+          },
+          "ticketsSold": {
+            "type": "integer",
+            "description": "Number of settled tickets sold."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the event was created."
+          }
+        }
+      },
+      "CreateTicketTypeRequest": {
+        "type": "object",
+        "required": ["name", "price"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Ticket type name (e.g. `VIP`, `Standard`)."
+          },
+          "price": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Price per ticket. Must be > 0.",
+            "example": 50.00
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Description of what this tier includes."
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Number of tickets available. Must be > 0 if the event has maximum capacity. Use `0` for unlimited.",
+            "default": 0
+          },
+          "isDefault": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether this is the pre-selected default tier. First created type is always default."
+          }
+        }
+      },
+      "UpdateTicketTypeRequest": {
+        "type": "object",
+        "required": ["name", "price"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Ticket type name."
+          },
+          "price": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Price per ticket. Must be > 0."
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Description of what this tier includes."
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Number of tickets available."
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Whether this is the default tier."
+          }
+        }
+      },
+      "TicketTypeData": {
+        "type": "object",
+        "description": "Full ticket type representation.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Ticket type ID."
+          },
+          "eventId": {
+            "type": "string",
+            "description": "Parent event ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Ticket type name."
+          },
+          "price": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Price per ticket."
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tier description."
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Total tickets available (0 = unlimited)."
+          },
+          "quantitySold": {
+            "type": "integer",
+            "description": "Tickets sold so far."
+          },
+          "quantityAvailable": {
+            "type": "integer",
+            "description": "Remaining tickets (quantity - quantitySold)."
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Whether this is the default tier."
+          },
+          "ticketTypeState": {
+            "type": "string",
+            "enum": ["Active", "Disabled"],
+            "description": "Current ticket type state."
+          }
+        }
+      },
+      "TicketData": {
+        "type": "object",
+        "description": "Full ticket representation.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Ticket UUID."
+          },
+          "eventId": {
+            "type": "string",
+            "description": "Parent event ID."
+          },
+          "ticketTypeId": {
+            "type": "string",
+            "description": "Ticket type ID."
+          },
+          "ticketTypeName": {
+            "type": "string",
+            "description": "Name of the ticket type at time of purchase."
+          },
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Amount paid."
+          },
+          "firstName": {
+            "type": "string",
+            "description": "Attendee first name."
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Attendee last name."
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Attendee email."
+          },
+          "ticketNumber": {
+            "type": "string",
+            "description": "Full ticket number (e.g. `EVT-abc123-260615-xK9mP2qR`)."
+          },
+          "txnNumber": {
+            "type": "string",
+            "description": "Short transaction number (e.g. `xK9mP2qR`)."
+          },
+          "paymentStatus": {
+            "type": "string",
+            "description": "Payment status (e.g. `Settled`)."
+          },
+          "checkedIn": {
+            "type": "boolean",
+            "description": "Whether the attendee has checked in."
+          },
+          "checkedInAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the attendee checked in."
+          },
+          "emailSent": {
+            "type": "boolean",
+            "description": "Whether the ticket confirmation email was sent."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the ticket was created."
+          }
+        }
+      },
+      "OrderData": {
+        "type": "object",
+        "description": "Full order representation with nested tickets.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Order ID."
+          },
+          "eventId": {
+            "type": "string",
+            "description": "Parent event ID."
+          },
+          "totalAmount": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Total order amount."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency code."
+          },
+          "invoiceId": {
+            "type": "string",
+            "description": "BTCPay Server invoice ID."
+          },
+          "paymentStatus": {
+            "type": "string",
+            "description": "Payment status."
+          },
+          "invoiceStatus": {
+            "type": "string",
+            "description": "Invoice status."
+          },
+          "emailSent": {
+            "type": "boolean",
+            "description": "Whether the order confirmation email was sent."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the order was created."
+          },
+          "purchaseDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the payment was settled."
+          },
+          "tickets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketData"
+            },
+            "description": "Tickets in this order."
+          }
+        }
+      },
+      "CheckinResultData": {
+        "type": "object",
+        "description": "Result of a check-in attempt.",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the check-in succeeded."
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "description": "Error message if check-in failed (e.g. already checked in)."
+          },
+          "ticket": {
+            "allOf": [
+              { "$ref": "#/components/schemas/TicketData" }
+            ],
+            "nullable": true,
+            "description": "The ticket data, or `null` if the ticket was invalid."
+          }
+        }
+      },
+      "GreenfieldError": {
+        "type": "object",
+        "description": "Standard Greenfield API error.",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Machine-readable error code."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message."
+          }
+        }
+      },
+      "ValidationErrorResponse": {
+        "type": "array",
+        "description": "Validation error list.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Field that caused the error."
+            },
+            "message": {
+              "type": "string",
+              "description": "Validation message."
+            }
+          }
+        }
+      }
+    }
+  }
+}
