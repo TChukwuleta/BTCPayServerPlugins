@@ -16,20 +16,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
 
-/// <summary>
-/// Greenfield API controller for managing tickets, orders, check-ins, and exports.
-/// </summary>
+[Route("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/")]
 [ApiController]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield, Policy = Policies.CanModifyStoreSettings)]
 [EnableCors(CorsPolicies.All)]
-public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
+public class GreenfieldSatoshiTicketsController : ControllerBase
 {
     private readonly TicketService _ticketService;
     private readonly EmailService _emailService;
     private readonly EmailSenderFactory _emailSenderFactory;
     private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
 
-    public GreenfieldSatoshiTicketsTicketsController(
+    public GreenfieldSatoshiTicketsController(
         TicketService ticketService,
         EmailService emailService,
         EmailSenderFactory emailSenderFactory,
@@ -43,48 +41,34 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
 
     private string CurrentStoreId => HttpContext.GetStoreData()?.Id;
 
-    /// <summary>
-    /// List settled tickets for an event, with optional text search.
-    /// </summary>
-    [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/tickets")]
-    [Authorize(Policy = Policies.CanViewStoreSettings)]
+    [HttpGet("tickets")]
     public async Task<IActionResult> GetTickets(string storeId, string eventId, [FromQuery] string searchText = null)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
-        if (ticketEvent == null)
+        var eventExists = ctx.Events.Any(c => c.Id == eventId && c.StoreId == CurrentStoreId);
+        if (!eventExists)
             return EventNotFound();
 
-        var query = ctx.Tickets.AsNoTracking()
-            .Where(t => t.EventId == eventId && t.StoreId == CurrentStoreId
+        var query = ctx.Tickets.AsNoTracking().Where(t => t.EventId == eventId && t.StoreId == CurrentStoreId
                         && t.PaymentStatus == TransactionStatus.Settled.ToString());
 
         if (!string.IsNullOrEmpty(searchText))
         {
+            searchText = searchText.Trim();
             query = query.Where(t =>
-                t.TxnNumber.Contains(searchText) ||
-                t.FirstName.Contains(searchText) ||
-                t.LastName.Contains(searchText) ||
-                t.Email.Contains(searchText) ||
-                t.TicketNumber.Contains(searchText));
+                t.TxnNumber.Contains(searchText) || t.FirstName.Contains(searchText) ||
+                t.LastName.Contains(searchText) || t.Email.Contains(searchText) ||t.TicketNumber.Contains(searchText));
         }
-
         var tickets = query.ToList();
-
         var result = tickets.Select(ToTicketData).ToArray();
         return Ok(result);
     }
 
-    /// <summary>
-    /// Export settled tickets as a CSV file download.
-    /// </summary>
-    [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/tickets/export")]
-    [Authorize(Policy = Policies.CanViewStoreSettings)]
+
+    [HttpGet("tickets/export")]
     public async Task<IActionResult> ExportTickets(string storeId, string eventId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
         if (ticketEvent == null)
             return EventNotFound();
@@ -129,16 +113,13 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
         return File(fileBytes, "text/csv", fileName);
     }
 
-    /// <summary>
-    /// Check in a ticket by ticket number or short transaction number.
-    /// </summary>
-    [HttpPost("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/tickets/{ticketNumber}/check-in")]
+
+    [HttpPost("tickets/{ticketNumber}/check-in")]
     public async Task<IActionResult> CheckinTicket(string storeId, string eventId, string ticketNumber)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
-        if (ticketEvent == null)
+        var ticketExist = ctx.Events.Any(c => c.Id == eventId && c.StoreId == CurrentStoreId);
+        if (!ticketExist)
             return EventNotFound();
 
         var checkinResult = await _ticketService.CheckinTicket(eventId, ticketNumber, CurrentStoreId);
@@ -149,26 +130,20 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
             ErrorMessage = checkinResult.ErrorMessage,
             Ticket = checkinResult.Ticket != null ? ToTicketData(checkinResult.Ticket) : null
         };
-
         return Ok(result);
     }
 
-    /// <summary>
-    /// List settled orders for an event, with optional text search. Includes nested tickets.
-    /// </summary>
-    [HttpGet("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/orders")]
-    [Authorize(Policy = Policies.CanViewStoreSettings)]
+
+    [HttpGet("orders")]
     public async Task<IActionResult> GetOrders(string storeId, string eventId, [FromQuery] string searchText = null)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
-        if (ticketEvent == null)
+        var ticketExist = ctx.Events.Any(c => c.Id == eventId && c.StoreId == CurrentStoreId);
+        if (!ticketExist)
             return EventNotFound();
 
         var query = ctx.Orders.AsNoTracking().Include(c => c.Tickets)
-            .Where(c => c.EventId == eventId && c.StoreId == CurrentStoreId
-                        && c.PaymentStatus == TransactionStatus.Settled.ToString());
+            .Where(c => c.EventId == eventId && c.StoreId == CurrentStoreId && c.PaymentStatus == TransactionStatus.Settled.ToString());
 
         if (!string.IsNullOrEmpty(searchText))
         {
@@ -183,14 +158,10 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
 
         var orders = query.ToList();
         var result = orders.Select(ToOrderData).ToArray();
-
         return Ok(result);
     }
 
-    /// <summary>
-    /// Re-send the ticket confirmation email to a specific ticket holder.
-    /// </summary>
-    [HttpPost("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/orders/{orderId}/tickets/{ticketId}/send-reminder")]
+    [HttpPost("orders/{orderId}/tickets/{ticketId}/send-reminder")]
     public async Task<IActionResult> SendReminder(string storeId, string eventId, string orderId, string ticketId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
@@ -215,7 +186,6 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
             return this.CreateAPIError(422, "email-not-configured",
                 "Email SMTP settings are not configured. Configure email settings in the store admin.");
         }
-
         try
         {
             var emailResponse = await _emailService.SendTicketRegistrationEmail(CurrentStoreId, ticket, ticketEvent);
@@ -228,18 +198,14 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
             else
             {
                 var failedList = emailResponse.FailedRecipients?.Count > 0
-                    ? string.Join(", ", emailResponse.FailedRecipients)
-                    : ticket.Email;
-                return this.CreateAPIError(500, "email-send-failed",
-                    $"Failed to send ticket email to: {failedList}");
+                    ? string.Join(", ", emailResponse.FailedRecipients) : ticket.Email;
+                return this.CreateAPIError(500, "email-send-failed", $"Failed to send ticket email to: {failedList}");
             }
         }
         catch (Exception ex)
         {
-            return this.CreateAPIError(500, "email-send-failed",
-                $"An error occurred when sending ticket details: {ex.Message}");
+            return this.CreateAPIError(500, "email-send-failed", $"An error occurred when sending ticket details: {ex.Message}");
         }
-
         return Ok(new { success = true, message = "Ticket details have been sent to the recipient via email" });
     }
 
@@ -283,9 +249,7 @@ public class GreenfieldSatoshiTicketsTicketsController : ControllerBase
         };
     }
 
-    /// <summary>
-    /// Escapes a string value for safe inclusion in a CSV field per RFC 4180.
-    /// </summary>
+
     private static string EscapeCsvField(string value)
     {
         if (string.IsNullOrEmpty(value))

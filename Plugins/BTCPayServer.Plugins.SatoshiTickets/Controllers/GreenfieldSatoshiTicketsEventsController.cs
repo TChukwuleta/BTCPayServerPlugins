@@ -21,7 +21,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
 
-[Route("~/plugins/{storeId}/satoshi-tickets/api/v1/")]
+[Route("~/api/v1/stores/{storeId}/satoshi-tickets/")]
 [ApiController]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield, Policy = Policies.CanModifyStoreSettings)]
 [EnableCors(CorsPolicies.All)]
@@ -71,7 +71,6 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
 
 
     [HttpGet("events/{eventId}")]
-    [Authorize(Policy = Policies.CanViewStoreSettings)]
     public async Task<IActionResult> GetEvent(string storeId, string eventId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
@@ -276,7 +275,6 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
             return this.CreateValidationError(ModelState);
         }
         await using var ctx = _dbContextFactory.CreateContext();
-
         var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
         if (entity == null)
             return EventNotFound();
@@ -284,9 +282,7 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         var userId = _userManager.GetUserId(User);
         var imageUpload = await _fileService.UploadImage(file, userId);
         if (!imageUpload.Success)
-        {
             return this.CreateAPIError(422, "logo-upload-failed", imageUpload.Response);
-        }
 
         entity.EventLogo = imageUpload.StoredFile.Id;
         ctx.Events.Update(entity);
@@ -298,10 +294,7 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
         return Ok(await ToEventData(entity, ticketsSold));
     }
 
-    /// <summary>
-    /// Remove the logo from an event.
-    /// </summary>
-    [HttpDelete("~/api/v1/stores/{storeId}/satoshi-tickets/events/{eventId}/logo")]
+    [HttpDelete("events/{eventId}/logo")]
     public async Task<IActionResult> DeleteEventLogo(string storeId, string eventId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
