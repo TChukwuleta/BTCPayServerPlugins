@@ -340,6 +340,7 @@ public class GreenfieldSatoshiTicketsEventsController : ControllerBase
             StartDate = entity.StartDate,
             EndDate = entity.EndDate,
             Currency = entity.Currency,
+            TicketsSold = ticketsSold,
             RedirectUrl = entity.RedirectUrl,
             EmailSubject = entity.EmailSubject,
             EmailBody = entity.EmailBody,
