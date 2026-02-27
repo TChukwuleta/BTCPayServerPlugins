@@ -12,6 +12,7 @@ using BTCPayServer.Plugins.LightSpeed.Data;
 using BTCPayServer.Plugins.LightSpeed.Services;
 using BTCPayServer.Plugins.LightSpeed.ViewModels;
 using BTCPayServer.Services.Stores;
+using MailKit.Search;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -89,6 +90,8 @@ public class UILightSpeedController : Controller
         var expectedOrigin = settings.LightSpeedUrl.TrimEnd('/');
         if (!origin.TrimEnd('/').Equals(expectedOrigin, StringComparison.OrdinalIgnoreCase))
             return BadRequest("Invalid origin");
+
+        using var l = await OrderLocks.LockAsync(register_id, CancellationToken.None);
 
         var invoice = await _invoiceController.CreateInvoiceCoreRaw(new CreateInvoiceRequest()
         {

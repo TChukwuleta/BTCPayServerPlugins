@@ -5,23 +5,20 @@ using BTCPayServer.Client.Models;
 using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
-using BTCPayServer.Plugins.LightSpeed.Data;
-using BTCPayServer.Plugins.LightSpeed.Services;
+using BTCPayServer.Plugins.JumpSeller.Services;
 using Microsoft.Extensions.Logging;
 
-namespace BTCPayServer.Plugins.LightSpeed;
+namespace BTCPayServer.Plugins.JumpSeller;
 
-internal class LightSpeedHostedService : EventHostedServiceBase
+internal class JumpSellerHostedService : EventHostedServiceBase
 {
-    private readonly LightSpeedService _lightSpeedService;
-    public LightSpeedHostedService(EventAggregator eventAggregator, Logs logs, LightSpeedService lightSpeedService) : base(eventAggregator, logs)
+    private readonly JumpSellerService _jumpSellerService;
+    public JumpSellerHostedService(EventAggregator eventAggregator, Logs logs, JumpSellerService jumpSellerService) : base(eventAggregator, logs)
     {
-        _lightSpeedService = lightSpeedService;
+        _jumpSellerService = jumpSellerService;
     }
 
-
     protected override void SubscribeToEvents()
-
     {
         Subscribe<InvoiceEvent>();
         base.SubscribeToEvents();
@@ -48,21 +45,18 @@ internal class LightSpeedHostedService : EventHostedServiceBase
         {
             try
             {
-                LightSpeedPaymentStatus? result = invoice switch
-                {
-                    { Status: InvoiceStatus.Settled } => LightSpeedPaymentStatus.Settled,
-                    { Status: InvoiceStatus.Expired } => LightSpeedPaymentStatus.Expired,
-                    { Status: InvoiceStatus.Invalid } => LightSpeedPaymentStatus.Failed,
-                    _ => null
-                };
-                if (result is not null)
-                {
-                    await _lightSpeedService.UpdatePaymentStatus(invoice.Id, result.Value);
-                }
+                var invoiceData = await _jumpSellerService.GetInvoiceData(invoice.Id);
+                if (invoiceData == null) return;
+
+                var settings = await _jumpSellerService.GetSettings(invoiceData.StoreId);
+                if (settings is null) return;
+
+                var result = _jumpSellerService.MapInvoiceStatusToResult(invoice, settings, out var message);
+                await _jumpSellerService.SendCallback(invoiceData, settings, result, message);
             }
             catch (Exception ex)
             {
-                Logs.PayServer.LogError(ex, $"Error while trying to register order transaction for light speed");
+                Logs.PayServer.LogError(ex, $"Jumpseller error while trying to register order transaction for light speed");
             }
         }
     }
