@@ -15,7 +15,7 @@ The docs are powered by [Redocly](https://redocly.com/) and generated from the O
 The raw OpenAPI spec (swagger.json) is available at:
 
 ```
-https://YOUR_BTCPAY_SERVER/_content/BTCPayServer.Plugins.SatoshiTickets/swagger/v1/swagger.json
+https://YOUR_BTCPAY_SERVER/plugins/satoshi-tickets/api-docs/swagger.json
 ```
 
 You can import this URL directly into [Postman](https://www.postman.com/), [Swagger Editor](https://editor.swagger.io/), or any other OpenAPI-compatible tool.

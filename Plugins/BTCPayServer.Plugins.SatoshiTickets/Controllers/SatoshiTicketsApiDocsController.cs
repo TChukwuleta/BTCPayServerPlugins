@@ -1,4 +1,3 @@
-using System.IO;
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,10 +6,14 @@ namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
 [Route("~/plugins/satoshi-tickets/api-docs")]
 public class SatoshiTicketsApiDocsController : Controller
 {
+    private static readonly Assembly Assembly = typeof(SatoshiTicketsApiDocsController).Assembly;
+    private const string ResourcePrefix = "BTCPayServer.Plugins.SatoshiTickets.Resources.";
+
     [HttpGet]
     public IActionResult Index()
     {
         var specUrl = Url.Action(nameof(Swagger));
+        var redocUrl = Url.Action(nameof(RedocScript));
         var html = $@"<!DOCTYPE html>
 <html>
 <head>
@@ -21,7 +24,7 @@ public class SatoshiTicketsApiDocsController : Controller
 </head>
 <body>
     <redoc spec-url=""{specUrl}""></redoc>
-    <script src=""https://cdn.redoc.ly/redoc/v2.4.0/bundles/redoc.standalone.js""></script>
+    <script src=""{redocUrl}""></script>
 </body>
 </html>";
         return Content(html, "text/html");
@@ -30,10 +33,19 @@ public class SatoshiTicketsApiDocsController : Controller
     [HttpGet("swagger.json")]
     public IActionResult Swagger()
     {
-        var assembly = Assembly.GetExecutingAssembly();
-        var stream = assembly.GetManifestResourceStream("BTCPayServer.Plugins.SatoshiTickets.Resources.swagger.json");
+        var stream = Assembly.GetManifestResourceStream(ResourcePrefix + "swagger.json");
         if (stream == null)
             return NotFound();
         return File(stream, "application/json");
+    }
+
+    [HttpGet("redoc.js")]
+    [ResponseCache(Duration = 86400)]
+    public IActionResult RedocScript()
+    {
+        var stream = Assembly.GetManifestResourceStream(ResourcePrefix + "redoc.standalone.js");
+        if (stream == null)
+            return NotFound();
+        return File(stream, "application/javascript");
     }
 }

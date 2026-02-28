@@ -32,6 +32,7 @@
     <ItemGroup>
 	    <EmbeddedResource Include="Resources\js\jsqr_min.js" />
 	    <EmbeddedResource Include="Resources\swagger.json" />
+	    <EmbeddedResource Include="Resources\redoc.standalone.js" />
     </ItemGroup>
 
   <ItemGroup Condition="$(Configuration) != 'Release'">
