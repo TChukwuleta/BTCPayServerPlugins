@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
@@ -31,6 +31,7 @@
 
     <ItemGroup>
 	    <EmbeddedResource Include="Resources\js\jsqr_min.js" />
+	    <EmbeddedResource Include="Resources\swagger.json" />
     </ItemGroup>
 
   <ItemGroup Condition="$(Configuration) != 'Release'">

@@ -1,3 +1,5 @@
+using System.IO;
+using System.Reflection;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
@@ -8,7 +10,7 @@ public class SatoshiTicketsApiDocsController : Controller
     [HttpGet]
     public IActionResult Index()
     {
-        var specUrl = "/_content/BTCPayServer.Plugins.SatoshiTickets/swagger/v1/swagger.json";
+        var specUrl = Url.Action(nameof(Swagger));
         var html = $@"<!DOCTYPE html>
 <html>
 <head>
@@ -23,5 +25,15 @@ public class SatoshiTicketsApiDocsController : Controller
 </body>
 </html>";
         return Content(html, "text/html");
+    }
+
+    [HttpGet("swagger.json")]
+    public IActionResult Swagger()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var stream = assembly.GetManifestResourceStream("BTCPayServer.Plugins.SatoshiTickets.Resources.swagger.json");
+        if (stream == null)
+            return NotFound();
+        return File(stream, "application/json");
     }
 }
