@@ -19,6 +19,7 @@
       "description": "Current BTCPay Server instance",
       "variables": {
         "storeId": {
+          "default": "your-store-id",
           "description": "The store ID"
         }
       }
