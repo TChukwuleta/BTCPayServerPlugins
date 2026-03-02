@@ -1,6 +1,7 @@
 @using BTCPayServer.Abstractions.Contracts
 @using BTCPayServer.Abstractions.Extensions
 @using System.Globalization
+@using BTCPayServer.Abstractions.Models
 @using BTCPayServer.Plugins.SatoshiTickets.Data
 @using BTCPayServer.Plugins.SatoshiTickets.ViewModels
 @inject IFileService FileService
@@ -8,7 +9,7 @@
 @model List<TicketTypeViewModel>
 @{
     Layout = "_Layout";
-    ViewData.SetActivePage(PluginNavPages.Index, "Ticket Tiers");
+    ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketIndex), "Ticket Tiers") { ActiveCategory = nameof(SatoshiTicketNavPages) });
     var canUpload = await FileService.IsAvailable();
     var storeId = ScopeProvider.GetCurrentStoreId();
     bool isEditMode = !string.IsNullOrEmpty(Model.First().TicketTypeId);

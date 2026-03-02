@@ -3,6 +3,7 @@ using System;
 using BTCPayServer.Plugins.SatoshiTickets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.SatoshiTickets.Data.Migrations
 {
     [DbContext(typeof(SimpleTicketSalesDbContext))]
-    partial class SimpleTicketSalesDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260302053604_updateSettings")]
+    partial class updateSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -146,12 +149,6 @@ namespace BTCPayServer.Plugins.SatoshiTickets.Data.Migrations
 
                     b.Property<bool>("EnableAutoReminders")
                         .HasColumnType("boolean");
-
-                    b.Property<string>("ReminderEmailBody")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ReminderEmailSubject")
-                        .HasColumnType("text");
 
                     b.Property<string>("StoreId")
                         .HasColumnType("text");

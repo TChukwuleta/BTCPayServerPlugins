@@ -51,4 +51,11 @@ public class UpdateSimpleTicketSalesEventViewModel
 
     [Display(Name = "Redirect Url after ticket purchase")]
     public string RedirectUrl { get; set; }
+
+    [Display(Name = "Enable Reminder to be sent for this event")]
+    public bool ReminderEnabled { get; set; }
+
+    [Display(Name = "Days before event to send reminder")]
+    [Range(1, 365, ErrorMessage = "Must be between 1 and 365 days")]
+    public int? ReminderDaysBeforeEvent { get; set; }
 }

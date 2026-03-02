@@ -1,5 +1,6 @@
 @using BTCPayServer.Abstractions.Contracts
 @using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
 @using BTCPayServer.Plugins.SatoshiTickets.Data
 @using BTCPayServer.Plugins.SatoshiTickets.ViewModels
 @using BTCPayServer.Services
@@ -9,7 +10,7 @@
 @model EventTicketViewModel
 @{
     Layout = "_Layout";
-    ViewData.SetActivePage(PluginNavPages.Index, $"{Model.EventTitle}");
+    ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketIndex), $"{Model.EventTitle}") { ActiveCategory = nameof(SatoshiTicketNavPages) });
     var canUpload = await FileService.IsAvailable();
     var storeId = ScopeProvider.GetCurrentStoreId();
     string checkInUrl = Url.Action("TicketCheckin", "UITicketType", new { storeId, eventId = Model.EventId }, protocol: Context.Request.Scheme);

@@ -22,39 +22,42 @@ public class EmailService
         _emailSender = emailSender;
     }
 
+    public async Task<bool> IsEmailSettingsConfigured(string storeId)
+    {
+        var emailSender = await _emailSender.GetEmailSender(storeId);
+        return (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+    }
+
     private async Task<EmailDispatchResult> SendBulkEmail(string storeId, IEnumerable<EmailRecipient> recipients)
     {
         var settings = await (await _emailSender.GetEmailSender(storeId)).GetEmailSettings();
         if (!settings.IsComplete())
             return new EmailDispatchResult { IsSuccessful = false };
 
-        var client = await settings.CreateSmtpClient();
         List<string> failedRecipients = new List<string>();
         var isSuccess = true;
-        try
+        foreach (var recipient in recipients)
         {
-            foreach (var recipient in recipients)
+            var client = await settings.CreateSmtpClient();
+            try
             {
-                try
-                {
-                    var message = new MimeMessage();
-                    message.From.Add(MailboxAddress.Parse(settings.From));
-                    message.To.Add(recipient.Address);
-                    message.Subject = recipient.Subject;
-                    message.Body = new TextPart("plain") { Text = recipient.MessageText };
-                    await client.SendAsync(message);
-                }
-                catch (Exception ex)
-                {
-                    isSuccess = false;
-                    failedRecipients.Add(recipient.Address.ToString());
-                    _logs.PayServer.LogError(ex, $"Error sending email to: {recipient.Address}");
-                }
+                var message = new MimeMessage();
+                message.From.Add(MailboxAddress.Parse(settings.From));
+                message.To.Add(recipient.Address);
+                message.Subject = recipient.Subject;
+                message.Body = new TextPart("plain") { Text = recipient.MessageText };
+                await client.SendAsync(message);
             }
-        }
-        finally
-        {
-            await client.DisconnectAsync(true);
+            catch (Exception ex)
+            {
+                isSuccess = false;
+                failedRecipients.Add(recipient.Address.ToString());
+                _logs.PayServer.LogError(ex, $"Error sending email to: {recipient.Address}");
+            }
+            finally
+            {
+                await client.DisconnectAsync(true);
+            }
         }
         return new EmailDispatchResult { IsSuccessful = isSuccess, FailedRecipients = failedRecipients };
     }
@@ -108,6 +111,39 @@ Click the link to view your tickets: {ticket.QRCodeLink}";
                 {
                     Address = InternetAddress.Parse(ticket.Email),
                     Subject = ticketEvent.EmailSubject,
+                    MessageText = emailBody
+                });
+            }
+            catch (Exception ex)
+            {
+                _logs.PayServer.LogWarning(ex, $"Invalid email for ticket {ticket.Id}: {ticket.Email}");
+            }
+        }
+        return await SendBulkEmail(storeId, recipients);
+    }
+
+    public async Task<EmailDispatchResult> SendReminderEmail(string storeId, IEnumerable<Ticket> uniqueTickets, Event ticketEvent, string reminderSubject, string reminderBody)
+    {
+        var recipients = new List<EmailRecipient>();
+        var subject = !string.IsNullOrWhiteSpace(reminderSubject) ? reminderSubject : ticketEvent.EmailSubject;
+        var bodyTemplate = !string.IsNullOrWhiteSpace(reminderBody) ? reminderBody : ticketEvent.EmailBody;
+        foreach (var ticket in uniqueTickets)
+        {
+            string emailBody = bodyTemplate
+                .Replace("{{Title}}", ticketEvent.Title)
+                .Replace("{{Location}}", ticketEvent.Location)
+                .Replace("{{Name}}", $"{ticket.FirstName} {ticket.LastName}")
+                .Replace("{{Email}}", ticket.Email)
+                .Replace("{{Description}}", ticketEvent.Description)
+                .Replace("{{EventDate}}", ticketEvent.StartDate.ToString("MMMM dd, yyyy"))
+                .Replace("{{Currency}}", ticketEvent.Currency);
+
+            try
+            {
+                recipients.Add(new EmailRecipient
+                {
+                    Address = InternetAddress.Parse(ticket.Email),
+                    Subject = subject,
                     MessageText = emailBody
                 });
             }
