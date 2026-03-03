@@ -211,6 +211,7 @@ Click the link to view your tickets: {ticket.QRCodeLink}";
             catch (Exception ex)
             {
                 _logs.PayServer.LogWarning(ex, $"Invalid email for ticket {ticket.Id}: {ticket.Email}");
+                return false;
             }
         }
         var sendBultEmail = await SendBulkEmail(storeId, recipients);
