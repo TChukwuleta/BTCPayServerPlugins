@@ -15,6 +15,7 @@ using BTCPayServer.Plugins.Emails.Services;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels;
+using BTCPayServer.Plugins.SatoshiTickets.ViewModels.Models;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Stores;
@@ -92,7 +93,7 @@ public class UITicketSalesController : Controller
                 Location = ticketEvent.Location,
                 Id = ticketEvent.Id,
                 Title = ticketEvent.Title,
-                EventPurchaseLink = Url.Action("EventSummary", "UITicketSalesPublic", new { storeId = CurrentStore.Id, eventId = ticketEvent.Id }, Request.Scheme),
+                EventPurchaseLink = Url.Action(nameof(UITicketSalesPublicController.EventSummary), "UITicketSalesPublic", new { storeId = CurrentStore.Id, eventId = ticketEvent.Id }, Request.Scheme),
                 Description = ticketEvent.Description,
                 EventDate = ticketEvent.StartDate,
                 CreatedAt = ticketEvent.CreatedAt,
@@ -107,8 +108,7 @@ public class UITicketSalesController : Controller
             eventsViewModel = eventsViewModel.Where(c => c.EventDate <= DateTime.UtcNow).ToList();
         }
 
-        var emailSender = await _emailSenderFactory.GetEmailSender(storeId);
-        var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+        var isEmailSettingsConfigured = await _emailService.IsEmailSettingsConfigured(CurrentStore.Id);
         ViewData["StoreEmailSettingsConfigured"] = isEmailSettingsConfigured;
         if (!isEmailSettingsConfigured)
         {
@@ -494,8 +494,7 @@ public class UITicketSalesController : Controller
             TempData[WellKnownTempData.ErrorMessage] = $"Invalid Ticket specified";
             return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId = model.EventId });
         }
-        var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStore.Id);
-        var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+        var isEmailConfigured = await _emailService.IsEmailSettingsConfigured(CurrentStore.Id);
         if (!isEmailConfigured)
         {
             TempData[WellKnownTempData.ErrorMessage] = $"Email settings not setup. Kindly configure Email SMTP in the admin settings";
@@ -519,6 +518,63 @@ public class UITicketSalesController : Controller
         return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId = model.EventId });
     }
 
+    [HttpGet("settings")]
+    public async Task<IActionResult> Settings(string storeId)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == CurrentStore.Id);
+
+        ViewData["StoreEmailSettingsConfigured"] = await _emailService.IsEmailSettingsConfigured(CurrentStore.Id);
+        var vm = new SatoshiTicketsSettingsViewModel
+        {
+            EnableAutoReminders = settings?.EnableAutoReminders ?? false,
+            DefaultReminderDaysBeforeEvent = settings?.DefaultReminderDaysBeforeEvent ?? 3,
+            ReminderEmailBody = settings?.ReminderEmailBody,
+            ReminderEmailSubject = settings?.ReminderEmailSubject
+        };
+        return View(vm);
+    }
+
+    [HttpPost("settings")]
+    public async Task<IActionResult> Settings(string storeId, SatoshiTicketsSettingsViewModel vm)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        if (vm.EnableAutoReminders && vm.DefaultReminderDaysBeforeEvent <= 0)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Default reminder days must be greater than 0";
+            return RedirectToAction(nameof(Settings), new { storeId = CurrentStore.Id });
+        }
+
+        await using var ctx = _dbContextFactory.CreateContext();
+        var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == CurrentStore.Id);
+        if (settings == null)
+        {
+            ctx.SatoshiTicketsSettings.Add(new SatoshiTicketsSetting
+            {
+                StoreId = CurrentStore.Id,
+                EnableAutoReminders = vm.EnableAutoReminders,
+                DefaultReminderDaysBeforeEvent = vm.DefaultReminderDaysBeforeEvent,
+                ReminderEmailSubject = vm.ReminderEmailSubject,
+                ReminderEmailBody = vm.ReminderEmailBody
+            });
+        }
+        else
+        {
+            settings.EnableAutoReminders = vm.EnableAutoReminders;
+            settings.DefaultReminderDaysBeforeEvent = vm.DefaultReminderDaysBeforeEvent;
+            settings.ReminderEmailBody = vm.ReminderEmailBody;
+            settings.ReminderEmailSubject = vm.ReminderEmailSubject;
+            ctx.SatoshiTicketsSettings.Update(settings);
+        }
+        await ctx.SaveChangesAsync();
+        TempData[WellKnownTempData.SuccessMessage] = "Reminder settings updated successfully";
+        return RedirectToAction(nameof(Settings), new { storeId = CurrentStore.Id });
+    }
 
     [HttpGet("{eventId}/export")]
     public async Task<IActionResult> ExportTickets(string storeId, string eventId)
@@ -585,7 +641,9 @@ public class UITicketSalesController : Controller
             EventType = entity.EventType,
             EmailSubject = entity.EmailSubject,
             HasMaximumCapacity = entity.HasMaximumCapacity,
-            MaximumEventCapacity = entity.MaximumEventCapacity
+            MaximumEventCapacity = entity.MaximumEventCapacity,
+            ReminderEnabled = entity.ReminderEnabled,
+            ReminderDaysBeforeEvent = entity.ReminderDaysBeforeEvent
         };
     }
 
@@ -593,6 +651,9 @@ public class UITicketSalesController : Controller
     {
         void MapTo(Event e)
         {
+            if (e.Id != null && e.StartDate != model.StartDate)
+                e.ReminderSentAt = null;
+
             e.StoreId = CurrentStore.Id;
             e.Title = model.Title;
             e.Description = model.Description;
@@ -606,6 +667,8 @@ public class UITicketSalesController : Controller
             e.EmailSubject = model.EmailSubject;
             e.HasMaximumCapacity = model.HasMaximumCapacity;
             e.MaximumEventCapacity = model.MaximumEventCapacity;
+            e.ReminderEnabled = model.ReminderEnabled;
+            e.ReminderDaysBeforeEvent = model.ReminderDaysBeforeEvent;
 
             if (!string.IsNullOrWhiteSpace(model.EventImageUrl))
                 e.EventLogo = model.EventImageUrl;

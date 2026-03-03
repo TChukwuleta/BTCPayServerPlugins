@@ -8,12 +8,15 @@ using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
 using BTCPayServer.Plugins.Emails.Services;
+using BTCPayServer.Plugins.SatoshiTickets.Data;
 using BTCPayServer.Services.Invoices;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Services;
 
-public class SimpleTicketSalesHostedService : EventHostedServiceBase
+public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicTask
 {
     public const string TICKET_SALES_PREFIX = "Ticket_Sales_";
     private readonly EmailService _emailService;
@@ -36,11 +39,86 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
     protected override void SubscribeToEvents()
     {
         Subscribe<InvoiceEvent>();
+        Subscribe<PeriodProcessEvent>();
         base.SubscribeToEvents();
+    }
+    public class PeriodProcessEvent
+    {
+        public string StoreId { get; set; }
+        public SatoshiTicketsSetting Setting { get; set; }
+    }
+
+
+    public async Task Do(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var db = _dbContextFactory.CreateContext();
+            var storeSetings = db.SatoshiTicketsSettings.Where(s => s.EnableAutoReminders).ToList();
+            foreach (var settings in storeSetings)
+            {
+                if (!await _emailService.IsEmailSettingsConfigured(settings.StoreId))
+                    continue;
+
+                PushEvent(new PeriodProcessEvent { StoreId = settings.StoreId, Setting = settings });
+            }
+        }
+        catch (PostgresException ex) when (ex.SqlState == "42P01")
+        {
+            Logs.PayServer.LogInformation("Skipping task: SatoshiTickets table not created yet.");
+        }
     }
 
     protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
     {
+        if (evt is PeriodProcessEvent sequentialExecute)
+        {
+            await using var ctx = _dbContextFactory.CreateContext();
+            var now = DateTimeOffset.UtcNow;
+
+            var upcomingEvents = ctx.Events.Where(e => e.EventState == Data.EntityState.Active && e.StartDate > now.UtcDateTime
+                         && e.ReminderSentAt == null && e.StoreId == sequentialExecute.StoreId).ToList();
+
+            if (!upcomingEvents.Any()) return;
+
+            foreach (var ticketEvent in upcomingEvents)
+            {
+                if (!ticketEvent.ReminderEnabled) continue;
+
+                var settings = sequentialExecute.Setting;
+
+                int effectiveDays = ticketEvent.ReminderDaysBeforeEvent ?? (settings?.DefaultReminderDaysBeforeEvent ?? 3);
+                var daysUntilEvent = (ticketEvent.StartDate - now.UtcDateTime).TotalDays;
+                if (daysUntilEvent > effectiveDays) continue;
+
+                if (!await _emailService.IsEmailSettingsConfigured(ticketEvent.StoreId)) continue;
+
+                var settledTickets = ctx.Orders.Include(o => o.Tickets).Where(o => o.EventId == ticketEvent.Id
+                             && o.StoreId == ticketEvent.StoreId && o.PaymentStatus == Data.TransactionStatus.Settled.ToString())
+                    .SelectMany(o => o.Tickets).ToList().DistinctBy(t => t.Email).ToList();
+
+                if (!settledTickets.Any()) continue;
+
+                try
+                {
+                    var dispatchResult = await _emailService.SendReminderEmail(ticketEvent.StoreId, settledTickets, ticketEvent, settings?.ReminderEmailSubject, settings?.ReminderEmailBody);
+                    if (!dispatchResult)
+                    {
+                        Logs.PayServer.LogWarning("SatoshiTickets: Reminder dispatch incomplete for event {EventId}", ticketEvent.Id);
+                        continue;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logs.PayServer.LogWarning(ex, "SatoshiTickets: Failed sending reminders for event {EventId}", ticketEvent.Id);
+                    continue;
+                }
+                var tracked = ctx.Events.First(e => e.Id == ticketEvent.Id);
+                tracked.ReminderSentAt = DateTimeOffset.UtcNow;
+                await ctx.SaveChangesAsync();
+            }
+        }
+
         if (evt is InvoiceEvent invoiceEvent && new[]
         {
             InvoiceEvent.MarkedCompleted,
@@ -66,6 +144,7 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
                     }
                 }
             }
+
         await base.ProcessEvent(evt, cancellationToken);
     }
 
@@ -105,15 +184,12 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase
 
         if (success)
         {
-            var sender = await _emailSenderFactory.GetEmailSender(invoice.StoreId);
-            var settings = await sender.GetEmailSettings();
-            if (settings?.IsComplete() == true)
+            var isEmailConfigured = await _emailService.IsEmailSettingsConfigured(invoice.StoreId);
+            if (isEmailConfigured)
             {
                 try
                 {
-                    var emailResponse = await _emailService.SendTicketRegistrationEmail(invoice.StoreId, order.Tickets, ticketEvent);
-                    if (emailResponse.IsSuccessful) order.EmailSent = true;
-                    result.Write($"Email sent successfully to recipients in Order with Id: {order.Id}", InvoiceEventData.EventSeverity.Success);
+                    await _emailService.SendTicketRegistrationEmail(invoice.StoreId, order.Tickets, ticketEvent);
                 }
                 catch { result.Write($"Failed to send email for Order Id: {order.Id}.", InvoiceEventData.EventSeverity.Error); }
             }

@@ -1,19 +1,19 @@
 @using BTCPayServer.Abstractions.Contracts
 @using BTCPayServer.Abstractions.Extensions
 @using System.Globalization
+@using BTCPayServer.Abstractions.Models
 @using BTCPayServer.Plugins.SatoshiTickets.Data
 @using BTCPayServer.Plugins.SatoshiTickets.ViewModels
 @inject IFileService FileService
 @inject IScopeProvider ScopeProvider
 @model UpdateSimpleTicketSalesEventViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Event");
+    ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketIndex), "Events") { ActiveCategory = nameof(SatoshiTicketNavPages) });
     var canUpload = await FileService.IsAvailable();
     var storeId = ScopeProvider.GetCurrentStoreId();
     bool isEditMode = !string.IsNullOrEmpty(Model.EventId);
     string formAction = isEditMode
-        ? Url.Action("UpdateEvent", "UITicketSales", new { eventId = Model.EventId, storeId })
-        : Url.Action("CreateEvent", "UITicketSales", new { storeId });
+        ? Url.Action("UpdateEvent", "UITicketSales", new { eventId = Model.EventId, storeId }) : Url.Action("CreateEvent", "UITicketSales", new { storeId });
 }
 
 <div class="sticky-header">
@@ -147,6 +147,20 @@
         </div>
     </div>
 
+    <div class="row align-items-center mb-4">
+        <div class="col-md-12 d-flex flex-column">
+            <div class="form-group d-flex align-items-center">
+                <input asp-for="ReminderEnabled" type="checkbox" class="btcpay-toggle me-2" id="reminderToggle" />
+                <label asp-for="ReminderEnabled" class="form-check-label"></label>
+            </div>
+            <div id="reminderDaysInput" class="mt-2" style="display: none;">
+                <label asp-for="ReminderDaysBeforeEvent" class="form-label"></label>
+                <input asp-for="ReminderDaysBeforeEvent" type="number" class="form-control w-25" placeholder="Enter reminder days" />
+                <span asp-validation-for="ReminderDaysBeforeEvent" class="text-danger"></span>
+            </div>
+        </div>
+    </div>
+
     <div class="row mt-3">
         <div class="col-sm-6">
             <div class="form-group">
@@ -212,6 +226,15 @@
             }
             updateVisibility();
             toggle.addEventListener("change", updateVisibility);
+
+            const reminderToggle = document.getElementById("reminderToggle");
+            const reminderDaysDiv = document.getElementById("reminderDaysInput");
+            function updateReminderVisibility() {
+                reminderDaysDiv.style.display = reminderToggle.checked ? "block" : "none";
+            }
+            updateReminderVisibility();
+            reminderToggle.addEventListener("change", updateReminderVisibility);
+
             const variables = [
                 'Name',
                 'Email',

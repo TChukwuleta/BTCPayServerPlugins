@@ -1,0 +1,83 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.SatoshiTickets.Data
+@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@using BTCPayServer.Plugins.Emails.Controllers
+@using BTCPayServer.Plugins.Emails
+@using BTCPayServer.Plugins.SatoshiTickets.ViewModels.Models
+@inject BTCPayServer.Abstractions.Contracts.IScopeProvider ScopeProvider
+@model SatoshiTicketsSettingsViewModel
+@{
+    ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketSettings), "Satoshi Tickets Settings") { ActiveCategory = nameof(SatoshiTicketNavPages) });
+    var storeId = ScopeProvider.GetCurrentStoreId();
+    var isEmailConfigured = (bool)(ViewData["StoreEmailSettingsConfigured"] ?? false);
+}
+
+<div class="sticky-header">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <button type="submit" form="settings-form" class="btn btn-primary">Save Settings</button>
+</div>
+
+<partial name="_StatusMessage" />
+
+@if (!isEmailConfigured)
+{
+    <div class="alert alert-warning" role="alert">
+        Email SMTP is not configured. Auto reminders will not send until SMTP is set up.
+        <a asp-controller="UIStoresEmail" asp-action="StoreEmailSettings" asp-area="@EmailsPlugin.Area" asp-route-storeId="@storeId" class="alert-link">Configure SMTP</a>
+    </div>
+}
+
+<form id="settings-form" asp-action="Settings" asp-route-storeId="@storeId" method="post">
+    <div class="row">
+        <div class="col-sm-8 col-md-6">
+            <div class="form-group mb-4">
+                <div class="d-flex align-items-center gap-3">
+                    <input asp-for="EnableAutoReminders" type="checkbox" class="btcpay-toggle" id="EnableAutoReminders" onchange="updateDaysVisibility()" />
+                    <label asp-for="EnableAutoReminders" class="form-check-label mb-0"></label>
+                </div>
+                <div class="form-text mt-1">
+                    When enabled, attendees receive a reminder email before the event. Individual events can override this setting.
+                </div>
+            </div>
+
+            <div id="reminderDaysSection">
+                <div class="form-group">
+                    <label asp-for="DefaultReminderDaysBeforeEvent" class="form-label"></label>
+                    <input asp-for="DefaultReminderDaysBeforeEvent" type="number" min="1" max="365" class="form-control w-auto" />
+                    <span asp-validation-for="DefaultReminderDaysBeforeEvent" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="form-group mt-3">
+                <label asp-for="ReminderEmailSubject" class="form-label"></label>
+                <input asp-for="ReminderEmailSubject" type="text" class="form-control" />
+                <div class="form-text">
+                    Subject for the reminder email. Supports <code>{{Title}}</code>, <code>{{EventDate}}</code>, <code>{{Location}}</code>.
+                </div>
+                <span asp-validation-for="ReminderEmailSubject" class="text-danger"></span>
+            </div>
+
+            <div class="form-group mt-3">
+                <label asp-for="ReminderEmailBody" class="form-label"></label>
+                <textarea asp-for="ReminderEmailBody" class="form-control" rows="6"></textarea>
+                <div class="form-text">
+                    Body of the reminder email. Supports <code>{{Name}}</code>, <code>{{Title}}</code>, <code>{{EventDate}}</code>, <code>{{Location}}</code>, <code>{{Description}}</code>.
+                </div>
+                <span asp-validation-for="ReminderEmailBody" class="text-danger"></span>
+            </div>
+
+        </div>
+    </div>
+</form>
+
+@section PageFootContent {
+    <script>
+        function updateDaysVisibility() {
+            const toggle = document.getElementById('EnableAutoReminders');
+            const section = document.getElementById('reminderDaysSection');
+            section.style.display = toggle.checked ? 'block' : 'none';
+        }
+        updateDaysVisibility();
+    </script>
+}

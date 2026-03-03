@@ -18,6 +18,7 @@ public class SimpleTicketSalesDbContext : DbContext
     public DbSet<Ticket> Tickets { get; set; }
     public DbSet<TicketType> TicketTypes { get; set; }
     public DbSet<Order> Orders { get; set; }
+    public DbSet<SatoshiTicketsSetting> SatoshiTicketsSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -23,4 +23,7 @@ public class Event
     public bool HasMaximumCapacity { get; set; }
     public int? MaximumEventCapacity { get; set; }
     public EntityState EventState { get; set; }
+    public bool ReminderEnabled { get; set; }
+    public int? ReminderDaysBeforeEvent { get; set; }
+    public DateTimeOffset? ReminderSentAt { get; set; }
 }

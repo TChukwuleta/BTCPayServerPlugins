@@ -1,10 +1,11 @@
+using System;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using System;
+using Microsoft.Extensions.Hosting;
 
 namespace BTCPayServer.Plugins.SatoshiTickets;
 
@@ -20,9 +21,10 @@ public class Plugin : BaseBTCPayServerPlugin
         services.AddSingleton<IUIExtension>(new UIExtension("SimpleTicketSalesPluginHeaderNav", "header-nav"));
         services.AddSingleton<EmailService>();
         services.AddSingleton<TicketService>();
-        services.AddSingleton<SimpleTicketSalesHostedService>();
         services.AddSingleton<SimpleTicketSalesDbContextFactory>();
-        services.AddHostedService<SimpleTicketSalesHostedService>();
+        services.AddSingleton<SimpleTicketSalesHostedService>();
+        services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<SimpleTicketSalesHostedService>());
+        services.AddScheduledTask<SimpleTicketSalesHostedService>(TimeSpan.FromMinutes(3));
         services.AddHostedService<ApplicationPartsLogger>();
         services.AddDbContext<SimpleTicketSalesDbContext>((provider, o) =>
         {
