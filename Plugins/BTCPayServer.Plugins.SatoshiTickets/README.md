@@ -95,6 +95,30 @@ Congratulations, everything is set up and ticket purchasing is working.
    ![Ticket list, checking in](./img/SatoshiTickets/ticket_checkin_2.png)   
 
 
+## API Documentation
+
+Satoshi tickets plugin API now available. See documentation at:
+
+```
+{btcpay_server_url}/plugins/{storeId}/satoshi-tickets/api-docs
+
+```
+
+All endpoints require a BTCPay Server Greenfield API key passed in the `Authorization` header.
+
+```
+Authorization: token YOUR_API_KEY
+```
+
+**Required permissions:**
+
+- `btcpay.store.canviewstoresettings` - for all GET (read) endpoints
+- `btcpay.store.canmodifystoresettings` - for all POST, PUT, DELETE (write) endpoints
+
+To create an API key: BTCPay Server > Account > Manage Account > API Keys > Generate Key. Select at minimum the permissions `CanViewStoreSettings` and `CanModifyStoreSettings` for the target store.
+
+
+
 ## Contribute
 
 This BTCPay Server plugin is built and maintained entirely by contributors around the internet. We welcome and appreciate new contributions.
