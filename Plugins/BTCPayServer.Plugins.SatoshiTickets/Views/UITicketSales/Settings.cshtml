@@ -51,18 +51,16 @@
 
             <div class="form-group mt-3">
                 <label asp-for="ReminderEmailSubject" class="form-label"></label>
-                <input asp-for="ReminderEmailSubject" type="text" class="form-control"
-                       placeholder="e.g. Reminder: {{Title}} is coming up!" />
+                <input asp-for="ReminderEmailSubject" type="text" class="form-control" />
                 <div class="form-text">
-                    Subject line for the reminder email. Supports <code>{{Title}}</code>, <code>{{EventDate}}</code>, <code>{{Location}}</code>.
+                    Subject for the reminder email. Supports <code>{{Title}}</code>, <code>{{EventDate}}</code>, <code>{{Location}}</code>.
                 </div>
                 <span asp-validation-for="ReminderEmailSubject" class="text-danger"></span>
             </div>
 
             <div class="form-group mt-3">
                 <label asp-for="ReminderEmailBody" class="form-label"></label>
-                <textarea asp-for="ReminderEmailBody" class="form-control" rows="6"
-                          placeholder="e.g. Hi {{Name}}, just a reminder that {{Title}} is on {{EventDate}} at {{Location}}. See you there!"></textarea>
+                <textarea asp-for="ReminderEmailBody" class="form-control" rows="6"></textarea>
                 <div class="form-text">
                     Body of the reminder email. Supports <code>{{Name}}</code>, <code>{{Title}}</code>, <code>{{EventDate}}</code>, <code>{{Location}}</code>, <code>{{Description}}</code>.
                 </div>

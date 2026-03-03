@@ -527,15 +527,13 @@ public class UITicketSalesController : Controller
         await using var ctx = _dbContextFactory.CreateContext();
         var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == CurrentStore.Id);
 
-        var emailSender = await _emailSenderFactory.GetEmailSender(storeId);
-        var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
-        ViewData["StoreEmailSettingsConfigured"] = isEmailConfigured;
+        ViewData["StoreEmailSettingsConfigured"] = await _emailService.IsEmailSettingsConfigured(CurrentStore.Id);
         var vm = new SatoshiTicketsSettingsViewModel
         {
-            EnableAutoReminders = settings.EnableAutoReminders,
-            DefaultReminderDaysBeforeEvent = settings.DefaultReminderDaysBeforeEvent,
-            ReminderEmailBody = settings.ReminderEmailBody,
-            ReminderEmailSubject = settings.ReminderEmailSubject
+            EnableAutoReminders = settings?.EnableAutoReminders ?? false,
+            DefaultReminderDaysBeforeEvent = settings?.DefaultReminderDaysBeforeEvent ?? 3,
+            ReminderEmailBody = settings?.ReminderEmailBody,
+            ReminderEmailSubject = settings?.ReminderEmailSubject
         };
         return View(vm);
     }

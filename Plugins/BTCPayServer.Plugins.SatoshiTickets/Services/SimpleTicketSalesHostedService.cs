@@ -101,11 +101,17 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicT
 
                 try
                 {
-                    await _emailService.SendReminderEmail(ticketEvent.StoreId, settledTickets, ticketEvent, settings?.ReminderEmailSubject, settings?.ReminderEmailBody);
+                    var dispatchResult = await _emailService.SendReminderEmail(ticketEvent.StoreId, settledTickets, ticketEvent, settings?.ReminderEmailSubject, settings?.ReminderEmailBody);
+                    if (!dispatchResult)
+                    {
+                        Logs.PayServer.LogWarning("SatoshiTickets: Reminder dispatch incomplete for event {EventId}", ticketEvent.Id);
+                        continue;
+                    }
                 }
                 catch (Exception ex)
                 {
                     Logs.PayServer.LogWarning(ex, "SatoshiTickets: Failed sending reminders for event {EventId}", ticketEvent.Id);
+                    continue;
                 }
                 var tracked = ctx.Events.First(e => e.Id == ticketEvent.Id);
                 tracked.ReminderSentAt = DateTimeOffset.UtcNow;
@@ -183,9 +189,7 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicT
             {
                 try
                 {
-                    var emailResponse = await _emailService.SendTicketRegistrationEmail(invoice.StoreId, order.Tickets, ticketEvent);
-                    if (emailResponse.IsSuccessful) order.EmailSent = true;
-                    result.Write($"Email sent successfully to recipients in Order with Id: {order.Id}", InvoiceEventData.EventSeverity.Success);
+                    await _emailService.SendTicketRegistrationEmail(invoice.StoreId, order.Tickets, ticketEvent);
                 }
                 catch { result.Write($"Failed to send email for Order Id: {order.Id}.", InvoiceEventData.EventSeverity.Error); }
             }

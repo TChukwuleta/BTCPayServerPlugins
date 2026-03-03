@@ -1,22 +1,23 @@
-﻿using System.Threading.Tasks;
-using System;
-using BTCPayServer.Logging;
-using MimeKit;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using Microsoft.Extensions.Logging;
-using BTCPayServer.Plugins.SatoshiTickets.Data;
 using System.IO;
-using System.Reflection;
 using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
 using BTCPayServer.Plugins.Emails.Services;
+using BTCPayServer.Plugins.SatoshiTickets.Data;
+using MailKit.Net.Smtp;
+using Microsoft.Extensions.Logging;
+using MimeKit;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Services;
 
 public class EmailService
 {
     private readonly EmailSenderFactory _emailSender;
-    private readonly Logs _logs;
-    public EmailService(EmailSenderFactory emailSender, Logs logs)
+    private readonly Logging.Logs _logs;
+    public EmailService(EmailSenderFactory emailSender, Logging.Logs logs)
     {
         _logs = logs;
         _emailSender = emailSender;
@@ -34,11 +35,14 @@ public class EmailService
         if (!settings.IsComplete())
             return new EmailDispatchResult { IsSuccessful = false };
 
-        List<string> failedRecipients = new List<string>();
-        var isSuccess = true;
-        foreach (var recipient in recipients)
+        var recipientList = recipients.ToList();
+        if (recipientList.Count == 0)
+            return new EmailDispatchResult { IsSuccessful = true };
+
+        var failedRecipients = new ConcurrentBag<string>();
+        await Parallel.ForEachAsync(recipientList, new ParallelOptions { MaxDegreeOfParallelism = 4 }, async (recipient, _) =>
         {
-            var client = await settings.CreateSmtpClient();
+            using var client = await settings.CreateSmtpClient();
             try
             {
                 var message = new MimeMessage();
@@ -50,13 +54,70 @@ public class EmailService
             }
             catch (Exception ex)
             {
-                isSuccess = false;
                 failedRecipients.Add(recipient.Address.ToString());
                 _logs.PayServer.LogError(ex, $"Error sending email to: {recipient.Address}");
             }
             finally
             {
-                await client.DisconnectAsync(true);
+                if (client.IsConnected)
+                    await client.DisconnectAsync(true);
+            }
+        });
+        var failed = failedRecipients.ToList();
+        return new EmailDispatchResult { IsSuccessful = failed.Count == 0, FailedRecipients = failed };
+    }
+
+
+    private async Task<EmailDispatchResult> SendBulkEmail2(string storeId, IEnumerable<EmailRecipient> recipients)
+    {
+        var settings = await (await _emailSender.GetEmailSender(storeId)).GetEmailSettings();
+        if (!settings.IsComplete())
+            return new EmailDispatchResult { IsSuccessful = false };
+
+        var failedRecipients = new List<string>();
+        var isSuccess = true;
+        SmtpClient client = null;
+        try
+        {
+            client = await settings.CreateSmtpClient();
+            foreach (var recipient in recipients)
+            {
+                try
+                {
+                    var message = new MimeMessage();
+                    message.From.Add(MailboxAddress.Parse(settings.From));
+                    message.To.Add(recipient.Address);
+                    message.Subject = recipient.Subject;
+                    message.Body = new TextPart("plain") { Text = recipient.MessageText };
+                    await client.SendAsync(message);
+                }
+                catch (Exception ex)
+                {
+                    isSuccess = false;
+                    failedRecipients.Add(recipient.Address.ToString());
+                    _logs.PayServer.LogError(ex, $"Error sending email to: {recipient.Address}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logs.PayServer.LogError(ex, "Failed to establish SMTP connection for bulk email");
+            return new EmailDispatchResult { IsSuccessful = false, FailedRecipients = recipients.Select(r => r.Address.ToString()).ToList() };
+        }
+        finally
+        {
+            if (client != null)
+            {
+                try
+                {
+                    if (client.IsConnected)
+                        await client.DisconnectAsync(true);
+                }
+                catch (Exception ex)
+                {
+                    _logs.PayServer.LogError(ex, "Error disconnecting SMTP client");
+                }
+                client.Dispose();
             }
         }
         return new EmailDispatchResult { IsSuccessful = isSuccess, FailedRecipients = failedRecipients };
@@ -87,7 +148,7 @@ Click the link to view your tickets: {ticket.QRCodeLink}";
         return await SendBulkEmail(storeId, recipients);
     }
 
-    public async Task<EmailDispatchResult> SendTicketRegistrationEmail(string storeId, IEnumerable<Ticket> tickets, Event ticketEvent)
+    public async Task SendTicketRegistrationEmail(string storeId, IEnumerable<Ticket> tickets, Event ticketEvent)
     {
         var recipients = new List<EmailRecipient>();
         foreach (var ticket in tickets)
@@ -119,10 +180,10 @@ Click the link to view your tickets: {ticket.QRCodeLink}";
                 _logs.PayServer.LogWarning(ex, $"Invalid email for ticket {ticket.Id}: {ticket.Email}");
             }
         }
-        return await SendBulkEmail(storeId, recipients);
+        await SendBulkEmail(storeId, recipients);
     }
 
-    public async Task<EmailDispatchResult> SendReminderEmail(string storeId, IEnumerable<Ticket> uniqueTickets, Event ticketEvent, string reminderSubject, string reminderBody)
+    public async Task<bool> SendReminderEmail(string storeId, IEnumerable<Ticket> uniqueTickets, Event ticketEvent, string reminderSubject, string reminderBody)
     {
         var recipients = new List<EmailRecipient>();
         var subject = !string.IsNullOrWhiteSpace(reminderSubject) ? reminderSubject : ticketEvent.EmailSubject;
@@ -152,7 +213,8 @@ Click the link to view your tickets: {ticket.QRCodeLink}";
                 _logs.PayServer.LogWarning(ex, $"Invalid email for ticket {ticket.Id}: {ticket.Email}");
             }
         }
-        return await SendBulkEmail(storeId, recipients);
+        var sendBultEmail = await SendBulkEmail(storeId, recipients);
+        return sendBultEmail.IsSuccessful;
     }
 
     public string GetEmbeddedResourceContent(string resourceName)
