@@ -7,7 +7,7 @@
   <PropertyGroup>
     <Product>Satoshi Tickets</Product>
     <Description> Bitcoin-powered event ticket and management system</Description>
-    <Version>1.2.2</Version>
+    <Version>1.2.3</Version>
   </PropertyGroup>
 
   <!-- Plugin development properties -->
@@ -32,7 +32,7 @@
     <ItemGroup>
 	    <EmbeddedResource Include="Resources\js\jsqr_min.js" />
 	    <EmbeddedResource Include="Resources\swagger.json" />
-	    <EmbeddedResource Include="Resources\redoc.standalone.js" />
+	    <EmbeddedResource Include="Resources\js\redoc.standalone.js" />
     </ItemGroup>
 
   <ItemGroup Condition="$(Configuration) != 'Release'">
@@ -61,6 +61,5 @@
 	
   <ItemGroup>
     <Folder Include="img\" />
-    <Folder Include="Resources\js\" />
   </ItemGroup>
 </Project>

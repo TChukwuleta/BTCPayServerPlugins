@@ -3,17 +3,18 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
 
-[Route("~/plugins/satoshi-tickets/api-docs")]
+[Route("~/plugins/{storeId}/satoshi-tickets/api-docs")]
 public class SatoshiTicketsApiDocsController : Controller
 {
     private static readonly Assembly Assembly = typeof(SatoshiTicketsApiDocsController).Assembly;
     private const string ResourcePrefix = "BTCPayServer.Plugins.SatoshiTickets.Resources.";
 
     [HttpGet]
-    public IActionResult Index()
+    public IActionResult Index(string storeId)
     {
-        var specUrl = Url.Action(nameof(Swagger));
-        var redocUrl = Url.Action(nameof(RedocScript));
+        var specUrl = Url.Action(nameof(Swagger), new { storeId });
+        var redocUrl = Url.Action(nameof(RedocScript), new { storeId });
+
         var html = $@"<!DOCTYPE html>
 <html>
 <head>
@@ -43,7 +44,7 @@ public class SatoshiTicketsApiDocsController : Controller
     [ResponseCache(Duration = 86400)]
     public IActionResult RedocScript()
     {
-        var stream = Assembly.GetManifestResourceStream(ResourcePrefix + "redoc.standalone.js");
+        var stream = Assembly.GetManifestResourceStream(ResourcePrefix + "js/redoc.standalone.js");
         if (stream == null)
             return NotFound();
         return File(stream, "application/javascript");
