@@ -8,6 +8,7 @@
 <!DOCTYPE html>
 <html lang="en" @(Env.IsDeveloping ? " data-devenv" : "")>
 <head>
+    <title>@ViewData["Title"]</title>
     <partial name="LayoutHead" />
     @await RenderSectionAsync("PageHeadContent", false)
     <meta name="robots" content="noindex,nofollow">
