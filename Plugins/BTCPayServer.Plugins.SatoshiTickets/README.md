@@ -95,12 +95,12 @@ Congratulations, everything is set up and ticket purchasing is working.
    ![Ticket list, checking in](./img/SatoshiTickets/ticket_checkin_2.png)   
 
 
-## API Documentattion
+## API Documentation
 
-Sotoshi tickets plugin API now available. See documentation at:
+Satoshi tickets plugin API now available. See documentation at:
 
 ```
-{btcapy_server_url}/plugins/{storeId}/satoshi-tickets/api-docs
+{btcpay_server_url}/plugins/{storeId}/satoshi-tickets/api-docs
 
 ```
 
