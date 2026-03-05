@@ -1,0 +1,46 @@
+﻿@using BTCPayServer.Plugins.JumpSeller.ViewModels
+@model JumpSellerSettingsViewModel
+@{
+    ViewData["Title"] = "JumpSeller Integration";
+}
+
+<form method="post">
+    <div class="sticky-header">
+        <h2 text-translate="true">@ViewData["Title"]</h2>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+        </div>
+    </div>
+
+    <partial name="_StatusMessage" />
+
+    <div class="row">
+        <div class="col-xl-8 col-xxl-constrain">
+            <div class="form-group mb-4">
+                <label asp-for="EpgAccountId" class="form-label fw-semibold"></label>
+                <input asp-for="EpgAccountId" class="form-control" autocomplete="off" />
+                <span asp-validation-for="EpgAccountId" class="text-danger small"></span>
+                <small class="form-text text-muted">The value you put in the <strong>Payment Method Key</strong> field in JumpSeller</small>
+            </div>
+
+            <div class="form-group mb-4">
+                <label asp-for="EpgSecret" class="form-label fw-semibold"></label>
+                <input asp-for="EpgSecret" class="form-control" autocomplete="off" />
+                <span asp-validation-for="EpgSecret" class="text-danger small"></span>
+                <small class="form-text text-muted">
+                    The value you put in the <strong>Payment Method Secret</strong> field in JumpSeller</small>
+            </div>
+
+            <div class="p-3 bg-light border rounded mb-2">
+                <p class="fw-semibold mb-2">Register this as External Payment Gateway Payment Method URL in JumpSeller</p>
+                <div class="input-group input-group-sm">
+                    <input type="text" class="form-control font-monospace bg-white" value="@Model.PaymentUrl" readonly />
+                    <button class="btn btn-outline-secondary" type="button"
+                            onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(()=>{ this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy',1500) })">
+                        Copy
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
