@@ -8,7 +8,7 @@ a BTCPay checkout appears inside the Lightspeed payment screen. Once the payment
 - A running BTCPay Server instance (self-hosted or hosted by a third party)
 - A Lightspeed retail account (ourstore.retail.lightspeed.app)
 
-This plugin does not support Lightspeed Restaurant or Lightspeed eCom yet.
+BTCPay plugin for LightSpeed is Retail POS (X-Series) only
 
 
 ## Installation
@@ -33,6 +33,8 @@ Lightspeed opens a payment window of which BTCPay Server invoice checkout page i
 The customer can then go ahead and pay with any of the payment option available.
 
 Once payment is confirmed, the window will close and the sale will be marked as paid in Lightspeed.
+
+N.B: For improved UX around QR display, you can disable store header to show in checkout page by going to `Stores Settings > Checkout Appearance` and disable `Show the store header`
 
 ### Troubleshooting
 

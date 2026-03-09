@@ -4,7 +4,7 @@
 @model LightspeedSettingsViewModel
 @{
     Layout = "_Layout";
-    ViewData["Title"] = "Lightspeed HQ (Retail)";
+    ViewData["Title"] = "Lightspeed HQ (Retail X-Series)";
     var storeId = ScopeProvider.GetCurrentStoreId();
 }
 
@@ -20,10 +20,13 @@
 
     <div class="row">
         <div class="col-xl-8 col-xxl-constrain">
-
             <div class="form-group mb-4">
-                <label asp-for="LightSpeedUrl" class="form-label fw-semibold">Lightspeed Domain URL</label>
-                <input asp-for="LightSpeedUrl" class="form-control" placeholder="myshop" autocomplete="off" />
+                <label asp-for="LightSpeedUrl" class="form-label fw-semibold">Lightspeed Store URL</label>
+                <div class="input-group">
+                    <span class="input-group-text">https://</span>
+                    <input asp-for="LightSpeedUrl" class="form-control" placeholder="myshop" autocomplete="off" />
+                    <span class="input-group-text">.retail.lightspeed.app</span>
+                </div>
                 <span asp-validation-for="LightSpeedUrl" class="text-danger small"></span>
             </div>
 

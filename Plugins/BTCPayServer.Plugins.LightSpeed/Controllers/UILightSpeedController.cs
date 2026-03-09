@@ -1,6 +1,8 @@
 using System;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Client;
@@ -12,12 +14,9 @@ using BTCPayServer.Plugins.LightSpeed.Data;
 using BTCPayServer.Plugins.LightSpeed.Services;
 using BTCPayServer.Plugins.LightSpeed.ViewModels;
 using BTCPayServer.Services.Stores;
-using MailKit.Search;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace BTCPayServer.Plugins.LightSpeed;
@@ -26,15 +25,12 @@ namespace BTCPayServer.Plugins.LightSpeed;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
 public class UILightSpeedController : Controller
 {
-    private readonly ILogger<UILightSpeedController> _logger;
     private readonly StoreRepository _storeRepository;
     private readonly LightSpeedService _lightSpeedService;
     private readonly UIInvoiceController _invoiceController;
 
-    public UILightSpeedController(StoreRepository storeRepository, LightSpeedService lightSpeedService, UIInvoiceController invoiceController,
-        ILogger<UILightSpeedController> logger)
+    public UILightSpeedController(StoreRepository storeRepository, LightSpeedService lightSpeedService, UIInvoiceController invoiceController)
     {
-        _logger = logger;
         _storeRepository = storeRepository;
         _lightSpeedService = lightSpeedService;
         _invoiceController = invoiceController;
@@ -45,7 +41,10 @@ public class UILightSpeedController : Controller
     public async Task<IActionResult> Settings(string storeId)
     {
         var settings = await _lightSpeedService.GetSettings(CurrentStore.Id) ?? new LightspeedSettings { StoreId = storeId };
-
+        if (settings.LightSpeedUrl?.Contains(".retail.lightspeed.app") is true)
+        {
+            settings.LightSpeedUrl = settings.LightSpeedUrl.Replace("https://", "").Replace(".retail.lightspeed.app", "").Trim('/');
+        }
         return View(new LightspeedSettingsViewModel
         {
             StoreId = settings.StoreId,
@@ -59,11 +58,16 @@ public class UILightSpeedController : Controller
     [HttpPost("settings")]
     public async Task<IActionResult> Settings(string storeId, LightspeedSettingsViewModel model)
     {
-        if (!ModelState.IsValid)
+        if (string.IsNullOrEmpty(model.LightSpeedUrl))
+        {
+            ModelState.AddModelError(nameof(model.LightSpeedUrl), "Please enter your lightspeed store");
             return View(model);
-
+        }
+        if (!model.LightSpeedUrl.Contains("."))
+        {
+            model.LightSpeedUrl = $"https://{model.LightSpeedUrl}.retail.lightspeed.app";
+        }
         model.StoreId = storeId;
-        _logger.LogInformation(JsonConvert.SerializeObject(model, Formatting.Indented));
         await _lightSpeedService.SaveSettings(model);
         TempData[WellKnownTempData.SuccessMessage] = "Lightspeed HQ settings saved";
         return RedirectToAction(nameof(Settings), new { storeId });
@@ -79,51 +83,59 @@ public class UILightSpeedController : Controller
         [FromQuery] decimal amount, [FromQuery] string register_id, [FromQuery] string origin,
         [FromQuery] string? currency, [FromQuery] string? retailer_payment_type_id, [FromQuery] string? customer_id, [FromQuery] string? reference_id)
     {
-        var settings = await _lightSpeedService.GetSettings(storeId);
-        var store = await _storeRepository.FindStore(storeId);
-        if (store == null || settings is null || !settings.IsConfigured)
-            return BadRequest("Plugin not configured for this store");
-
-        if (string.IsNullOrEmpty(currency))
-            return BadRequest("Currency not present");
-
-        var expectedOrigin = settings.LightSpeedUrl.TrimEnd('/');
-        if (!origin.TrimEnd('/').Equals(expectedOrigin, StringComparison.OrdinalIgnoreCase))
-            return BadRequest("Invalid origin");
-
-        using var l = await OrderLocks.LockAsync(register_id, CancellationToken.None);
-
-        var invoice = await _invoiceController.CreateInvoiceCoreRaw(new CreateInvoiceRequest()
+        try
         {
-            Amount = amount,
-            Currency = currency,
-            Metadata = new JObject
+            var settings = await _lightSpeedService.GetSettings(storeId);
+            var store = await _storeRepository.FindStore(storeId);
+            if (store == null || settings is null || !settings.IsConfigured)
+                return BadRequest("Plugin not configured for this store");
+
+            if (string.IsNullOrEmpty(currency))
+                return BadRequest("Currency not present");
+
+            var expectedOrigin = settings.LightSpeedUrl.TrimEnd('/');
+            if (!origin.TrimEnd('/').Equals(expectedOrigin, StringComparison.OrdinalIgnoreCase))
+                return BadRequest("Invalid origin");
+
+            using var l = await OrderLocks.LockAsync(register_id, CancellationToken.None);
+
+            var invoice = await _invoiceController.CreateInvoiceCoreRaw(new CreateInvoiceRequest()
             {
-                ["orderId"] = reference_id ?? register_id,
-                ["lightspeedRegisterId"] = register_id,
-                ["lightspeedOrigin"] = origin,
-                ["lightspeedCustomerId"] = customer_id,
-                ["lightspeedReferenceId"] = reference_id,
-                ["lightspeedPaymentTypeId"] = retailer_payment_type_id,
-            },
-            AdditionalSearchTerms = [register_id]
-        }, store, Request.GetAbsoluteRoot(), [register_id], CancellationToken.None);
+                Amount = amount,
+                Currency = currency,
+                Metadata = new JObject
+                {
+                    ["orderId"] = reference_id ?? register_id,
+                    ["lightspeedRegisterId"] = register_id,
+                    ["lightspeedOrigin"] = origin,
+                    ["lightspeedCustomerId"] = customer_id,
+                    ["lightspeedReferenceId"] = reference_id,
+                    ["lightspeedPaymentTypeId"] = retailer_payment_type_id,
+                },
+                AdditionalSearchTerms = [register_id]
+            }, store, Request.GetAbsoluteRoot(), [register_id], CancellationToken.None);
 
-        await _lightSpeedService.AddLightSpeedPayment(new LightSpeedPayment
+            await _lightSpeedService.AddLightSpeedPayment(new LightSpeedPayment
+            {
+                InvoiceId = invoice.Id,
+                StoreId = storeId,
+                RegisterSaleId = register_id,
+                Amount = amount,
+                Currency = currency
+            });
+            ViewBag.InvoiceId = invoice.Id;
+            ViewBag.InvoiceUrl = CheckoutUrl(invoice.Id);
+            ViewBag.EventsUrl = Url.Action(nameof(Status), "UILightspeed", new { storeId, invoiceId = invoice.Id }, Request.Scheme);
+            ViewBag.Origin = origin;
+            ViewBag.Amount = amount;
+            ViewBag.Currency = currency;
+            return View();
+        }
+        catch (Exception)
         {
-            InvoiceId = invoice.Id,
-            StoreId = storeId,
-            RegisterSaleId = register_id,
-            Amount = amount,
-            Currency = currency
-        });
-        ViewBag.InvoiceId = invoice.Id;
-        ViewBag.InvoiceUrl = CheckoutUrl(invoice.Id);
-        ViewBag.EventsUrl = Url.Action(nameof(Status), "UILightspeed", new { storeId, invoiceId = invoice.Id }, Request.Scheme);
-        ViewBag.Origin = origin;
-        ViewBag.Amount = amount;
-        ViewBag.Currency = currency;
-        return View();
+            ViewBag.Error = "Payment could not be initialised. Please try another payment method or contact support.";
+            return View();
+        }
     }
 
     [HttpGet("status")]
