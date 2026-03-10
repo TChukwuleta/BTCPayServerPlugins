@@ -16,12 +16,12 @@ Accept Bitcoin and Lightning Network payments directly in your JumpSeller store.
 5. Go to Settings → Checkout → Payments. On the top right of the page , click on `Add Payment Method` button
 6. You'd see a list of Methods to select from. Choose `External Gateway`.
 7. Fill in the details of the payment method as follows:
-   - Name: `BTCPay Server` (or any name you want to give to the payment method)
+   - Name: `Bitcoin (via BTCPay)` (or any name you want to give to the payment method)
    - Description: `Pay with Bitcoin and Lightning Network`
 	- Logo: BTCPay Server logo
 	- Payment Method URL: This is the gateway url and it is available in the plugin settings page.
-	- Payment Method Key: This can be any value, for example `btcpayserver`. The value chosen should also be added in the plugin settings page for XXXX input field.
-	- Payment Method Secret: This can be any value, for example `btcpayserver`. The value chosen should also be added in the plugin settings page for YYYY input field.
+	- Payment Method Key: This can be any value, for example `btcpayserver`. The value chosen should also be added in the plugin settings page.
+	- Payment Method Secret: This can be any value, for example `btcpayserver`. The value chosen should also be added in the plugin settings page. 
 8. Click `Save` to save the payment method. You should see the new payment method in the list of payment methods. Also save settings in the plugin page after adding the payment method in JumpSeller.
 
 That's it. Now you can now receive Bitcoin and Lightning Network payments in your JumpSeller store.
