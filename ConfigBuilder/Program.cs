@@ -8,7 +8,7 @@ foreach (var plugin in plugins)
     var assemblyConfigurationAttribute = typeof(Program).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>();
     var buildConfigurationName = assemblyConfigurationAttribute?.Configuration;
 
-    p += $"{Path.GetFullPath(plugin)}/bin/{buildConfigurationName}/net8.0/{Path.GetFileName(plugin)}.dll;";
+    p += $"{Path.GetFullPath(plugin)}/bin/{buildConfigurationName}/net10.0/{Path.GetFileName(plugin)}.dll;";
 }
 
 var content = JsonSerializer.Serialize(new
