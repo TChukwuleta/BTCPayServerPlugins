@@ -31,7 +31,7 @@ services:
         - "sshd_datadir:/root/.ssh"
 
   devlnd:
-    image: btcpayserver/bitcoin:29.1
+    image: btcpayserver/bitcoin:30.2
     environment:
       BITCOIN_NETWORK: testnet
       BITCOIN_WALLETDIR: "/data/wallets"
@@ -45,16 +45,6 @@ services:
       - postgres
       - customer_lnd
       - merchant_lnd
-
-  selenium:
-    image: selenium/standalone-chrome:125.0
-    extra_hosts:
-      - "tests:172.23.0.18"
-    expose:
-      - "4444"
-    networks:
-      default:
-      custom:
 
   nbxplorer:
     image: nicolasdorier/nbxplorer:2.5.29
@@ -82,7 +72,7 @@ services:
 
   bitcoind:
     restart: unless-stopped
-    image: btcpayserver/bitcoin:29.1
+    image: btcpayserver/bitcoin:30.2
     environment:
       BITCOIN_NETWORK: testnet
       BITCOIN_WALLETDIR: "/data/wallets"

@@ -5,7 +5,6 @@ using BTCPayServer.Data;
 using BTCPayServer.Events;
 using BTCPayServer.Plugins.Monetization;
 using BTCPayServer.Services;
-using BTCPayServer.Views.Manage;
 using BTCPayServer.Views.Server;
 using Microsoft.Playwright;
 using Xunit;
@@ -17,7 +16,7 @@ namespace BTCPayServer.Tests;
 public class MonetizationTests(ITestOutputHelper helper) : UnitTestBase(helper)
 {
     [Fact]
-    [Trait("Playwright", "Playwright")]
+    [Trait("Playwright", "Playwright-2")]
     public async Task CanMonetizeServer()
     {
         await using var s = CreatePlaywrightTester(newDb: true);

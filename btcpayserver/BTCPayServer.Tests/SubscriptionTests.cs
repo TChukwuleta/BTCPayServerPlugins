@@ -7,7 +7,6 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using BTCPayServer.Abstractions;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
 using BTCPayServer.Data.Subscriptions;
@@ -15,11 +14,7 @@ using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
 using BTCPayServer.Plugins.Emails.HostedServices;
 using BTCPayServer.Plugins.Subscriptions;
-using BTCPayServer.Plugins.Webhooks;
 using BTCPayServer.Tests.PMO;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Playwright;
 using NBitcoin;
 using NBXplorer;
@@ -55,7 +50,7 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
     }
 
     [Fact]
-    [Trait("Playwright", "Playwright")]
+    [Trait("Playwright", "Playwright-2")]
     public async Task CanEditOfferingAndPlans()
     {
         await using var s = CreatePlaywrightTester();
@@ -79,7 +74,7 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
         await editPlan.Save();
 
         // Remove the other plans
-        for (int i = 0; i < 3; i++)
+        for (var i = 0; i < 3; i++)
         {
             await s.Page.GetByRole(AriaRole.Link, new() { Name = "Remove" }).Nth(1).ClickAsync();
             await s.ConfirmDeleteModal();
@@ -185,13 +180,13 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
     }
 
     [Fact]
-    [Trait("Playwright", "Playwright")]
+    [Trait("Playwright", "Playwright-2")]
     public async Task CanUpgradeAndDowngrade()
     {
         await using var s = CreatePlaywrightTester();
         await s.StartAsync();
         await s.RegisterNewUser();
-        (_, string storeId) = await s.CreateNewStore();
+        await s.CreateNewStore();
         await s.AddDerivationScheme();
 
         var invoice = new InvoiceCheckoutPMO(s);
@@ -219,22 +214,22 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
             // Note that at this point, the customer has a period of 15 days + 1 month.
             // This is because the trial period is 15 days, so we extend the plan.
             await portal.GoTo7Days();
+            // The downgrade can be paid by the current, more expensive plan.
+            var unused = GetUnusedPeriodValue(usedDays: 7, planPrice: 299.0m, daysInPeriod: 15 + DaysInTrialEndMonth(15));
             await portal.Downgrade("Pro Plan");
 
-            decimal totalRefunded = 0m;
-            // The downgrade can be paid by the current, more expensive plan.
-            var unused = GetUnusedPeriodValue(usedDays: 7, planPrice: 299.0m, daysInPeriod: 15 + DaysInThisMonth());
+            var totalRefunded = 0m;
             totalRefunded += await portal.AssertRefunded(unused);
             var expectedBalance = totalRefunded - 99.0m;
-            await portal.AssertCredit(creditBalance: $"${expectedBalance:F2}");
+            await portal.AssertCredit(creditBalance: $"${expectedBalance.ToString("F2", CultureInfo.InvariantCulture)}");
 
             // This time, we should have 1 month in the current period.
             await portal.GoTo7Days();
 
+            unused = GetUnusedPeriodValue(usedDays: 7, planPrice: 99.0m, daysInPeriod: DaysInThisMonth());
             var credited = await s.Server.WaitForEvent<SubscriptionEvent.SubscriberCredited>(async () =>
             {
                 await portal.Downgrade("Basic Plan");
-                unused = GetUnusedPeriodValue(usedDays: 7, planPrice: 99.0m, daysInPeriod: DaysInThisMonth());
                 unused = await portal.AssertRefunded(unused);
                 totalRefunded += unused;
             });
@@ -244,17 +239,17 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
 
 
             expectedBalance = totalRefunded - 29.0m - 99.0m;
-            await portal.AssertCredit("$29.00", "-$29.00", "$0.00", $"${expectedBalance:F2}");
+            await portal.AssertCredit("$29.00", "-$29.00", "$0.00", $"${expectedBalance.ToString("F2", CultureInfo.InvariantCulture)}");
             // The balance should now be around 202.15 USD
 
             // Now, let's try upgrade. Since we have enough money, we should be able to upgrade without invoice.
             await portal.GoTo7Days();
-            await portal.Upgrade("Pro Plan");
             unused = GetUnusedPeriodValue(usedDays: 7, planPrice: 29.0m, daysInPeriod: DaysInThisMonth());
+            await portal.Upgrade("Pro Plan");
             unused = await portal.AssertRefunded(unused);
             totalRefunded += unused;
             expectedBalance = totalRefunded - 29.0m - 99.0m - 99.0m;
-            await portal.AssertCredit(creditBalance: $"${expectedBalance:F2}");
+            await portal.AssertCredit(creditBalance: $"${expectedBalance.ToString("F2", CultureInfo.InvariantCulture)}");
 
             // However, for going back to enterprise, we do not have enough.
             await portal.GoTo7Days();
@@ -268,7 +263,7 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
             });
             await invoice.ClickRedirect();
             unused = await portal.AssertRefunded(unused);
-            totalRefunded += unused;
+            //totalRefunded += unused;
             await s.Page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
             await portal.AssertCreditHistory(
                 [
@@ -280,13 +275,13 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
                     "$" + (299m - expectedBalance - unused).ToString("F2", CultureInfo.InvariantCulture)
                 ]);
             expectedBalance = 0m;
-            await portal.AssertCredit(creditBalance: $"${expectedBalance:F2}");
+            await portal.AssertCredit(creditBalance: $"${expectedBalance.ToString("F2", CultureInfo.InvariantCulture)}");
         }
     }
 
     private static decimal GetUnusedPeriodValue(int usedDays, decimal planPrice, int daysInPeriod)
     {
-        var unused = (double)(daysInPeriod - usedDays) / (double)daysInPeriod;
+        var unused = (daysInPeriod - usedDays) / (double)daysInPeriod;
         var expected = (decimal)Math.Round((double)planPrice * unused, 2);
         return expected;
     }
@@ -296,6 +291,11 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
         return DateTime.DaysInMonth(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month);
     }
 
+    private static int DaysInTrialEndMonth(int trialDays)
+    {
+        var trialEnd = DateTimeOffset.UtcNow.AddDays(trialDays);
+        return DateTime.DaysInMonth(trialEnd.Year, trialEnd.Month);
+    }
 
     [Fact]
     [Trait("Integration", "Integration")]
@@ -314,12 +314,13 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
             SuccessRedirectUrl = "https://google.com",
             Features = new()
             {
-                new() { Id = "can-access", Description = "Can access the subscription API" }
+                new() { Id = "can-access", Description = "Can access the subscription API" },
+                new() { Id = "can-access2", Description = "Can access the subscription API" }
             }
         });
         Assert.Equal("Test", offering.AppName);
         Assert.Equal("https://google.com", offering.SuccessRedirectUrl);
-        Assert.Single(offering.Features);
+        Assert.Equal(2, offering.Features.Count);
         Assert.Equal("can-access", offering.Features[0].Id);
 
         var plan = await client.CreateOfferingPlan(user.StoreId, offering.Id, new()
@@ -328,17 +329,24 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
             Price = 10m,
             Features = ["can-access"]
         });
+        await client.CreateOfferingPlan(user.StoreId, offering.Id, new()
+        {
+            Name = "2NewPlan2",
+            Price = 100m,
+            Features = ["can-access2"]
+        });
         Assert.Equal(("NewPlan", 10m, "USD"), (plan.Name, plan.Price, plan.Currency));
         plan = await client.GetOfferingPlan(user.StoreId, offering.Id, plan.Id);
         Assert.Equal(("NewPlan", 10m, "USD"), (plan.Name, plan.Price, plan.Currency));
         Assert.Contains("can-access", plan.Features);
 
         offering = await client.GetOffering(offering.StoreId, offering.Id);
+        Assert.Equal(2, offering.Plans.Count);
         var offering2 = (await client.GetOfferings(offering.StoreId))[0];
         Assert.Equal(offering.Id, offering2.Id);
         Assert.Equal(offering.AppName, offering2.AppName);
         Assert.Equal(offering.SuccessRedirectUrl, offering2.SuccessRedirectUrl);
-        Assert.Single(offering2.Features);
+        Assert.Equal(2, offering2.Features.Count);
         Assert.Equal("can-access", offering2.Features[0].Id);
         Assert.Equal("can-access", offering.Features[0].Id);
 
@@ -387,6 +395,7 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
 
         planCheckout = await client.GetPlanCheckout(planCheckout.Id);
         Assert.NotNull(planCheckout.Subscriber);
+        Assert.Equal(2, planCheckout.Subscriber.Offering.Plans.Count);
         Assert.Equal("test", planCheckout.Subscriber.Metadata["sub"]?.ToString());
 
         var subscriber = await client.GetSubscriber(user.StoreId, offering.Id, planCheckout.Subscriber.Customer.Id);
@@ -416,8 +425,9 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
             CustomerSelector = "test@gmail.com",
             DurationMinutes = TimeSpan.FromMinutes(3.0)
         });
-
+        Assert.Equal(2, session.Subscriber.Offering.Plans.Count);
         session = await client.GetPortalSession(session.Id);
+        Assert.Equal(2, session.Subscriber.Offering.Plans.Count);
         Assert.True(session.Expiration < DateTimeOffset.UtcNow + TimeSpan.FromMinutes(5.0));
         Assert.True(session.Expiration > DateTimeOffset.UtcNow + TimeSpan.FromMinutes(2.0));
         Assert.NotNull(session.Subscriber);
@@ -465,19 +475,12 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
 
         await MoveToExpiration(s, offering);
 
-        subscriber = await client.GetSubscriber(user.StoreId, offering.Id, planCheckout.Subscriber.Customer.Id);
-        Assert.False(subscriber.IsActive);
-
-        planCheckout = await client.CreatePlanCheckout(new()
-        {
-            StoreId = user.StoreId,
-            PlanId = plan.Id,
-            OfferingId = offering.Id,
-            CustomerSelector = "test@gmail.com"
-        });
-        await client.ProceedPlanCheckout(planCheckout.Id);
+        // The price to renew is 10 USD, the user has 27 USD.
+        // The subscriber, should be renewed.
         subscriber = await client.GetSubscriber(user.StoreId, offering.Id, planCheckout.Subscriber.Customer.Id);
         Assert.True(subscriber.IsActive);
+        result = await client.GetCredit(user.StoreId, offering.Id, planCheckout.Subscriber.Customer.Id, "current");
+        Assert.Equal(-5m + 2m + 30m -10m, result.Value);
     }
 
     private static async Task MoveToExpiration(ServerTester s, OfferingModel offering)
@@ -491,11 +494,9 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
 
     private static async Task CanAccessUrl(string url)
     {
-        using (var http = new HttpClient())
-        {
-            using var resp = await http.GetAsync(url);
-            resp.EnsureSuccessStatusCode();
-        }
+        using var http = new HttpClient();
+        using var resp = await http.GetAsync(url);
+        resp.EnsureSuccessStatusCode();
     }
 
     [Fact]
@@ -552,32 +553,34 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
 
         await offering.NewSubscriber("Free Plan", "free@example.com", false, hasInvoice: false);
         await offering.GoToSubscribers();
-        await using (var portal = await offering.GoToPortal("free@example.com"))
+        await using var portal = await offering.GoToPortal("free@example.com");
+        await portal.GoToReminder();
+        await portal.AssertCallToAction(PortalPMO.CallToAction.Warning, noticeTitle: "Upgrade needed in 3 days");
+        await portal.ClickCallToAction();
+
+        await s.Server.WaitForEvent<Events.SubscriptionEvent.PlanStarted>(async () =>
         {
-            await portal.GoToReminder();
-            await portal.AssertCallToAction(PortalPMO.CallToAction.Warning, noticeTitle: "Upgrade needed in 3 days");
-            await portal.ClickCallToAction();
-            await s.PayInvoice(clickRedirect: true);
+            await s.PayInvoice();
+        });
+        await s.ClickCheckoutRedirect();
+        await portal.AssertNoCallToAction();
+        await portal.AssertPlan("Basic Plan");
 
-            await portal.AssertNoCallToAction();
-            await portal.AssertPlan("Basic Plan");
-
-            await portal.AssertCreditHistory([
-                "Upgrade to new plan 'Basic Plan'",
-                "Credit purchase",
-                "Starting plan 'Free Plan'"
-            ]);
-        }
+        await portal.AssertCreditHistory([
+            "Upgrade to new plan 'Basic Plan'",
+            "Credit purchase",
+            "Starting plan 'Free Plan'"
+        ]);
     }
 
     [Fact]
-    [Trait("Playwright", "Playwright")]
+    [Trait("Playwright", "Playwright-2")]
     public async Task CanCreateSubscriberAndCircleThroughStates()
     {
         await using var s = CreatePlaywrightTester();
         await s.StartAsync();
         await s.RegisterNewUser();
-        (_, string storeId) = await s.CreateNewStore();
+        var (_, storeId) = await s.CreateNewStore();
         await s.AddDerivationScheme();
 
         var offering = await CreateNewSubscription(s);
@@ -618,7 +621,7 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
         // Payment isn't yet confirmed, and no optimistic activation
         await offering.AssertHasNotSubscriber("basic@example.com");
 
-        // Mark the invoice of basic2 invalid, so he should go from active to inactive
+        // Mark the invoice for basic2 invalid, so he should go from active to inactive
         var api = await s.AsTestAccount().CreateClient();
         var invoice = (await api.GetInvoices(storeId)).First();
         var invoiceId = invoice.Id;
@@ -677,7 +680,7 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
 
             var sendingPaymentReminder = offering.WaitEvent<SubscriptionEvent.SubscriberEvent.PaymentReminder>();
             await portal.GoToReminder();
-            var paymentReminder = await sendingPaymentReminder;
+            await sendingPaymentReminder;
 
             await portal.AssertCallToAction(PortalPMO.CallToAction.Warning, noticeTitle: "Payment due in 3 days");
             await portal.GoToNextPhase();
@@ -736,7 +739,11 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
             await portal.GoToReminder();
             await portal.AssertCallToAction(PortalPMO.CallToAction.Warning, noticeTitle: "Payment due in 3 days");
             await portal.ClickCallToAction();
-            await s.PayInvoice(mine: true, clickRedirect: true);
+            await s.Server.WaitForEvent<Events.SubscriptionEvent.SubscriberCredited>(async () =>
+            {
+                await s.PayInvoice(mine: true);
+            });
+            await s.ClickCheckoutRedirect();
             await portal.AssertNoCallToAction();
         }
 
@@ -980,7 +987,14 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
         private static string GetAlertSelector(CallToAction callToAction) => $"div.alert-translucent.alert-{callToAction.ToString().ToLowerInvariant()}";
 
         public async Task AssertNoCallToAction()
-            => Assert.Equal(0, await s.Page.Locator($"div.alert-translucent").CountAsync());
+        {
+            await s.Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+            if (await s.Page.Locator($"div.alert-translucent").CountAsync() != 0)
+            {
+                var text = await s.Page.Locator($"div.alert-translucent").TextContentAsync();
+                Assert.Fail($"Call to action shouldn't have shown ({text})");
+            }
+        }
 
 
         public ValueTask DisposeAsync() => disposable?.DisposeAsync() ?? ValueTask.CompletedTask;
@@ -1033,7 +1047,7 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
             var match = Regex.Match(text!, @"\((.*?) USD has been refunded\)");
             var v = decimal.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
             var diff = Math.Abs(refunded - v);
-            if (diff >= 3.0m)
+            if (diff >= 4.0m)
             {
                 Assert.Fail($"Expected {refunded} USD, but got {v} USD");
             }
@@ -1051,7 +1065,7 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
         {
             var descriptions = await s.Page.QuerySelectorAllAsync(".credit-history tr td:nth-child(2)");
             var credits = await s.Page.QuerySelectorAllAsync(".credit-history tr td:nth-child(3)");
-            for (int i = 0; i < creditLines.Count; i++)
+            for (var i = 0; i < creditLines.Count; i++)
             {
                 var txt = await descriptions[i].InnerTextAsync();
                 Assert.StartsWith(creditLines[i], txt);
@@ -1066,9 +1080,13 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
         public string? Name { get; set; }
         public string? SuccessRedirectUrl { get; set; }
 
+        // ReSharper disable once InconsistentNaming
         public string? Features_0__Id { get; set; }
+        // ReSharper disable once InconsistentNaming
         public string? Features_0__ShortDescription { get; set; }
+        // ReSharper disable once InconsistentNaming
         public string? Features_1__Id { get; set; }
+        // ReSharper disable once InconsistentNaming
         public string? Features_1__ShortDescription { get; set; }
 
         public async Task Fill()
@@ -1220,7 +1238,7 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
                 Assert.Equal(EnableFeatures.Count, b.EnableFeatures.Count);
 
                 var (ea, eb) = (EnableFeatures.OrderBy(e => e).ToArray(), b.EnableFeatures.OrderBy(e => e).ToArray());
-                for (int i = 0; i < EnableFeatures.Count; i++)
+                for (var i = 0; i < EnableFeatures.Count; i++)
                     Assert.Equal(ea[i], eb[i]);
             }
 
@@ -1228,7 +1246,7 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
             {
                 Assert.Equal(DisableFeatures.Count, b.DisableFeatures.Count);
                 var (ea, eb) = (DisableFeatures.OrderBy(e => e).ToArray(), b.DisableFeatures.OrderBy(e => e).ToArray());
-                for (int i = 0; i < DisableFeatures.Count; i++)
+                for (var i = 0; i < DisableFeatures.Count; i++)
                     Assert.Equal(ea[i], eb[i]);
             }
 

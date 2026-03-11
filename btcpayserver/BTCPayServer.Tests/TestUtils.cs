@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
-using OpenQA.Selenium;
 using Xunit;
 using Xunit.Sdk;
 
@@ -46,6 +45,9 @@ namespace BTCPayServer.Tests
             }
             return Path.Combine(directory.FullName, "TestData", relativeFilePath);
         }
+
+        public static DateTimeOffset RoundSeconds(DateTimeOffset dateTimeOffset)
+            => new DateTimeOffset(dateTimeOffset.Year, dateTimeOffset.Month, dateTimeOffset.Day, dateTimeOffset.Hour, dateTimeOffset.Minute, dateTimeOffset.Second, dateTimeOffset.Offset);
 
         public static T AssertType<T>(this object obj)
             => Assert.IsType<T>(obj);
@@ -91,10 +93,6 @@ namespace BTCPayServer.Tests
                 {
                     act();
                     break;
-                }
-                catch (WebDriverException) when (!cts.Token.IsCancellationRequested)
-                {
-                    cts.Token.WaitHandle.WaitOne(500);
                 }
                 catch (XunitException) when (!cts.Token.IsCancellationRequested)
                 {

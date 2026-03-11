@@ -18,7 +18,7 @@ namespace BTCPayServer.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.11")
+                .HasAnnotation("ProductVersion", "10.0.1")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -74,6 +74,28 @@ namespace BTCPayServer.Migrations
                     b.HasIndex("InvoiceDataId");
 
                     b.ToTable("AddressInvoices");
+                });
+
+            modelBuilder.Entity("BTCPayServer.Data.ApiKeyPermissionUsage", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ApiKey")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("LastUsed")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Permission")
+                        .HasColumnType("text");
+
+                    b.Property<int>("UsageCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ApiKeyPermissionUsages");
                 });
 
             modelBuilder.Entity("BTCPayServer.Data.AppData", b =>
@@ -280,7 +302,7 @@ namespace BTCPayServer.Migrations
                         .HasColumnName("additional_data")
                         .HasDefaultValueSql("'{}'::jsonb");
 
-                    b.Property<string[]>("BCC")
+                    b.PrimitiveCollection<string[]>("BCC")
                         .IsRequired()
                         .HasColumnType("text[]")
                         .HasColumnName("bcc");
@@ -290,7 +312,7 @@ namespace BTCPayServer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("body");
 
-                    b.Property<string[]>("CC")
+                    b.PrimitiveCollection<string[]>("CC")
                         .IsRequired()
                         .HasColumnType("text[]")
                         .HasColumnName("cc");
@@ -325,7 +347,7 @@ namespace BTCPayServer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("subject");
 
-                    b.Property<string[]>("To")
+                    b.PrimitiveCollection<string[]>("To")
                         .IsRequired()
                         .HasColumnType("text[]")
                         .HasColumnName("to");
@@ -817,7 +839,7 @@ namespace BTCPayServer.Migrations
                     b.Property<DateTimeOffset?>("Expiry")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string[]>("OutpointsUsed")
+                    b.PrimitiveCollection<string[]>("OutpointsUsed")
                         .HasColumnType("text[]");
 
                     b.Property<int>("State")
@@ -956,12 +978,74 @@ namespace BTCPayServer.Migrations
                     b.ToTable("Stores");
                 });
 
+            modelBuilder.Entity("BTCPayServer.Data.StoreLabelData", b =>
+                {
+                    b.Property<string>("StoreId")
+                        .HasColumnType("text")
+                        .HasColumnName("store_id");
+
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Color")
+                        .HasColumnType("text")
+                        .HasColumnName("color");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
+                    b.Property<uint>("XMin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("StoreId", "Id");
+
+                    b.ToTable("store_labels", (string)null);
+                });
+
+            modelBuilder.Entity("BTCPayServer.Data.StoreLabelLinkData", b =>
+                {
+                    b.Property<string>("StoreId")
+                        .HasColumnType("text")
+                        .HasColumnName("store_id");
+
+                    b.Property<string>("StoreLabelId")
+                        .HasColumnType("text")
+                        .HasColumnName("store_label_id");
+
+                    b.Property<string>("ObjectId")
+                        .HasColumnType("text")
+                        .HasColumnName("object_id");
+
+                    b.Property<uint>("XMin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("StoreId", "StoreLabelId", "ObjectId");
+
+                    b.HasIndex("StoreId", "ObjectId");
+
+                    b.ToTable("store_label_links", (string)null);
+                });
+
             modelBuilder.Entity("BTCPayServer.Data.StoreRole", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("text");
 
-                    b.Property<List<string>>("Permissions")
+                    b.PrimitiveCollection<List<string>>("Permissions")
                         .HasColumnType("text[]");
 
                     b.Property<string>("Role")
@@ -1807,6 +1891,9 @@ namespace BTCPayServer.Migrations
                     b.Property<string>("Blob")
                         .HasColumnType("JSONB");
 
+                    b.Property<DateTimeOffset>("DeliveryTime")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("Pruned")
                         .HasColumnType("boolean");
 
@@ -2210,6 +2297,17 @@ namespace BTCPayServer.Migrations
                     b.Navigation("InvoiceData");
 
                     b.Navigation("PullPaymentData");
+                });
+
+            modelBuilder.Entity("BTCPayServer.Data.StoreLabelLinkData", b =>
+                {
+                    b.HasOne("BTCPayServer.Data.StoreLabelData", "StoreLabel")
+                        .WithMany()
+                        .HasForeignKey("StoreId", "StoreLabelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("StoreLabel");
                 });
 
             modelBuilder.Entity("BTCPayServer.Data.StoreRole", b =>

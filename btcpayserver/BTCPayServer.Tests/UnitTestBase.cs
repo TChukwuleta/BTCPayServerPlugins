@@ -1,8 +1,5 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Hosting;
 using BTCPayServer.Logging;
@@ -94,10 +91,6 @@ namespace BTCPayServer.Tests
         public ServerTester CreateServerTester([CallerMemberNameAttribute] string scope = null, bool newDb = false)
         {
             return new ServerTester(scope, newDb, TestLogs, TestLogProvider, CreateNetworkProvider());
-        }
-        public SeleniumTester CreateSeleniumTester([CallerMemberNameAttribute] string scope = null, bool newDb = false)
-        {
-            return new SeleniumTester() { Server = new ServerTester(scope, newDb, TestLogs, TestLogProvider, CreateNetworkProvider()) };
         }
         public PlaywrightTester CreatePlaywrightTester([CallerMemberNameAttribute] string scope = null, bool newDb = false)
         {
