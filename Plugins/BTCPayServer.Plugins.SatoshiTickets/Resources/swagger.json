@@ -52,7 +52,7 @@
       "get": {
         "tags": ["Events"],
         "summary": "List events",
-        "description": "Returns active events for the store. Use `expired=true` to get only past events.",
+        "description": "Returns all events for the store (active and disabled). Use `expired=true` to get only past events.",
         "operationId": "getEvents",
         "parameters": [
           {
@@ -127,7 +127,7 @@
       "get": {
         "tags": ["Events"],
         "summary": "Get event",
-        "description": "Returns a single active event by ID.",
+        "description": "Returns a single event by ID (active or disabled).",
         "operationId": "getEvent",
         "parameters": [
           {
