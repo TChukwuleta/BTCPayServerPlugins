@@ -13,7 +13,7 @@ public class Plugin : BaseBTCPayServerPlugin
 {
     public override IBTCPayServerPlugin.PluginDependency[] Dependencies { get; } =
     {
-        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.1.0" }
+        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.3.6" }
     };
 
     public override void Execute(IServiceCollection services)
@@ -43,8 +43,6 @@ public class Plugin : BaseBTCPayServerPlugin
 
     public override void Execute(IApplicationBuilder applicationBuilder, IServiceProvider applicationBuilderApplicationServices)
     {
-
-        //applicationBuilder.UseMiddleware<CorsMiddleware>();
         applicationBuilder.UseCors("AllowAllOrigins");
 
         base.Execute(applicationBuilder, applicationBuilderApplicationServices);

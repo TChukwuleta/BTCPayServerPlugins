@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
@@ -11,16 +10,13 @@ using BTCPayServer.Client;
 using BTCPayServer.Data;
 using BTCPayServer.Plugins.Emails;
 using BTCPayServer.Plugins.Emails.Controllers;
-using BTCPayServer.Plugins.Emails.Services;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels.Models;
 using BTCPayServer.Services;
-using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -33,82 +29,58 @@ using StoreData = BTCPayServer.Data.StoreData;
 namespace BTCPayServer.Plugins.SatoshiTickets;
 
 
-[Route("~/plugins/{storeId}/ticketevent/")]
+[Route("~/plugins/{storeId}/satoshi-tickets/ticketevent")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
-public class UITicketSalesController : Controller
-{
-    private readonly AppService _appService;
-    private readonly UriResolver _uriResolver;
-    private readonly IFileService _fileService;
-    private readonly StoreRepository _storeRepo;
-    private readonly EmailService _emailService;
-    private readonly IHttpClientFactory _clientFactory;
-    private readonly TicketService _ticketService;
-    private readonly EmailSenderFactory _emailSenderFactory;
-    private readonly BTCPayNetworkProvider _networkProvider;
-    private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
-    private readonly UserManager<ApplicationUser> _userManager;
-    public UITicketSalesController
-        (AppService appService,
-        UriResolver uriResolver,
+public class UITicketSalesController(UriResolver uriResolver,
         IFileService fileService,
         StoreRepository storeRepo,
         EmailService emailService,
         TicketService ticketService,
-        IHttpClientFactory clientFactory,
-        EmailSenderFactory emailSenderFactory,
-        BTCPayNetworkProvider networkProvider,
         SimpleTicketSalesDbContextFactory dbContextFactory,
-        UserManager<ApplicationUser> userManager)
-    {
-        _storeRepo = storeRepo;
-        _appService = appService;
-        _uriResolver = uriResolver;
-        _fileService = fileService;
-        _emailService = emailService;
-        _userManager = userManager;
-        _ticketService = ticketService;
-        _clientFactory = clientFactory;
-        _networkProvider = networkProvider;
-        _dbContextFactory = dbContextFactory;
-        _emailSenderFactory = emailSenderFactory;
-    }
-    public StoreData CurrentStore => HttpContext.GetStoreData();
+        UserManager<ApplicationUser> userManager) : Controller
+{
+
+    private async Task<StoreData?> GetStoreData(string id) => await storeRepo.FindStore(id);
 
 
     [HttpGet("list")]
     public async Task<IActionResult> List(string storeId, bool expired)
     {
-        if (string.IsNullOrEmpty(storeId))
+        if (string.IsNullOrEmpty(storeId) || await GetStoreData(storeId) is not { } store)
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
-
-        var events = ctx.Events.Where(c => c.StoreId == CurrentStore.Id).ToList();
-        var eventTickets = ctx.Tickets.Where(t => t.StoreId == CurrentStore.Id && t.PaymentStatus == TransactionStatus.Settled.ToString()).ToList();
-        var eventsViewModel = events.Select(ticketEvent =>
+        await using var ctx = dbContextFactory.CreateContext();
+        var query = ctx.Events.Where(e => e.StoreId == store.Id).Select(e => new
         {
-            return new SalesTicketsEventsListViewModel
-            {
-                Location = ticketEvent.Location,
-                Id = ticketEvent.Id,
-                Title = ticketEvent.Title,
-                EventPurchaseLink = Url.Action(nameof(UITicketSalesPublicController.EventSummary), "UITicketSalesPublic", new { storeId = CurrentStore.Id, eventId = ticketEvent.Id }, Request.Scheme),
-                Description = ticketEvent.Description,
-                EventDate = ticketEvent.StartDate,
-                CreatedAt = ticketEvent.CreatedAt,
-                StoreId = CurrentStore.Id,
-                EventState = ticketEvent.EventState,
-                TicketSold = eventTickets.Count(c => c.EventId == ticketEvent.Id)
-            };
-        }).ToList();
+            e.Id,
+            e.Location,
+            e.Title,
+            e.Description,
+            e.StartDate,
+            e.CreatedAt,
+            e.EventState,
+            TicketCount = ctx.Tickets.Count(t => t.EventId == e.Id && t.StoreId == store.Id && t.PaymentStatus == TransactionStatus.Settled.ToString())
+        });
 
         if (expired)
-        {
-            eventsViewModel = eventsViewModel.Where(c => c.EventDate <= DateTime.UtcNow).ToList();
-        }
+            query = query.Where(e => e.StartDate <= DateTime.UtcNow);
 
-        var isEmailSettingsConfigured = await _emailService.IsEmailSettingsConfigured(CurrentStore.Id);
+        var eventsData = query.ToList();
+        var eventsViewModel = eventsData.Select(e => new SalesTicketsEventsListViewModel
+        {
+            Id = e.Id,
+            Location = e.Location,
+            Title = e.Title,
+            Description = e.Description,
+            EventDate = e.StartDate,
+            CreatedAt = e.CreatedAt,
+            StoreId = store.Id,
+            EventState = e.EventState,
+            TicketSold = e.TicketCount,
+            EventPurchaseLink = Url.Action(nameof(UITicketSalesPublicController.EventSummary), "UITicketSalesPublic", new { storeId, eventId = e.Id }, Request.Scheme)
+        }).ToList();
+
+        var isEmailSettingsConfigured = await emailService.IsEmailSettingsConfigured(store.Id);
         ViewData["StoreEmailSettingsConfigured"] = isEmailSettingsConfigured;
         if (!isEmailSettingsConfigured)
         {
@@ -118,7 +90,7 @@ public class UITicketSalesController : Controller
                     values: new
                     {
                         area = EmailsPlugin.Area,
-                        storeId = CurrentStore.Id
+                        storeId = store.Id
                     })}' class='alert-link'>configure Email SMTP</a> to create an event",
                 Severity = StatusMessageModel.StatusSeverity.Info
             });
@@ -131,24 +103,24 @@ public class UITicketSalesController : Controller
     [HttpGet("view")]
     public async Task<IActionResult> ViewEvent(string storeId, string eventId)
     {
-        if (string.IsNullOrEmpty(CurrentStore.Id))
+        if (string.IsNullOrEmpty(storeId) || await GetStoreData(storeId) is not { } store)
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
 
         var defaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, string.Empty);
-        var vm = new UpdateSimpleTicketSalesEventViewModel { StoreId = CurrentStore.Id, StoreDefaultCurrency = defaultCurrency };
+        var vm = new UpdateSimpleTicketSalesEventViewModel { StoreId = store.Id, StoreDefaultCurrency = defaultCurrency };
         if (!string.IsNullOrEmpty(eventId))
         {
-            var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
+            var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == store.Id);
             if (entity == null)
             {
                 TempData[WellKnownTempData.ErrorMessage] = "Invalid event record specified for this store";
-                return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
+                return RedirectToAction(nameof(List), new { storeId });
             }
             vm = TicketSalesEventToViewModel(entity);
-            var getFile = entity.EventLogo == null ? null : await _fileService.GetFileUrl(Request.GetAbsoluteRootUri(), entity.EventLogo);
-            vm.EventImageUrl = getFile == null ? null : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile));
+            var getFile = entity.EventLogo == null ? null : await fileService.GetFileUrl(Request.GetAbsoluteRootUri(), entity.EventLogo);
+            vm.EventImageUrl = getFile == null ? null : await uriResolver.Resolve(Request.GetAbsoluteRootUri(), new UnresolvedUri.Raw(getFile));
             vm.StoreDefaultCurrency = await GetStoreDefaultCurrentIfEmpty(storeId, entity.Currency);
         }
         vm.EventTypes = Enum.GetValues(typeof(EventType)).Cast<EventType>()
@@ -167,7 +139,7 @@ public class UITicketSalesController : Controller
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         if (vm.HasMaximumCapacity && (!vm.MaximumEventCapacity.HasValue || vm.MaximumEventCapacity.Value <= 0))
         {
             TempData[WellKnownTempData.ErrorMessage] = "Kindly input the event capacity";
@@ -188,7 +160,7 @@ public class UITicketSalesController : Controller
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
         {
-            imageUpload = await _fileService.UploadImage(vm.EventImageFile, GetUserId());
+            imageUpload = await fileService.UploadImage(vm.EventImageFile, GetUserId());
             if (!imageUpload.Success)
             {
                 TempData[WellKnownTempData.ErrorMessage] = imageUpload.Response;
@@ -214,7 +186,7 @@ public class UITicketSalesController : Controller
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
         {
@@ -236,7 +208,7 @@ public class UITicketSalesController : Controller
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
         {
-            imageUpload = await _fileService.UploadImage(vm.EventImageFile, GetUserId());
+            imageUpload = await fileService.UploadImage(vm.EventImageFile, GetUserId());
             if (!imageUpload.Success)
             {
                 TempData[WellKnownTempData.ErrorMessage] = imageUpload.Response;
@@ -264,7 +236,7 @@ public class UITicketSalesController : Controller
         if (CurrentStore is null)
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == eventId).ToList();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == eventId);
         if (ticketEvent == null || !ticketTypes.Any())
@@ -286,7 +258,7 @@ public class UITicketSalesController : Controller
         if (CurrentStore is null)
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == eventId).ToList();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == eventId);
         if (ticketEvent == null || !ticketTypes.Any())
@@ -320,7 +292,7 @@ public class UITicketSalesController : Controller
         if (CurrentStore is null)
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
 
         var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
@@ -342,7 +314,7 @@ public class UITicketSalesController : Controller
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
 
         var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
@@ -378,7 +350,7 @@ public class UITicketSalesController : Controller
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
 
         var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
         if (entity == null)
@@ -440,7 +412,7 @@ public class UITicketSalesController : Controller
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
-        var checkinTicket = await _ticketService.CheckinTicket(eventId, ticketNumber, CurrentStore.Id);
+        var checkinTicket = await ticketService.CheckinTicket(eventId, ticketNumber, CurrentStore.Id);
         if (checkinTicket.Success)
         {
             TempData[WellKnownTempData.SuccessMessage] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} of ticket type: {checkinTicket.Ticket.TicketTypeName} checked-in successfully";
@@ -458,7 +430,7 @@ public class UITicketSalesController : Controller
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id.Equals(eventId) && c.StoreId.Equals(CurrentStore.Id));
         var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets).FirstOrDefault(o => o.Id == orderId && o.StoreId == CurrentStore.Id && o.EventId == eventId && o.Tickets.Any());
         if (ticketEvent == null || order == null || !order.Tickets.Any())
@@ -480,7 +452,7 @@ public class UITicketSalesController : Controller
             return NotFound();
 
         Console.WriteLine(JsonConvert.SerializeObject(model));
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id.Equals(model.EventId) && c.StoreId.Equals(CurrentStore.Id));
         var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets)
             .FirstOrDefault(o => o.Id == model.OrderId && o.StoreId == CurrentStore.Id && o.EventId == model.EventId && o.Tickets.Any());
@@ -494,7 +466,7 @@ public class UITicketSalesController : Controller
             TempData[WellKnownTempData.ErrorMessage] = $"Invalid Ticket specified";
             return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId = model.EventId });
         }
-        var isEmailConfigured = await _emailService.IsEmailSettingsConfigured(CurrentStore.Id);
+        var isEmailConfigured = await emailService.IsEmailSettingsConfigured(CurrentStore.Id);
         if (!isEmailConfigured)
         {
             TempData[WellKnownTempData.ErrorMessage] = $"Email settings not setup. Kindly configure Email SMTP in the admin settings";
@@ -502,7 +474,7 @@ public class UITicketSalesController : Controller
         }
         try
         {
-            var emailResponse = await _emailService.SendTicketRegistrationEmail(CurrentStore.Id, order.Tickets.First(), ticketEvent);
+            var emailResponse = await emailService.SendTicketRegistrationEmail(CurrentStore.Id, order.Tickets.First(), ticketEvent);
             if (emailResponse.IsSuccessful)
                 order.EmailSent = true;
 
@@ -524,10 +496,10 @@ public class UITicketSalesController : Controller
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == CurrentStore.Id);
 
-        ViewData["StoreEmailSettingsConfigured"] = await _emailService.IsEmailSettingsConfigured(CurrentStore.Id);
+        ViewData["StoreEmailSettingsConfigured"] = await emailService.IsEmailSettingsConfigured(CurrentStore.Id);
         var vm = new SatoshiTicketsSettingsViewModel
         {
             EnableAutoReminders = settings?.EnableAutoReminders ?? false,
@@ -550,7 +522,7 @@ public class UITicketSalesController : Controller
             return RedirectToAction(nameof(Settings), new { storeId = CurrentStore.Id });
         }
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == CurrentStore.Id);
         if (settings == null)
         {
@@ -582,7 +554,7 @@ public class UITicketSalesController : Controller
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == storeId);
         var ordersWithTickets = ctx.Orders.AsNoTracking()
             .Where(o => o.StoreId == storeId && o.EventId == eventId && o.PaymentStatus == TransactionStatus.Settled.ToString())
@@ -616,13 +588,13 @@ public class UITicketSalesController : Controller
     {
         if (string.IsNullOrWhiteSpace(currency))
         {
-            var store = await _storeRepo.FindStore(storeId);
+            var store = await storeRepo.FindStore(storeId);
             currency = store.GetStoreBlob().DefaultCurrency;
         }
         return currency.Trim().ToUpperInvariant();
     }
 
-    private string GetUserId() => _userManager.GetUserId(User);
+    private string GetUserId() => userManager.GetUserId(User);
 
     private UpdateSimpleTicketSalesEventViewModel TicketSalesEventToViewModel(Event entity)
     {
