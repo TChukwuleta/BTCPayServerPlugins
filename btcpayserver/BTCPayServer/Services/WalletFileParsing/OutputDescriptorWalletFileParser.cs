@@ -1,7 +1,8 @@
 #nullable enable
 using System;
 using System.Diagnostics.CodeAnalysis;
-
+using System.Linq;
+using BTCPayServer;
 namespace BTCPayServer.Services.WalletFileParsing;
 public class OutputDescriptorWalletFileParser : IWalletFileParser
 {

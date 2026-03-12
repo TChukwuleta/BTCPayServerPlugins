@@ -1,3 +1,5 @@
+using System;
+
 namespace BTCPayServer.Client.Models
 {
     public class GreenfieldPermissionAPIError : GreenfieldAPIError

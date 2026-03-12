@@ -1,4 +1,5 @@
 @using BTCPayServer.Services.PaymentRequests
+@using Microsoft.AspNetCore.Html
 @using BTCPayServer.Client
 @using BTCPayServer.Services
 @inject CallbackGenerator CallbackGenerator
@@ -59,8 +60,9 @@
             <vc:icon symbol="nav-reporting" />
             <span text-translate="true">Reporting</span>
         </a>
-        <a id="page-primary" asp-action="EditPaymentRequest" asp-route-storeId="@storeId" class="btn btn-primary mt-3 mt-sm-0" role="button" permission="@Policies.CanModifyPaymentRequests">
-            <span text-translate="true">Create Request</span>
+        <a id="page-primary" asp-action="EditPaymentRequest" asp-route-storeId="@storeId" class="btn btn-primary mt-3 mt-sm-0" role="button"
+           permission="@Policies.CanModifyPaymentRequests" text-translate="true">
+            Create Request
         </a>
     </div>
 </div>
@@ -339,13 +341,14 @@
                             @item.ReferenceId
                         </td>
                         <td>
-                            <vc:label-manager
-                                selected-labels="item.Labels?.Select(l => l.Text).ToArray()"
-                                exclude-types="true"
-                                display-inline="true"
-                                linked-type="@WalletObjectData.Types.PaymentRequest"
-                                store-id="@storeId"
-                                store-object-id="@item.Id"/>
+                            @if (wallet != null)
+                            {
+                                <vc:label-manager
+                                    wallet-object-id="new WalletObjectId(wallet, WalletObjectData.Types.PaymentRequest, item.Id)"
+                                    selected-labels="item.Labels?.Select(l => l.Text).ToArray()"
+                                    exclude-types="true"
+                                    display-inline="true" />
+                            }
                         </td>
                         <td>
                             <span class="badge badge-@item.Status.ToLower() status-badge">@item.Status</span>

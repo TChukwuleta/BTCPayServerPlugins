@@ -23,7 +23,6 @@ namespace BTCPayServer.Data
         }
         public DbSet<AddressInvoiceData> AddressInvoices { get; set; }
         public DbSet<APIKeyData> ApiKeys { get; set; }
-        public DbSet<ApiKeyPermissionUsage> ApiKeyPermissionUsages { get; set; }
         public DbSet<AppData> Apps { get; set; }
         public DbSet<StoredFile> Files { get; set; }
         public DbSet<InvoiceSearchData> InvoiceSearches { get; set; }
@@ -47,8 +46,6 @@ namespace BTCPayServer.Data
         public DbSet<U2FDevice> U2FDevices { get; set; }
         public DbSet<Fido2Credential> Fido2Credentials { get; set; }
         public DbSet<UserStore> UserStore { get; set; }
-        public DbSet<StoreLabelData> StoreLabels { get; set; }
-        public DbSet<StoreLabelLinkData> StoreLabelLinks { get; set; }
         public DbSet<StoreRole> StoreRoles { get; set; }
         [Obsolete]
         public DbSet<WalletData> Wallets { get; set; }
@@ -96,8 +93,6 @@ namespace BTCPayServer.Data
             PullPaymentData.OnModelCreating(builder, Database);
             RefundData.OnModelCreating(builder);
             SettingData.OnModelCreating(builder, Database);
-            StoreLabelData.OnModelCreating(builder);
-            StoreLabelLinkData.OnModelCreating(builder);
             StoreSettingData.OnModelCreating(builder, Database);
             StoreWebhookData.OnModelCreating(builder);
             StoreData.OnModelCreating(builder, Database);

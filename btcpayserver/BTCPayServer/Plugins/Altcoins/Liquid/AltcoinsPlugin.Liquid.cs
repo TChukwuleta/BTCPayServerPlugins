@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NBitcoin;
 using NBitcoin.Altcoins;
 using NBitcoin.Altcoins.Elements;
+using NBXplorer;
 
 namespace BTCPayServer.Plugins.Altcoins;
 public partial class AltcoinsPlugin

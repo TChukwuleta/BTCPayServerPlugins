@@ -4,20 +4,32 @@ using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Data;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Stores;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BTCPayServer.Components.StoreSelector
 {
-    public class StoreSelector(
-        StoreRepository storeRepo,
-        UriResolver uriResolver)
-        : ViewComponent
+    public class StoreSelector : ViewComponent
     {
+        private readonly StoreRepository _storeRepo;
+        private readonly UriResolver _uriResolver;
+        private readonly UserManager<ApplicationUser> _userManager;
+
+        public StoreSelector(
+            StoreRepository storeRepo,
+            UriResolver uriResolver,
+            UserManager<ApplicationUser> userManager)
+        {
+            _storeRepo = storeRepo;
+            _uriResolver = uriResolver;
+            _userManager = userManager;
+        }
+
         public async Task<IViewComponentResult> InvokeAsync()
         {
-            var userId = UserClaimsPrincipal.GetId();
-            var stores = await storeRepo.GetStoresByUserId(userId);
-            var currentStore = ViewContext.HttpContext.GetNavStoreData();
+            var userId = _userManager.GetUserId(UserClaimsPrincipal);
+            var stores = await _storeRepo.GetStoresByUserId(userId);
+            var currentStore = ViewContext.HttpContext.GetStoreData();
             var archivedCount = stores.Count(s => s.Archived);
             var options = stores
                 .Where(store => !store.Archived)
@@ -37,7 +49,7 @@ namespace BTCPayServer.Components.StoreSelector
                 Options = options,
                 CurrentStoreId = currentStore?.Id,
                 CurrentDisplayName = currentStore?.StoreName,
-                CurrentStoreLogoUrl = await uriResolver.Resolve(Request.GetAbsoluteRootUri(), blob?.LogoUrl),
+                CurrentStoreLogoUrl = await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), blob?.LogoUrl),
                 ArchivedCount = archivedCount
             };
 

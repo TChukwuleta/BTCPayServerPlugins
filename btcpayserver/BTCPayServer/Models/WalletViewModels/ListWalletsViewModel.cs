@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BTCPayServer;
 using NBitcoin;
 
 namespace BTCPayServer.Models.WalletViewModels

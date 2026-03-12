@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.BIP78.Sender;
 using BTCPayServer.Client;
 using BTCPayServer.Client.Models;
@@ -76,13 +77,34 @@ namespace BTCPayServer.Tests
 
         public async Task<BTCPayServerClient> CreateClient(params string[] permissions)
         {
-            var client = await CreateClient();
-            var k = await client.CreateAPIKey(new()
-            {
-                Label = "API Key Test",
-                Permissions = permissions.Select(Permission.Parse).ToArray()
-            });
-            return new BTCPayServerClient(parent.PayTester.ServerUri, k.ApiKey);
+            var manageController = parent.PayTester.GetController<UIManageController>(UserId, StoreId, IsAdmin);
+            Assert.IsType<RedirectToActionResult>(await manageController.AddApiKey(
+                new UIManageController.AddApiKeyViewModel()
+                {
+                    PermissionValues = permissions.Select(s =>
+                    {
+                        Permission.TryParse(s, out var p);
+                        return p;
+                    }).GroupBy(permission => permission.Policy).Select(p =>
+                    {
+                        var stores = p.Where(permission => !string.IsNullOrEmpty(permission.Scope))
+                            .Select(permission => permission.Scope).ToList();
+                        return new UIManageController.AddApiKeyViewModel.PermissionValueItem()
+                        {
+                            Permission = p.Key,
+                            Forbidden = false,
+                            StoreMode = stores.Any() ? UIManageController.AddApiKeyViewModel.ApiKeyStoreMode.Specific : UIManageController.AddApiKeyViewModel.ApiKeyStoreMode.AllStores,
+                            SpecificStores = stores,
+                            Value = true
+                        };
+                    }).ToList()
+                }));
+            var statusMessage = manageController.TempData.GetStatusMessageModel();
+            Assert.NotNull(statusMessage);
+            var str = "<code class='alert-link'>";
+            var apiKey = statusMessage.Html.Substring(statusMessage.Html.IndexOf(str) + str.Length);
+            apiKey = apiKey.Substring(0, apiKey.IndexOf("</code>"));
+            return new BTCPayServerClient(parent.PayTester.ServerUri, apiKey);
         }
 
         public void Register(bool isAdmin = false)
@@ -94,16 +116,10 @@ namespace BTCPayServer.Tests
         {
             await RegisterAsync(isAdmin);
             await CreateStoreAsync();
-            await PairWithBitpayAPI();
-        }
-
-        public async Task PairWithBitpayAPI()
-        {
-            var store = GetController<BTCPayServer.Plugins.Bitpay.Controllers.UIStoresTokenController>();
-            var pairingCode = await BitPay.RequestClientAuthorizationAsync("test", Facade.Merchant);
+            var store = GetController<UIStoresController>();
+            var pairingCode = BitPay.RequestClientAuthorization("test", Facade.Merchant);
             Assert.IsType<ViewResult>(await store.RequestPairing(pairingCode.ToString()));
-            var result = await store.Pair(pairingCode.ToString(), StoreId);
-            Assert.IsType<RedirectToActionResult>(result);
+            await store.Pair(pairingCode.ToString(), StoreId);
         }
 
         public BTCPayServerClient CreateClientFromAPIKey(string apiKey)
@@ -151,7 +167,7 @@ namespace BTCPayServer.Tests
             storeController.UpdateWalletSettings(walletSettings).GetAwaiter().GetResult();
         }
 
-        public T GetController<T>(bool setImplicitStore = true) where T : ControllerBase
+        public T GetController<T>(bool setImplicitStore = true) where T : Controller
         {
             var controller = parent.PayTester.GetController<T>(UserId, setImplicitStore ? StoreId : null, IsAdmin);
             return controller;
@@ -271,44 +287,32 @@ namespace BTCPayServer.Tests
         {
             RegisterLightningNodeAsync(cryptoCode, connectionType, isMerchant).GetAwaiter().GetResult();
         }
-        public Task RegisterLightningNodeAsync(string cryptoCode, bool isMerchant = true)
+        public Task RegisterLightningNodeAsync(string cryptoCode, bool isMerchant = true, string storeId = null)
         {
-            return RegisterLightningNodeAsync(cryptoCode, null, isMerchant);
+            return RegisterLightningNodeAsync(cryptoCode, null, isMerchant, storeId);
         }
-        public async Task RegisterLightningNodeAsync(string cryptoCode, string connectionType, bool isMerchant = true)
+        public async Task RegisterLightningNodeAsync(string cryptoCode, string connectionType, bool isMerchant = true, string storeId = null)
         {
-            var connectionString = parent.GetLightningConnectionString(connectionType, isMerchant);
-            var client = await this.CreateClient();
-            await RegisterLightnignNodeCore(client, cryptoCode, connectionString);
-        }
+            var storeController = GetController<UIStoresController>();
 
-        private async Task RegisterLightnignNodeCore(BTCPayServerClient client, string cryptoCode, string connectionString)
-        {
-            await client.UpdateStorePaymentMethod(this.StoreId, $"{cryptoCode}-LN", new UpdatePaymentMethodRequest()
-            {
-                Enabled = true,
-                Config = connectionString == LightningPaymentMethodConfig.InternalNode ?
-                    JValue.CreateString("Internal Node") :
-                    new JObject()
-                    {
-                        ["connectionString"] = connectionString
-                    }
-            });
-            await client.UpdateStorePaymentMethod(this.StoreId, $"{cryptoCode}-LNURL", new UpdatePaymentMethodRequest()
-            {
-                Enabled = true,
-                Config = new JObject()
-                {
-                    ["useBech32Scheme"] = true,
-                    ["lud12Enabled"] = false
-                }
-            });
+            var connectionString = parent.GetLightningConnectionString(connectionType, isMerchant);
+            var nodeType = connectionString == LightningPaymentMethodConfig.InternalNode ? LightningNodeType.Internal : LightningNodeType.Custom;
+
+            var vm = new LightningNodeViewModel { ConnectionString = connectionString, LightningNodeType = nodeType, SkipPortTest = true };
+            await storeController.SetupLightningNode(storeId ?? StoreId,
+                vm, "save", cryptoCode);
+            if (storeController.ModelState.ErrorCount != 0)
+                Assert.Fail(storeController.ModelState.FirstOrDefault().Value.Errors[0].ErrorMessage);
         }
 
         public async Task RegisterInternalLightningNodeAsync(string cryptoCode, string storeId = null)
         {
-            var client = await this.CreateClient();
-            await RegisterLightnignNodeCore(client, cryptoCode, "Internal Node");
+            var storeController = GetController<UIStoresController>();
+            var vm = new LightningNodeViewModel { ConnectionString = "", LightningNodeType = LightningNodeType.Internal, SkipPortTest = true };
+            await storeController.SetupLightningNode(storeId ?? StoreId,
+                vm, "save", cryptoCode);
+            if (storeController.ModelState.ErrorCount != 0)
+                Assert.Fail(storeController.ModelState.FirstOrDefault().Value.Errors[0].ErrorMessage);
         }
 
         public async Task<Coin> ReceiveUTXO(Money value, BTCPayNetwork network = null)

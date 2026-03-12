@@ -32,7 +32,10 @@ namespace BTCPayServer.Controllers.Greenfield
 
         [HttpGet("me/id")]
         [Authorize(Policy = Policies.CanViewProfile, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
-        public string GetCurrentUserId() => User.GetId();
+        public string GetCurrentUserId()
+        {
+            return _userManager.GetUserId(User);
+        }
 
         [HttpGet("me")]
         [Authorize(Policy = Policies.CanViewProfile, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]

@@ -1,5 +1,10 @@
 #nullable enable
 using System;
+using System.Threading;
+using System.Threading.Tasks;
+using BTCPayServer.Abstractions.Contracts;
+using BTCPayServer.Events;
+using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Services
@@ -8,26 +13,43 @@ namespace BTCPayServer.Services
     {
         T Settings { get; }
     }
-
-    abstract class SettingsAccessor
+    class SettingsAccessor<T> : ISettingsAccessor<T>, IStartupTask, IHostedService where T : class, new()
     {
-        public abstract void SetSetting(object? setting);
-    }
+        T? _Settings;
+        public T Settings => _Settings ?? throw new InvalidOperationException($"Settings {typeof(T)} not yet initialized");
 
-    class SettingsAccessor<T> : SettingsAccessor, ISettingsAccessor<T> where T : class, new()
-    {
-        T? _settings;
-        public T Settings => _settings ?? throw new InvalidOperationException($"Settings {typeof(T)} not yet initialized");
+        public EventAggregator Aggregator { get; }
+        public ISettingsRepository SettingsRepository { get; }
+
+        IDisposable? disposable;
+
+        public SettingsAccessor(EventAggregator aggregator, ISettingsRepository settings)
+        {
+            Aggregator = aggregator;
+            SettingsRepository = settings;
+        }
+        public async Task StartAsync(CancellationToken cancellationToken)
+        {
+            if (_Settings != null)
+                return;
+            _Settings = await SettingsRepository.GetSettingAsync<T>() ?? new T();
+            disposable = Aggregator.Subscribe<SettingsChanged<T>>(v => _Settings = Clone(v.Settings));
+        }
 
         private T Clone(T settings)
         {
             return JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(settings))!;
         }
 
-
-        public override void SetSetting(object? setting)
+        public Task StopAsync(CancellationToken cancellationToken)
         {
-            _settings = setting is not null ? Clone((T)setting) : new T();
+            disposable?.Dispose();
+            return Task.CompletedTask;
+        }
+
+        public async Task ExecuteAsync(CancellationToken cancellationToken = default)
+        {
+            await StartAsync(cancellationToken);
         }
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BTCPayServer.Services.Labels;
 
 namespace BTCPayServer.Models.PaymentRequestViewModels;
 

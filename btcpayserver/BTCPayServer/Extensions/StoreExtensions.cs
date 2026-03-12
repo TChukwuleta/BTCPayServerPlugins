@@ -2,7 +2,6 @@
 using System.Linq;
 using BTCPayServer.Client;
 using BTCPayServer.Data;
-using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 
 namespace BTCPayServer
@@ -13,7 +12,7 @@ namespace BTCPayServer
         {
             return store.UserStores?.FirstOrDefault(r => r.ApplicationUserId == userId)?.StoreRole;
         }
-
+        
         public static PermissionSet GetPermissionSet(this StoreRole storeRole, string storeId)
         {
             return new PermissionSet(storeRole.Permissions
@@ -27,23 +26,16 @@ namespace BTCPayServer
            return  store.GetStoreRoleOfUser(userId)?.GetPermissionSet(store.Id)?? new PermissionSet();
         }
 
-        public static bool HasPolicy(this StoreData store, string userId, string policy, PermissionService permissionService)
+        public static bool HasPermission(this StoreData store, string userId, string permission)
         {
-            if (!Permission.TryCreatePermission(policy, store.Id, out var requiredPermission))
-                return false;
-            return GetPermissionSet(store, userId).HasPermission(requiredPermission, permissionService);
+            return GetPermissionSet(store, userId).HasPermission(permission, store.Id);
         }
 
-        public static bool HasPermission(this PermissionSet permissionSet, Permission permission, PermissionService permissionService)
+        public static bool HasPermission(this PermissionSet permissionSet, string permission, string storeId)
         {
-            foreach (var existing in permissionSet.Permissions)
-            {
-                if (permissionService.Contains(existing, permission))
-                    return true;
-            }
-            return false;
+            return permissionSet.Contains(permission, storeId);
         }
-
+        
         public static DerivationSchemeSettings? GetDerivationSchemeSettings(this StoreData store, PaymentMethodHandlerDictionary handlers, string cryptoCode, bool onlyEnabled = false)
         {
             var pmi = Payments.PaymentTypes.CHAIN.GetPaymentMethodId(cryptoCode);

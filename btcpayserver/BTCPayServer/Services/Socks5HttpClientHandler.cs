@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using BTCPayServer.Configuration;
+using BTCPayServer.HostedServices;
 
 namespace BTCPayServer.Services
 {

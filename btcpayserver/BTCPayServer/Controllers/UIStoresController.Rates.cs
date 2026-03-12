@@ -6,6 +6,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
+using BTCPayServer.Abstractions.Extensions;
+using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;
 using BTCPayServer.Data;
 using BTCPayServer.Models.StoreViewModels;
@@ -29,16 +31,16 @@ public partial class UIStoresController
 
     [HttpPost("{storeId}/rates")]
     [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
-    public async Task<IActionResult> Rates(RatesViewModel model, string storeId, string? command = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Rates(RatesViewModel model, string? command = null, string? storeId = null, CancellationToken cancellationToken = default)
     {
-        model.StoreId = CurrentStore.Id;
+        model.StoreId = storeId ?? model.StoreId;
 
         var storeBlob = CurrentStore.GetStoreBlob();
         try
         {
             var currencyPairs = model.DefaultCurrencyPairs?
                 .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(CurrencyPair.Parse)
+                .Select(p => CurrencyPair.Parse(p))
                 .ToArray();
             storeBlob.DefaultCurrencyPairs = currencyPairs;
         }
@@ -145,7 +147,7 @@ public partial class UIStoresController
         if (CurrentStore.SetStoreBlob(storeBlob))
         {
             await _storeRepo.UpdateStore(CurrentStore);
-            TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["Rate settings updated"].Value;
+            TempData[WellKnownTempData.SuccessMessage] = "Rate settings updated";
         }
         return RedirectToAction(nameof(Rates), new
         {
@@ -163,7 +165,8 @@ public partial class UIStoresController
         blob.RateScripting = model.ShowScripting;
         if (model.ShowScripting)
         {
-            if (!RateRules.TryParse(model.Script, out var rules, out var errors))
+            RateRules? rules;
+            if (!RateRules.TryParse(model.Script, out rules, out var errors))
             {
                 errors ??= [];
                 var errorString = string.Join(", ", errors.ToArray());
@@ -182,6 +185,7 @@ public partial class UIStoresController
         if (model.PreferredExchange is not null && GetAvailableExchanges().All(a => a.Id != model.PreferredExchange))
         {
             ModelState.AddModelError(nameof(model.PreferredExchange), StringLocalizer["Unsupported exchange"]);
+            return;
         }
     }
 
@@ -191,14 +195,11 @@ public partial class UIStoresController
             return;
         var sources = GetAvailableExchanges();
         var exchange = rateSettings.GetPreferredExchange(_defaultRules, storeBlob.DefaultCurrency);
-        var chosenSource = sources.FirstOrDefault(r => r.Id == exchange);
+        var chosenSource = sources.First(r => r.Id == exchange);
         vm.Exchanges = _userStoresController.GetExchangesSelectList(storeBlob.DefaultCurrency, rateSettings);
         vm.PreferredExchange = vm.Exchanges.SelectedValue as string;
-        if (chosenSource is not null)
-        {
-            vm.PreferredResolvedExchange = chosenSource.Id;
-            vm.RateSource = chosenSource.Url;
-        }
+        vm.PreferredResolvedExchange = chosenSource.Id;
+        vm.RateSource = chosenSource.Url;
         vm.Script = rateSettings.GetRateRules(_defaultRules, storeBlob.Spread).ToString();
 
         var defaultRateSettings = (await _storeRepo.GetDefaultStoreTemplate()).GetStoreBlob()?.GetRateSettings(false) ?? new();

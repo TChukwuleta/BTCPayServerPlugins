@@ -1,3 +1,5 @@
+using BTCPayServer.Payments;
+
 namespace BTCPayServer.Payouts
 {
     public class PayoutMethodIds

@@ -1,8 +1,11 @@
 #nullable enable
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using BTCPayServer.Data;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
@@ -14,6 +17,7 @@ public class BTCPayServerSecurityStampValidator(
     IOptions<SecurityStampValidatorOptions> options,
     SignInManager<ApplicationUser> signInManager,
     ILoggerFactory logger,
+    UserManager<ApplicationUser> userManager,
     BTCPayServerSecurityStampValidator.DisabledUsers disabledUsers)
     : SecurityStampValidator<ApplicationUser>(options, signInManager, logger)
 {
@@ -54,7 +58,8 @@ public class BTCPayServerSecurityStampValidator(
     public override async Task ValidateAsync(CookieValidatePrincipalContext context)
     {
         if (disabledUsers.HasAny &&
-            context.Principal.GetIdOrNull() is string id &&
+            context.Principal is not null &&
+            userManager.GetUserId(context.Principal) is string id &&
             disabledUsers.Contains(id))
         {
             context.Properties.IssuedUtc = null;

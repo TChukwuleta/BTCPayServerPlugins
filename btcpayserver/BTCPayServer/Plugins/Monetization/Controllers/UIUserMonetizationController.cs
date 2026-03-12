@@ -8,6 +8,7 @@ using BTCPayServer.Data.Subscriptions;
 using BTCPayServer.Plugins.Subscriptions;
 using BTCPayServer.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,7 @@ public class UIUserMonetizationController(
     ApplicationDbContext ctx,
     MonetizationSettings settings,
     PoliciesSettings policies,
+    UserManager<ApplicationUser> userManager,
     LinkGenerator linkGenerator
     ) : Controller
 {
@@ -53,7 +55,7 @@ public class UIUserMonetizationController(
     {
         if (settings.OfferingId is not { } offeringId)
             return NotFound();
-        var userId = User.GetId();
+        var userId = userManager.GetUserId(User);
         var sub = await ctx.Subscribers.GetBySelector(offeringId, CustomerSelector.ByIdentity(SubscriberDataExtensions.IdentityType, userId));
         if (sub is null)
             return NotFound();

@@ -6,6 +6,7 @@ using Dapper;
 using Microsoft.EntityFrameworkCore;
 using NBitcoin.DataEncoders;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace BTCPayServer;

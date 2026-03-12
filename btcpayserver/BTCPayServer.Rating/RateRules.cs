@@ -1,9 +1,11 @@
 #nullable enable
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -163,7 +165,7 @@ namespace BTCPayServer.Rating
         public RateRule GetRuleFor(CurrencyPair currencyPair)
         {
             if (currencyPair.Left == "X" || currencyPair.Right == "X")
-                return new RateRule(this, currencyPair, CreateExpression($"ERR_INVALID_CURRENCY_PAIR({currencyPair})"));
+                throw new ArgumentException(paramName: nameof(currencyPair), message: "Invalid X currency");
             if (currencyPair.Left == currencyPair.Right)
                 return new RateRule(this, currencyPair, CreateExpression("1.0"));
             var candidate = FindBestCandidate(currencyPair);

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Net;
+using BTCPayServer.Configuration;
 using BTCPayServer.Logging;
 using BTCPayServer.SSH;
 using Microsoft.Extensions.Configuration;

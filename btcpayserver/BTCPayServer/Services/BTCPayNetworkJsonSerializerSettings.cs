@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BTCPayServer.Payouts;
+using NBitcoin;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Services

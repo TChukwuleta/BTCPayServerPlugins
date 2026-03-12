@@ -1,3 +1,5 @@
+using System;
+
 namespace BTCPayServer.Models.WalletViewModels
 {
     public class WalletSigningOptionsModel : IHasBackAndReturnUrl

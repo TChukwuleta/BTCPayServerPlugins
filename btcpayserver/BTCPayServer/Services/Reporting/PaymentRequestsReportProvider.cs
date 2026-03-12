@@ -6,7 +6,6 @@ using BTCPayServer.Data;
 using BTCPayServer.Payments.Bitcoin;
 using BTCPayServer.Payments.Lightning;
 using BTCPayServer.Services.Invoices;
-using BTCPayServer.Services.Labels;
 using BTCPayServer.Services.PaymentRequests;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,7 +15,8 @@ public class PaymentRequestsReportProvider(
     ApplicationDbContextFactory dbContextFactory,
     InvoiceRepository invoiceRepository,
     PaymentMethodHandlerDictionary handlers,
-    StoreLabelRepository storeLabelRepository,
+    WalletRepository walletRepository,
+    BTCPayNetworkProvider networkProvider,
     DisplayFormatter displayFormatter)
     : ReportProvider
 {
@@ -80,6 +80,9 @@ public class PaymentRequestsReportProvider(
         if (paymentRequests.Count == 0)
             return;
 
+        var network = networkProvider.DefaultNetwork;
+        var walletId = new WalletId(queryContext.StoreId, network.CryptoCode);
+
         var paymentRequestIds = paymentRequests.Select(pr => pr.Id).ToArray();
 
         var orderIds = paymentRequests
@@ -87,8 +90,8 @@ public class PaymentRequestsReportProvider(
             .Distinct()
             .ToArray();
 
-        var labelsTask = storeLabelRepository.GetStoreLabelsForObjects(
-            queryContext.StoreId,
+        var labelsTask = walletRepository.GetWalletLabelsForObjects(
+            walletId,
             WalletObjectData.Types.PaymentRequest,
             paymentRequestIds
         );
@@ -112,12 +115,13 @@ public class PaymentRequestsReportProvider(
 
         foreach (var paymentRequest in paymentRequests)
         {
+            var prBlob = paymentRequest.GetBlob();
             var prOrderId = PaymentRequestRepository.GetOrderIdForPaymentRequest(paymentRequest.Id);
 
             labelsByPaymentRequestId.TryGetValue(paymentRequest.Id, out var labelTuples);
             var labelsString = labelTuples is { Length: > 0 }
                 ? string.Join(", ", labelTuples.Select(l => l.Label))
-                : "Unlabeled";
+                : "";
 
             if (!invoicesByOrderId.TryGetValue(prOrderId, out var prInvoices) || prInvoices.Count == 0)
             {

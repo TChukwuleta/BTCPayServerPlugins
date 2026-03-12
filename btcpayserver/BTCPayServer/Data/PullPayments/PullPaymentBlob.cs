@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using BTCPayServer.Client.JsonConverters;
 using BTCPayServer.JsonConverters;
+using BTCPayServer.Payments;
 using BTCPayServer.Payouts;
 using Newtonsoft.Json;
 

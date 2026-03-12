@@ -3,26 +3,49 @@ using System.Threading.Tasks;
 using BTCPayServer.Data;
 using BTCPayServer.Models.InvoicingModels;
 using BTCPayServer.Services.Invoices;
+using BTCPayServer.Services.Rates;
+using BTCPayServer.Services.Stores;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BTCPayServer.Components.StoreRecentInvoices;
 
-public class StoreRecentInvoices(
-    InvoiceRepository invoiceRepo) : ViewComponent
+public class StoreRecentInvoices : ViewComponent
 {
-    public async Task<IViewComponentResult> InvokeAsync(StoreData store, bool initialRendering)
+    private readonly StoreRepository _storeRepo;
+    private readonly InvoiceRepository _invoiceRepo;
+    private readonly CurrencyNameTable _currencyNameTable;
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly ApplicationDbContextFactory _dbContextFactory;
+
+    public StoreRecentInvoices(
+        StoreRepository storeRepo,
+        InvoiceRepository invoiceRepo,
+        CurrencyNameTable currencyNameTable,
+        UserManager<ApplicationUser> userManager,
+        ApplicationDbContextFactory dbContextFactory)
+    {
+        _storeRepo = storeRepo;
+        _invoiceRepo = invoiceRepo;
+        _userManager = userManager;
+        _currencyNameTable = currencyNameTable;
+        _dbContextFactory = dbContextFactory;
+    }
+
+    public async Task<IViewComponentResult> InvokeAsync(StoreData store, string cryptoCode, bool initialRendering)
     {
         var vm = new StoreRecentInvoicesViewModel
         {
             StoreId = store.Id,
+            CryptoCode = cryptoCode,
             InitialRendering = initialRendering
         };
 
         if (vm.InitialRendering)
             return View(vm);
 
-        var userId = UserClaimsPrincipal.GetIdOrNull();
-        var invoiceEntities = await invoiceRepo.GetInvoices(new InvoiceQuery
+        var userId = _userManager.GetUserId(UserClaimsPrincipal);
+        var invoiceEntities = await _invoiceRepo.GetInvoices(new InvoiceQuery
         {
             UserId = userId,
             StoreId = [store.Id],
@@ -35,11 +58,11 @@ public class StoreRecentInvoices(
             let state = invoice.GetInvoiceState()
             select new StoreRecentInvoiceViewModel
             {
-                Date = invoice.InvoiceTime,
-                Status = state,
-                HasRefund = invoice.Refunds.Any(),
+                Date = invoice.InvoiceTime, 
+                Status = state, 
+                HasRefund = invoice.Refunds.Any(), 
                 InvoiceId = invoice.Id,
-                OrderId = invoice.Metadata.OrderId ?? string.Empty,
+                OrderId = invoice.Metadata.OrderId ?? string.Empty, 
                 Amount = invoice.Price,
                 Currency = invoice.Currency,
                 Details = new InvoiceDetailsModel

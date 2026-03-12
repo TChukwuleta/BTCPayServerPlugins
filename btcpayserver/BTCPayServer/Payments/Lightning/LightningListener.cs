@@ -527,7 +527,6 @@ namespace BTCPayServer.Payments.Lightning
                 var lightningClient = _lightningClientFactory.Create(ConnectionString, _network);
                 if (lightningClient is null)
                     return;
-                ListenLogs(lightningClient);
                 uri = lightningClient.GetServerUri(ConnectionString)?.RemoveUserInfo() ?? "";
                 Logs.PayServer.LogInformation("{CryptoCode} (Lightning): Start listening {Uri}", _network.CryptoCode, uri);
                 using var session = await lightningClient.Listen(cancellation);
@@ -577,14 +576,6 @@ namespace BTCPayServer.Payments.Lightning
             if (_ListenedInvoices.IsEmpty)
                 Logs.PayServer.LogInformation("{CryptoCode} (Lightning): No more invoice to listen on {Uri}, releasing the connection", _network.CryptoCode,
                     uri);
-        }
-
-        private void ListenLogs(ILightningClient lightningClient)
-        {
-            if (lightningClient is BTCPayServer.Lightning.LND.LndClient lnd)
-            {
-                lnd.Log = msg => Logs.PayServer.LogWarning(msg);
-            }
         }
 
         private uint256? GetPaymentHash(ListenedInvoice listenedInvoice)

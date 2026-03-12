@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System;
 using BTCPayServer.Payments;
 using System.Threading.Tasks;
+using BTCPayServer.Abstractions.Contracts;
 using System.Linq;
 
 namespace BTCPayServer.Services;

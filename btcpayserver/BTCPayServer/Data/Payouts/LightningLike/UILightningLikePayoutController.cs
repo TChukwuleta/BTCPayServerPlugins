@@ -16,6 +16,7 @@ using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -23,10 +24,12 @@ using Microsoft.Extensions.Options;
 namespace BTCPayServer.Data.Payouts.LightningLike
 {
     [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie)]
+    [AutoValidateAntiforgeryToken]
     public class UILightningLikePayoutController : Controller
     {
         private readonly ApplicationDbContextFactory _applicationDbContextFactory;
         private readonly LightningAutomatedPayoutSenderFactory _lightningAutomatedPayoutSenderFactory;
+        private readonly UserManager<ApplicationUser> _userManager;
         private readonly BTCPayNetworkJsonSerializerSettings _btcPayNetworkJsonSerializerSettings;
         private readonly PayoutMethodHandlerDictionary _payoutHandlers;
         private readonly PaymentMethodHandlerDictionary _handlers;
@@ -38,6 +41,7 @@ namespace BTCPayServer.Data.Payouts.LightningLike
 
         public UILightningLikePayoutController(ApplicationDbContextFactory applicationDbContextFactory,
             LightningAutomatedPayoutSenderFactory lightningAutomatedPayoutSenderFactory,
+            UserManager<ApplicationUser> userManager,
             BTCPayNetworkJsonSerializerSettings btcPayNetworkJsonSerializerSettings,
             PayoutMethodHandlerDictionary payoutHandlers,
             PaymentMethodHandlerDictionary handlers,
@@ -49,6 +53,7 @@ namespace BTCPayServer.Data.Payouts.LightningLike
         {
             _applicationDbContextFactory = applicationDbContextFactory;
             _lightningAutomatedPayoutSenderFactory = lightningAutomatedPayoutSenderFactory;
+            _userManager = userManager;
             _btcPayNetworkJsonSerializerSettings = btcPayNetworkJsonSerializerSettings;
             _payoutHandlers = payoutHandlers;
             _handlers = handlers;
@@ -62,7 +67,7 @@ namespace BTCPayServer.Data.Payouts.LightningLike
         private async Task<List<PayoutData>> GetPayouts(ApplicationDbContext dbContext, PayoutMethodId pmi,
             string[] payoutIds)
         {
-            var userId = User.GetId();
+            var userId = _userManager.GetUserId(User);
             if (string.IsNullOrEmpty(userId))
             {
                 return new List<PayoutData>();
@@ -194,7 +199,7 @@ namespace BTCPayServer.Data.Payouts.LightningLike
             if (string.IsNullOrEmpty(storeId))
                 return;
 
-            var userId = User.GetId();
+            var userId = _userManager.GetUserId(User);
             var store = await _storeRepository.FindStore(storeId, userId);
             if (store != null)
             {

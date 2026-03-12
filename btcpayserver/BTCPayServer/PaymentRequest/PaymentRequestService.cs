@@ -4,10 +4,13 @@ using System.Threading.Tasks;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
 using BTCPayServer.Models.PaymentRequestViewModels;
+using BTCPayServer.Payments;
 using BTCPayServer.Services;
+using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.PaymentRequests;
 using BTCPayServer.Services.Rates;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 using PaymentRequestData = BTCPayServer.Data.PaymentRequestData;
 
 namespace BTCPayServer.PaymentRequest
@@ -48,9 +51,8 @@ namespace BTCPayServer.PaymentRequest
 
         public async Task UpdatePaymentRequestStateIfNeeded(PaymentRequestData pr)
         {
-            if (pr is null)
-                return;
-            var newStatus = pr switch
+            var newStatus = pr.Status;
+            newStatus = pr switch
             {
                 { Expirable: true, Expiry: { } e }
                     when e <= DateTimeOffset.UtcNow => PaymentRequestStatus.Expired,
@@ -84,14 +86,12 @@ namespace BTCPayServer.PaymentRequest
         {
             var pr = await _paymentRequestRepository.FindPaymentRequest(id, userId);
             if (pr == null)
+            {
                 return null;
-            return await AsViewModel(pr);
-        }
+            }
 
-        public async Task<ViewPaymentRequestViewModel> AsViewModel(PaymentRequestData pr)
-        {
             var blob = pr.GetBlob();
-            var invoices = await _paymentRequestRepository.GetInvoicesForPaymentRequest(pr.Id);
+            var invoices = await _paymentRequestRepository.GetInvoicesForPaymentRequest(id);
             var paymentStats = _invoiceRepository.GetContributionsByPaymentMethodId(pr.Currency, invoices, true);
             var amountDue = pr.Amount - paymentStats.Total;
             var pendingInvoice = invoices.OrderByDescending(entity => entity.InvoiceTime)
@@ -113,26 +113,26 @@ namespace BTCPayServer.PaymentRequest
                 PendingInvoiceHasPayments = pendingInvoice != null &&
                                             pendingInvoice.ExceptionStatus != InvoiceExceptionStatus.None,
                 Invoices = new ViewPaymentRequestViewModel.InvoiceList(invoices.Select(entity =>
+                {
+                    var state = entity.GetInvoiceState();
+                    var payments = ViewPaymentRequestViewModel.PaymentRequestInvoicePayment.GetViewModels(entity, _displayFormatter, _transactionLinkProviders, _handlers);
+
+                    if (state.Status is InvoiceStatus.Invalid or InvoiceStatus.Expired && payments.Count is 0)
+                        return null;
+
+                    return new ViewPaymentRequestViewModel.PaymentRequestInvoice
                     {
-                        var state = entity.GetInvoiceState();
-                        var payments = ViewPaymentRequestViewModel.PaymentRequestInvoicePayment.GetViewModels(entity, _displayFormatter, _transactionLinkProviders, _handlers);
-
-                        if (state.Status is InvoiceStatus.Invalid or InvoiceStatus.Expired && payments.Count is 0)
-                            return null;
-
-                        return new ViewPaymentRequestViewModel.PaymentRequestInvoice
-                        {
-                            Id = entity.Id,
-                            Amount = entity.Price,
-                            AmountFormatted = _displayFormatter.Currency(entity.Price, pr.Currency, DisplayFormatter.CurrencyFormat.Symbol),
-                            Currency = entity.Currency,
-                            ExpiryDate = entity.ExpirationTime.DateTime,
-                            State = state,
-                            StateFormatted = state.ToString(),
-                            Payments = payments
-                        };
-                    })
-                    .Where(invoice => invoice != null))
+                        Id = entity.Id,
+                        Amount = entity.Price,
+                        AmountFormatted = _displayFormatter.Currency(entity.Price, pr.Currency, DisplayFormatter.CurrencyFormat.Symbol),
+                        Currency = entity.Currency,
+                        ExpiryDate = entity.ExpirationTime.DateTime,
+                        State = state,
+                        StateFormatted = state.ToString(),
+                        Payments = payments
+                    };
+                })
+                .Where(invoice => invoice != null))
             };
         }
     }

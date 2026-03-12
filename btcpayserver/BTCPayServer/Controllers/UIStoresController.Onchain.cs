@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,6 +21,7 @@ using Microsoft.AspNetCore.Mvc;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 using NBXplorer;
+using NBXplorer.DerivationStrategy;
 using NBXplorer.Models;
 using Newtonsoft.Json.Linq;
 
@@ -702,7 +704,7 @@ public partial class UIStoresController
 
     private ActionResult IsAvailable(string cryptoCode, out StoreData store, out BTCPayNetwork network)
     {
-        store = HttpContext.GetStoreDataOrNull();
+        store = HttpContext.GetStoreData();
         network = cryptoCode == null ? null : _explorerProvider.GetNetwork(cryptoCode);
         return store == null || network == null ? NotFound() : null;
     }

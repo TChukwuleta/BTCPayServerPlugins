@@ -4,7 +4,16 @@ using Microsoft.AspNetCore.Http;
 
 namespace BTCPayServer.Services.Stores;
 
-public class ScopeProvider(IHttpContextAccessor httpContextAccessor) : IScopeProvider
+public class ScopeProvider : IScopeProvider
 {
-    public string? GetCurrentStoreId() => httpContextAccessor.HttpContext?.GetCurrentStoreId();
+    private readonly IHttpContextAccessor _httpContextAccessor;
+
+    public ScopeProvider(IHttpContextAccessor httpContextAccessor)
+    {
+        _httpContextAccessor = httpContextAccessor;
+    }
+    public string? GetCurrentStoreId()
+    {
+        return _httpContextAccessor.HttpContext.GetStoreData()?.Id;
+    }
 }

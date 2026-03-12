@@ -3,43 +3,44 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using ExchangeSharp;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace BTCPayServer.Tests
 {
     public class FakeServer : IDisposable
     {
-        IHost host;
-        readonly SemaphoreSlim semaphore = new(0);
+        IWebHost webHost;
+        readonly SemaphoreSlim semaphore;
         readonly CancellationTokenSource cts = new CancellationTokenSource();
+        public FakeServer()
+        {
+            _channel = Channel.CreateUnbounded<HttpContext>();
+            semaphore = new SemaphoreSlim(0);
+        }
 
-        readonly Channel<HttpContext> _channel = Channel.CreateUnbounded<HttpContext>();
+        readonly Channel<HttpContext> _channel;
         public async Task Start()
         {
-            host = Host.CreateDefaultBuilder()
-                .ConfigureLogging(p => p.ClearProviders())
-                .ConfigureWebHostDefaults(webBuilder =>
-                {
-                    webBuilder
-                        .UseKestrel()
-                        .UseUrls("http://127.0.0.1:0")
-                        .Configure(app =>
+            webHost = new WebHostBuilder()
+                    .UseKestrel()
+                    .UseUrls("http://127.0.0.1:0")
+                    .Configure(appBuilder =>
+                    {
+                        appBuilder.Run(async ctx =>
                         {
-                            app.Run(async ctx =>
-                            {
-                                await _channel.Writer.WriteAsync(ctx);
-                                await semaphore.WaitAsync(cts.Token);
-                            });
+                            await _channel.Writer.WriteAsync(ctx);
+                            await semaphore.WaitAsync(cts.Token);
                         });
-                })
-                .Build();
-            await host.StartAsync();
-            var port = new Uri(host.GetServerFeatures<IServerAddressesFeature>().Addresses.First(), UriKind.Absolute)
+                    })
+                    .Build();
+            await webHost.StartAsync();
+            var port = new Uri(webHost.ServerFeatures.Get<IServerAddressesFeature>().Addresses.First(), UriKind.Absolute)
                 .Port;
             ServerUri = new Uri($"http://127.0.0.1:{port}/");
         }
@@ -53,12 +54,12 @@ namespace BTCPayServer.Tests
 
         public async Task Stop()
         {
-            await host.StopAsync();
+            await webHost.StopAsync();
         }
         public void Dispose()
         {
             cts.Dispose();
-            host?.Dispose();
+            webHost?.Dispose();
             semaphore.Dispose();
         }
 

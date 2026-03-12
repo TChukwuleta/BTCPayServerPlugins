@@ -1,4 +1,5 @@
-﻿using BTCPayServer.Data.Subscriptions;
+﻿using BTCPayServer.Data;
+using BTCPayServer.Data.Subscriptions;
 using BTCPayServer.Models;
 
 namespace BTCPayServer.Views.UIStoreMembership;

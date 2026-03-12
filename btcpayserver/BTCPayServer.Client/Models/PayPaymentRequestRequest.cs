@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
 using BTCPayServer.JsonConverters;
 using Newtonsoft.Json;
 

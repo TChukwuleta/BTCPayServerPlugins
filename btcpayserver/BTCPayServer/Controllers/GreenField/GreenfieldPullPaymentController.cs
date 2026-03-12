@@ -125,8 +125,7 @@ namespace BTCPayServer.Controllers.Greenfield
                 ModelState.AddModelError(nameof(request.BOLT11Expiration), $"The BOLT11 expiration should be positive");
             }
 
-			var storeData = HttpContext.GetStoreData();
-			var supported = _payoutHandlers.GetSupportedPayoutMethods(storeData);
+            var supported = _payoutHandlers.GetSupportedPayoutMethods(HttpContext.GetStoreData());
             if (request.PayoutMethods is not null)
             {
                 for (int i = 0; i < request.PayoutMethods.Length; i++)
@@ -145,7 +144,7 @@ namespace BTCPayServer.Controllers.Greenfield
             if (!ModelState.IsValid)
                 return this.CreateValidationError(ModelState);
 
-			var ppId = await _pullPaymentService.CreatePullPayment(storeData, request);
+            var ppId = await _pullPaymentService.CreatePullPayment(HttpContext.GetStoreData(), request);
             var pp = await _pullPaymentService.GetPullPayment(ppId, false);
             return this.Ok(CreatePullPaymentData(pp));
         }
@@ -376,14 +375,14 @@ retry:
         public async Task<IActionResult> GetPullPaymentLNURL(string pullPaymentId)
         {
             var pp = await _pullPaymentService.GetPullPayment(pullPaymentId, false);
-            if (pp is null || _networkProvider.DefaultNetwork?.CryptoCode is not {} cryptoCode)
+            if (pp is null)
                 return PullPaymentNotFound();
 
             if (_pullPaymentService.SupportsLNURL(pp))
             {
                 var lnurlEndpoint = new Uri(Url.Action("GetLNURLForPullPayment", "UILNURL", new
                 {
-                    cryptoCode,
+                    cryptoCode = _networkProvider.DefaultNetwork.CryptoCode,
                     pullPaymentId
                 }, Request.Scheme, Request.Host.ToString())!);
 
@@ -447,7 +446,7 @@ retry:
                 ModelState.AddModelError(nameof(request.Destination), destination.error ?? "The destination is invalid for the payment specified");
                 return this.CreateValidationError(ModelState);
             }
-
+            
             var amt = ClaimRequest.GetClaimedAmount(destination.destination, request.Amount, payoutHandler.Currency, pp.Currency);
             if (amt is ClaimRequest.ClaimedAmountResult.Error err)
             {
@@ -585,10 +584,11 @@ retry:
         [Authorize(Policy = Policies.CanArchivePullPayments, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
         public async Task<IActionResult> ArchivePullPayment(string storeId, string pullPaymentId)
         {
-            var pp = HttpContext.GetPullPaymentDataOrNull();
-            if (pp is null)
+            using var ctx = _dbContextFactory.CreateContext();
+            var pp = await ctx.PullPayments.FindAsync(pullPaymentId);
+            if (pp is null || pp.StoreId != storeId)
                 return PullPaymentNotFound();
-            await _pullPaymentService.Cancel(new PullPaymentHostedService.CancelRequest(pp.Id));
+            await _pullPaymentService.Cancel(new PullPaymentHostedService.CancelRequest(pullPaymentId));
             return Ok();
         }
 

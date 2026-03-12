@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BTCPayServer.Client.Models;
+using BTCPayServer.Payments;
 using BTCPayServer.Payouts;
 
 namespace BTCPayServer.Models.WalletViewModels

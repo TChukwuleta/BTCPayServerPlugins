@@ -20,17 +20,21 @@ namespace BTCPayServer.Controllers.Greenfield
     [EnableCors(CorsPolicies.All)]
     public class GreenfieldInternalLightningNodeApiController : GreenfieldLightningNodeApiController
     {
+        private readonly LightningClientFactoryService _lightningClientFactory;
         private readonly IOptions<LightningNetworkOptions> _lightningNetworkOptions;
+        private readonly PaymentMethodHandlerDictionary _handlers;
 
         public GreenfieldInternalLightningNodeApiController(
-            PoliciesSettings policiesSettings,
+            PoliciesSettings policiesSettings, LightningClientFactoryService lightningClientFactory,
             IOptions<LightningNetworkOptions> lightningNetworkOptions,
             IAuthorizationService authorizationService,
             PaymentMethodHandlerDictionary handlers,
             LightningHistogramService lnHistogramService
             ) : base(policiesSettings, authorizationService, handlers, lnHistogramService)
         {
+            _lightningClientFactory = lightningClientFactory;
             _lightningNetworkOptions = lightningNetworkOptions;
+            _handlers = handlers;
         }
 
         [Authorize(Policy = Policies.CanUseInternalLightningNode,

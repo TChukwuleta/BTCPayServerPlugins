@@ -9,6 +9,7 @@ using BTCPayServer.Plugins.PayButton.Models;
 using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Localization;
 using StoreData = BTCPayServer.Data.StoreData;
@@ -18,15 +19,28 @@ namespace BTCPayServer.Plugins.PayButton.Controllers
     [Route("stores")]
     [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
-    [Area(PayButtonPlugin.Area)]
-    public class UIPayButtonController(
-        StoreRepository repo,
-        UIStoresController storesController,
-        IStringLocalizer stringLocalizer,
-        AppService appService)
-        : Controller
+    [AutoValidateAntiforgeryToken]
+    public class UIPayButtonController : Controller
     {
-        public IStringLocalizer StringLocalizer { get; } = stringLocalizer;
+        public UIPayButtonController(
+            StoreRepository repo,
+            UIStoresController storesController,
+            UserManager<ApplicationUser> userManager,
+            IStringLocalizer stringLocalizer,
+            AppService appService)
+        {
+            _repo = repo;
+            _userManager = userManager;
+            _appService = appService;
+            _storesController = storesController;
+            StringLocalizer = stringLocalizer;
+        }
+
+        readonly StoreRepository _repo;
+        readonly UserManager<ApplicationUser> _userManager;
+        private readonly AppService _appService;
+        private readonly UIStoresController _storesController;
+        public IStringLocalizer StringLocalizer { get; }
 
         [HttpPost("{storeId}/disable-anyone-can-pay")]
         public async Task<IActionResult> DisableAnyoneCanCreateInvoice(string storeId)
@@ -35,7 +49,7 @@ namespace BTCPayServer.Plugins.PayButton.Controllers
             blob.AnyoneCanInvoice = false;
             GetCurrentStore.SetStoreBlob(blob);
             TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["Feature disabled"].Value;
-            await repo.UpdateStore(GetCurrentStore);
+            await _repo.UpdateStore(GetCurrentStore);
             return RedirectToAction(nameof(PayButton), new { storeId });
         }
 
@@ -46,10 +60,10 @@ namespace BTCPayServer.Plugins.PayButton.Controllers
             var storeBlob = store.GetStoreBlob();
             if (!storeBlob.AnyoneCanInvoice)
             {
-                return View("Enable", null);
+                return View("PayButton/Enable", null);
             }
 
-            var apps = await appService.GetAllApps(User.GetId(), false, store.Id);
+            var apps = await _appService.GetAllApps(_userManager.GetUserId(User), false, store.Id);
             // unset app store data, because we don't need it and inclusion leads to circular references when serializing to JSON
             foreach (var app in apps)
             {
@@ -61,7 +75,7 @@ namespace BTCPayServer.Plugins.PayButton.Controllers
                 Price = null,
                 Currency = storeBlob.DefaultCurrency,
                 DefaultPaymentMethod = string.Empty,
-                PaymentMethods = storesController.GetEnabledPaymentMethodChoices(store),
+                PaymentMethods = _storesController.GetEnabledPaymentMethodChoices(store),
                 ButtonSize = 2,
                 UrlRoot = appUrl,
                 PayButtonImageUrl = appUrl + "img/paybutton/pay.svg",
@@ -72,7 +86,7 @@ namespace BTCPayServer.Plugins.PayButton.Controllers
                 Step = "1",
                 Apps = apps
             };
-            return View("PayButton", model);
+            return View("PayButton/PayButton", model);
         }
 
         [HttpPost("{storeId}/paybutton")]
@@ -82,7 +96,7 @@ namespace BTCPayServer.Plugins.PayButton.Controllers
             blob.AnyoneCanInvoice = enableStore;
             if (GetCurrentStore.SetStoreBlob(blob))
             {
-                await repo.UpdateStore(GetCurrentStore);
+                await _repo.UpdateStore(GetCurrentStore);
                 TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["Store successfully updated"].Value;
             }
 

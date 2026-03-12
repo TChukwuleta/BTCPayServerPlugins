@@ -1,6 +1,9 @@
+using System;
 using System.Collections.Generic;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Payments;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 
 namespace BTCPayServer.Models.StoreReportsViewModels;
 

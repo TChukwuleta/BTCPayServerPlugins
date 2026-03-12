@@ -1,4 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
+using NBitcoin;
 
 namespace BTCPayServer.Models.StoreViewModels
 {

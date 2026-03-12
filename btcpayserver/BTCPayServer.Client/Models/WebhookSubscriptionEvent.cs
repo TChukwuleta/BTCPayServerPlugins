@@ -1,4 +1,9 @@
-﻿namespace BTCPayServer.Client.Models;
+﻿using System;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Converters;
+
+namespace BTCPayServer.Client.Models;
 
 public class WebhookSubscriptionEvent : StoreWebhookEvent
 {

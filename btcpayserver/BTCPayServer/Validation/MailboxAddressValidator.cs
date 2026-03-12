@@ -1,6 +1,8 @@
 #nullable enable
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 using MimeKit;
 
 namespace BTCPayServer

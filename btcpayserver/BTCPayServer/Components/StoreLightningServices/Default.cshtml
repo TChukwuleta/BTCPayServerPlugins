@@ -1,14 +1,13 @@
-@using BTCPayServer.Client
 @model BTCPayServer.Components.StoreLightningServices.StoreLightningServicesViewModel
 
 @if (Model.Services != null && Model.Services.Any())
 {
-    <div permission="@Policies.CanModifyServerSettings" id="StoreLightningServices-@Model.StoreId" class="widget store-lightning-services">
+    <div id="StoreLightningServices-@Model.StoreId" class="widget store-lightning-services">
         <header class="mb-4">
             <h6 text-translate="true">Lightning Services</h6>
             <a
                 asp-controller="UIPublicLightningNodeInfo"
-                asp-action="ShowLightningNodeInfo"
+                asp-action="ShowLightningNodeInfo"app-top-items
                 asp-route-cryptoCode="@Model.CryptoCode"
                 asp-route-storeId="@Model.StoreId"
                 target="_blank"

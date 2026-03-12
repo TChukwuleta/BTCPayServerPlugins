@@ -5,6 +5,8 @@ using System.Globalization;
 using System.Linq;
 using BTCPayServer.Models.InvoicingModels;
 using BTCPayServer.Services;
+using BTCPayServer.Services.Invoices;
+using Microsoft.AspNetCore.Mvc;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 

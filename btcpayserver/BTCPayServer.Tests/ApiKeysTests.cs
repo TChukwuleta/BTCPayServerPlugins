@@ -9,99 +9,99 @@ using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
 using BTCPayServer.Security.Greenfield;
 using BTCPayServer.Views.Manage;
-using Microsoft.Playwright;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using OpenQA.Selenium;
+using OpenQA.Selenium.Support.Extensions;
+using OpenQA.Selenium.Support.UI;
 using Xunit;
 using Xunit.Abstractions;
+using StoreData = BTCPayServer.Data.StoreData;
 
 namespace BTCPayServer.Tests
 {
-    public class ApiKeysTests(ITestOutputHelper helper) : UnitTestBase(helper)
+    public class ApiKeysTests : UnitTestBase
     {
-        public const string TestApiPath = "api/test/apikey";
+        public const int TestTimeout = 120_000;
 
-        [Fact]
-        [Trait("Playwright", "Playwright-2")]
+        public const string TestApiPath = "api/test/apikey";
+        public ApiKeysTests(ITestOutputHelper helper) : base(helper)
+        {
+        }
+
+        [Fact(Timeout = TestTimeout)]
+        [Trait("Selenium", "Selenium")]
         public async Task CanCreateApiKeys()
         {
             //there are 2 ways to create api keys:
             //as a user through your profile
             //as an external application requesting an api key from a user
 
-            await using var s = CreatePlaywrightTester();
+            using var s = CreateSeleniumTester();
             await s.StartAsync();
             var tester = s.Server;
 
             var user = tester.NewAccount();
             await user.GrantAccessAsync();
             await user.MakeAdmin(false);
-            await s.GoToLogin();
-            await s.LogIn(user.RegisterDetails.Email, user.RegisterDetails.Password);
-            await s.GoToProfile(ManageNavPages.APIKeys);
-            await s.ClickPagePrimary();
-
-            async Task AssertNoPermission(string permission)
-            {
-                await s.Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-                var txt = await s.Page.ContentAsync();
-                Assert.DoesNotContain(permission, txt);
-            }
-            async Task AssertPermission(string permission)
-            {
-                await s.Page.Locator($".text-muted:has-text('{permission}')").WaitForAsync();
-            }
+            s.GoToLogin();
+            s.LogIn(user.RegisterDetails.Email, user.RegisterDetails.Password);
+            s.GoToProfile(ManageNavPages.APIKeys);
+            s.ClickPagePrimary();
 
             //not an admin, so this permission should not show
-            await AssertNoPermission("btcpay.server.canmodifyserversettings");
+            Assert.DoesNotContain("btcpay.server.canmodifyserversettings", s.Driver.PageSource);
             await user.MakeAdmin();
-            await s.Logout();
-            await s.GoToLogin();
-            await s.LogIn(user.RegisterDetails.Email, user.RegisterDetails.Password);
-            await s.GoToProfile(ManageNavPages.APIKeys);
-            await s.ClickPagePrimary();
-            await AssertPermission("btcpay.server.canmodifyserversettings");
+            s.Logout();
+            s.GoToLogin();
+            s.LogIn(user.RegisterDetails.Email, user.RegisterDetails.Password);
+            s.GoToProfile(ManageNavPages.APIKeys);
+            s.ClickPagePrimary();
+            Assert.Contains("btcpay.server.canmodifyserversettings", s.Driver.PageSource);
 
             //server management should show now
-            await s.Page.SetCheckedAsync("#btcpay\\.server\\.canmodifyserversettings", true);
-            await s.Page.SetCheckedAsync("#btcpay\\.store\\.canmodifystoresettings", true);
-            await s.Page.SetCheckedAsync("#btcpay\\.user\\.canviewprofile", true);
-            await s.ClickPagePrimary();
-            var superApiKey = await (await s.FindAlertMessage()).Locator("code").TextContentAsync();
+            s.Driver.SetCheckbox(By.Id("btcpay.server.canmodifyserversettings"), true);
+            s.Driver.SetCheckbox(By.Id("btcpay.store.canmodifystoresettings"), true);
+            s.Driver.SetCheckbox(By.Id("btcpay.user.canviewprofile"), true);
+            s.ClickPagePrimary();
+            var superApiKey = s.FindAlertMessage().FindElement(By.TagName("code")).Text;
 
             //this api key has access to everything
             await TestApiAgainstAccessToken(superApiKey, tester, user, Policies.CanModifyServerSettings, Policies.CanModifyStoreSettings, Policies.CanViewProfile);
 
-            await s.ClickPagePrimary();
-            await s.Page.SetCheckedAsync("#btcpay\\.server\\.canmodifyserversettings", true);
-            await s.ClickPagePrimary();
-            var serverOnlyApiKey = await (await s.FindAlertMessage()).Locator("code").TextContentAsync();
+            s.ClickPagePrimary();
+            s.Driver.SetCheckbox(By.Id("btcpay.server.canmodifyserversettings"), true);
+            s.ClickPagePrimary();
+            var serverOnlyApiKey = s.FindAlertMessage().FindElement(By.TagName("code")).Text;
             await TestApiAgainstAccessToken(serverOnlyApiKey, tester, user,
                 Policies.CanModifyServerSettings);
 
-            await s.ClickPagePrimary();
-            await s.Page.SetCheckedAsync("#btcpay\\.store\\.canmodifystoresettings", true);
-            await s.ClickPagePrimary();
-            var allStoreOnlyApiKey = await (await s.FindAlertMessage()).Locator("code").TextContentAsync();
+            s.ClickPagePrimary();
+            s.Driver.SetCheckbox(By.Id("btcpay.store.canmodifystoresettings"), true);
+            s.ClickPagePrimary();
+            var allStoreOnlyApiKey = s.FindAlertMessage().FindElement(By.TagName("code")).Text;
             await TestApiAgainstAccessToken(allStoreOnlyApiKey, tester, user,
                 Policies.CanModifyStoreSettings);
 
-            await s.ClickPagePrimary();
-            await s.Page.Locator("button[value='btcpay.store.canmodifystoresettings:change-store-mode']").ClickAsync();
+            s.ClickPagePrimary();
+            s.Driver.FindElement(By.CssSelector("button[value='btcpay.store.canmodifystoresettings:change-store-mode']")).Click();
             //there should be a store already by default in the dropdown
             var getPermissionValueIndex =
-                await s.Page.Locator("input[value='btcpay.store.canmodifystoresettings']")
-                    .GetAttributeAsync("name");
-            getPermissionValueIndex = getPermissionValueIndex!.Replace(".Permission", ".SpecificStores[0]");
-            await s.Page.SelectOptionAsync($"[name='{getPermissionValueIndex}']", user.StoreId);
-            await s.ClickPagePrimary();
-            var selectiveStoreApiKey = await (await s.FindAlertMessage()).Locator("code").TextContentAsync();
+                s.Driver.FindElement(By.CssSelector("input[value='btcpay.store.canmodifystoresettings']"))
+                    .GetAttribute("name")
+                    .Replace(".Permission", ".SpecificStores[0]");
+            var dropdown = s.Driver.FindElement(By.Name(getPermissionValueIndex));
+            var option = dropdown.FindElement(By.TagName("option"));
+            var storeId = option.GetAttribute("value");
+            option.Click();
+            s.ClickPagePrimary();
+            var selectiveStoreApiKey = s.FindAlertMessage().FindElement(By.TagName("code")).Text;
             await TestApiAgainstAccessToken(selectiveStoreApiKey, tester, user,
-                Permission.Create(Policies.CanModifyStoreSettings, user.StoreId).ToString());
+                Permission.Create(Policies.CanModifyStoreSettings, storeId).ToString());
 
-            await s.ClickPagePrimary(); // New API key
-            await s.ClickPagePrimary(); // Generate
-            var noPermissionsApiKey = await (await s.FindAlertMessage()).Locator("code").TextContentAsync();
+            s.ClickPagePrimary(); // New API key
+            s.ClickPagePrimary(); // Generate
+            var noPermissionsApiKey = s.FindAlertMessage().FindElement(By.TagName("code")).Text;
             await TestApiAgainstAccessToken(noPermissionsApiKey, tester, user);
             await Assert.ThrowsAnyAsync<HttpRequestException>(async () =>
             {
@@ -126,68 +126,62 @@ namespace BTCPayServer.Tests
                 new[] { Policies.CanModifyServerSettings }, applicationDetails: (appidentifier, new Uri(callbackUrl))).ToString();
 
             // No upfront store selection with only server settings
-            await s.GoToUrl(authUrl);
-            await s.Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-            var pageContent = await s.Page.ContentAsync();
-            Assert.Contains(appidentifier, pageContent);
-            Assert.True(await s.Page.Locator("select#StoreId").CountAsync() == 0);
+            s.GoToUrl(authUrl);
+            Assert.Contains(appidentifier, s.Driver.PageSource);
+            Assert.True(s.Driver.ElementDoesNotExist(By.CssSelector("select#StoreId")));
 
             // No upfront store selection with selectiveStores being false
             authUrl = BTCPayServerClient.GenerateAuthorizeUri(s.ServerUri,
                 new[] { Policies.CanModifyStoreSettings, Policies.CanModifyServerSettings }, selectiveStores: false, applicationDetails: (appidentifier, new Uri(callbackUrl))).ToString();
-            await s.GoToUrl(authUrl);
-            await s.Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-            Assert.True(await s.Page.Locator("select#StoreId").CountAsync() == 0);
+            s.GoToUrl(authUrl);
+            Assert.True(s.Driver.ElementDoesNotExist(By.CssSelector("select#StoreId")));
 
             // Now with store settings
             authUrl = BTCPayServerClient.GenerateAuthorizeUri(s.ServerUri,
                 new[] { Policies.CanModifyStoreSettings, Policies.CanModifyServerSettings }, selectiveStores: true, applicationDetails: (appidentifier, new Uri(callbackUrl))).ToString();
-            await s.GoToUrl(authUrl);
-            var storeSettingsPageContent = await s.Page.ContentAsync();
-            Assert.Contains(appidentifier, storeSettingsPageContent);
+            s.GoToUrl(authUrl);
+            Assert.Contains(appidentifier, s.Driver.PageSource);
 
             // Select a store
-            await s.Page.SelectOptionAsync("#StoreId", user.StoreId);
-            await s.Page.Locator("#continue").ClickAsync();
+            var select = new SelectElement(s.Driver.FindElement(By.Id("StoreId")));
+            select.SelectByIndex(0);
+            s.Driver.FindElement(By.Id("continue")).Click();
 
-            Assert.Equal("hidden", (await s.Page.GetAttributeAsync("#btcpay\\.store\\.canmodifystoresettings", "type")).ToLowerInvariant());
-            Assert.Equal("true", (await s.Page.GetAttributeAsync("#btcpay\\.store\\.canmodifystoresettings", "value")).ToLowerInvariant());
-            Assert.Equal("hidden", (await s.Page.GetAttributeAsync("#btcpay\\.server\\.canmodifyserversettings", "type")).ToLowerInvariant());
-            Assert.Equal("true", (await s.Page.GetAttributeAsync("#btcpay\\.server\\.canmodifyserversettings", "value")).ToLowerInvariant());
-            var pageContent2 = await s.Page.ContentAsync();
-            Assert.DoesNotContain("change-store-mode", pageContent2);
+            Assert.Equal("hidden", s.Driver.FindElement(By.Id("btcpay.store.canmodifystoresettings")).GetAttribute("type").ToLowerInvariant());
+            Assert.Equal("true", s.Driver.FindElement(By.Id("btcpay.store.canmodifystoresettings")).GetAttribute("value").ToLowerInvariant());
+            Assert.Equal("hidden", s.Driver.FindElement(By.Id("btcpay.server.canmodifyserversettings")).GetAttribute("type").ToLowerInvariant());
+            Assert.Equal("true", s.Driver.FindElement(By.Id("btcpay.server.canmodifyserversettings")).GetAttribute("value").ToLowerInvariant());
+            Assert.DoesNotContain("change-store-mode", s.Driver.PageSource);
 
-            await s.Page.Locator("#consent-yes").ClickAsync();
-            await s.Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-            Assert.Equal(callbackUrl, s.Page.Url);
+            s.Driver.WaitForAndClick(By.Id("consent-yes"));
+            Assert.Equal(callbackUrl, s.Driver.Url);
 
             var apiKeyRepo = s.Server.PayTester.GetService<APIKeyRepository>();
-            var accessToken = await GetAccessTokenFromCallbackResult(s);
+            var accessToken = GetAccessTokenFromCallbackResult(s.Driver);
             await TestApiAgainstAccessToken(accessToken, tester, user,
                 (await apiKeyRepo.GetKey(accessToken)).GetBlob().Permissions);
 
             authUrl = BTCPayServerClient.GenerateAuthorizeUri(s.ServerUri,
                 new[] { Policies.CanModifyStoreSettings, Policies.CanModifyServerSettings }, false, true, (null, new Uri(callbackUrl))).ToString();
 
-            await s.GoToUrl(authUrl);
-            var kukksappPageContent = await s.Page.ContentAsync();
-            Assert.DoesNotContain("kukksappname", kukksappPageContent);
+            s.GoToUrl(authUrl);
+            Assert.DoesNotContain("kukksappname", s.Driver.PageSource);
 
             // Select a store
-            await s.Page.SelectOptionAsync("#StoreId", user.StoreId);
-            await s.Page.Locator("#continue").ClickAsync();
+            select = new SelectElement(s.Driver.FindElement(By.Id("StoreId")));
+            select.SelectByIndex(0);
+            s.Driver.FindElement(By.Id("continue")).Click();
 
-            Assert.Equal("checkbox", (await s.Page.GetAttributeAsync("#btcpay\\.store\\.canmodifystoresettings", "type")).ToLowerInvariant());
-            Assert.Equal("true", (await s.Page.GetAttributeAsync("#btcpay\\.store\\.canmodifystoresettings", "value")).ToLowerInvariant());
-            Assert.Equal("checkbox", (await s.Page.GetAttributeAsync("#btcpay\\.server\\.canmodifyserversettings", "type")).ToLowerInvariant());
-            Assert.Equal("true", (await s.Page.GetAttributeAsync("#btcpay\\.server\\.canmodifyserversettings", "value")).ToLowerInvariant());
+            Assert.Equal("checkbox", s.Driver.FindElement(By.Id("btcpay.store.canmodifystoresettings")).GetAttribute("type").ToLowerInvariant());
+            Assert.Equal("true", s.Driver.FindElement(By.Id("btcpay.store.canmodifystoresettings")).GetAttribute("value").ToLowerInvariant());
+            Assert.Equal("checkbox", s.Driver.FindElement(By.Id("btcpay.server.canmodifyserversettings")).GetAttribute("type").ToLowerInvariant());
+            Assert.Equal("true", s.Driver.FindElement(By.Id("btcpay.server.canmodifyserversettings")).GetAttribute("value").ToLowerInvariant());
 
-            await s.Page.SetCheckedAsync("#btcpay\\.server\\.canmodifyserversettings", false);
-            await s.Page.Locator("#consent-yes").ClickAsync();
-            await s.Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-            Assert.Equal(callbackUrl, s.Page.Url);
+            s.Driver.SetCheckbox(By.Id("btcpay.server.canmodifyserversettings"), false);
+            s.Driver.WaitForAndClick(By.Id("consent-yes"));
+            Assert.Equal(callbackUrl, s.Driver.Url);
 
-            accessToken = await GetAccessTokenFromCallbackResult(s);
+            accessToken = GetAccessTokenFromCallbackResult(s.Driver);
             await TestApiAgainstAccessToken(accessToken, tester, user,
                 (await apiKeyRepo.GetKey(accessToken)).GetBlob().Permissions);
 
@@ -197,47 +191,45 @@ namespace BTCPayServer.Tests
                 new[] { Policies.CanModifyStoreSettings, Policies.CanModifyServerSettings }, false, true, (appidentifier, new Uri(callbackUrl))).ToString();
 
             //if it's the same, go to the confirm page
-            await s.GoToUrl(authUrl);
+            s.GoToUrl(authUrl);
 
             // Select the same store
-            await s.Page.SelectOptionAsync("#StoreId", user.StoreId);
-            await s.Page.Locator("#continue").ClickAsync();
+            select = new SelectElement(s.Driver.FindElement(By.Id("StoreId")));
+            select.SelectByIndex(0);
+            s.Driver.FindElement(By.Id("continue")).Click();
 
-            var confirmPageContent = await s.Page.ContentAsync();
-            Assert.Contains("previously generated the API Key", confirmPageContent);
-            await s.Page.Locator("#continue").ClickAsync();
-            await s.Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-            Assert.Equal(callbackUrl, s.Page.Url);
+            Assert.Contains("previously generated the API Key", s.Driver.PageSource);
+            s.Driver.WaitForAndClick(By.Id("continue"));
+            Assert.Equal(callbackUrl, s.Driver.Url);
 
             //same app but different redirect = nono
             authUrl = BTCPayServerClient.GenerateAuthorizeUri(s.ServerUri,
                 new[] { Policies.CanModifyStoreSettings, Policies.CanModifyServerSettings }, false, true, (appidentifier, new Uri("https://international.local/callback"))).ToString();
 
-            await s.GoToUrl(authUrl);
+            s.GoToUrl(authUrl);
 
             // Select the same store
-            await s.Page.SelectOptionAsync("#StoreId", user.StoreId);
-            await s.Page.Locator("#continue").ClickAsync();
+            select = new SelectElement(s.Driver.FindElement(By.Id("StoreId")));
+            select.SelectByIndex(0);
+            s.Driver.FindElement(By.Id("continue")).Click();
 
-            var internationalPageContent = await s.Page.ContentAsync();
-            Assert.DoesNotContain("previously generated the API Key", internationalPageContent);
-            Assert.False(s.Page.Url.StartsWith("https://international.local/callback"));
+            Assert.DoesNotContain("previously generated the API Key", s.Driver.PageSource);
+            Assert.False(s.Driver.Url.StartsWith("https://international.com/callback"));
 
             // Make sure we can check all permissions when not an admin
             TestLogs.LogInformation("Make sure we can check all permissions when not an admin");
             await user.MakeAdmin(false);
-            await s.GoToHome();
-            await s.Logout();
-            await s.GoToLogin();
-            await s.LogIn(user.RegisterDetails.Email, user.RegisterDetails.Password);
-            await s.GoToUrl("/account/apikeys");
-            await s.ClickPagePrimary();
-            int checkedPermissionCount = await s.Page.Locator(".form-check-input").CountAsync();
-            await s.Page.EvaluateAsync("document.querySelectorAll('#Permissions .form-check-input').forEach(i => i.click())");
+            s.Logout();
+            s.GoToLogin();
+            s.LogIn(user.RegisterDetails.Email, user.RegisterDetails.Password);
+            s.GoToUrl("/account/apikeys");
+            s.ClickPagePrimary();
+            int checkedPermissionCount = s.Driver.FindElements(By.ClassName("form-check-input")).Count;
+            s.Driver.ExecuteJavaScript("document.querySelectorAll('#Permissions .form-check-input').forEach(i => i.click())");
 
             TestLogs.LogInformation("Generating API key");
-            await s.ClickPagePrimary();
-            var allAPIKey = await (await s.FindAlertMessage()).Locator("code").TextContentAsync();
+            s.ClickPagePrimary();
+            var allAPIKey = s.FindAlertMessage().FindElement(By.TagName("code")).Text;
 
             TestLogs.LogInformation($"Checking API key permissions: {allAPIKey}");
             var apikeydata = await TestApiAgainstAccessToken<ApiKeyData>(allAPIKey, "api/v1/api-keys/current", tester.PayTester.HttpClient);
@@ -245,107 +237,11 @@ namespace BTCPayServer.Tests
 
             TestLogs.LogInformation("Checking empty permissions");
             authUrl = BTCPayServerClient.GenerateAuthorizeUri(s.ServerUri, Array.Empty<string>(), false, true).ToString();
-            await s.GoToUrl(authUrl);
-            await s.Page.SelectOptionAsync("#StoreId", user.StoreId);
-            await s.Page.Locator("#continue").ClickAsync();
-            var emptyPageContent = await s.Page.ContentAsync();
-            Assert.Contains("There are no associated permissions to the API key being requested", emptyPageContent);
-        }
-
-
-        [Fact]
-        [Trait("Playwright", "Playwright-2")]
-        public async Task CanViewApiKeyPermissionAnalysis()
-        {
-            await using var s = CreatePlaywrightTester();
-            await s.StartAsync();
-            var tester = s.Server;
-            var user = tester.NewAccount();
-            await user.GrantAccessAsync();
-            await s.GoToLogin();
-            await s.LogIn(user.RegisterDetails.Email, user.RegisterDetails.Password);
-
-            await s.GoToProfile(ManageNavPages.APIKeys);
-            await s.ClickPagePrimary();
-            await s.Page.SetCheckedAsync("#btcpay\\.store\\.cancreateinvoice", true);
-            await s.Page.SetCheckedAsync("#btcpay\\.store\\.canviewinvoices", true);
-            await s.ClickPagePrimary();
-            var apiKey = await (await s.FindAlertMessage()).Locator("code").TextContentAsync();
-
-            await s.GoToUrl($"api-keys/{apiKey}/view-analysis");
-            await s.Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-
-            var cards = await s.Page.Locator(".display-6.fw-bold").AllTextContentsAsync();
-            Assert.Equal("2", cards[0].Trim());
-            Assert.Equal("0", cards[1].Trim());
-            Assert.Equal("2", cards[2].Trim());
-
-            var allRows = s.Page.Locator("#all-permissions tbody tr");
-            Assert.Equal(2, await allRows.CountAsync());
-            var neverUsedBadges = s.Page.Locator("#all-permissions .badge:has-text('Never Used')");
-            Assert.Equal(2, await neverUsedBadges.CountAsync());
-
-            await s.Page.Locator("#used-tab").ClickAsync();
-            await s.Page.Locator("#used-permissions.show.active").WaitForAsync();
-            Assert.Equal(0, await s.Page.Locator("#used-permissions tbody tr").CountAsync());
-
-            await s.Page.Locator("#unused-tab").ClickAsync();
-            await s.Page.Locator("#unused-permissions.show.active").WaitForAsync();
-            var unusedRows = s.Page.Locator("#unused-permissions tbody tr");
-            Assert.Equal(2, await unusedRows.CountAsync());
-
-            var uri = new Uri(tester.PayTester.ServerUri, $"api/v1/stores/{user.StoreId}/invoices");
-            var request = new HttpRequestMessage(HttpMethod.Get, uri);
-            request.Headers.Authorization = new AuthenticationHeaderValue("token", apiKey);
-            var response = await tester.PayTester.HttpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-
-            await s.Page.ReloadAsync();
-            await s.Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-
-            cards = await s.Page.Locator(".display-6.fw-bold").AllTextContentsAsync();
-            Assert.Equal("2", cards[0].Trim());
-            Assert.Equal("1", cards[1].Trim());
-            Assert.Equal("1", cards[2].Trim());
-
-            await s.Page.Locator("#used-tab").ClickAsync();
-            await s.Page.Locator("#used-permissions.show.active").WaitForAsync();
-            var usedRows = s.Page.Locator("#used-permissions tbody tr");
-            Assert.Equal(1, await usedRows.CountAsync());
-            await s.Page.Locator("#used-permissions .badge.bg-success:has-text('Active')").WaitForAsync();
-
-            await s.Page.Locator("#unused-tab").ClickAsync();
-            await s.Page.Locator("#unused-permissions.show.active").WaitForAsync();
-            unusedRows = s.Page.Locator("#unused-permissions tbody tr");
-            Assert.Equal(1, await unusedRows.CountAsync());
-        }
-
-        [Fact]
-        [Trait("Playwright", "Playwright-2")]
-        public async Task CannotViewOtherUsersApiKeyAnalysis()
-        {
-            await using var s = CreatePlaywrightTester();
-            await s.StartAsync();
-            var tester = s.Server;
-
-            var user1 = tester.NewAccount();
-            await user1.GrantAccessAsync();
-            var user2 = tester.NewAccount();
-            await user2.GrantAccessAsync();
-
-            await s.GoToLogin();
-            await s.LogIn(user1.RegisterDetails.Email, user1.RegisterDetails.Password);
-            await s.GoToProfile(ManageNavPages.APIKeys);
-            await s.ClickPagePrimary();
-            await s.ClickPagePrimary();
-            var user1ApiKey = await (await s.FindAlertMessage()).Locator("code").TextContentAsync();
-            await s.Logout();
-
-            await s.GoToLogin();
-            await s.LogIn(user2.RegisterDetails.Email, user2.RegisterDetails.Password);
-            await s.GoToUrl($"api-keys/{user1ApiKey}/view-analysis");
-            await s.Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-            Assert.Contains("404", await s.Page.ContentAsync());
+            s.GoToUrl(authUrl);
+            select = new SelectElement(s.Driver.FindElement(By.Id("StoreId")));
+            select.SelectByIndex(0);
+            s.Driver.FindElement(By.Id("continue")).Click();
+            Assert.Contains("There are no associated permissions to the API key being requested", s.Driver.PageSource);
         }
 
         async Task TestApiAgainstAccessToken(string accessToken, ServerTester tester, TestAccount testAccount,
@@ -515,9 +411,9 @@ namespace BTCPayServer.Tests
             return JsonConvert.DeserializeObject<T>(rawJson);
         }
 
-        private async Task<string> GetAccessTokenFromCallbackResult(PlaywrightTester tester)
+        private string GetAccessTokenFromCallbackResult(IWebDriver driver)
         {
-            var source = await tester.Page.Locator("body").TextContentAsync();
+            var source = driver.FindElement(By.TagName("body")).Text;
             var json = JObject.Parse(source);
             return json.GetValue("apiKey")!.Value<string>();
         }

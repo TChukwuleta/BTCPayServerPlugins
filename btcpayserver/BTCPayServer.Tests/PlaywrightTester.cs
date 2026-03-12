@@ -16,7 +16,6 @@ using BTCPayServer.Views.Stores;
 using BTCPayServer.Views.Wallets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Playwright;
-using static Microsoft.Playwright.Assertions;
 using NBitcoin;
 using NBitcoin.RPC;
 using Xunit;
@@ -514,18 +513,6 @@ namespace BTCPayServer.Tests
             await Page.Locator("#page-primary").ClickAsync();
         }
 
-        public async Task AddStoreLabelAsync(ILocator row, string label)
-        {
-            var labelInput = row.Locator(".ts-control input");
-            await labelInput.WaitForAsync();
-            await labelInput.FillAsync(label);
-            var resp = await Page.RunAndWaitForResponseAsync(
-                () => labelInput.PressAsync("Enter"),
-                r => r.Request.Method == "POST" &&
-                     r.Url.Contains("/update-labels", StringComparison.OrdinalIgnoreCase));
-            Assert.True(resp.Ok, $"update-labels returned {resp.Status}");
-        }
-
         public async Task GoToWalletSettings(string cryptoCode = "BTC")
         {
             await Page.GetByTestId("Wallet-" + cryptoCode).Locator("a").ClickAsync();
@@ -645,7 +632,7 @@ namespace BTCPayServer.Tests
             return (name, appId);
         }
 
-        public async Task PayInvoice(bool mine = false, decimal? amount = null, bool clickRedirect = false, bool clickReceipt = false)
+        public async Task PayInvoice(bool mine = false, decimal? amount = null, bool clickRedirect = false)
         {
             if (amount is not null)
             {
@@ -658,22 +645,17 @@ namespace BTCPayServer.Tests
             {
                 await MineBlockOnInvoiceCheckout();
             }
+
             if (amount is null)
                 await Page.Locator("xpath=//*[text()=\"Invoice Paid\" or text()=\"Payment Received\"]").WaitForAsync();
             else
-                await Page.Locator("xpath=//*[text()=\"Invoice Paid\" or text()=\"Payment Received\" or text()=\"The invoice hasn't been paid in full.\"]").WaitForAsync();
+                await Page.Locator("xpath=//*[text()=\"Invoice Paid\" or text()=\"Payment Received\" or text()=\"The invoice hasn't been paid in full.\"]")
+                    .WaitForAsync();
             if (clickRedirect)
             {
-                await ClickCheckoutRedirect();
-            }
-            if (clickReceipt)
-            {
-                await Page.Locator("#ReceiptLink").WaitForAsync();
-                await Page.ClickAsync("#ReceiptLink");
+                await Page.ClickAsync("#StoreLink");
             }
         }
-
-        public Task ClickCheckoutRedirect() => Page.ClickAsync("#StoreLink");
 
         /// <summary>
         /// Take a screenshot. If running in CI, it is uploaded in the artifacts (see https://github.com/btcpayserver/btcpayserver/pull/6794)
@@ -707,14 +689,6 @@ namespace BTCPayServer.Tests
                     await newPage.CloseAsync();
                 tester.Page = oldPage;
             }
-        }
-
-        public async Task<IAsyncDisposable> SwitchPage(Func<Task> pageOpeningAction, bool closeAfter = true)
-        {
-            var o = Page.Context.WaitForPageAsync();
-            await pageOpeningAction();
-            await o;
-            return await SwitchPage(o, closeAfter);
         }
 
         public async Task<IAsyncDisposable> SwitchPage(Task<IPage> page, bool closeAfter = true)
@@ -912,31 +886,5 @@ namespace BTCPayServer.Tests
             link = System.Net.WebUtility.HtmlDecode(link);
             await GoToUrl(link);
         }
-
-        public async Task SelectStoreContext(string storeId)
-        {
-            await Page.ClickAsync("#StoreSelectorToggle");
-            await Page.ClickAsync($"#StoreSelectorMenuItem-{storeId}");
-        }
-
-        public async Task FillAlertDialog(string text, Func<Task> openDialog)
-        {
-            // Handle the alert dialog in Playwright
-            // ReSharper disable once AsyncVoidMethod
-            async void Callback(object? sender, IDialog e)
-                => await e.AcceptAsync(text);
-            Page.Dialog += Callback;
-            try
-            {
-                await openDialog();
-            }
-            finally
-            {
-                Page.Dialog -= Callback;
-            }
-        }
-
-        public Task ElementDoesNotExist(string selector)
-            => Expect(Page.Locator(selector)).ToHaveCountAsync(0);
     }
 }

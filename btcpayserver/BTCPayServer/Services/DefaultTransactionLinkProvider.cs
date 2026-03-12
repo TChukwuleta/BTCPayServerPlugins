@@ -1,4 +1,5 @@
 #nullable enable
+using NBitcoin;
 using System.Globalization;
 using System.Linq;
 

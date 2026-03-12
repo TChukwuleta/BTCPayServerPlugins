@@ -1,3 +1,4 @@
+using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -31,9 +32,7 @@ namespace BTCPayServer.ModelBinders
 
             var networkProvider = (BTCPayNetworkProvider)bindingContext.HttpContext.RequestServices.GetService(typeof(BTCPayNetworkProvider));
             var cryptoCode = bindingContext.ValueProvider.GetValue("cryptoCode").FirstValue;
-            var network = networkProvider?.GetNetwork<BTCPayNetwork>(cryptoCode ?? networkProvider.DefaultCryptoCode);
-            if (network == null)
-                return Task.CompletedTask;
+            var network = networkProvider.GetNetwork<BTCPayNetwork>(cryptoCode ?? networkProvider.DefaultNetwork.CryptoCode);
             try
             {
                 var data = network.NBXplorerNetwork.DerivationStrategyFactory.Parse(key);

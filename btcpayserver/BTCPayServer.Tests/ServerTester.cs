@@ -5,20 +5,23 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using BTCPayServer.Hosting;
 using BTCPayServer.Lightning;
 using BTCPayServer.Lightning.CLightning;
 using BTCPayServer.Payments.Lightning;
 using BTCPayServer.Tests.Lnd;
 using BTCPayServer.Tests.Logging;
+using Microsoft.Extensions.Configuration.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NBitcoin;
 using NBitcoin.RPC;
 using NBitpayClient;
 using NBXplorer;
+using BTCPayServer.Abstractions.Contracts;
+using System.Diagnostics.Metrics;
 using System.Threading;
 using BTCPayServer.Events;
-using BTCPayServer.Hosting;
-using BTCPayServer.Services;
 
 namespace BTCPayServer.Tests
 {
@@ -79,14 +82,18 @@ namespace BTCPayServer.Tests
             PayTester.SocksEndpoint = GetEnvironment("TESTS_SOCKSENDPOINT", "localhost:9050");
         }
 
-        public async Task RestartMigration()
+        public string Scope { get; set; }
+
+        public void ActivateLangs()
         {
-            var settings = PayTester.GetService<SettingsRepository>();
-            await settings.UpdateSetting<MigrationSettings>(new MigrationSettings());
-            await PayTester.RestartStartupTask<MigrationStartupTask>();
+            TestLogs.LogInformation("Activating Langs...");
+            var dir = TestUtils.GetTestDataFullPath("Langs");
+            var langdir = Path.Combine(PayTester._Directory, "Langs");
+            Directory.CreateDirectory(langdir);
+            foreach (var file in Directory.GetFiles(dir))
+                File.Copy(file, Path.Combine(langdir, Path.GetFileName(file)));
         }
 
-        public string Scope { get; set; }
 
         public void ActivateLTC()
         {

@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using NBitcoin;
+using NBXplorer;
 using NBXplorer.DerivationStrategy;
 using Newtonsoft.Json.Linq;
 using StoreData = BTCPayServer.Data.StoreData;

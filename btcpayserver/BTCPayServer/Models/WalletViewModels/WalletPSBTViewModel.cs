@@ -36,8 +36,7 @@ namespace BTCPayServer.Models.WalletViewModels
         public IFormFile UploadedPSBTFile { get; set; }
 
 
-        #nullable enable
-        public async Task<PSBT?> GetPSBT(Network? network, ModelStateDictionary modelState)
+        public async Task<PSBT> GetPSBT(Network network, ModelStateDictionary modelState)
         {
             var psbt = await GetPSBTCore(network, modelState);
             if (psbt != null)
@@ -54,7 +53,7 @@ namespace BTCPayServer.Models.WalletViewModels
         }
         public bool InvalidPSBT { get; set; }
 
-        async Task<PSBT?> GetPSBTCore(Network? network, ModelStateDictionary modelState)
+        async Task<PSBT> GetPSBTCore(Network network, ModelStateDictionary modelState)
         {
             if (UploadedPSBTFile != null)
             {
@@ -68,8 +67,6 @@ namespace BTCPayServer.Models.WalletViewModels
                     {
                         await stream.ReadAsync(bytes, 0, (int)UploadedPSBTFile.Length);
                     }
-                    if (network is null)
-                        return null;
                     return NBitcoin.PSBT.Load(bytes, network);
                 }
                 catch (Exception ex)
@@ -92,8 +89,6 @@ namespace BTCPayServer.Models.WalletViewModels
                 try
                 {
                     InvalidPSBT = false;
-                    if (network is null)
-                        return null;
                     return NBitcoin.PSBT.Parse(PSBT, network);
                 }
                 catch (Exception ex) when (!InvalidPSBT)

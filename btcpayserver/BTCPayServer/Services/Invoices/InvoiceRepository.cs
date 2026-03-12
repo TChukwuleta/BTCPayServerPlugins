@@ -10,6 +10,7 @@ using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
 using BTCPayServer.Events;
 using BTCPayServer.Logging;
+using BTCPayServer.Models.InvoicingModels;
 using BTCPayServer.Payments;
 using Dapper;
 using Microsoft.EntityFrameworkCore;

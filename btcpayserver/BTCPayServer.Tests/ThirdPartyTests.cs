@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Controllers;
 using BTCPayServer.Data;
+using BTCPayServer.HostedServices;
 using BTCPayServer.Hosting;
 using BTCPayServer.Models.StoreViewModels;
 using BTCPayServer.Models.WalletViewModels;
@@ -19,13 +20,16 @@ using BTCPayServer.Storage.Models;
 using BTCPayServer.Storage.Services.Providers.AzureBlobStorage.Configuration;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileSystemGlobbing;
 using NBitcoin;
 using NBitpayClient;
 using Newtonsoft.Json;
 using Xunit;
 using Xunit.Abstractions;
 using Xunit.Sdk;
+using static BTCPayServer.HostedServices.PullPaymentHostedService.PayoutApproval;
 
 namespace BTCPayServer.Tests
 {
@@ -137,7 +141,8 @@ namespace BTCPayServer.Tests
                 .Select(s => s.Id).ToHashSet();
             var providerList = factory
                 .Providers
-                .Where(p => p.Value is BackgroundFetcherRateProvider)
+                .Where(p => p.Value is BackgroundFetcherRateProvider bf &&
+                            !(bf.Inner is CoinGeckoRateProvider cg && cg.UnderlyingExchange != null))
                 .Select(p => (ExpectedName: p.Key, ResultAsync: p.Value.GetRatesAsync(default),
                     Fetcher: (BackgroundFetcherRateProvider)p.Value))
                 .ToList();
@@ -289,7 +294,6 @@ namespace BTCPayServer.Tests
 
             var urlBlacklist = new string[]
             {
-                "https://zaphq.io", // Returns forbidden over test. Opening on tab, it redirects to strike
                 "https://www.btse.com", // not allowing to be hit from circleci
                 "https://www.bitpay.com", // not allowing to be hit from circleci
                 "https://support.bitpay.com",
@@ -617,6 +621,7 @@ retry:
             await user.GrantAccessAsync();
             user.RegisterDerivationScheme("BTC");
             List<decimal> rates = new List<decimal>();
+            rates.Add(await CreateInvoice(tester, user, "coingecko"));
             var bitflyer = await CreateInvoice(tester, user, "bitflyer", "JPY");
             var bitflyer2 = await CreateInvoice(tester, user, "bitflyer", "JPY");
             Assert.Equal(bitflyer, bitflyer2); // Should be equal because cache
@@ -632,9 +637,9 @@ retry:
             string currency = "USD")
         {
             var storeController = user.GetController<UIStoresController>();
-            var vm = await storeController.Rates().AssertViewModelAsync<RatesViewModel>();
+            var vm = (RatesViewModel)((ViewResult)await storeController.Rates()).Model;
             vm.PrimarySource.PreferredExchange = exchange;
-            await storeController.Rates(vm,vm.StoreId);
+            await storeController.Rates(vm);
             var invoice2 = await user.BitPay.CreateInvoiceAsync(
                 new Invoice()
                 {

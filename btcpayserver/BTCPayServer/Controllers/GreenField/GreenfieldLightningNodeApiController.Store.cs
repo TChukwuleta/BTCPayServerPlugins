@@ -55,7 +55,7 @@ namespace BTCPayServer.Controllers.Greenfield
         {
             return base.GetBalance(cryptoCode, cancellationToken);
         }
-
+        
         [Authorize(Policy = Policies.CanUseLightningNodeInStore, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
         [HttpGet("~/api/v1/stores/{storeId}/lightning/{cryptoCode}/histogram")]
         public override Task<IActionResult> GetHistogram(string cryptoCode, [FromQuery] HistogramType? type = null, CancellationToken cancellationToken = default)
@@ -153,6 +153,11 @@ namespace BTCPayServer.Controllers.Greenfield
             }
             var network = handler.Network;
             var store = HttpContext.GetStoreData();
+            if (store == null)
+            {
+                throw new JsonHttpException(StoreNotFound());
+            }
+
             var id = PaymentTypes.LN.GetPaymentMethodId(cryptoCode);
             var existing = store.GetPaymentMethodConfig<LightningPaymentMethodConfig>(id, _handlers);
             if (existing == null)
@@ -172,6 +177,11 @@ namespace BTCPayServer.Controllers.Greenfield
                 return Task.FromResult(internalLightningNode);
             }
             throw ErrorLightningNodeNotConfiguredForStore();
+        }
+
+        private IActionResult StoreNotFound()
+        {
+            return this.CreateAPIError(404, "store-not-found", "The store was not found");
         }
     }
 }

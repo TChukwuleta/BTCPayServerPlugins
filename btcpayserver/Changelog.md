@@ -1,86 +1,5 @@
 # Changelog
 
-## 2.3.5
-
-### New Features
-
-* Allow BTCPay Server to start without any on-chain payment methods with `BTCPAY_NODEFAULTCHAIN` (#7180) @NicolasDorier
-* Add custom textbox for checkout (#7182) @pavlenex
-* Add CoinDCX rate provider for BTC/INR rates (#7173) @Abhijay007
-* Add Desiboard rate provider for BTC/USD and BTC/INR rates (#7169) @Abhijay007
-* Dashboard: Support multi-crypto wallet balance widgets (#7110) @Sup3rlativ3
-* Ability to update a previously downloaded language pack (#7185) @Abhijay007
-
-### Fixes
-
-* Fix: Images in Point of Sale Cart doesn't show on mobile (#7190) @NicolasDorier
-* Fix: Payments getting undetected on LND when the node restarted (#7176) @rockstardev
-* Fix: Do not show claim button in pull payments if it is archived (#7154 #7167) @NicolasDorier
-* Fix: Unable to edit roles when navigating from store level to Roles (#7157) @rockstardev
-
-### Improvements
-
-* Throttle Greenfield API calls with Basic auth (#7177) @NicolasDorier
-* Added missing translations strings for various files (#6897) @Abhijay007
-
-## 2.3.4
-
-### New Features
-
-* Set LUNO as the default exchange for ZAR currency @NicolasDorier
-* Add a `deliveryTime` property to webhook deliveries in the API and UI (#7140) @NicolasDorier
-* Add subscriber's metadata to email placeholders (#7150) @NicolasDorier
-
-### Fixes
-
-* Fix: Deleting webhooks could time out (#7151) @NicolasDorier
-* Fix: Offering and Customer metadata email placeholders couldn't be used (#7150) @NicolasDorier
-* Subscribers with enough credits were receiving payment reminder emails and not being automatically renewed (#7108) @NicolasDorier
-* Fix scan-qrcode icon alignment (#7116) @Psycarlo
-* Public node info page no longer lists local network IPs (#7131 #7028) @NicolasDorier
-* Forms with an optional empty email field can now be submitted (#7117 #7134) @NicolasDorier
-* Keypad POS now displays “Any amount” items correctly (#6697 #7137) @NicolasDorier
-* `CanModifyInvoices` permission now includes viewing Lightning invoices for the store (#6867 #7138) @NicolasDorier
-* Certain HTTP status codes no longer cause webhooks to be retried (#3146 #7139) @NicolasDorier
-
-### Miscellaneous
-
-* Test suite migrated from Selenium to Playwright @Abhijay007
-* Add docs for subscriptions webhooks (#7149 #7152) @NicolasDorier
-
-## 2.3.3
-
-CoinGecko's API now mandates the use of an API Key for accessing rates.
-Consequently, we've decided to discontinue support of CoinGecko-based rate sources.
-For those who relied on CoinGecko, invoice creation will now fail, and you must choose an alternative rate provider.
-
-In some circumstances, we were using CoinGecko rate providers to calculate the exchange rate (for example, for `LTC`).
-
-### New features
-
-* Cold wallet transaction support via Greenfield API (#7068) @Aeroverra
-* Add Norwegian lang in the available language packs (https://github.com/btcpayserver/btcpayserver-translator/pull/12) @schjonhaug
-
-### Bug fixes
-
-* Fix: It shouldn't be possible to create an invoice when all store users are disabled (#7100) @NicolasDorier
-* Fix: Remove CoinGecko and any rate source provided by them (#7096) @NicolasDorier
-* Fix: Change the default rate source for LTC conversion from CoinGecko to Kraken. (#7096) @NicolasDorier
-* Fix: In monetization, it was impossible to recreate a user with email of a previously deleted user (#7097 #7082) @NicolasDorier
-* Fix: Backend translations would sometimes fail to load during startup (#7083) @NicolasDorier
-* Fix: Subs plan checkout always showed 'per month' (#7080) @NicolasDorier
-* Fix: Editing a plan subscription set the Currency back to USD (#7079) @NicolasDorier
-* Fix: `Disable zero amount invoices` in PoS doesn't show when Keypad mode is selected (#7071) @NicolasDorier
-* Fix: Adding labels payment requests would sometimes not work as expected (#7087) @thgO-O
-* Fix: PSBT Scan via Camera was not closing the modal dialog when signing a multisig transaction (#6925 #7089) @NicolasDorier
-* Fix: Selecting some rate source would crash the Stores/Rates page (#7095) @NicolasDorier
-
-### Miscellaneous
-
-* Include UI extension point for pos (#7073) @TChukwuleta
-* CI: Make sure release commits are properly signed (#7077 #7069) @Abhijay007
-* CI: Make sure the list of language packs available in the UI reflect the [translation repository](https://github.com/btcpayserver/btcpayserver-translator). @Abhijay007
-
 ## 2.3.2
 
 This release fixes an important regression from `2.3.1` affecting support for payment methods other than BTC and Lightning.
@@ -630,14 +549,14 @@ If you are using Boltcards, we advise you to update to this release.
 
 ### Bug fixes
 
-* LNUrl payouts failing due to amount restriction wouldn't be immediately canceled (#6061) @Kukks
+* LNUrl payouts failing due to amount restriction wouldn't be immediately cancelled (#6061) @Kukks
 * Fix row ordering and display issues in reporting (#6065 #6087, 597e2b0e) @NicolasDorier @dennisreimann
 * Parse Timespan strings in the API properly (#6012) @dennisreimann
-* "Return to Store" link in the invoice receipt should return to the redirectUrl (#6079) @dennisreimann
+* "Return to Store" link in invoice receipt should return to the redirectUrl (#6079) @dennisreimann
 * Fix crash caused by custom explorer links in some conditions (#6077 #6078) @dennisreimann
 * Fix: Can't save email settings on store level (#6076 #6080) @dennisreimann
 * Reports: Fix dropdown z-index @dennisreimann
-* Shopify: Properly cancel an order when BTCPay invoice expires and restock the inventory (#6104 #6107 #6108) @NicolasDorier
+* Shopify: Properly cancel an order when BTCPay invoice expires, and restock the inventory (#6104 #6107 #6108) @NicolasDorier
 * Shopify: Generate BTCPay invoice as soon as the payment page in shopify opens (#6105) @NicolasDorier
 
 ### Improvements
@@ -651,7 +570,7 @@ If you are using Boltcards, we advise you to update to this release.
 
 ### Bug fixes
 
-* Fix a potential crash on the receipt print page (#6045) @dennisreimann
+* Fix potential crash on receipt print page (#6045) @dennisreimann
 * Fix invoice paid for topping up a pull payment didn't top up. @NicolasDorier
 * Pull payment: Enable CORS for LNURL request (#6044) @dennisreimann
 

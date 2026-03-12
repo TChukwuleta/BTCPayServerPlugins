@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BTCPayServer.Client.Models;
 using BTCPayServer.JsonConverters;
 using BTCPayServer.Payments;
 using Newtonsoft.Json;
@@ -63,7 +64,6 @@ namespace BTCPayServer.Models.InvoicingModels
         public int TxCountForFee { get; set; }
         public string Paid { get; set; }
         public string StoreSupportUrl { get; set; }
-        public string CheckoutText { get; set; }
 
         public string OrderId { get; set; }
         public decimal NetworkFee { get; set; }

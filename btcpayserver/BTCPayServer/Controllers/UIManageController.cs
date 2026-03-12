@@ -11,11 +11,13 @@ using BTCPayServer.Fido2;
 using BTCPayServer.Models.ManageViewModels;
 using BTCPayServer.Security.Greenfield;
 using BTCPayServer.Services;
+using BTCPayServer.Plugins.Emails.Services;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 
@@ -27,6 +29,7 @@ namespace BTCPayServer.Controllers
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly EmailSenderFactory _EmailSenderFactory;
         private readonly ILogger _logger;
         private readonly UrlEncoder _urlEncoder;
         private readonly BTCPayServerEnvironment _btcPayServerEnvironment;
@@ -39,13 +42,13 @@ namespace BTCPayServer.Controllers
         private readonly UriResolver _uriResolver;
         private readonly IFileService _fileService;
         private readonly EventAggregator _eventAggregator;
-        private readonly PermissionService _permissionService;
         readonly StoreRepository _StoreRepository;
         public IStringLocalizer StringLocalizer { get; }
 
         public UIManageController(
           UserManager<ApplicationUser> userManager,
           SignInManager<ApplicationUser> signInManager,
+          EmailSenderFactory emailSenderFactory,
           ILogger<UIManageController> logger,
           UrlEncoder urlEncoder,
           StoreRepository storeRepository,
@@ -59,11 +62,11 @@ namespace BTCPayServer.Controllers
           IFileService fileService,
           IStringLocalizer stringLocalizer,
           IHtmlHelper htmlHelper,
-          EventAggregator eventAggregator,
-          PermissionService permissionService)
+          EventAggregator eventAggregator)
         {
             _userManager = userManager;
             _signInManager = signInManager;
+            _EmailSenderFactory = emailSenderFactory;
             _logger = logger;
             _urlEncoder = urlEncoder;
             _btcPayServerEnvironment = btcPayServerEnvironment;
@@ -78,7 +81,6 @@ namespace BTCPayServer.Controllers
             _fileService = fileService;
             _StoreRepository = storeRepository;
             StringLocalizer = stringLocalizer;
-            _permissionService = permissionService;
         }
 
         [HttpGet]
@@ -86,7 +88,9 @@ namespace BTCPayServer.Controllers
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
-                return NotFound();
+            {
+                throw new ApplicationException($"Unable to load user with ID '{_userManager.GetUserId(User)}'.");
+            }
             var blob = user.GetBlob() ?? new();
             var model = new IndexViewModel
             {
@@ -106,7 +110,9 @@ namespace BTCPayServer.Controllers
 
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
-                return NotFound();
+            {
+                throw new ApplicationException($"Unable to load user with ID '{_userManager.GetUserId(User)}'.");
+            }
 
             var blob = user.GetBlob() ?? new();
             blob.ShowInvoiceStatusChangeHint = false;
@@ -121,7 +127,9 @@ namespace BTCPayServer.Controllers
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
-                return NotFound();
+            {
+                throw new ApplicationException($"Unable to load user with ID '{_userManager.GetUserId(User)}'.");
+            }
 
             bool needUpdate = false;
             var email = user.Email;
@@ -207,7 +215,9 @@ namespace BTCPayServer.Controllers
 
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
-                return NotFound();
+            {
+                throw new ApplicationException($"Unable to load user with ID '{_userManager.GetUserId(User)}'.");
+            }
 
             var callbackUrl = await _callbackGenerator.ForEmailConfirmation(user);
             _eventAggregator.Publish(new UserEvent.ConfirmationEmailRequested(user, callbackUrl));
@@ -220,7 +230,9 @@ namespace BTCPayServer.Controllers
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
-                return NotFound();
+            {
+                throw new ApplicationException($"Unable to load user with ID '{_userManager.GetUserId(User)}'.");
+            }
 
             var hasPassword = await _userManager.HasPasswordAsync(user);
             if (!hasPassword)
@@ -243,7 +255,9 @@ namespace BTCPayServer.Controllers
 
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
-                return NotFound();
+            {
+                throw new ApplicationException($"Unable to load user with ID '{_userManager.GetUserId(User)}'.");
+            }
 
             var changePasswordResult = await _userManager.ChangePasswordAsync(user, model.OldPassword, model.NewPassword);
             if (!changePasswordResult.Succeeded)
@@ -264,7 +278,9 @@ namespace BTCPayServer.Controllers
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
-                return NotFound();
+            {
+                throw new ApplicationException($"Unable to load user with ID '{_userManager.GetUserId(User)}'.");
+            }
 
             var hasPassword = await _userManager.HasPasswordAsync(user);
 
@@ -288,7 +304,9 @@ namespace BTCPayServer.Controllers
 
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
-                return NotFound();
+            {
+                throw new ApplicationException($"Unable to load user with ID '{_userManager.GetUserId(User)}'.");
+            }
 
             var addPasswordResult = await _userManager.AddPasswordAsync(user, model.NewPassword);
             if (!addPasswordResult.Succeeded)

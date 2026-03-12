@@ -1,6 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using BTCPayServer.Data;
 using BTCPayServer.Data.Subscriptions;
+using Microsoft.AspNetCore.Mvc.Razor;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace BTCPayServer.Views.UIStoreMembership
 {

@@ -15,6 +15,7 @@ namespace BTCPayServer.Plugins.Subscriptions.Controllers;
 
 
 [AllowAnonymous]
+[AutoValidateAntiforgeryToken]
 [Area(SubscriptionsPlugin.Area)]
 [Route("plan-checkout/{checkoutId}")]
 public class UIPlanCheckoutController(

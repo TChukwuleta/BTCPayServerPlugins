@@ -1,6 +1,9 @@
 using BTCPayServer.Models;
+using BTCPayServer.Payments.Bitcoin;
+using BTCPayServer.Payments.Lightning;
 using BTCPayServer.Services.Invoices;
 using Microsoft.AspNetCore.Mvc;
+using NBitpayClient;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Linq;

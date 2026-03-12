@@ -3,6 +3,7 @@ using System.Linq;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Plugins.PointOfSale;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace BTCPayServer.Services.Invoices;
 

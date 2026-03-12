@@ -1,6 +1,11 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
+using BTCPayServer.Components.AppSales;
+using BTCPayServer.Data;
 using BTCPayServer.Services.Apps;
+using BTCPayServer.Services.Stores;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewComponents;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -27,12 +32,12 @@ public class AppTopItems : ViewComponent
             Id = appId,
             AppType = appType,
             DataUrl = Url.Action("AppTopItems", "UIApps", new { appId }),
-            InitialRendering = HttpContext.GetAppDataOrNull()?.Id != appId
+            InitialRendering = HttpContext.GetAppData()?.Id != appId
         };
         if (vm.InitialRendering)
             return View(vm);
 
-        var app = HttpContext.GetAppDataOrNull();
+        var app = HttpContext.GetAppData();
         var entries = await _appService.GetItemStats(app);
         vm.SalesCount = entries.Select(e => e.SalesCount).ToList();
         vm.Entries = entries.Take(5).ToList();

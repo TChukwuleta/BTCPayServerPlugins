@@ -343,9 +343,9 @@ namespace BTCPayServer.Services.Apps
             return await query.FirstOrDefaultAsync();
         }
 
-        public async Task<StoreData> GetStore(AppData app)
+        public Task<StoreData?> GetStore(AppData app)
         {
-            return await _storeRepository.FindStore(app.StoreDataId) ?? throw new Exception("App's store is not found");
+            return _storeRepository.FindStore(app.StoreDataId);
         }
 
         public static string SerializeTemplate(AppItem[] items)

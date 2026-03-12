@@ -149,13 +149,15 @@
                     const labelManagerList = document.querySelectorAll("input.label-manager");
                     labelManagerList.forEach(labelManager => {
                         labelManager.addEventListener("labelmanager:changed", ({ detail }) => {
-                            const { id, labels: newLabels } = detail;
+                            const { walletObjectId, labels: newLabels } = detail;
 
-                            const targetAddress = this.addresses.find(addr => addr.address === id);
+                            const targetAddress = this.addresses.find(addr => addr.address === walletObjectId);
                             if (!targetAddress) return;
 
-                            const next = (newLabels || []).map(text => ({ text }));
-                            this.$set(targetAddress, "labels", next);
+                            const existingLabels = targetAddress.labels?.map(l => l.text) || [];
+                            const merged = Array.from(new Set([...existingLabels, ...newLabels])).map(text => ({ text }));
+
+                            this.$set(targetAddress, 'labels', merged);
                         });
                     });
                 },

@@ -1,4 +1,6 @@
 #nullable enable
+using BTCPayServer;
+
 namespace BTCPayServer.Services;
 public abstract class TransactionLinkProvider
 {

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -132,8 +133,6 @@ public class MonetizationHostedService(
                               WHERE ci.customer_id = s.customer_id
                                 AND ci.type = @type
                                 AND ci.value = @id;
-                              DELETE FROM customers_identities ci
-                              WHERE ci.type = @type AND ci.value = @id;
                               """, new { type = Monetization.SubscriberDataExtensions.IdentityType, id = deleted.User.Id });
         }
     }
@@ -144,9 +143,7 @@ public class MonetizationHostedService(
         var user = await userManager.FindByIdAsync(userId ?? "");
         if (user is not null &&
             await userService.SetDisabled(user.Id, !activated) is not UserService.SetDisabledResult.Error)
-        {
             EventAggregator.Publish(new MonetizationLockoutUpdated([(user.Id, !activated)]));
-        }
     }
 
     private async Task AttachUserIdToSubscriber(string id, SubscriptionEvent.NewSubscriber newSub)
@@ -340,8 +337,6 @@ public class MonetizationHostedService(
                 disabledUsers.Add(update.UserId);
             else
                 disabledUsers.Remove(update.UserId);
-
-        await ctx.Users.UpdateStoreNoActiveUserForUsers(updated.Select(u => u.UserId).ToArray());
         EventAggregator.Publish(new MonetizationLockoutUpdated(updated));
     }
 

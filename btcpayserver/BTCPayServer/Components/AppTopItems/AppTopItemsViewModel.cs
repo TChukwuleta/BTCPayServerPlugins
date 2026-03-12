@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using BTCPayServer.Client.Models;
+using BTCPayServer.Services.Apps;
 
 namespace BTCPayServer.Components.AppTopItems;
 

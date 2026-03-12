@@ -1,6 +1,10 @@
 #nullable enable
+using System;
+using System.Linq;
 using System.Threading.Tasks;
 using BTCPayServer.Data;
+using BTCPayServer.Data.Subscriptions;
+using BTCPayServer.Plugins.Subscriptions;
 using BTCPayServer.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;

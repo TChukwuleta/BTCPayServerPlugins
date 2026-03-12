@@ -23,8 +23,10 @@ public partial class UIStoresController
     [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     public async Task<IActionResult> Dashboard()
     {
-        var store = HttpContext.GetStoreData();
-        HttpContext.SetPreferredStoreId(store.Id);
+        var store = CurrentStore;
+        if (store is null)
+            return NotFound();
+            
         var storeBlob = store.GetStoreBlob();
 
         AddPaymentMethods(store, storeBlob,
@@ -32,7 +34,7 @@ public partial class UIStoresController
 
         var walletEnabled = derivationSchemes.Any(scheme => !string.IsNullOrEmpty(scheme.Value) && scheme.Enabled);
         var lightningEnabled = lightningNodes.Any(ln => !string.IsNullOrEmpty(ln.Address) && ln.Enabled);
-        var cryptoCode = _networkProvider.DefaultCryptoCode;
+        var cryptoCode = _networkProvider.DefaultNetwork.CryptoCode;
         var vm = new StoreDashboardViewModel
         {
             WalletEnabled = walletEnabled,
@@ -42,12 +44,7 @@ public partial class UIStoresController
             StoreName = CurrentStore.StoreName,
             CryptoCode = cryptoCode,
             Network = _networkProvider.DefaultNetwork,
-            IsSetUp = walletEnabled || lightningEnabled,
-            EnabledWalletCryptos = derivationSchemes
-                .Where(scheme => scheme is { Enabled: true, WalletSupported: true })
-                .Select(scheme => scheme.Crypto)
-                .Distinct()
-                .ToList()
+            IsSetUp = walletEnabled || lightningEnabled
         };
 
         // Widget data
@@ -72,7 +69,7 @@ public partial class UIStoresController
     [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     public IActionResult LightningBalance(string storeId, string cryptoCode)
     {
-        var store = HttpContext.GetStoreDataOrNull();
+        var store = HttpContext.GetStoreData();
         return store != null
              ? ViewComponent("StoreLightningBalance", new { Store = store, CryptoCode = cryptoCode })
              : NotFound();
@@ -82,7 +79,7 @@ public partial class UIStoresController
     [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     public IActionResult StoreNumbers(string storeId, string cryptoCode)
     {
-        var store = HttpContext.GetStoreDataOrNull();
+        var store = HttpContext.GetStoreData();
         return store != null
             ? ViewComponent("StoreNumbers", new { Store = store, CryptoCode = cryptoCode })
             : NotFound();
@@ -92,19 +89,19 @@ public partial class UIStoresController
     [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     public IActionResult RecentTransactions(string storeId, string cryptoCode)
     {
-        var store = HttpContext.GetStoreDataOrNull();
+        var store = HttpContext.GetStoreData();
         return store != null
             ? ViewComponent("StoreRecentTransactions", new { Store = store, CryptoCode = cryptoCode })
             : NotFound();
     }
 
-    [HttpGet("{storeId}/dashboard/recent-invoices")]
+    [HttpGet("{storeId}/dashboard/{cryptoCode}/recent-invoices")]
     [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
-    public IActionResult RecentInvoices(string storeId)
+    public IActionResult RecentInvoices(string storeId, string cryptoCode)
     {
-        var store = HttpContext.GetStoreDataOrNull();
+        var store = HttpContext.GetStoreData();
         return store != null
-            ? ViewComponent("StoreRecentInvoices", new { Store = store })
+            ? ViewComponent("StoreRecentInvoices", new { Store = store, CryptoCode = cryptoCode })
             : NotFound();
     }
 

@@ -1,6 +1,8 @@
 using System.Threading.Tasks;
+using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services;
 using NBitcoin;
+using ExchangeSharp.BinanceGroup;
 
 namespace BTCPayServer.Payments.Bitcoin
 {

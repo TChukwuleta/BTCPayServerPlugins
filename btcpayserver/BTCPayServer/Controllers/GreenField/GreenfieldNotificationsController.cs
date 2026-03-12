@@ -44,7 +44,7 @@ namespace BTCPayServer.Controllers.Greenfield
             var items = await _notificationManager.GetNotifications(new NotificationsQuery
             {
                 Seen = seen,
-                UserId = User.GetId(),
+                UserId = _userManager.GetUserId(User),
                 Skip = skip,
                 Take = take,
                 StoreIds = storeId,
@@ -60,7 +60,7 @@ namespace BTCPayServer.Controllers.Greenfield
             var items = await _notificationManager.GetNotifications(new NotificationsQuery
             {
                 Ids = [id],
-                UserId = User.GetId()
+                UserId = _userManager.GetUserId(User)
             });
 
             return items.Count == 0 ? NotificationNotFound() : Ok(ToModel(items.Items.First()));
@@ -71,7 +71,7 @@ namespace BTCPayServer.Controllers.Greenfield
         public async Task<IActionResult> UpdateNotification(string id, UpdateNotification request)
         {
             var items = await _notificationManager.ToggleSeen(
-                new NotificationsQuery { Ids = [id], UserId = User.GetId() }, request.Seen);
+                new NotificationsQuery { Ids = [id], UserId = _userManager.GetUserId(User) }, request.Seen);
 
             return items.Count == 0 ? NotificationNotFound() : Ok(ToModel(items.First()));
         }
@@ -83,7 +83,7 @@ namespace BTCPayServer.Controllers.Greenfield
             await _notificationManager.Remove(new NotificationsQuery
             {
                 Ids = [id],
-                UserId = User.GetId()
+                UserId = _userManager.GetUserId(User)
             });
 
             return Ok();

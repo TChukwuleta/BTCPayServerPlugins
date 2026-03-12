@@ -3,8 +3,10 @@ using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;
+using BTCPayServer.Data;
 using BTCPayServer.Fido2.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Localization;
 
@@ -12,11 +14,21 @@ namespace BTCPayServer.Fido2
 {
     [Route("fido2")]
     [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
-    public class UIFido2Controller(
-        Fido2Service fido2Service,
-        IStringLocalizer stringLocalizer) : Controller
+    public class UIFido2Controller : Controller
     {
-        private IStringLocalizer StringLocalizer { get; } = stringLocalizer;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly Fido2Service _fido2Service;
+        private IStringLocalizer StringLocalizer { get; }
+
+        public UIFido2Controller(
+            UserManager<ApplicationUser> userManager,
+            Fido2Service fido2Service,
+            IStringLocalizer stringLocalizer)
+        {
+            _userManager = userManager;
+            _fido2Service = fido2Service;
+            StringLocalizer = stringLocalizer;
+        }
 
         [HttpGet("{id}/delete")]
         public IActionResult Remove(string id)
@@ -27,7 +39,7 @@ namespace BTCPayServer.Fido2
         [HttpPost("{id}/delete")]
         public async Task<IActionResult> RemoveP(string id)
         {
-            await fido2Service.Remove(id, User.GetId());
+            await _fido2Service.Remove(id, _userManager.GetUserId(User));
 
             TempData.SetStatusMessageModel(new StatusMessageModel
             {
@@ -41,7 +53,7 @@ namespace BTCPayServer.Fido2
         [HttpGet("register")]
         public async Task<IActionResult> Create(AddFido2CredentialViewModel viewModel)
         {
-            var options = await fido2Service.RequestCreation(User.GetId());
+            var options = await _fido2Service.RequestCreation(_userManager.GetUserId(User));
             if (options is null)
             {
                 TempData.SetStatusMessageModel(new StatusMessageModel
@@ -60,7 +72,7 @@ namespace BTCPayServer.Fido2
         [HttpPost("register")]
         public async Task<IActionResult> CreateResponse([FromForm] string data, [FromForm] string name)
         {
-            if (await fido2Service.CompleteCreation(User.GetId(), name, data))
+            if (await _fido2Service.CompleteCreation(_userManager.GetUserId(User), name, data))
             {
 
                 TempData.SetStatusMessageModel(new StatusMessageModel

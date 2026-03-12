@@ -1,4 +1,6 @@
 #nullable enable
+using System;
+using BTCPayServer.Lightning;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Payments.Lightning

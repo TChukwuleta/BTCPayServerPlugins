@@ -1,7 +1,9 @@
 #nullable enable
+using BTCPayServer.Models.InvoicingModels;
 using BTCPayServer.Payments.Bitcoin;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services;
+using Org.BouncyCastle.Crypto.Modes.Gcm;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Localization;

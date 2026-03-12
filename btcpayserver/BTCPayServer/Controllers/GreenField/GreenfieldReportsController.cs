@@ -20,12 +20,17 @@ namespace BTCPayServer.Controllers.GreenField;
 [ApiController]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
 [EnableCors(CorsPolicies.All)]
-public class GreenfieldReportsController(
-    ApplicationDbContextFactory dbContextFactory,
-    ReportService reportService) : ControllerBase
+public class GreenfieldReportsController : Controller
 {
-    public ApplicationDbContextFactory DBContextFactory { get; } = dbContextFactory;
-    public ReportService ReportService { get; } = reportService;
+    public GreenfieldReportsController(
+        ApplicationDbContextFactory dbContextFactory,
+        ReportService reportService)
+    {
+        DBContextFactory = dbContextFactory;
+        ReportService = reportService;
+    }
+    public ApplicationDbContextFactory DBContextFactory { get; }
+    public ReportService ReportService { get; }
 
     public const string DefaultReport = "Invoices";
     [Authorize(Policy = Policies.CanViewReports, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
@@ -57,7 +62,7 @@ public class GreenfieldReportsController(
                 From = from,
                 To = to
             };
-            return Ok(result);
+            return Json(result);
         }
 
         ModelState.AddModelError(nameof(vm.ViewName), "View doesn't exist");

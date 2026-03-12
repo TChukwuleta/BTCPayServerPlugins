@@ -4,8 +4,10 @@ using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;
+using BTCPayServer.Data;
 using LNURL;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Localization;
@@ -19,13 +21,15 @@ namespace BTCPayServer
     [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
     public class UILNURLAuthController : Controller
     {
+        private readonly UserManager<ApplicationUser> _userManager;
         private readonly LnurlAuthService _lnurlAuthService;
         private readonly LinkGenerator _linkGenerator;
         public IStringLocalizer StringLocalizer { get; }
 
-        public UILNURLAuthController(LnurlAuthService lnurlAuthService,
+        public UILNURLAuthController(UserManager<ApplicationUser> userManager, LnurlAuthService lnurlAuthService,
             IStringLocalizer stringLocalizer, LinkGenerator linkGenerator)
         {
+            _userManager = userManager;
             _lnurlAuthService = lnurlAuthService;
             _linkGenerator = linkGenerator;
             StringLocalizer = stringLocalizer;
@@ -43,7 +47,7 @@ namespace BTCPayServer
         [HttpPost("{id}/delete")]
         public async Task<IActionResult> RemoveP(string id)
         {
-            await _lnurlAuthService.Remove(id, User.GetId());
+            await _lnurlAuthService.Remove(id, _userManager.GetUserId(User));
 
             TempData.SetStatusMessageModel(new StatusMessageModel
             {
@@ -57,7 +61,7 @@ namespace BTCPayServer
         [HttpGet("register")]
         public async Task<IActionResult> Create(string name)
         {
-            var userId = User.GetId();
+            var userId = _userManager.GetUserId(User);
             var options = await _lnurlAuthService.RequestCreation(userId);
             if (options is null)
             {
@@ -86,7 +90,7 @@ namespace BTCPayServer
         [HttpGet("register/check")]
         public Task<IActionResult> CreateCheck()
         {
-            var userId = User.GetId();
+            var userId = _userManager.GetUserId(User);
             if (_lnurlAuthService.CreationStore.TryGetValue(userId, out _))
             {
                 return Task.FromResult<IActionResult>(Ok());

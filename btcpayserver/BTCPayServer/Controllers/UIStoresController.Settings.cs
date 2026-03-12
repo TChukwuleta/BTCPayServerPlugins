@@ -22,7 +22,7 @@ public partial class UIStoresController
     [HttpGet("{storeId}/settings")]
     public async Task<IActionResult> GeneralSettings(string storeId)
     {
-        var store = HttpContext.GetStoreDataOrNull();
+        var store = HttpContext.GetStoreData();
         if (store == null) return NotFound();
 
         var storeBlob = store.GetStoreBlob();
@@ -170,7 +170,7 @@ public partial class UIStoresController
         {
             await _storeRepo.UpdateStore(CurrentStore);
 
-            TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["Store successfully updated"].Value;
+            TempData[WellKnownTempData.SuccessMessage] = "Store successfully updated";
         }
 
         return RedirectToAction(nameof(GeneralSettings), new
@@ -208,7 +208,7 @@ public partial class UIStoresController
     public async Task<IActionResult> DeleteStorePost(string storeId)
     {
         await _storeRepo.DeleteStore(CurrentStore.Id);
-        TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["Store successfully deleted."].Value;
+        TempData[WellKnownTempData.SuccessMessage] = "Store successfully deleted.";
         return RedirectToAction(nameof(UIHomeController.Index), "UIHome");
     }
 
@@ -250,7 +250,6 @@ public partial class UIStoresController
             : await _uriResolver.Resolve(Request.GetAbsoluteRootUri(), storeBlob.PaymentSoundUrl);
         vm.HtmlTitle = storeBlob.HtmlTitle;
         vm.SupportUrl = storeBlob.StoreSupportUrl;
-        vm.CheckoutText = storeBlob.CheckoutText;
         vm.DisplayExpirationTimer = (int)storeBlob.DisplayExpirationTimer.TotalMinutes;
         vm.ReceiptOptions = CheckoutAppearanceViewModel.ReceiptOptionsViewModel.Create(storeBlob.ReceiptOptions);
         vm.AutoDetectLanguage = storeBlob.AutoDetectLanguage;
@@ -383,7 +382,6 @@ public partial class UIStoresController
         blob.ReceiptOptions = model.ReceiptOptions.ToDTO();
         blob.HtmlTitle = string.IsNullOrWhiteSpace(model.HtmlTitle) ? null : model.HtmlTitle;
         blob.StoreSupportUrl = string.IsNullOrWhiteSpace(model.SupportUrl) ? null : model.SupportUrl.IsValidEmail() ? $"mailto:{model.SupportUrl}" : model.SupportUrl;
-        blob.CheckoutText = string.IsNullOrWhiteSpace(model.CheckoutText) ? null : model.CheckoutText;
         blob.DisplayExpirationTimer = TimeSpan.FromMinutes(model.DisplayExpirationTimer);
         blob.AutoDetectLanguage = model.AutoDetectLanguage;
         blob.DefaultLang = model.DefaultLang;
@@ -394,7 +392,7 @@ public partial class UIStoresController
         if (needUpdate)
         {
             await _storeRepo.UpdateStore(CurrentStore);
-            TempData[WellKnownTempData.SuccessMessage] = StringLocalizer["Store successfully updated"].Value;
+            TempData[WellKnownTempData.SuccessMessage] = "Store successfully updated";
         }
 
         return RedirectToAction(nameof(CheckoutAppearance), new
@@ -419,8 +417,8 @@ public partial class UIStoresController
         var defaultChoice = defaultPaymentId?.FindNearest(enabled);
         if (defaultChoice is null)
         {
-            defaultChoice = enabled.FirstOrDefault(e => e == PaymentTypes.CHAIN.GetPaymentMethodId(_networkProvider.DefaultCryptoCode)) ??
-                            enabled.FirstOrDefault(e => e == PaymentTypes.LN.GetPaymentMethodId(_networkProvider.DefaultCryptoCode)) ??
+            defaultChoice = enabled.FirstOrDefault(e => e == PaymentTypes.CHAIN.GetPaymentMethodId(_networkProvider.DefaultNetwork.CryptoCode)) ??
+                            enabled.FirstOrDefault(e => e == PaymentTypes.LN.GetPaymentMethodId(_networkProvider.DefaultNetwork.CryptoCode)) ??
                             enabled.FirstOrDefault();
         }
         var choices = GetEnabledPaymentMethodChoices(storeData);

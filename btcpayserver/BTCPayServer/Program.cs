@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -11,7 +12,6 @@ using BTCPayServer.Plugins;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 [assembly: InternalsVisibleTo("BTCPayServer.Tests")]
@@ -28,7 +28,8 @@ namespace BTCPayServer
             if (args.Length > 0 && args[0] == "run")
                 args = args.Skip(1).ToArray(); // Hack to make dotnet watch work
 
-            IHost host = null;
+            ServicePointManager.DefaultConnectionLimit = 100;
+            IWebHost host = null;
             var processor = new ConsoleLoggerProcessor();
             var loggerProvider = new CustomConsoleLogProvider(processor);
             using var loggerFactory = new LoggerFactory();
@@ -46,9 +47,9 @@ namespace BTCPayServer
                 confBuilder.AddJsonFile("appsettings.dev.json", true, false);
 #endif
                 conf = confBuilder.Build();
-
-
-                var builder = Host.CreateDefaultBuilder(args)
+                var builder = new WebHostBuilder()
+                    .UseKestrel()
+                    .UseConfiguration(conf)
                     .ConfigureLogging(l =>
                     {
                         l.AddFilter("Microsoft", LogLevel.Error);
@@ -62,18 +63,12 @@ namespace BTCPayServer
                         //l.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Trace);
                         l.AddFilter("Microsoft.EntityFrameworkCore.Migrations", LogLevel.Information);
                         l.AddFilter("BTCPayServer.Migrations", LogLevel.Information);
-                        l.AddFilter("BTCPayServer.Security", LogLevel.Warning);
                         l.AddFilter("System.Net.Http.HttpClient", LogLevel.Critical);
                         l.AddFilter("Microsoft.AspNetCore.Antiforgery.Internal", LogLevel.Critical);
                         l.AddFilter("Fido2NetLib.DistributedCacheMetadataService", LogLevel.Error);
-                        l.ClearProviders();
                         l.AddProvider(new CustomConsoleLogProvider(processor));
                     })
-                    .ConfigureSerilog(conf)
-                    .ConfigureWebHostDefaults(webBuilder =>
-                        webBuilder.UseKestrel()
-                        .UseConfiguration(conf)
-                        .UseStartup<Startup>());
+                    .UseStartup<Startup>();
 
                 // When we run the app with dotnet run (typically in dev env), the wwwroot isn't in the same directory
                 // than this assembly.
@@ -89,7 +84,7 @@ namespace BTCPayServer
                 }
                 host = builder.Build();
                 await host.StartWithTasksAsync();
-                var urls = host.GetServerFeatures<IServerAddressesFeature>().Addresses;
+                var urls = host.ServerFeatures.Get<IServerAddressesFeature>().Addresses;
                 foreach (var url in urls)
                 {
                     // Some tools such as dotnet watch parse this exact log to open the browser

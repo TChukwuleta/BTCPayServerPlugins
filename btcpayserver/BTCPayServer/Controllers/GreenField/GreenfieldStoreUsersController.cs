@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
@@ -42,12 +43,19 @@ namespace BTCPayServer.Controllers.Greenfield
         [Authorize(Policy = Policies.CanViewStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
         [HttpGet("~/api/v1/stores/{storeId}/users")]
         public async Task<IActionResult> GetStoreUsers()
-        => Ok(await ToAPI(HttpContext.GetStoreData()));
+        {
+            var store = HttpContext.GetStoreData();
+            return store == null ? StoreNotFound() : Ok(await ToAPI(store));
+        }
 
         [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
         [HttpDelete("~/api/v1/stores/{storeId}/users/{idOrEmail}")]
         public async Task<IActionResult> RemoveStoreUser(string storeId, string idOrEmail)
         {
+            var store = HttpContext.GetStoreData();
+            if (store == null)
+                return StoreNotFound();
+
             var user = await _userManager.FindByIdOrEmail(idOrEmail);
             if (user == null)
                 return UserNotFound();
@@ -62,6 +70,10 @@ namespace BTCPayServer.Controllers.Greenfield
         [HttpPut("~/api/v1/stores/{storeId}/users/{idOrEmail?}")]
         public async Task<IActionResult> AddOrUpdateStoreUser(string storeId, StoreUserData request, string idOrEmail = null)
         {
+            var store = HttpContext.GetStoreData();
+            if (store == null)
+                return StoreNotFound();
+
             // Deprecated properties
             request.StoreRole ??= request.AdditionalData.TryGetValue("role", out var role) ? role.ToString() : null;
             request.Id ??= request.AdditionalData.TryGetValue("userId", out var userId) ? userId.ToString() : null;
@@ -120,6 +132,11 @@ namespace BTCPayServer.Controllers.Greenfield
                 storeUsers.Add(data);
             }
             return storeUsers;
+        }
+
+        private IActionResult StoreNotFound()
+        {
+            return this.CreateAPIError(404, "store-not-found", "The store was not found");
         }
 
         private IActionResult UserNotFound()

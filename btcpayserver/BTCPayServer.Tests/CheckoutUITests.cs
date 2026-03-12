@@ -3,460 +3,462 @@ using System.Threading.Tasks;
 using BTCPayServer.Payments;
 using BTCPayServer.Views.Stores;
 using NBitcoin;
-using Microsoft.Playwright;
-using static Microsoft.Playwright.Assertions;
+using OpenQA.Selenium;
+using OpenQA.Selenium.Support.UI;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace BTCPayServer.Tests
 {
-    [Trait("Playwright", "Playwright-2")]
+    [Trait("Selenium", "Selenium")]
     [Collection(nameof(NonParallelizableCollectionDefinition))]
-    public class CheckoutUITests(ITestOutputHelper helper) : UnitTestBase(helper)
+    public class CheckoutUITests : UnitTestBase
     {
         public const int TestTimeout = TestUtils.TestTimeout;
+        public CheckoutUITests(ITestOutputHelper helper) : base(helper)
+        {
+        }
 
         [Fact(Timeout = TestTimeout)]
         [Trait("Lightning", "Lightning")]
         public async Task CanConfigureCheckout()
         {
-            await using var s = CreatePlaywrightTester();
+            using var s = CreateSeleniumTester();
             s.Server.ActivateLightning();
             await s.StartAsync();
-            await s.RegisterNewUser(true);
-            await s.CreateNewStore();
-            await s.AddLightningNode();
+            s.GoToRegister();
+            s.RegisterNewUser(true);
+            s.CreateNewStore();
+            s.AddLightningNode();
             // Use non-legacy derivation scheme
-            await s.AddDerivationScheme("BTC", "tpubDD79XF4pzhmPSJ9AyUay9YbXAeD1c6nkUqC32pnKARJH6Ja5hGUfGc76V82ahXpsKqN6UcSGXMkzR34aZq4W23C6DAdZFaVrzWqzj24F8BC");
-
-            Task ToggleCollapse() => s.Page.ClickAsync($"button.payment-details-button");
+            s.AddDerivationScheme("BTC", "tpubDD79XF4pzhmPSJ9AyUay9YbXAeD1c6nkUqC32pnKARJH6Ja5hGUfGc76V82ahXpsKqN6UcSGXMkzR34aZq4W23C6DAdZFaVrzWqzj24F8BC");
 
             // Configure store url
             var storeUrl = "https://satoshisteaks.com/";
             var supportUrl = "https://support.satoshisteaks.com/{InvoiceId}/";
-            await s.GoToStore();
-            await s.Page.FillAsync("#StoreWebsite", storeUrl);
-            await s.ClickPagePrimary();
-            await s.FindAlertMessage(partialText: "Store successfully updated");
+            s.GoToStore();
+            s.Driver.FindElement(By.Id("StoreWebsite")).SendKeys(storeUrl);
+            s.ClickPagePrimary();
+            Assert.Contains("Store successfully updated", s.FindAlertMessage().Text);
 
-            await s.GoToStore(StoreNavPages.CheckoutAppearance);
-            await s.Page.ClickAsync("#Presets");
-            await s.Page.ClickAsync("#Presets_InStore");
-            await s.Page.Locator("#ShowPayInWalletButton").SetCheckedAsync(true);
-            await s.Page.FillAsync("#SupportUrl", supportUrl);
-            await s.ClickPagePrimary();
-            await s.FindAlertMessage(partialText: "Store successfully updated");
+            s.GoToStore(StoreNavPages.CheckoutAppearance);
+            s.Driver.WaitForAndClick(By.Id("Presets"));
+            s.Driver.WaitForAndClick(By.Id("Presets_InStore"));
+            Assert.True(s.Driver.SetCheckbox(By.Id("ShowPayInWalletButton"), true));
+            s.Driver.FindElement(By.Id("SupportUrl")).SendKeys(supportUrl);
+            s.ClickPagePrimary();
+            Assert.Contains("Store successfully updated", s.FindAlertMessage().Text);
 
             // Top up/zero amount invoices
-            var invoiceId = await s.CreateInvoice(amount: null);
-            await s.GoToInvoiceCheckout(invoiceId);
-            await s.Page.Locator(".payment-method").First.WaitForAsync();
-            Assert.Equal(2, await s.Page.Locator(".payment-method").CountAsync());
-            await Expect(s.Page.Locator(".payment-method.active")).ToContainTextAsync("Bitcoin");
-            await Expect(s.Page.Locator(".payment-method:nth-child(2)")).ToContainTextAsync("LNURL");
-            var qrValue = await s.Page.Locator(".qr-container").GetAttributeAsync("data-qr-value");
-            var clipboard = await s.Page.Locator(".qr-container").GetAttributeAsync("data-clipboard");
-            var payUrl = await s.Page.Locator("#PayInWallet").GetAttributeAsync("href");
-            var address = await s.Page.Locator("#Address_BTC-CHAIN .truncate-center").GetAttributeAsync("data-text");
+            var invoiceId = s.CreateInvoice(amount: null);
+            s.GoToInvoiceCheckout(invoiceId);
+            Assert.Equal(2, s.Driver.FindElements(By.CssSelector(".payment-method")).Count);
+            Assert.Contains("Bitcoin", s.Driver.FindElement(By.CssSelector(".payment-method.active")).Text);
+            Assert.Contains("LNURL", s.Driver.FindElement(By.CssSelector(".payment-method:nth-child(2)")).Text);
+            var qrValue = s.Driver.FindElement(By.CssSelector(".qr-container")).GetAttribute("data-qr-value");
+            var clipboard = s.Driver.FindElement(By.CssSelector(".qr-container")).GetAttribute("data-clipboard");
+            var payUrl = s.Driver.FindElement(By.Id("PayInWallet")).GetAttribute("href");
+            var address = s.Driver.FindElement(By.CssSelector("#Address_BTC-CHAIN .truncate-center")).GetAttribute("data-text");
             Assert.StartsWith("bcrt", address);
             Assert.DoesNotContain("lightning=", payUrl);
             Assert.Equal($"bitcoin:{address}", payUrl);
             Assert.Equal($"bitcoin:{address}", clipboard);
-            Assert.Equal($"bitcoin:{address!.ToUpperInvariant()}", qrValue);
-            await s.ElementDoesNotExist("#Lightning_BTC-CHAIN");
+            Assert.Equal($"bitcoin:{address.ToUpperInvariant()}", qrValue);
+            s.Driver.ElementDoesNotExist(By.Id("Lightning_BTC-CHAIN"));
 
             // Contact option
-            var contactLink = s.Page.Locator("#ContactLink");
-            Assert.Equal("Contact us", await contactLink.TextContentAsync());
-            Assert.Matches(supportUrl.Replace("{InvoiceId}", invoiceId), await contactLink.GetAttributeAsync("href"));
+            var contactLink = s.Driver.FindElement(By.Id("ContactLink"));
+            Assert.Equal("Contact us", contactLink.Text);
+            Assert.Matches(supportUrl.Replace("{InvoiceId}", invoiceId), contactLink.GetAttribute("href"));
 
-            // Details should show the exchange rate
-            await ToggleCollapse();
-            await s.ElementDoesNotExist("#PaymentDetails-TotalPrice");
-            await s.ElementDoesNotExist("#PaymentDetails-TotalFiat");
-            await s.ElementDoesNotExist("#PaymentDetails-AmountDue");
-            await Expect(s.Page.Locator("#PaymentDetails-ExchangeRate")).ToContainTextAsync("$");
-            await Expect(s.Page.Locator("#PaymentDetails-RecommendedFee")).ToContainTextAsync("sat/byte");
+            // Details should show exchange rate
+            s.Driver.ToggleCollapse("PaymentDetails");
+            s.Driver.ElementDoesNotExist(By.Id("PaymentDetails-TotalPrice"));
+            s.Driver.ElementDoesNotExist(By.Id("PaymentDetails-TotalFiat"));
+            s.Driver.ElementDoesNotExist(By.Id("PaymentDetails-AmountDue"));
+            Assert.Contains("$", s.Driver.FindElement(By.Id("PaymentDetails-ExchangeRate")).Text);
+            Assert.Contains("sat/byte", s.Driver.FindElement(By.Id("PaymentDetails-RecommendedFee")).Text);
 
             // Switch to LNURL
-            await s.Page.ClickAsync(".payment-method:nth-child(2)");
-            await TestUtils.EventuallyAsync(async () =>
+            s.Driver.FindElement(By.CssSelector(".payment-method:nth-child(2)")).Click();
+            TestUtils.Eventually(() =>
             {
-                payUrl = await s.Page.Locator("#PayInWallet").GetAttributeAsync("href");
+                payUrl = s.Driver.FindElement(By.Id("PayInWallet")).GetAttribute("href");
                 Assert.StartsWith("lightning:lnurl", payUrl);
-                Assert.StartsWith("lnurl", await s.Page.Locator("#Lightning_BTC-CHAIN .truncate-center").GetAttributeAsync("data-text"));
-                await s.ElementDoesNotExist("#Address_BTC-CHAIN");
+                Assert.StartsWith("lnurl", s.Driver.WaitForElement(By.CssSelector("#Lightning_BTC-CHAIN .truncate-center")).GetAttribute("data-text"));
+                s.Driver.ElementDoesNotExist(By.Id("Address_BTC-CHAIN"));
             });
 
             // Default payment method
-            await s.GoToHome();
-            invoiceId = await s.CreateInvoice(21000, "SATS", defaultPaymentMethod: "BTC-LN");
-            await s.GoToInvoiceCheckout(invoiceId);
-            await s.Page.Locator(".payment-method.active").WaitForAsync();
-            Assert.Equal(2, await s.Page.Locator(".payment-method").CountAsync());
-            await Expect(s.Page.Locator(".payment-method.active")).ToContainTextAsync("Lightning");
-            await Expect(s.Page.Locator(".payment-method").First).ToContainTextAsync("Bitcoin");
-            qrValue = await s.Page.Locator(".qr-container").GetAttributeAsync("data-qr-value");
-            clipboard = await s.Page.Locator(".qr-container").GetAttributeAsync("data-clipboard");
-            payUrl = await s.Page.Locator("#PayInWallet").GetAttributeAsync("href");
-            address = await s.Page.Locator("#Lightning_BTC-LN .truncate-center").GetAttributeAsync("data-text");
+            s.GoToHome();
+            invoiceId = s.CreateInvoice(21000, "SATS", defaultPaymentMethod: "BTC-LN");
+            s.GoToInvoiceCheckout(invoiceId);
+            Assert.Equal(2, s.Driver.FindElements(By.CssSelector(".payment-method")).Count);
+            Assert.Contains("Lightning", s.Driver.WaitForElement(By.CssSelector(".payment-method.active")).Text);
+            Assert.Contains("Bitcoin", s.Driver.WaitForElement(By.CssSelector(".payment-method")).Text);
+            qrValue = s.Driver.FindElement(By.CssSelector(".qr-container")).GetAttribute("data-qr-value");
+            clipboard = s.Driver.FindElement(By.CssSelector(".qr-container")).GetAttribute("data-clipboard");
+            payUrl = s.Driver.FindElement(By.Id("PayInWallet")).GetAttribute("href");
+            address = s.Driver.FindElement(By.CssSelector("#Lightning_BTC-LN .truncate-center")).GetAttribute("data-text");
             Assert.Equal($"lightning:{address}", payUrl);
             Assert.Equal($"lightning:{address}", clipboard);
-            Assert.Equal($"lightning:{address!.ToUpperInvariant()}", qrValue);
-            await s.ElementDoesNotExist("#Address_BTC-CHAIN");
+            Assert.Equal($"lightning:{address.ToUpperInvariant()}", qrValue);
+            s.Driver.ElementDoesNotExist(By.Id("Address_BTC-CHAIN"));
 
             // Lightning amount in sats
-            await Expect(s.Page.Locator("#AmountDue")).ToContainTextAsync("BTC");
-            await s.GoToHome();
-            await s.GoToLightningSettings();
-            await s.Page.Locator("#LightningAmountInSatoshi").SetCheckedAsync(true);
-            await s.ClickPagePrimary();
-            await s.FindAlertMessage(partialText: "BTC Lightning settings successfully updated");
-            await s.GoToInvoiceCheckout(invoiceId);
-            await Expect(s.Page.Locator("#AmountDue")).ToContainTextAsync("sats");
+            Assert.Contains("BTC", s.Driver.FindElement(By.Id("AmountDue")).Text);
+            s.GoToHome();
+            s.GoToLightningSettings();
+            s.Driver.SetCheckbox(By.Id("LightningAmountInSatoshi"), true);
+            s.ClickPagePrimary();
+            Assert.Contains("BTC Lightning settings successfully updated", s.FindAlertMessage().Text);
+            s.GoToInvoiceCheckout(invoiceId);
+            Assert.Contains("sats", s.Driver.FindElement(By.Id("AmountDue")).Text);
 
-            // Details should not show the exchange rate
-            await ToggleCollapse();
-            await s.ElementDoesNotExist("#PaymentDetails-ExchangeRate");
-            await s.ElementDoesNotExist("#PaymentDetails-TotalFiat");
-            await s.ElementDoesNotExist("#PaymentDetails-RecommendedFee");
-            await Expect(s.Page.Locator("#PaymentDetails-AmountDue")).ToContainTextAsync("21 000 sats");
-            await Expect(s.Page.Locator("#PaymentDetails-TotalPrice")).ToContainTextAsync("21 000 sats");
+            // Details should not show exchange rate
+            s.Driver.ToggleCollapse("PaymentDetails");
+            s.Driver.ElementDoesNotExist(By.Id("PaymentDetails-ExchangeRate"));
+            s.Driver.ElementDoesNotExist(By.Id("PaymentDetails-TotalFiat"));
+            s.Driver.ElementDoesNotExist(By.Id("PaymentDetails-RecommendedFee"));
+            Assert.Contains("21 000 sats", s.Driver.FindElement(By.Id("PaymentDetails-AmountDue")).Text);
+            Assert.Contains("21 000 sats", s.Driver.FindElement(By.Id("PaymentDetails-TotalPrice")).Text);
 
             // Expire
-            var expirySeconds = s.Page.Locator("#ExpirySeconds");
-            await expirySeconds.ClearAsync();
-            await expirySeconds.FillAsync("3");
-            await s.Page.ClickAsync("#Expire");
+            var expirySeconds = s.Driver.FindElement(By.Id("ExpirySeconds"));
+            expirySeconds.Clear();
+            expirySeconds.SendKeys("3");
+            s.Driver.FindElement(By.Id("Expire")).Click();
 
-            await TestUtils.EventuallyAsync(async () =>
+            TestUtils.Eventually(() =>
             {
-                var paymentInfo = s.Page.Locator("#PaymentInfo");
-                await paymentInfo.WaitForAsync();
-                var paymentInfoText = await paymentInfo.TextContentAsync();
-                Assert.Contains("This invoice will expire in", paymentInfoText);
-                Assert.DoesNotContain("Please send", paymentInfoText);
+                var paymentInfo = s.Driver.WaitForElement(By.Id("PaymentInfo"));
+                Assert.Contains("This invoice will expire in", paymentInfo.Text);
+                Assert.DoesNotContain("Please send", paymentInfo.Text);
             });
-            await TestUtils.EventuallyAsync(async () =>
+            TestUtils.Eventually(() =>
             {
-                var expiredSection = s.Page.Locator("#unpaid");
-                Assert.True(await expiredSection.IsVisibleAsync());
-                var expiredText = await expiredSection.TextContentAsync();
-                Assert.Contains("Invoice Expired", expiredText);
-                Assert.Contains("resubmit a payment", expiredText);
-                Assert.DoesNotContain("This invoice expired with partial payment", expiredText);
+                var expiredSection = s.Driver.FindElement(By.Id("unpaid"));
+                Assert.True(expiredSection.Displayed);
+                Assert.Contains("Invoice Expired", expiredSection.Text);
+                Assert.Contains("resubmit a payment", expiredSection.Text);
+                Assert.DoesNotContain("This invoice expired with partial payment", expiredSection.Text);
             });
-            await s.ElementDoesNotExist("#ReceiptLink");
-            Assert.Equal(storeUrl, await s.Page.Locator("#StoreLink").GetAttributeAsync("href"));
+            Assert.True(s.Driver.ElementDoesNotExist(By.Id("ReceiptLink")));
+            Assert.Equal(storeUrl, s.Driver.FindElement(By.Id("StoreLink")).GetAttribute("href"));
 
             // Expire paid partial
-            await s.GoToHome();
-            invoiceId = await s.CreateInvoice(2100, "EUR");
-            await s.GoToInvoiceCheckout(invoiceId);
+            s.GoToHome();
+            invoiceId = s.CreateInvoice(2100, "EUR");
+            s.GoToInvoiceCheckout(invoiceId);
             await Task.Delay(200);
-            address = await s.Page.Locator("#Address_BTC-CHAIN .truncate-center").GetAttributeAsync("data-text");
+            address = s.Driver.FindElement(By.CssSelector("#Address_BTC-CHAIN .truncate-center")).GetAttribute("data-text");
             var amountFraction = "0.00001";
-            await s.Server.ExplorerNode.SendToAddressAsync(BitcoinAddress.Create(address!, Network.RegTest),
+            await s.Server.ExplorerNode.SendToAddressAsync(BitcoinAddress.Create(address, Network.RegTest),
                 Money.Parse(amountFraction));
             await s.Server.ExplorerNode.GenerateAsync(1);
 
-            await Expect(s.Page.Locator("#PaymentInfo")).ToContainTextAsync("The invoice hasn't been paid in full.");
-            await Expect(s.Page.Locator("#PaymentInfo")).ToContainTextAsync("Please send");
+            expirySeconds = s.Driver.FindElement(By.Id("ExpirySeconds"));
+            expirySeconds.Clear();
+            expirySeconds.SendKeys("3");
+            s.Driver.FindElement(By.Id("Expire")).Click();
 
-            expirySeconds = s.Page.Locator("#ExpirySeconds");
-            await expirySeconds.ClearAsync();
-            await expirySeconds.FillAsync("3");
-            await s.Page.ClickAsync("#Expire");
-
-            await Expect(s.Page.Locator("#unpaid")).ToContainTextAsync("Invoice Expired");
-            await Expect(s.Page.Locator("#unpaid")).ToContainTextAsync("This invoice expired with partial payment");
-            await Expect(s.Page.Locator("#unpaid")).Not.ToContainTextAsync("resubmit a payment");
-
-            await s.ElementDoesNotExist("#ReceiptLink");
-            Assert.Equal(storeUrl, await s.Page.Locator("#StoreLink").GetAttributeAsync("href"));
+            TestUtils.Eventually(() =>
+            {
+                var paymentInfo = s.Driver.WaitForElement(By.Id("PaymentInfo"));
+                Assert.Contains("The invoice hasn't been paid in full.", paymentInfo.Text);
+                Assert.Contains("Please send", paymentInfo.Text);
+            });
+            TestUtils.Eventually(() =>
+            {
+                var expiredSection = s.Driver.FindElement(By.Id("unpaid"));
+                Assert.True(expiredSection.Displayed);
+                Assert.Contains("Invoice Expired", expiredSection.Text);
+                Assert.Contains("This invoice expired with partial payment", expiredSection.Text);
+                Assert.DoesNotContain("resubmit a payment", expiredSection.Text);
+            });
+            Assert.True(s.Driver.ElementDoesNotExist(By.Id("ReceiptLink")));
+            Assert.Equal(storeUrl, s.Driver.FindElement(By.Id("StoreLink")).GetAttribute("href"));
 
             // Test payment
-            await s.GoToHome();
-            invoiceId = await s.CreateInvoice();
-            await s.GoToInvoiceCheckout(invoiceId);
+            s.GoToHome();
+            invoiceId = s.CreateInvoice();
+            s.GoToInvoiceCheckout(invoiceId);
 
             // Details
-            await ToggleCollapse();
-            var details = s.Page.Locator("#payment .payment-details");
-            await Expect(details).ToContainTextAsync("Total Price");
-            await Expect(details).ToContainTextAsync("Total Fiat");
-            await Expect(details).ToContainTextAsync("Exchange Rate");
-            await Expect(details).ToContainTextAsync("Amount Due");
-            await Expect(details).ToContainTextAsync("Recommended Fee");
-            await Expect(s.Page.Locator("#PaymentDetails-ExchangeRate")).ToContainTextAsync("$");
-            await Expect(s.Page.Locator("#PaymentDetails-TotalFiat")).ToContainTextAsync("$");
-            await Expect(s.Page.Locator("#PaymentDetails-AmountDue")).ToContainTextAsync("BTC");
-            await Expect(s.Page.Locator("#PaymentDetails-TotalPrice")).ToContainTextAsync("BTC");
+            s.Driver.ToggleCollapse("PaymentDetails");
+            var details = s.Driver.FindElement(By.CssSelector(".payment-details"));
+            Assert.Contains("Total Price", details.Text);
+            Assert.Contains("Total Fiat", details.Text);
+            Assert.Contains("Exchange Rate", details.Text);
+            Assert.Contains("Amount Due", details.Text);
+            Assert.Contains("Recommended Fee", details.Text);
+            Assert.Contains("$", s.Driver.FindElement(By.Id("PaymentDetails-ExchangeRate")).Text);
+            Assert.Contains("$", s.Driver.FindElement(By.Id("PaymentDetails-TotalFiat")).Text);
+            Assert.Contains("BTC", s.Driver.FindElement(By.Id("PaymentDetails-AmountDue")).Text);
+            Assert.Contains("BTC", s.Driver.FindElement(By.Id("PaymentDetails-TotalPrice")).Text);
 
-            // Pay a partial amount
+            // Pay partial amount
             await Task.Delay(200);
-            await s.Page.Locator("#test-payment-amount").ClearAsync();
-            await s.Page.FillAsync("#test-payment-amount", "0.00001");
+            s.Driver.FindElement(By.Id("test-payment-amount")).Clear();
+            s.Driver.FindElement(By.Id("test-payment-amount")).SendKeys("0.00001");
 
             // Fake Pay
-            await s.Page.ClickAsync("#FakePayment");
-            await s.Page.ClickAsync("#mine-block");
-            await Expect(s.Page.Locator("#PaymentInfo")).ToContainTextAsync("The invoice hasn't been paid in full.");
-            await Expect(s.Page.Locator("#PaymentInfo")).ToContainTextAsync("Please send");
+            TestUtils.Eventually(() =>
+            {
+                s.Driver.FindElement(By.Id("FakePayment")).Click();
+                s.Driver.FindElement(By.Id("mine-block")).Click();
+                var paymentInfo = s.Driver.WaitForElement(By.Id("PaymentInfo"));
+                Assert.Contains("The invoice hasn't been paid in full", paymentInfo.Text);
+                Assert.Contains("Please send", paymentInfo.Text);
+            });
 
-            await s.Page.ReloadAsync();
+            s.Driver.Navigate().Refresh();
 
             // Pay full amount
-            await s.PayInvoice();
+            s.PayInvoice();
 
             // Processing
-            await Expect(s.Page.Locator("#processing")).ToContainTextAsync("Payment Received");
-            await Expect(s.Page.Locator("#processing")).ToContainTextAsync("Your payment has been received and is now processing");
-
-            await s.Page.Locator("#confetti").WaitForAsync();
+            TestUtils.Eventually(() =>
+            {
+                var processingSection = s.Driver.WaitForElement(By.Id("processing"));
+                Assert.True(processingSection.Displayed);
+                Assert.Contains("Payment Received", processingSection.Text);
+                Assert.Contains("Your payment has been received and is now processing", processingSection.Text);
+            });
+            s.Driver.FindElement(By.Id("confetti"));
 
             // Mine
-            await s.MineBlockOnInvoiceCheckout();
-            await TestUtils.EventuallyAsync(async () =>
+            s.MineBlockOnInvoiceCheckout();
+            TestUtils.Eventually(() =>
             {
                 Assert.Contains("Mined 1 block",
-                    await s.Page.Locator("#CheatSuccessMessage").TextContentAsync());
+                    s.Driver.WaitForElement(By.Id("CheatSuccessMessage")).Text);
             });
 
             // Settled
-            await TestUtils.EventuallyAsync(async () =>
+            TestUtils.Eventually(() =>
             {
-                var settledSection = s.Page.Locator("#settled");
-                await settledSection.WaitForAsync();
-                Assert.True(await settledSection.IsVisibleAsync());
-                Assert.Contains("Invoice Paid", await settledSection.TextContentAsync());
+                var settledSection = s.Driver.WaitForElement(By.Id("settled"));
+                Assert.True(settledSection.Displayed);
+                Assert.Contains("Invoice Paid", settledSection.Text);
             });
-            await s.Page.Locator("#confetti").WaitForAsync();
-            await s.Page.Locator("#ReceiptLink").WaitForAsync();
-            Assert.Equal(storeUrl, await s.Page.Locator("#StoreLink").GetAttributeAsync("href"));
+            s.Driver.FindElement(By.Id("confetti"));
+            s.Driver.FindElement(By.Id("ReceiptLink"));
+            Assert.Equal(storeUrl, s.Driver.FindElement(By.Id("StoreLink")).GetAttribute("href"));
 
             // BIP21
-            await s.GoToHome();
-            await s.GoToStore(s.StoreId, StoreNavPages.CheckoutAppearance);
-            await s.Page.Locator("#OnChainWithLnInvoiceFallback").SetCheckedAsync(true);
-            await s.Page.Locator("#LightningAmountInSatoshi").SetCheckedAsync(false);
-            await s.ClickPagePrimary();
-            await s.FindAlertMessage(partialText: "Store successfully updated");
+            s.GoToHome();
+            s.GoToStore(StoreNavPages.CheckoutAppearance);
+            s.Driver.SetCheckbox(By.Id("OnChainWithLnInvoiceFallback"), true);
+            s.Driver.SetCheckbox(By.Id("LightningAmountInSatoshi"), false);
+            s.ClickPagePrimary();
+            Assert.Contains("Store successfully updated", s.FindAlertMessage().Text);
 
-            invoiceId = await s.CreateInvoice();
-            await s.GoToInvoiceCheckout(invoiceId);
-            async Task AssertNoPaymentMethods() => Assert.False(await s.Page.Locator(".payment-method").IsVisibleAsync());
-            await AssertNoPaymentMethods();
-            await Expect(s.Page.Locator("#AmountDue")).ToContainTextAsync("BTC");
-            qrValue = await s.Page.Locator(".qr-container").GetAttributeAsync("data-qr-value");
-            clipboard = await s.Page.Locator(".qr-container").GetAttributeAsync("data-clipboard");
-            payUrl = await s.Page.Locator("#PayInWallet").GetAttributeAsync("href");
-            var copyAddressOnchain = await s.Page.Locator("#Address_BTC-CHAIN .truncate-center").GetAttributeAsync("data-text");
-            var copyAddressLightning = await s.Page.Locator("#Lightning_BTC-CHAIN .truncate-center").GetAttributeAsync("data-text");
+            invoiceId = s.CreateInvoice();
+            s.GoToInvoiceCheckout(invoiceId);
+            void AssertNoPaymentMethods() => Assert.False(s.Driver.FindElement(By.CssSelector(".payment-method")).Displayed);
+            AssertNoPaymentMethods();
+            Assert.Contains("BTC", s.Driver.FindElement(By.Id("AmountDue")).Text);
+            qrValue = s.Driver.FindElement(By.CssSelector(".qr-container")).GetAttribute("data-qr-value");
+            clipboard = s.Driver.FindElement(By.CssSelector(".qr-container")).GetAttribute("data-clipboard");
+            payUrl = s.Driver.FindElement(By.Id("PayInWallet")).GetAttribute("href");
+            var copyAddressOnchain = s.Driver.FindElement(By.CssSelector("#Address_BTC-CHAIN .truncate-center")).GetAttribute("data-text");
+            var copyAddressLightning = s.Driver.FindElement(By.CssSelector("#Lightning_BTC-CHAIN .truncate-center")).GetAttribute("data-text");
             Assert.StartsWith($"bitcoin:{copyAddressOnchain}?amount=", payUrl);
             Assert.Contains("?amount=", payUrl);
             Assert.Contains("&lightning=", payUrl);
             Assert.StartsWith("bcrt", copyAddressOnchain);
             Assert.StartsWith("lnbcrt", copyAddressLightning);
-            Assert.StartsWith($"bitcoin:{copyAddressOnchain!.ToUpperInvariant()}?amount=", qrValue);
+            Assert.StartsWith($"bitcoin:{copyAddressOnchain.ToUpperInvariant()}?amount=", qrValue);
             Assert.Contains("&lightning=LNBCRT", qrValue);
             Assert.Contains("&lightning=lnbcrt", clipboard);
             Assert.Equal(clipboard, payUrl);
 
             // Check details
-            await ToggleCollapse();
-            await Expect(s.Page.Locator("#PaymentDetails-ExchangeRate")).ToContainTextAsync("1 BTC = ");
-            await Expect(s.Page.Locator("#PaymentDetails-ExchangeRate")).ToContainTextAsync("$");
-            await Expect(s.Page.Locator("#PaymentDetails-TotalFiat")).ToContainTextAsync("$");
-            await Expect(s.Page.Locator("#PaymentDetails-AmountDue")).ToContainTextAsync("BTC");
-            await Expect(s.Page.Locator("#PaymentDetails-TotalPrice")).ToContainTextAsync("BTC");
+            s.Driver.ToggleCollapse("PaymentDetails");
+            Assert.Contains("1 BTC = ", s.Driver.FindElement(By.Id("PaymentDetails-ExchangeRate")).Text);
+            Assert.Contains("$", s.Driver.FindElement(By.Id("PaymentDetails-ExchangeRate")).Text);
+            Assert.Contains("$", s.Driver.FindElement(By.Id("PaymentDetails-TotalFiat")).Text);
+            Assert.Contains("BTC", s.Driver.FindElement(By.Id("PaymentDetails-AmountDue")).Text);
+            Assert.Contains("BTC", s.Driver.FindElement(By.Id("PaymentDetails-TotalPrice")).Text);
 
             // Switch to amount displayed in sats
-            await s.GoToHome();
-            await s.GoToStore(s.StoreId, StoreNavPages.CheckoutAppearance);
-            await s.Page.Locator("#LightningAmountInSatoshi").SetCheckedAsync(true);
-            await s.ClickPagePrimary();
-            await s.FindAlertMessage(partialText: "Store successfully updated");
-            await s.GoToInvoiceCheckout(invoiceId);
-            await Expect(s.Page.Locator("#AmountDue")).ToContainTextAsync("sats");
+            s.GoToHome();
+            s.GoToStore(StoreNavPages.CheckoutAppearance);
+            s.Driver.SetCheckbox(By.Id("LightningAmountInSatoshi"), true);
+            s.ClickPagePrimary();
+            Assert.Contains("Store successfully updated", s.FindAlertMessage().Text);
+            s.GoToInvoiceCheckout(invoiceId);
+            Assert.Contains("sats", s.Driver.FindElement(By.Id("AmountDue")).Text);
 
             // Check details
-            await ToggleCollapse();
-            await Expect(s.Page.Locator("#PaymentDetails-ExchangeRate")).ToContainTextAsync("1 sat = ");
-            await Expect(s.Page.Locator("#PaymentDetails-ExchangeRate")).ToContainTextAsync("$");
-            await Expect(s.Page.Locator("#PaymentDetails-TotalFiat")).ToContainTextAsync("$");
-            await Expect(s.Page.Locator("#PaymentDetails-AmountDue")).ToContainTextAsync("sats");
-            await Expect(s.Page.Locator("#PaymentDetails-TotalPrice")).ToContainTextAsync("sats");
+            s.Driver.ToggleCollapse("PaymentDetails");
+            Assert.Contains("1 sat = ", s.Driver.FindElement(By.Id("PaymentDetails-ExchangeRate")).Text);
+            Assert.Contains("$", s.Driver.FindElement(By.Id("PaymentDetails-ExchangeRate")).Text);
+            Assert.Contains("$", s.Driver.FindElement(By.Id("PaymentDetails-TotalFiat")).Text);
+            Assert.Contains("sats", s.Driver.FindElement(By.Id("PaymentDetails-AmountDue")).Text);
+            Assert.Contains("sats", s.Driver.FindElement(By.Id("PaymentDetails-TotalPrice")).Text);
 
-            // BIP21 with LN as the default payment method
-            await s.GoToHome();
-            invoiceId = await s.CreateInvoice(defaultPaymentMethod: "BTC-LN");
-            await s.GoToInvoiceCheckout(invoiceId);
-            await AssertNoPaymentMethods();
-            payUrl = await s.Page.Locator("#PayInWallet").GetAttributeAsync("href");
+            // BIP21 with LN as default payment method
+            s.GoToHome();
+            invoiceId = s.CreateInvoice(defaultPaymentMethod: "BTC-LN");
+            s.GoToInvoiceCheckout(invoiceId);
+            AssertNoPaymentMethods();
+            payUrl = s.Driver.FindElement(By.Id("PayInWallet")).GetAttribute("href");
             Assert.StartsWith("bitcoin:", payUrl);
             Assert.Contains("&lightning=lnbcrt", payUrl);
 
             // Check details
-            await ToggleCollapse();
-            await Expect(s.Page.Locator("#PaymentDetails-ExchangeRate")).ToContainTextAsync("1 sat = ");
-            await Expect(s.Page.Locator("#PaymentDetails-ExchangeRate")).ToContainTextAsync("$");
-            await Expect(s.Page.Locator("#PaymentDetails-TotalFiat")).ToContainTextAsync("$");
-            await Expect(s.Page.Locator("#PaymentDetails-AmountDue")).ToContainTextAsync("sats");
-            await Expect(s.Page.Locator("#PaymentDetails-TotalPrice")).ToContainTextAsync("sats");
+            s.Driver.ToggleCollapse("PaymentDetails");
+            Assert.Contains("1 sat = ", s.Driver.FindElement(By.Id("PaymentDetails-ExchangeRate")).Text);
+            Assert.Contains("$", s.Driver.FindElement(By.Id("PaymentDetails-ExchangeRate")).Text);
+            Assert.Contains("$", s.Driver.FindElement(By.Id("PaymentDetails-TotalFiat")).Text);
+            Assert.Contains("sats", s.Driver.FindElement(By.Id("PaymentDetails-AmountDue")).Text);
+            Assert.Contains("sats", s.Driver.FindElement(By.Id("PaymentDetails-TotalPrice")).Text);
 
             // Ensure LNURL is enabled
-            await s.GoToHome();
-            await s.GoToLightningSettings();
-            Assert.True(await s.Page.Locator("#LNURLEnabled").IsCheckedAsync());
+            s.GoToHome();
+            s.GoToLightningSettings();
+            Assert.True(s.Driver.FindElement(By.Id("LNURLEnabled")).Selected);
 
             // BIP21 with top-up invoice
-            invoiceId = await s.CreateInvoice(amount: null);
-            await s.GoToInvoiceCheckout(invoiceId);
-            await AssertNoPaymentMethods();
-            qrValue = await s.Page.Locator(".qr-container").GetAttributeAsync("data-qr-value");
-            clipboard = await s.Page.Locator(".qr-container").GetAttributeAsync("data-clipboard");
-            payUrl = await s.Page.Locator("#PayInWallet").GetAttributeAsync("href");
-            copyAddressOnchain = await s.Page.Locator("#Address_BTC-CHAIN .truncate-center").GetAttributeAsync("data-text");
-            copyAddressLightning = await s.Page.Locator("#Lightning_BTC-CHAIN .truncate-center").GetAttributeAsync("data-text");
+            invoiceId = s.CreateInvoice(amount: null);
+            s.GoToInvoiceCheckout(invoiceId);
+            AssertNoPaymentMethods();
+            qrValue = s.Driver.FindElement(By.CssSelector(".qr-container")).GetAttribute("data-qr-value");
+            clipboard = s.Driver.FindElement(By.CssSelector(".qr-container")).GetAttribute("data-clipboard");
+            payUrl = s.Driver.FindElement(By.Id("PayInWallet")).GetAttribute("href");
+            copyAddressOnchain = s.Driver.FindElement(By.CssSelector("#Address_BTC-CHAIN .truncate-center")).GetAttribute("data-text");
+            copyAddressLightning = s.Driver.FindElement(By.CssSelector("#Lightning_BTC-CHAIN .truncate-center")).GetAttribute("data-text");
             Assert.StartsWith($"bitcoin:{copyAddressOnchain}", payUrl);
             Assert.Contains("?lightning=lnurl", payUrl);
             Assert.DoesNotContain("amount=", payUrl);
             Assert.StartsWith("bcrt", copyAddressOnchain);
             Assert.StartsWith("lnurl", copyAddressLightning);
-            Assert.StartsWith($"bitcoin:{copyAddressOnchain!.ToUpperInvariant()}?lightning=LNURL", qrValue);
+            Assert.StartsWith($"bitcoin:{copyAddressOnchain.ToUpperInvariant()}?lightning=LNURL", qrValue);
             Assert.Contains($"bitcoin:{copyAddressOnchain}?lightning=lnurl", clipboard);
             Assert.Equal(clipboard, payUrl);
 
             // Check details
-            await ToggleCollapse();
-            await Expect(s.Page.Locator("#PaymentDetails-ExchangeRate")).ToContainTextAsync("1 sat = ");
-            await Expect(s.Page.Locator("#PaymentDetails-ExchangeRate")).ToContainTextAsync("$");
-            await s.ElementDoesNotExist("#PaymentDetails-TotalFiat");
-            await s.ElementDoesNotExist("#PaymentDetails-AmountDue");
-            await s.ElementDoesNotExist("#PaymentDetails-TotalPrice");
+            s.Driver.ToggleCollapse("PaymentDetails");
+            Assert.Contains("1 sat = ", s.Driver.FindElement(By.Id("PaymentDetails-ExchangeRate")).Text);
+            Assert.Contains("$", s.Driver.FindElement(By.Id("PaymentDetails-ExchangeRate")).Text);
+            s.Driver.ElementDoesNotExist(By.Id("PaymentDetails-TotalFiat"));
+            s.Driver.ElementDoesNotExist(By.Id("PaymentDetails-AmountDue"));
+            s.Driver.ElementDoesNotExist(By.Id("PaymentDetails-TotalPrice"));
 
-            // Expiry message should not show the amount for top-up invoice
-            expirySeconds = s.Page.Locator("#ExpirySeconds");
-            await expirySeconds.ClearAsync();
-            await expirySeconds.FillAsync("5");
-            await s.Page.ClickAsync("#Expire");
-            await TestUtils.EventuallyAsync(async () =>
+            // Expiry message should not show amount for top-up invoice
+            expirySeconds = s.Driver.FindElement(By.Id("ExpirySeconds"));
+            expirySeconds.Clear();
+            expirySeconds.SendKeys("5");
+            s.Driver.FindElement(By.Id("Expire")).Click();
+            TestUtils.Eventually(() =>
             {
-                var paymentInfo = s.Page.Locator("#PaymentInfo");
-                await paymentInfo.WaitForAsync();
-                var paymentInfoText = await paymentInfo.TextContentAsync();
-                Assert.Contains("This invoice will expire in", paymentInfoText);
-                Assert.Contains("00:0", paymentInfoText);
-                Assert.DoesNotContain("Please send", paymentInfoText);
+                var paymentInfo = s.Driver.WaitForElement(By.Id("PaymentInfo"));
+                Assert.Contains("This invoice will expire in", paymentInfo.Text);
+                Assert.Contains("00:0", paymentInfo.Text);
+                Assert.DoesNotContain("Please send", paymentInfo.Text);
             });
 
-            // Configure a countdown timer
-            await s.GoToHome();
-            invoiceId = await s.CreateInvoice();
-            await s.GoToHome();
-            await s.GoToStore(s.StoreId, StoreNavPages.CheckoutAppearance);
-            var displayExpirationTimer = s.Page.Locator("#DisplayExpirationTimer");
-            Assert.Equal("5", await displayExpirationTimer.InputValueAsync());
-            await displayExpirationTimer.ClearAsync();
-            await displayExpirationTimer.FillAsync("10");
-            await s.ClickPagePrimary();
-            await s.FindAlertMessage(partialText: "Store successfully updated");
+            // Configure countdown timer
+            s.GoToHome();
+            invoiceId = s.CreateInvoice();
+            s.GoToHome();
+            s.GoToStore(StoreNavPages.CheckoutAppearance);
+            var displayExpirationTimer = s.Driver.FindElement(By.Id("DisplayExpirationTimer"));
+            Assert.Equal("5", displayExpirationTimer.GetAttribute("value"));
+            displayExpirationTimer.Clear();
+            displayExpirationTimer.SendKeys("10");
+            s.ClickPagePrimary();
+            Assert.Contains("Store successfully updated", s.FindAlertMessage().Text);
 
-            await s.GoToInvoiceCheckout(invoiceId);
-            var paymentInfo2 = s.Page.Locator("#PaymentInfo");
-            Assert.False(await paymentInfo2.IsVisibleAsync());
-            var paymentInfoText2 = await paymentInfo2.TextContentAsync();
-            Assert.DoesNotContain("This invoice will expire in", paymentInfoText2);
+            s.GoToInvoiceCheckout(invoiceId);
+            var paymentInfo = s.Driver.FindElement(By.Id("PaymentInfo"));
+            Assert.False(paymentInfo.Displayed);
+            Assert.DoesNotContain("This invoice will expire in", paymentInfo.Text);
 
-            expirySeconds = s.Page.Locator("#ExpirySeconds");
-            await expirySeconds.ClearAsync();
-            await expirySeconds.FillAsync("599");
-            await s.Page.ClickAsync("#Expire");
-            await TestUtils.EventuallyAsync(async () =>
+            expirySeconds = s.Driver.FindElement(By.Id("ExpirySeconds"));
+            expirySeconds.Clear();
+            expirySeconds.SendKeys("599");
+            s.Driver.FindElement(By.Id("Expire")).Click();
+            TestUtils.Eventually(() =>
             {
-                var paymentInfo = s.Page.Locator("#PaymentInfo");
-                await paymentInfo.WaitForAsync();
-                Assert.True(await paymentInfo.IsVisibleAsync());
-                var paymentInfoText = await paymentInfo.TextContentAsync();
-                Assert.Contains("This invoice will expire in", paymentInfoText);
-                Assert.Contains("09:5", paymentInfoText);
+                paymentInfo = s.Driver.WaitForElement(By.Id("PaymentInfo"));
+                Assert.True(paymentInfo.Displayed);
+                Assert.Contains("This invoice will expire in", paymentInfo.Text);
+                Assert.Contains("09:5", paymentInfo.Text);
             });
 
             // Disable LNURL again
-            await s.GoToHome();
-            await s.GoToLightningSettings();
-            await s.Page.Locator("#LNURLEnabled").SetCheckedAsync(false);
-            await s.ClickPagePrimary();
-            await s.FindAlertMessage(partialText: "BTC Lightning settings successfully updated");
+            s.GoToHome();
+            s.GoToLightningSettings();
+            s.Driver.SetCheckbox(By.Id("LNURLEnabled"), false);
+            s.ClickPagePrimary();
+            Assert.Contains("BTC Lightning settings successfully updated", s.FindAlertMessage().Text);
 
             // Test:
             // - NFC/LNURL-W available with just Lightning
-            // - BIP21 works correctly even though Lightning is the default payment method
-            await s.GoToHome();
-            invoiceId = await s.CreateInvoice(defaultPaymentMethod: "BTC-LN");
-            await s.GoToInvoiceCheckout(invoiceId);
-            await AssertNoPaymentMethods();
-            payUrl = await s.Page.Locator("#PayInWallet").GetAttributeAsync("href");
+            // - BIP21 works correctly even though Lightning is default payment method
+            s.GoToHome();
+            invoiceId = s.CreateInvoice(defaultPaymentMethod: "BTC-LN");
+            s.GoToInvoiceCheckout(invoiceId);
+            AssertNoPaymentMethods();
+            payUrl = s.Driver.FindElement(By.Id("PayInWallet")).GetAttribute("href");
             Assert.StartsWith("bitcoin:", payUrl);
             Assert.Contains("&lightning=lnbcrt", payUrl);
 
             // Language Switch
-            var languageSelect = s.Page.Locator("#DefaultLang");
-            await Expect(languageSelect.Locator("option:checked")).ToHaveTextAsync("English");
-            await Expect(s.Page.Locator("#DetailsToggle")).ToHaveTextAsync("View Details");
-            Assert.DoesNotContain("lang=", s.Page.Url);
-            await languageSelect.SelectOptionAsync(new SelectOptionValue { Label = "Deutsch" });
-            await TestUtils.EventuallyAsync(async () =>
-            {
-                Assert.Contains("lang=de", s.Page.Url);
-                await Expect(s.Page.Locator("#DetailsToggle")).ToHaveTextAsync("Details anzeigen");
-            });
+            var languageSelect = new SelectElement(s.Driver.FindElement(By.Id("DefaultLang")));
+            Assert.Equal("English", languageSelect.SelectedOption.Text);
+            Assert.Equal("View Details", s.Driver.FindElement(By.Id("DetailsToggle")).Text);
+            Assert.DoesNotContain("lang=", s.Driver.Url);
+            languageSelect.SelectByText("Deutsch");
+            Assert.Equal("Details anzeigen", s.Driver.FindElement(By.Id("DetailsToggle")).Text);
+            Assert.Contains("lang=de", s.Driver.Url);
 
-            await s.Page.ReloadAsync();
-            languageSelect = s.Page.Locator("#DefaultLang");
-            await Expect(languageSelect.Locator("option:checked")).ToHaveTextAsync("Deutsch");
-            await Expect(s.Page.Locator("#DetailsToggle")).ToHaveTextAsync("Details anzeigen");
-
-            await languageSelect.SelectOptionAsync(new SelectOptionValue { Label = "English" });
-            await TestUtils.EventuallyAsync(async () =>
-            {
-                Assert.Contains("lang=en", s.Page.Url);
-                await Expect(s.Page.Locator("#DetailsToggle")).ToHaveTextAsync("View Details");
-            });
+            s.Driver.Navigate().Refresh();
+            languageSelect = new SelectElement(s.Driver.WaitForElement(By.Id("DefaultLang")));
+            Assert.Equal("Deutsch", languageSelect.SelectedOption.Text);
+            Assert.Equal("Details anzeigen", s.Driver.FindElement(By.Id("DetailsToggle")).Text);
+            languageSelect.SelectByText("English");
+            Assert.Equal("View Details", s.Driver.FindElement(By.Id("DetailsToggle")).Text);
+            Assert.Contains("lang=en", s.Driver.Url);
         }
 
         [Fact(Timeout = TestTimeout)]
         public async Task CanUseCheckoutAsModal()
         {
-            await using var s = CreatePlaywrightTester();
+            using var s = CreateSeleniumTester();
             await s.StartAsync();
-            await s.RegisterNewUser();
-            await s.CreateNewStore();
-            await s.GoToStore();
-            await s.AddDerivationScheme();
-            var invoiceId = await s.CreateInvoice(0.001m, "BTC", "a@x.com");
+            s.GoToRegister();
+            s.RegisterNewUser();
+            s.CreateNewStore();
+            s.GoToStore();
+            s.AddDerivationScheme();
+            var invoiceId = s.CreateInvoice(0.001m, "BTC", "a@x.com");
             var invoice = await s.Server.PayTester.InvoiceRepository.GetInvoice(invoiceId);
-            await s.GoToUrl($"/tests/index.html?invoice={invoiceId}");
-            await s.Page.Locator("[name='btcpay']").WaitForAsync();
+            s.Driver.Navigate()
+                .GoToUrl(new Uri(s.ServerUri, $"tests/index.html?invoice={invoiceId}"));
+            s.Driver.WaitUntilAvailable(By.Name("btcpay"));
 
-            var frameElement = s.Page.FrameLocator("[name='btcpay']");
-            Assert.True(await s.Page.Locator("[name='btcpay']").IsVisibleAsync());
-            await frameElement.Locator("#Checkout").WaitForAsync();
+            var frameElement = s.Driver.FindElement(By.Name("btcpay"));
+            Assert.True(frameElement.Displayed);
+            var iframe = s.Driver.SwitchTo().Frame(frameElement);
+            iframe.WaitUntilAvailable(By.Id("Checkout"));
 
             await s.Server.ExplorerNode.SendToAddressAsync(BitcoinAddress.Create(invoice
-                    .GetPaymentPrompt(PaymentTypes.CHAIN.GetPaymentMethodId("BTC"))!
+                    .GetPaymentPrompt(PaymentTypes.CHAIN.GetPaymentMethodId("BTC"))
                     .Destination, Network.RegTest),
                 new Money(0.001m, MoneyUnit.BTC));
 
-            await TestUtils.EventuallyAsync(async () =>
+            TestUtils.Eventually(() =>
             {
-                var closeButton = frameElement.Locator("#close");
-                Assert.True(await closeButton.IsVisibleAsync());
-                await closeButton.ClickAsync();
+                var closeButton = iframe.FindElement(By.Id("close"));
+                Assert.True(closeButton.Displayed);
+                closeButton.Click();
             });
-            await Expect(s.Page.Locator("[name='btcpay']")).Not.ToBeVisibleAsync();
-            Assert.Equal(s.Page.Url,
+            s.Driver.AssertElementNotFound(By.Name("btcpay"));
+            Assert.Equal(s.Driver.Url,
                 new Uri(s.ServerUri, $"tests/index.html?invoice={invoiceId}").ToString());
         }
     }

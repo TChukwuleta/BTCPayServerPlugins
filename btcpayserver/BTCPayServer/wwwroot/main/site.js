@@ -17,26 +17,9 @@ async function initLabelManager (elementId) {
     const element = document.getElementById(elementId);
     if (!element) return;
 
-    const {
-        fetchUrl,
-        updateUrl,
-        walletId,
-        labels,
-        selectElement,
-        storeId,
-        objectId,
-        objectType
-    } = element.dataset;
-
-    const isStoreScoped = !!storeId;
-
-    const commonCallId = isStoreScoped
-        ? `labels-store-${storeId}-${objectType}`
-        : `labels-wallet-${walletId}-${objectType}`;
-
+    const { fetchUrl, updateUrl, walletId, walletObjectType, walletObjectId, labels, selectElement } = element.dataset;
+    const commonCallId = `walletLabels-${walletId}`;
     const fetchWalletLabels = async (force = false) => {
-        if (!fetchUrl) return [];
-
         if (!force && window[commonCallId])
             return window[commonCallId];
 
@@ -75,6 +58,8 @@ async function initLabelManager (elementId) {
                 select.addOption(lbl);
             }
         });
+
+        select.refreshItems();
     };
     const applyLabelStyle = (el, data) => {
         const bg = data && data.color
@@ -180,9 +165,8 @@ async function initLabelManager (elementId) {
             const labels = Array.isArray(values) ? values : values.split(',');
             element.dispatchEvent(new CustomEvent("labelmanager:changed", {
                 detail: {
-                    id: objectId,
-                    type: objectType,
-                    labels
+                    walletObjectId,
+                    labels: labels
                 }
             }));
 
@@ -198,16 +182,16 @@ async function initLabelManager (elementId) {
             if (!updateUrl) return;
             select.lock();
             try {
-                const payload = { id: objectId, type: objectType, labels: select.items };
-                const tokenInput =
-                    element.closest('form')?.querySelector('input[name="__RequestVerificationToken"]') ||
-                    document.querySelector('input[name="__RequestVerificationToken"]');
-                const headers = { 'Content-Type': 'application/json' };
-                if (tokenInput?.value) headers['RequestVerificationToken'] = tokenInput.value;
                 const response = await fetch(updateUrl, {
                     method: 'POST',
-                    headers,
-                    body: JSON.stringify(payload)
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        id: walletObjectId,
+                        type: walletObjectType,
+                        labels: select.items
+                    })
                 });
                 if (!response.ok) {
                     throw new Error('Network response was not OK');

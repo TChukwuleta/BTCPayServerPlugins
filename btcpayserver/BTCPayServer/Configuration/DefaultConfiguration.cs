@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -10,6 +11,7 @@ using BTCPayServer.Plugins;
 using BTCPayServer.Plugins.Bitcoin;
 using CommandLine;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using NBitcoin;
 using NBXplorer;
@@ -32,8 +34,7 @@ namespace BTCPayServer.Configuration
             app.Option("--testnet | -testnet", $"Use testnet (deprecated, use --network instead)", CommandOptionType.BoolValue);
             app.Option("--regtest | -regtest", $"Use regtest (deprecated, use --network instead)", CommandOptionType.BoolValue);
             app.Option("--signet | -signet", $"Use signet (deprecated, use --network instead)", CommandOptionType.BoolValue);
-            app.Option("--chains | -c", $"Chains to support as a comma separated. Default to empty if --nodefaultchain is set (default: btc; available: {chains})", CommandOptionType.SingleValue);
-            app.Option("--nodefaultchain | -nodefaultchain", "Allow BTCPay to start without any chain enabled (default: false)", CommandOptionType.BoolValue);
+            app.Option("--chains | -c", $"Chains to support as a comma separated (default: btc; available: {chains})", CommandOptionType.SingleValue);
             app.Option("--postgres", $"Connection string to a PostgreSQL database", CommandOptionType.SingleValue);
             app.Option("--nocsp", $"Disable CSP (default false)", CommandOptionType.BoolValue);
             app.Option("--deprecated", $"Allow deprecated settings (default:false)", CommandOptionType.BoolValue);

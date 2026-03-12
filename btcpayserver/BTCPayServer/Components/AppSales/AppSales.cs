@@ -31,12 +31,12 @@ public class AppSales : ViewComponent
             Id = appId,
             AppType = appType,
             DataUrl = Url.Action("AppSales", "UIApps", new { appId }),
-            InitialRendering = HttpContext.GetAppDataOrNull()?.Id != appId
+            InitialRendering = HttpContext.GetAppData()?.Id != appId
         };
         if (vm.InitialRendering)
             return View(vm);
 
-        var app = HttpContext.GetAppDataOrNull();
+        var app = HttpContext.GetAppData();
         var stats = await _appService.GetSalesStats(app);
         vm.SalesCount = stats.SalesCount;
         vm.Series = stats.Series;

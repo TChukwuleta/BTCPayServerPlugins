@@ -8,14 +8,23 @@ namespace BTCPayServer.Controllers.Greenfield
 {
     [Controller]
     [EnableCors(CorsPolicies.All)]
-    public class GreenfieldHealthController(NBXplorerDashboard dashBoard) : ControllerBase
+    public class GreenfieldHealthController : ControllerBase
     {
+        private readonly NBXplorerDashboard _dashBoard;
+
+        public GreenfieldHealthController(NBXplorerDashboard dashBoard)
+        {
+            _dashBoard = dashBoard;
+        }
         [AllowAnonymous]
         [HttpGet("~/api/v1/health")]
         public ActionResult GetHealth()
-        =>  Ok( new ApiHealthData()
         {
-            Synchronized = dashBoard.IsFullySynched()
-        });
+            ApiHealthData model = new ApiHealthData()
+            {
+                Synchronized = _dashBoard.IsFullySynched()
+            };
+            return Ok(model);
+        }
     }
 }

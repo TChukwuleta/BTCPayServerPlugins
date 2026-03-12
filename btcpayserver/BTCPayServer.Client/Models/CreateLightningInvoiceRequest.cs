@@ -1,5 +1,6 @@
 using System;
 using BTCPayServer.Lightning;
+using NBitcoin;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Client.Models

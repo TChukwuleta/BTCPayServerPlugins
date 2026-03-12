@@ -1,5 +1,8 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Services.Rates;
@@ -7,10 +10,14 @@ using Newtonsoft.Json.Linq;
 
 namespace BTCPayServer.Rating
 {
-    public class HitBTCRateProvider(HttpClient httpClient) : IRateProvider
+    public class HitBTCRateProvider : IRateProvider
     {
         public RateSourceInfo RateSourceInfo => new("hitbtc", "HitBTC", "https://api.hitbtc.com/api/2/public/ticker");
-        private readonly HttpClient _httpClient = httpClient ?? new HttpClient();
+        private readonly HttpClient _httpClient;
+        public HitBTCRateProvider(HttpClient httpClient)
+        {
+            _httpClient = httpClient ?? new HttpClient();
+        }
 
         public async Task<PairRate[]> GetRatesAsync(CancellationToken cancellationToken)
         {

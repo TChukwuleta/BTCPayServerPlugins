@@ -90,19 +90,15 @@ public static partial class ApplicationDbContextExtensions
         => FetchPlanFeaturesAsync(ctx, new[] { plan });
 
 
-    public static async Task<OfferingData?> GetOfferingData(this DbSet<OfferingData> offerings, string offeringId, string? storeId = null, bool fetchPlanFeatures = false)
+    public static async Task<OfferingData?> GetOfferingData(this DbSet<OfferingData> offerings, string offeringId, string? storeId = null)
     {
         var offering = offerings.IncludeAll();
 
         var o = await offering
                 .Where(o => o.Id == offeringId)
                 .FirstOrDefaultAsync();
-        if (o is null)
+        if (storeId != null &&  o?.App.StoreDataId != storeId)
             return null;
-        if (storeId != null &&  o.App.StoreDataId != storeId)
-            return null;
-        if (fetchPlanFeatures)
-            await ((ApplicationDbContext)offerings.GetDbContext()).Plans.FetchPlanFeaturesAsync(o.Plans);
         return o;
     }
 
@@ -125,17 +121,8 @@ public static partial class ApplicationDbContextExtensions
             .Where(c => c.Id == checkoutId)
             .FirstOrDefaultAsync();
         if (checkout is not null)
-        {
-            // Make sure all offering data is loaded
-            await LoadOfferingDataAsync(checkouts, checkout.Plan.OfferingId);
-        }
+            await FetchPlanFeaturesAsync(checkouts, checkout.Plan);
         return checkout;
-    }
-
-    private static async Task LoadOfferingDataAsync<T>(DbSet<T> set, string offeringId) where T : class
-    {
-        var ctx = ((ApplicationDbContext)set.GetDbContext());
-        await ctx.Offerings.GetOfferingData(offeringId, fetchPlanFeatures: true);
     }
 
     public static async Task<(SubscriberData?, bool Created)> GetOrCreateByCustomerId(this DbSet<SubscriberData> subs, string custId, string offeringId, string planId, bool? optimisticActivation, bool testAccount, JObject? newMemberMetadata = null)
@@ -154,25 +141,12 @@ public static partial class ApplicationDbContextExtensions
         return member?.PlanId == planId ? (member, true) : (null, false);
     }
 
-    public static async Task<PortalSessionData?> GetActiveById(this DbSet<PortalSessionData> sessions, string sessionId)
-    {
-        var s = await sessions.IncludeAll()
+    public static Task<PortalSessionData?> GetActiveById(this IQueryable<PortalSessionData> sessions, string sessionId)
+        => sessions.IncludeAll()
             .Where(s => s.Id == sessionId && DateTimeOffset.UtcNow < s.Expiration).FirstOrDefaultAsync();
-        if (s is null)
-            return null;
-        await LoadOfferingDataAsync(sessions, s.Subscriber.OfferingId);
-        return s;
-    }
-
-    public static async Task<PortalSessionData?> GetById(this DbSet<PortalSessionData> sessions, string sessionId)
-    {
-        var s = await sessions.IncludeAll()
+    public static Task<PortalSessionData?> GetById(this IQueryable<PortalSessionData> sessions, string sessionId)
+        => sessions.IncludeAll()
             .Where(s => s.Id == sessionId).FirstOrDefaultAsync();
-        if (s is null)
-            return null;
-        await LoadOfferingDataAsync(sessions, s.Subscriber.OfferingId);
-        return s;
-    }
 
     public static IIncludableQueryable<PortalSessionData, StoreData> IncludeAll(this IQueryable<PortalSessionData> sessions)
     => sessions

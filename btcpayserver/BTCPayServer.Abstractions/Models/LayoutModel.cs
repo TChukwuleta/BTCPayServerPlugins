@@ -1,4 +1,6 @@
 #nullable enable
+using NBitcoin;
+
 namespace BTCPayServer.Abstractions.Models;
 
 public record WellKnownCategories(string CategoryId)
