@@ -9,7 +9,7 @@ public static class CheckInTokenHelper
 {
     public static bool VerifyToken(string token, EventCheckInSettings settings)
     {
-        if (string.IsNullOrEmpty(settings?.CheckInToken)) return false;
+        if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(settings?.CheckInToken)) return false;
         return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(settings.CheckInToken), Encoding.UTF8.GetBytes(token));
     }
 

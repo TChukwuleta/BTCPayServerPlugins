@@ -114,7 +114,10 @@
                                                         }
                                                     </td>
                                                     <td>
-                                                        <a asp-action="SendTicketReminder" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticketVm.Id" asp-route-orderId="@ticket.OrderId">Resend Ticket Email</a>
+                                                        @if (!ticketVm.CheckedIn)
+                                                        {
+                                                            <a asp-action="SendTicketReminder" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticketVm.Id" asp-route-orderId="@ticket.OrderId">Resend Ticket Email</a>
+                                                        }
                                                     </td>
                                                     <td class="text-end">
                                                         <a asp-action="DeleteTicket" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticketVm.Id" class="text-danger ms-2">Delete</a>

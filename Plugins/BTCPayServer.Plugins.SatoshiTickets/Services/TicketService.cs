@@ -29,7 +29,7 @@ public class TicketService
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, DateTime.UtcNow));
 
         if (rowsAffected == 0)
-            return new() { Success = false, ErrorMessage = $"Ticket previously checked in by {ticket.UsedAt.Value:f}" };
+            return new() { Success = false, ErrorMessage = "Ticket was already checked in" };
 
         ticket.UsedAt = DateTime.UtcNow;
         return new() { Success = true, Ticket = ticket };  

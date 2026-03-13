@@ -370,11 +370,38 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         if (settings == null || !settings.PinEnabled)
             return RedirectToAction(nameof(TicketCheckin), new { storeId, eventId, token });
 
-        if (!CheckInTokenHelper.VerifyPin(pin, settings.PinHash))
+        const int maxAttempts = 3;
+        const int lockoutMinutes = 15;
+        var attemptsKey = $"CheckIn_{eventId}_attempts";
+        var lockoutKey = $"CheckIn_{eventId}_lockout";
+
+        var lockoutStr = HttpContext.Session.GetString(lockoutKey);
+        if (lockoutStr != null && DateTimeOffset.TryParse(lockoutStr, out var lockedUntil) && lockedUntil > DateTimeOffset.UtcNow)
         {
-            TempData["CheckInErrorMessage"] = "Invalid PIN";
+            TempData["CheckInErrorMessage"] = $"Too many incorrect attempts. Try again in {(int)(lockedUntil - DateTimeOffset.UtcNow).TotalMinutes + 1} minutes.";
             return RedirectToAction(nameof(TicketCheckin), new { storeId, eventId, token });
         }
+
+        if (!CheckInTokenHelper.VerifyPin(pin, settings.PinHash))
+        {
+            var attempts = int.TryParse(HttpContext.Session.GetString(attemptsKey), out var a) ? a + 1 : 1;
+            HttpContext.Session.SetString(attemptsKey, attempts.ToString());
+
+            if (attempts >= maxAttempts)
+            {
+                var lockoutUntil = DateTimeOffset.UtcNow.AddMinutes(lockoutMinutes);
+                HttpContext.Session.SetString(lockoutKey, lockoutUntil.ToString("o"));
+                HttpContext.Session.Remove(attemptsKey);
+                TempData["CheckInErrorMessage"] = $"Too many incorrect attempts. Locked out for {lockoutMinutes} minutes.";
+            }
+            else
+            {
+                TempData["CheckInErrorMessage"] = $"Invalid PIN. {maxAttempts - attempts} attempt(s) remaining.";
+            }
+            return RedirectToAction(nameof(TicketCheckin), new { storeId, eventId, token });
+        }
+        HttpContext.Session.Remove(attemptsKey);
+        HttpContext.Session.Remove(lockoutKey);
         HttpContext.Session.SetString($"CheckIn_{eventId}", "authorized");
         return RedirectToAction(nameof(TicketCheckin), new { storeId, eventId, token });
     }
