@@ -19,7 +19,6 @@ using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
@@ -42,7 +41,6 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         TicketService ticketService,
         InvoiceRepository invoiceRepository,
         UIInvoiceController invoiceController,
-        IDataProtectionProvider dataProtectionProvider,
         SimpleTicketSalesDbContextFactory dbContextFactory) : Controller
 {
     private const string SessionKeyOrder = "Ticket_Order_";
@@ -343,11 +341,11 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
     {
         await using var ctx = dbContextFactory.CreateContext();
         var ev = ctx.Events.FirstOrDefault(e => e.Id == eventId && e.StoreId == storeId);
-        if (ev == null || !CheckInTokenHelper.VerifyToken(token, eventId, storeId, dataProtectionProvider))
-            return NotFound();
-
         var allSettings = await storeRepo.GetSettingAsync<Dictionary<string, EventCheckInSettings>>(storeId, Plugin.CheckinSettingsName);
         var settings = allSettings?.GetValueOrDefault(eventId);
+        if (ev == null || !CheckInTokenHelper.VerifyToken(token, settings))
+            return NotFound();
+
         var pinRequired = settings is { PinEnabled: true, } && HttpContext.Session.GetString($"CheckIn_{eventId}") != "authorized";
         return View(new TicketScannerViewModel
         {
@@ -364,11 +362,11 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
     {
         await using var ctx = dbContextFactory.CreateContext();
         var ev = ctx.Events.FirstOrDefault(e => e.Id == eventId && e.StoreId == storeId);
-        if (ev == null || !CheckInTokenHelper.VerifyToken(token, eventId, storeId, dataProtectionProvider))
-            return NotFound();
-
         var allSettings = await storeRepo.GetSettingAsync<Dictionary<string, EventCheckInSettings>>(storeId, Plugin.CheckinSettingsName);
         var settings = allSettings?.GetValueOrDefault(eventId);
+        if (ev == null || !CheckInTokenHelper.VerifyToken(token, settings))
+            return NotFound();
+
         if (settings == null || !settings.PinEnabled)
             return RedirectToAction(nameof(TicketCheckin), new { storeId, eventId, token });
 
@@ -387,7 +385,12 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
     {
         await using var ctx = dbContextFactory.CreateContext();
         var ev = ctx.Events.FirstOrDefault(e => e.Id == eventId && e.StoreId == storeId);
-        if (ev == null || !CheckInTokenHelper.VerifyToken(token, eventId, storeId, dataProtectionProvider))
+        var allSettings = await storeRepo.GetSettingAsync<Dictionary<string, EventCheckInSettings>>(storeId, Plugin.CheckinSettingsName);
+        var settings = allSettings?.GetValueOrDefault(eventId);
+        if (ev == null || !CheckInTokenHelper.VerifyToken(token, settings))
+            return NotFound();
+
+        if (settings is { PinEnabled: true } && HttpContext.Session.GetString($"CheckIn_{eventId}") != "authorized")
             return NotFound();
 
         var checkinTicket = await ticketService.CheckinTicket(eventId, ticketNumber, storeId);

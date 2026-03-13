@@ -261,7 +261,7 @@ public class GhostPluginService : EventHostedServiceBase
         pr.SetBlob(new PaymentRequestBlob()
         {
             Description = $"{member.Name} Ghost membership renewal",
-            //Title = $"{member.Name} Ghost Subscription",
+            Title = $"{member.Name} Ghost Subscription",
             Email = member.Email,
             AllowCustomPaymentAmounts = false
         });

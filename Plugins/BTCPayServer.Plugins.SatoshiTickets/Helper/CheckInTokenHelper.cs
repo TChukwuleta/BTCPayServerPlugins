@@ -1,26 +1,16 @@
 ﻿using System;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.AspNetCore.DataProtection;
+using BTCPayServer.Plugins.SatoshiTickets.Data;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Helper;
 
 public static class CheckInTokenHelper
 {
-    public static string GenerateToken(string eventId, string storeId, IDataProtectionProvider dataProtectionProvider)
+    public static bool VerifyToken(string token, EventCheckInSettings settings)
     {
-        var protector = dataProtectionProvider.CreateProtector("SatoshiTickets.CheckIn");
-        var raw = $"{eventId}:{storeId}";
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(protector.Protect(raw)));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
-
-    public static bool VerifyToken(string token, string eventId, string storeId, IDataProtectionProvider dataProtectionProvider)
-    {
-        var expected = GenerateToken(eventId, storeId, dataProtectionProvider);
-        return CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(expected),
-            Encoding.UTF8.GetBytes(token));
+        if (string.IsNullOrEmpty(settings?.CheckInToken)) return false;
+        return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(settings.CheckInToken), Encoding.UTF8.GetBytes(token));
     }
 
     public static string HashPin(string pin)

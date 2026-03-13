@@ -19,7 +19,7 @@
         </ol>
     </nav>
     <div class="d-flex align-items-center w-100">
-        <h2>Check-in Settings — @Model.EventTitle</h2>
+        <h2>Check-in @Model.EventTitle</h2>
         <div class="ms-auto">
             <button type="submit" form="checkin-settings-form" class="btn btn-success">Save Settings</button>
         </div>
@@ -35,6 +35,17 @@
         <div class="input-group mb-5">
             <input type="text" class="form-control" id="checkInUrl" value="@Model.CheckInUrl" readonly />
             <button class="btn btn-outline-secondary" type="button" id="copyBtn">Copy</button>
+            <div class="input-group mb-2">
+                <input type="text" class="form-control" id="checkInUrl" value="@Model.CheckInUrl" readonly />
+                <button class="btn btn-outline-secondary" type="button" id="copyBtn">Copy</button>
+            </div>
+            <div class="mb-5">
+                <form method="post" asp-action="RegenerateCheckInToken" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-link btn-sm text-danger p-0">Regenerate link</button>
+                </form>
+                <span class="text-muted" style="font-size: 0.85rem;"> — invalidates the current link</span>
+            </div>
         </div>
 
         <h4 class="mb-2">PIN Login</h4>

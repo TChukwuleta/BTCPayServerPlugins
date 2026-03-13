@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
@@ -19,7 +20,6 @@ using BTCPayServer.Plugins.SatoshiTickets.ViewModels.Models;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -39,7 +39,6 @@ public class UITicketSalesController(UriResolver uriResolver,
         StoreRepository storeRepo,
         EmailService emailService,
         TicketService ticketService,
-        IDataProtectionProvider dataProtectionProvider,
         SimpleTicketSalesDbContextFactory dbContextFactory,
         UserManager<ApplicationUser> userManager) : Controller
 {
@@ -585,15 +584,19 @@ public class UITicketSalesController(UriResolver uriResolver,
         var allSettings = await storeRepo.GetSettingAsync<Dictionary<string, EventCheckInSettings>>(storeId, Plugin.CheckinSettingsName)
                   ?? new Dictionary<string, EventCheckInSettings>();
 
-        var settings = allSettings.GetValueOrDefault(eventId) ?? new EventCheckInSettings { EventId = eventId };
-
-        var token = CheckInTokenHelper.GenerateToken(eventId, storeId, dataProtectionProvider);
+        var settings = allSettings.GetValueOrDefault(eventId);
+        if (settings == null)
+        {
+            settings = new EventCheckInSettings { EventId = eventId };
+            allSettings[eventId] = settings;
+            await storeRepo.UpdateSetting(storeId, Plugin.CheckinSettingsName, allSettings);
+        }
         var vm = new CheckInSettingsViewModel
         {
             StoreId = storeId,
             EventId = eventId,
             EventTitle = ev.Title,
-            CheckInUrl = Url.Action(nameof(UITicketSalesPublicController.TicketCheckin), "UITicketSalesPublic", new { storeId, eventId, token }, Request.Scheme),
+            CheckInUrl = Url.Action(nameof(UITicketSalesPublicController.TicketCheckin), "UITicketSalesPublic", new { storeId, eventId, token = settings.CheckInToken }, Request.Scheme),
             PinEnabled = settings.PinEnabled,
             HasExistingPin = !string.IsNullOrEmpty(settings.PinHash)
         };
@@ -637,6 +640,22 @@ public class UITicketSalesController(UriResolver uriResolver,
         allSettings[eventId] = settings;
         await storeRepo.UpdateSetting(storeId, Plugin.CheckinSettingsName, allSettings);
         TempData[WellKnownTempData.SuccessMessage] = "Check-in settings saved";
+        return RedirectToAction(nameof(CheckInSettings), new { storeId, eventId });
+    }
+
+    [HttpPost("{eventId}/checkin-settings/regenerate")]
+    public async Task<IActionResult> RegenerateCheckInToken(string storeId, string eventId)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        var allSettings = await storeRepo.GetSettingAsync<Dictionary<string, EventCheckInSettings>>(storeId, Plugin.CheckinSettingsName)
+                          ?? new Dictionary<string, EventCheckInSettings>();
+        var settings = allSettings.GetValueOrDefault(eventId) ?? new EventCheckInSettings { EventId = eventId };
+        settings.CheckInToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+        allSettings[eventId] = settings;
+        await storeRepo.UpdateSetting(storeId, Plugin.CheckinSettingsName, allSettings);
+        TempData[WellKnownTempData.SuccessMessage] = "Check-in link regenerated. Previous link is now invalid.";
         return RedirectToAction(nameof(CheckInSettings), new { storeId, eventId });
     }
 
