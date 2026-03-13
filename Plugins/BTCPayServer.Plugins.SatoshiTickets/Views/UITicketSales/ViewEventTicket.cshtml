@@ -1,34 +1,30 @@
-@using BTCPayServer.Abstractions.Contracts
 @using BTCPayServer.Abstractions.Extensions
 @using BTCPayServer.Abstractions.Models
 @using BTCPayServer.Plugins.SatoshiTickets.Data
 @using BTCPayServer.Plugins.SatoshiTickets.ViewModels
 @using BTCPayServer.Services
 @inject DisplayFormatter DisplayFormatter
-@inject IFileService FileService
-@inject IScopeProvider ScopeProvider
 @model EventTicketViewModel
 @{
     Layout = "_Layout";
     ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketIndex), $"{Model.EventTitle}") { ActiveCategory = nameof(SatoshiTicketNavPages) });
-    var canUpload = await FileService.IsAvailable();
-    var storeId = ScopeProvider.GetCurrentStoreId();
-    string checkInUrl = Url.Action("TicketCheckin", "UITicketType", new { storeId, eventId = Model.EventId }, protocol: Context.Request.Scheme);
 }
 
-<div class="sticky-header">
-    <h2 text-translate="true">@ViewData["Title"]</h2>
-    <div class="d-flex gap-3 mt-3 mt-sm-0">
-        <a asp-action="List" asp-route-storeId="@storeId" class="btn btn-secondary">Go Back</a>
-        <a asp-action="ExportTickets" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-success">Export Ticket Sales</a>
-        <div class="d-flex align-items-center gap-2">
-            <a id="ticket-checkin-link"
-               asp-controller="UITicketType" asp-action="TicketCheckin"
-               asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId"
-               class="btn btn-success" target="_blank" rel="noopener noreferrer">Ticket Check-in</a>
-            <button type="button" class="btn btn-link d-flex p-0 clipboard-button" data-bs-toggle="Copy Ticket check-in link" data-clipboard="@checkInUrl">
-                <vc:icon symbol="actions-copy" />
-            </button>
+
+<div class="sticky-header d-flex flex-column align-items-start">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a asp-action="List" asp-route-storeId="@Model.StoreId">Events</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">@ViewData["Title"]</li>
+        </ol>
+    </nav>
+    <div class="d-flex align-items-center w-100">
+        <h2>@ViewData["Title"]</h2>
+        <div class="ms-auto">
+            <a asp-action="ExportTickets" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" class="btn btn-success">Export Ticket Sales</a>
+            <a asp-action="CheckInSettings" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" class="btn btn-success">Ticket Check-in</a>
         </div>
     </div>
 </div>
@@ -51,7 +47,7 @@
 </div>
 
 <form class="d-flex flex-wrap flex-sm-nowrap align-items-center gap-3 mb-4 col-xxl-8" asp-action="ViewEventTicket"
-      asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" method="get">
+      asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" method="get">
     <input asp-for="SearchText" class="form-control" name="searchText" placeholder="Search" />
 </form>
 
@@ -96,7 +92,8 @@
                                                 <th>Amount</th>
                                                 <th>Currency</th>
                                                 <th>Checkin Attendee</th>
-                                                <th class="text-end">Send Reminder</th>
+                                                <th>Send Reminder</th>
+                                                <th class="text-end">Delete Ticket</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -113,11 +110,17 @@
                                                     <td>
                                                         @if (!ticketVm.CheckedIn)
                                                         {
-                                                            <a asp-action="CheckinTicketAttendee" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketNumber="@ticketVm.TicketNumber">Check In</a>
+                                                            <a asp-action="CheckinTicketAttendee" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" asp-route-ticketNumber="@ticketVm.TicketNumber">Check In</a>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        @if (!ticketVm.CheckedIn)
+                                                        {
+                                                            <a asp-action="SendTicketReminder" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticketVm.Id" asp-route-orderId="@ticket.OrderId">Resend Ticket Email</a>
                                                         }
                                                     </td>
                                                     <td class="text-end">
-                                                        <a asp-action="SendTicketReminder" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticketVm.Id" asp-route-orderId="@ticket.OrderId">Resend Ticket Email</a>
+                                                        <a asp-action="DeleteTicket" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" asp-route-ticketId="@ticketVm.Id" class="text-danger ms-2">Delete</a>
                                                     </td>
                                                 </tr>
                                             }

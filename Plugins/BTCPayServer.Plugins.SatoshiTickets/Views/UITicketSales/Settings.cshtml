@@ -5,11 +5,9 @@
 @using BTCPayServer.Plugins.Emails.Controllers
 @using BTCPayServer.Plugins.Emails
 @using BTCPayServer.Plugins.SatoshiTickets.ViewModels.Models
-@inject BTCPayServer.Abstractions.Contracts.IScopeProvider ScopeProvider
 @model SatoshiTicketsSettingsViewModel
 @{
     ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketSettings), "Satoshi Tickets Settings") { ActiveCategory = nameof(SatoshiTicketNavPages) });
-    var storeId = ScopeProvider.GetCurrentStoreId();
     var isEmailConfigured = (bool)(ViewData["StoreEmailSettingsConfigured"] ?? false);
 }
 
@@ -24,11 +22,11 @@
 {
     <div class="alert alert-warning" role="alert">
         Email SMTP is not configured. Auto reminders will not send until SMTP is set up.
-        <a asp-controller="UIStoresEmail" asp-action="StoreEmailSettings" asp-area="@EmailsPlugin.Area" asp-route-storeId="@storeId" class="alert-link">Configure SMTP</a>
+        <a asp-controller="UIStoresEmail" asp-action="StoreEmailSettings" asp-area="@EmailsPlugin.Area" asp-route-storeId="@Model.StoreId" class="alert-link">Configure SMTP</a>
     </div>
 }
 
-<form id="settings-form" asp-action="Settings" asp-route-storeId="@storeId" method="post">
+<form id="settings-form" asp-action="Settings" asp-route-storeId="@Model.StoreId" method="post">
     <div class="row">
         <div class="col-sm-8 col-md-6">
             <div class="form-group mb-4">

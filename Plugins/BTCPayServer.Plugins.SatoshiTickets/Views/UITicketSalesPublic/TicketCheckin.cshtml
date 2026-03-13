@@ -31,7 +31,8 @@
             </div>
 
             <div id="scanner-app" class="p-4 rounded shadow-sm" style="border-bottom: none;">
-                <form asp-action="Checkin" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" method="post" class="row justify-content-center">
+                <form asp-controller="UITicketSalesPublic" asp-action="Checkin" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId"
+                      asp-route-token="@Model.Token" method="post" class="row justify-content-center">
                     <div class="col-md-6">
                         <div class="input-group mb-3">
                             <input type="text" name="ticketNumber" class="form-control" placeholder="Enter ticket code manually" required />
@@ -46,6 +47,29 @@
     </div>
 </div>
 
+@if (Model.PinRequired)
+{
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+        <div style="background: var(--btcpay-body-bg); border: 1px solid var(--btcpay-body-border-medium); border-radius: 12px; padding: 2rem; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+            <div class="text-center mb-4">
+                <div style="background: var(--btcpay-body-bg-light); border-radius: 50%; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+                    <vc:icon symbol="info" />
+                </div>
+                <h4 class="mb-1">Check-in Access</h4>
+                <p class="text-muted mb-0" style="font-size: 0.9rem;">Enter the PIN to access the check-in scanner for <strong>@Model.EventName</strong></p>
+            </div>
+            <form asp-action="VerifyPin" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" asp-route-token="@Model.Token" method="post">
+                @Html.AntiForgeryToken()
+                <div class="form-group mb-3">
+                    <input type="password" name="pin" class="form-control form-control-lg text-center"
+                           placeholder="&#9679;&#9679;&#9679;&#9679;" autofocus required
+                           style="letter-spacing: 8px; font-size: 1.4rem;" />
+                </div>
+                <button type="submit" class="btn btn-success w-100">Confirm</button>
+            </form>
+        </div>
+    </div>
+}
 
 @section PageFootContent {
     <style>

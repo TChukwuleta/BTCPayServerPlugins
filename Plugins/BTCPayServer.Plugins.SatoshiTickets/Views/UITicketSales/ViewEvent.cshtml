@@ -5,15 +5,13 @@
 @using BTCPayServer.Plugins.SatoshiTickets.Data
 @using BTCPayServer.Plugins.SatoshiTickets.ViewModels
 @inject IFileService FileService
-@inject IScopeProvider ScopeProvider
 @model UpdateSimpleTicketSalesEventViewModel
 @{
     ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketIndex), "Events") { ActiveCategory = nameof(SatoshiTicketNavPages) });
     var canUpload = await FileService.IsAvailable();
-    var storeId = ScopeProvider.GetCurrentStoreId();
     bool isEditMode = !string.IsNullOrEmpty(Model.EventId);
     string formAction = isEditMode
-        ? Url.Action("UpdateEvent", "UITicketSales", new { eventId = Model.EventId, storeId }) : Url.Action("CreateEvent", "UITicketSales", new { storeId });
+        ? Url.Action("UpdateEvent", "UITicketSales", new { eventId = Model.EventId, storeId = Model.StoreId }) : Url.Action("CreateEvent", "UITicketSales", new { storeId = Model.StoreId });
 }
 
 <div class="sticky-header">
@@ -21,7 +19,7 @@
     <div class="d-flex gap-3 mt-3 mt-sm-0">
         @if (!string.IsNullOrEmpty(Model.EventId))
         {
-            <a asp-controller="UITicketType" asp-action="List" asp-route-storeId="@storeId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Ticket Tiers</a>
+            <a asp-controller="UITicketType" asp-action="List" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Ticket Tiers</a>
         }
         <button type="submit" form="event-form" class="btn btn-success">@(isEditMode ? "Update Event" : "Create Event")</button>
     </div>
@@ -31,6 +29,7 @@
 <partial name="_StatusMessage" />
 
 <form id="event-form" action="@formAction" method="post" enctype="multipart/form-data">
+    @Html.AntiForgeryToken()
     <div class="row">
         <div class="col-sm-10 col-md-9 col-xl-7 col-xxl-6">
             <div class="form-group">

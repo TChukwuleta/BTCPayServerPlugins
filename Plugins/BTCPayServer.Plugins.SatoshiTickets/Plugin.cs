@@ -11,6 +11,7 @@ namespace BTCPayServer.Plugins.SatoshiTickets;
 
 public class Plugin : BaseBTCPayServerPlugin
 {
+    public const string CheckinSettingsName = "SatoshiTicketCheckInSettings";
     public override IBTCPayServerPlugin.PluginDependency[] Dependencies { get; } =
     {
         new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.3.6" }
