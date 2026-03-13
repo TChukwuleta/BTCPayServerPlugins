@@ -12,6 +12,7 @@ namespace BTCPayServer.Plugins.JumpSeller;
 
 [Route("~/plugins/{storeId}/jumpseller/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
+[AutoValidateAntiforgeryToken]
 public class UIJumpSellerController : Controller
 {
     private readonly JumpSellerService _jumpSellerService;
