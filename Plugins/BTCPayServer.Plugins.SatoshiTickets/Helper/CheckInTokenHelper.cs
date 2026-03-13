@@ -25,20 +25,29 @@ public static class CheckInTokenHelper
         // Store salt + hash together
         return $"{Convert.ToHexString(salt)}:{Convert.ToHexString(hash)}";
     }
-
     public static bool VerifyPin(string pin, string storedHash)
     {
+        if (string.IsNullOrEmpty(pin) || string.IsNullOrEmpty(storedHash))
+            return false;
+
         var parts = storedHash.Split(':');
         if (parts.Length != 2) return false;
-        var salt = Convert.FromHexString(parts[0]);
-        var expectedHash = Convert.FromHexString(parts[1]);
-        var actualHash = Rfc2898DeriveBytes.Pbkdf2(
-            Encoding.UTF8.GetBytes(pin),
-            salt,
-            iterations: 100_000,
-            HashAlgorithmName.SHA256,
-            outputLength: 32);
-        return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
-    }
 
+        try
+        {
+            var salt = Convert.FromHexString(parts[0]);
+            var expectedHash = Convert.FromHexString(parts[1]);
+            var actualHash = Rfc2898DeriveBytes.Pbkdf2(
+                Encoding.UTF8.GetBytes(pin),
+                salt,
+                iterations: 100_000,
+                HashAlgorithmName.SHA256,
+                outputLength: 32);
+            return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
 }

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using AngleSharp.Dom;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Extensions;
@@ -412,21 +413,35 @@ public class UITicketSalesController(UriResolver uriResolver,
         return View(vm);
     }
 
+
     [HttpGet("{eventId}/tickets/{ticketNumber}/check-in")]
     public async Task<IActionResult> CheckinTicketAttendee(string storeId, string eventId, string ticketNumber)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
+        await using var ctx = dbContextFactory.CreateContext();
+        var ticket = ctx.Tickets.FirstOrDefault(c => (c.TicketNumber == ticketNumber || c.TxnNumber == ticketNumber) && c.EventId == eventId);
+        if (ticket == null)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Ticket not found";
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId, eventId });
+        }
+        return View("Confirm", new ConfirmModel("Check in attendee", $"Check in {ticket.FirstName} {ticket.LastName} ({ticketNumber})? This cannot be undone.", "Check In"));
+    }
+
+    [HttpPost("{eventId}/tickets/{ticketNumber}/check-in")]
+    public async Task<IActionResult> CheckinTicketAttendeePost(string storeId, string eventId, string ticketNumber)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
         var checkinTicket = await ticketService.CheckinTicket(eventId, ticketNumber, CurrentStore.Id);
         if (checkinTicket.Success)
-        {
             TempData[WellKnownTempData.SuccessMessage] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} of ticket type: {checkinTicket.Ticket.TicketTypeName} checked-in successfully";
-        }
         else
-        {
             TempData[WellKnownTempData.ErrorMessage] = checkinTicket.ErrorMessage;
-        }
+
         return RedirectToAction(nameof(ViewEventTicket), new { storeId, eventId });
     }
 

@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Services;
 
@@ -23,17 +24,15 @@ public class TicketService
         if (ticket == null) return new() { ErrorMessage = "Invalid ticket record specified", Success = false };
 
         if (ticket.UsedAt.HasValue) return new() { ErrorMessage = $"Ticket previously checked in by {ticket.UsedAt.Value:f}", Success = false, Ticket = ticket };
-        try
-        {
-            ticket.UsedAt = DateTime.UtcNow;
-            ctx.Tickets.Update(ticket);
-            await ctx.SaveChangesAsync();
-        }
-        catch (Exception)
-        {
-            return new() { Success = false, ErrorMessage = "Error occured while checking in ticket" };
-        }
-        return new() { Success = true, Ticket = ticket };   
+
+        var rowsAffected = await ctx.Tickets.Where(t => (t.TicketNumber == ticketNumber || t.TxnNumber == ticketNumber) && t.EventId == eventId && t.StoreId == storeId && t.UsedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, DateTime.UtcNow));
+
+        if (rowsAffected == 0)
+            return new() { Success = false, ErrorMessage = $"Ticket previously checked in by {ticket.UsedAt.Value:f}" };
+
+        ticket.UsedAt = DateTime.UtcNow;
+        return new() { Success = true, Ticket = ticket };  
     }
 }
 
