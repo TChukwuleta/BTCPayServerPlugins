@@ -8,16 +8,23 @@
     ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketIndex), "Ticket Tiers") { ActiveCategory = nameof(SatoshiTicketNavPages) });
 }
 
-
-<div class="sticky-header">
-    <h2 text-translate="true">@ViewData["Title"]</h2>
-    <div class="d-flex gap-3 mt-3 mt-sm-0">
-        <a asp-controller="UITicketSales" asp-action="List" asp-route-storeId="@Model.StoreId" class="btn btn-secondary" role="button">Go to Events</a>
-        <a asp-action="ViewTicketType" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" class="btn btn-success" role="button">Create Ticket Tiers</a>
+<div class="sticky-header d-flex flex-column align-items-start">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a asp-controller="UITicketSales" asp-action="List" asp-route-storeId="@Model.StoreId">Events</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">@ViewData["Title"]</li>
+        </ol>
+    </nav>
+    <div class="d-flex align-items-center w-100">
+        <h2>@ViewData["Title"]</h2>
+        <div class="ms-auto">
+            <a asp-action="ViewTicketType" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" class="btn btn-success" role="button">Create Ticket Tiers</a>
+        </div>
     </div>
 </div>
 <partial name="_StatusMessage" />
-
 
 @if (Model.TicketTypes.Any())
 {

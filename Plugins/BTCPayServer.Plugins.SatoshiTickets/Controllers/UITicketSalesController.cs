@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,6 +12,7 @@ using BTCPayServer.Data;
 using BTCPayServer.Plugins.Emails;
 using BTCPayServer.Plugins.Emails.Controllers;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
+using BTCPayServer.Plugins.SatoshiTickets.Helper;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels.Models;
@@ -586,6 +588,74 @@ public class UITicketSalesController(UriResolver uriResolver,
         }
         byte[] fileBytes = Encoding.UTF8.GetBytes(csvData.ToString());
         return File(fileBytes, "text/csv", fileName);
+    }
+
+    [HttpGet("{eventId}/checkin-settings")]
+    public async Task<IActionResult> CheckInSettings(string storeId, string eventId)
+    {
+        if (await GetStoreData(storeId) is not { } store)
+            return NotFound();
+
+        await using var ctx = dbContextFactory.CreateContext();
+        var ev = ctx.Events.FirstOrDefault(e => e.Id == eventId && e.StoreId == storeId);
+        if (ev == null) return NotFound();
+
+        var allSettings = await storeRepo.GetSettingAsync<Dictionary<string, EventCheckInSettings>>(storeId, Plugin.CheckinSettingsName)
+                  ?? new Dictionary<string, EventCheckInSettings>();
+
+        var settings = allSettings.GetValueOrDefault(eventId) ?? new EventCheckInSettings { EventId = eventId };
+
+        var token = CheckInTokenHelper.GenerateToken(eventId, storeId);
+        var vm = new CheckInSettingsViewModel
+        {
+            StoreId = storeId,
+            EventId = eventId,
+            EventTitle = ev.Title,
+            CheckInUrl = Url.Action(nameof(UITicketSalesPublicController.TicketCheckin), "UITicketSalesPublic", new { storeId, eventId, token }, Request.Scheme),
+            PinEnabled = settings.PinEnabled,
+            HasExistingPin = !string.IsNullOrEmpty(settings.PinHash)
+        };
+        return View(vm);
+    }
+
+    [HttpPost("{eventId}/checkin-settings")]
+    public async Task<IActionResult> CheckInSettings(string storeId, string eventId, CheckInSettingsViewModel vm)
+    {
+        if (await GetStoreData(storeId) is not { } store)
+            return NotFound();
+
+        await using var ctx = dbContextFactory.CreateContext();
+        var ev = ctx.Events.FirstOrDefault(e => e.Id == eventId && e.StoreId == storeId);
+        if (ev == null) return NotFound();
+
+        var allSettings = await storeRepo.GetSettingAsync<Dictionary<string, EventCheckInSettings>>(storeId, Plugin.CheckinSettingsName)
+                          ?? new Dictionary<string, EventCheckInSettings>();
+
+        var settings = allSettings.GetValueOrDefault(eventId) ?? new EventCheckInSettings { EventId = eventId };
+        settings.PinEnabled = vm.PinEnabled;
+
+        if (!vm.PinEnabled)
+        {
+            settings.PinHash = null;
+        }
+        else if (!string.IsNullOrEmpty(vm.Pin))
+        {
+            if (vm.Pin.Length < 4)
+            {
+                TempData[WellKnownTempData.ErrorMessage] = "PIN must be at least 4 digits";
+                return RedirectToAction(nameof(CheckInSettings), new { storeId, eventId });
+            }
+            settings.PinHash = CheckInTokenHelper.HashPin(vm.Pin);
+        }
+        else if (string.IsNullOrEmpty(settings.PinHash))
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Please set a PIN";
+            return RedirectToAction(nameof(CheckInSettings), new { storeId, eventId });
+        }
+        allSettings[eventId] = settings;
+        await storeRepo.UpdateSetting(storeId, Plugin.CheckinSettingsName, allSettings);
+        TempData[WellKnownTempData.SuccessMessage] = "Check-in settings saved";
+        return RedirectToAction(nameof(CheckInSettings), new { storeId, eventId });
     }
 
     private string GetUserId() => userManager.GetUserId(User);

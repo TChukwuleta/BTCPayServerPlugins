@@ -13,11 +13,20 @@
         : Url.Action("CreateTicketType", "UITicketType", new { eventId = Model.EventId, storeId = Model.StoreId });
 }
 
-<div class="sticky-header">
-    <h2 text-translate="true">@ViewData["Title"]</h2>
-    <div class="d-flex gap-3 mt-3 mt-sm-0">
-        <a id="create-event" asp-controller="UITicketSales" asp-action="List" asp-route-storeId="@Model.StoreId" class="btn btn-secondary" role="button">Go to Events</a>
-        <button type="submit" form="event-form" class="btn btn-success">@(isEditMode ? "Update Ticket Tier" : "Create Ticket Tier")</button>
+<div class="sticky-header d-flex flex-column align-items-start">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a asp-controller="UITicketType" asp-action="List" asp-route-eventId="@Model.EventId" asp-route-storeId="@Model.StoreId">Tiers</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">@ViewData["Title"]</li>
+        </ol>
+    </nav>
+    <div class="d-flex align-items-center w-100">
+        <h2>@ViewData["Title"]</h2>
+        <div class="ms-auto">
+            <button type="submit" form="event-form" class="btn btn-success">@(isEditMode ? "Update Ticket Tier" : "Create Ticket Tier")</button>
+        </div>
     </div>
 </div>
 

@@ -18,4 +18,17 @@ public static class CheckInTokenHelper
         var expected = GenerateToken(eventId, storeId);
         return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(token));
     }
+
+    public static string HashPin(string pin)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(pin));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    public static bool VerifyPin(string pin, string hash)
+    {
+        var expected = HashPin(pin);
+        return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(hash));
+    }
+
 }

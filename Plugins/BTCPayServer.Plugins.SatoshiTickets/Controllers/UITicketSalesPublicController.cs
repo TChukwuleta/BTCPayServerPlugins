@@ -11,6 +11,7 @@ using BTCPayServer.Controllers;
 using BTCPayServer.Data;
 using BTCPayServer.Models;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
+using BTCPayServer.Plugins.SatoshiTickets.Helper;
 using BTCPayServer.Plugins.SatoshiTickets.Helper.Extensions;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels;
@@ -18,7 +19,7 @@ using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
@@ -326,9 +327,7 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         });
     }
 
-
     [HttpGet("satoshiticket/jsqr_min.js")]
-    [EnableCors("AllowAllOrigins")]
     public async Task<IActionResult> GetQRScannerJs(string storeId)
     {
         var store = await storeRepo.FindStore(storeId);
@@ -337,6 +336,64 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         return Content(emailService.GetEmbeddedResourceContent("Resources.js.jsqr_min.js"), "text/javascript");
     }
 
+    [HttpGet("{eventId}/check-in/{token}")]
+    public async Task<IActionResult> TicketCheckin(string storeId, string eventId, string token)
+    {
+        await using var ctx = dbContextFactory.CreateContext();
+        var ev = ctx.Events.FirstOrDefault(e => e.Id == eventId && e.StoreId == storeId);
+        if (ev == null || !CheckInTokenHelper.VerifyToken(token, eventId, storeId))
+            return NotFound();
+
+        var allSettings = await storeRepo.GetSettingAsync<Dictionary<string, EventCheckInSettings>>(storeId, Plugin.CheckinSettingsName);
+        var settings = allSettings?.GetValueOrDefault(eventId);
+        var pinRequired = settings is { PinEnabled: true, } && HttpContext.Session.GetString($"CheckIn_{eventId}") != "authorized";
+        return View(new TicketScannerViewModel
+        {
+            StoreId = storeId,
+            EventId = eventId,
+            EventName = ev.Title,
+            Token = token,
+            PinRequired = pinRequired
+        });
+    }
+
+    [HttpPost("{eventId}/check-in/{token}/verify-pin")]
+    public async Task<IActionResult> VerifyPin(string storeId, string eventId, string token, string pin)
+    {
+        await using var ctx = dbContextFactory.CreateContext();
+        var ev = ctx.Events.FirstOrDefault(e => e.Id == eventId && e.StoreId == storeId);
+        if (ev == null || !CheckInTokenHelper.VerifyToken(token, eventId, storeId))
+            return NotFound();
+
+        var allSettings = await storeRepo.GetSettingAsync<Dictionary<string, EventCheckInSettings>>(storeId, Plugin.CheckinSettingsName);
+        var settings = allSettings?.GetValueOrDefault(eventId);
+        if (settings == null || !settings.PinEnabled)
+            return RedirectToAction(nameof(TicketCheckin), new { storeId, eventId, token });
+
+        if (!CheckInTokenHelper.VerifyPin(pin, settings.PinHash))
+        {
+            TempData["CheckInErrorMessage"] = "Invalid PIN";
+            return RedirectToAction(nameof(TicketCheckin), new { storeId, eventId, token });
+        }
+        HttpContext.Session.SetString($"CheckIn_{eventId}", "authorized");
+        return RedirectToAction(nameof(TicketCheckin), new { storeId, eventId, token });
+    }
+
+
+    [HttpPost("{eventId}/check-in/{token}/ticket")]
+    public async Task<IActionResult> Checkin(string storeId, string eventId, string token, string ticketNumber)
+    {
+        var checkinTicket = await ticketService.CheckinTicket(eventId, ticketNumber, storeId);
+        if (checkinTicket.Success)
+        {
+            TempData["CheckInSuccessMessage"] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} of ticket type: {checkinTicket.Ticket.TicketTypeName} checked-in successfully";
+        }
+        else
+        {
+            TempData["CheckInErrorMessage"] = checkinTicket.ErrorMessage;
+        }
+        return RedirectToAction(nameof(TicketCheckin), new { storeId, eventId, token });
+    }
 
     private async Task<InvoiceEntity> CreateInvoice(BTCPayServer.Data.StoreData store, Order order, string currency, string url, string redirectUrl)
     {

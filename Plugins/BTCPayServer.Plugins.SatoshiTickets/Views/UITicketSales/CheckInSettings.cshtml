@@ -1,0 +1,84 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.SatoshiTickets.Data
+@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@model CheckInSettingsViewModel
+@{
+    Layout = "_Layout";
+    ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketIndex), "Check-in Settings") { ActiveCategory = nameof(SatoshiTicketNavPages) });
+    var pinDisplay = Model.PinEnabled ? "block" : "none";
+}
+
+<div class="sticky-header d-flex flex-column align-items-start">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a asp-controller="UITicketSales" asp-action="ViewEventTicket" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId">@Model.EventTitle</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">Check-in Settings</li>
+        </ol>
+    </nav>
+    <div class="d-flex align-items-center w-100">
+        <h2>Check-in Settings — @Model.EventTitle</h2>
+        <div class="ms-auto">
+            <button type="submit" form="checkin-settings-form" class="btn btn-success">Save Settings</button>
+        </div>
+    </div>
+</div>
+
+<partial name="_StatusMessage" />
+
+<div class="row mt-4">
+    <div class="col-sm-10 col-md-9 col-xl-7 col-xxl-6">
+
+        <h4 class="mb-2">Check-in URL</h4>
+        <div class="input-group mb-5">
+            <input type="text" class="form-control" id="checkInUrl" value="@Model.CheckInUrl" readonly />
+            <button class="btn btn-outline-secondary" type="button" id="copyBtn">Copy</button>
+        </div>
+
+        <h4 class="mb-2">PIN Login</h4>
+        <p class="text-muted">Enable a PIN for checkin url</p>
+
+        <form id="checkin-settings-form" method="post">
+            @Html.AntiForgeryToken()
+
+            <div class="form-group d-flex align-items-center mb-3">
+                <input asp-for="PinEnabled" type="checkbox" class="btcpay-toggle me-2" id="pinToggle" />
+                <label asp-for="PinEnabled" class="form-check-label">Enable PIN login</label>
+            </div>
+
+            <div id="pinSection" style="display: @pinDisplay">
+                @if (Model.HasExistingPin)
+                {
+                    <p class="text-muted mb-3"><vc:icon symbol="checkmark" /> A PIN has already been set.</p>
+                }
+                <div class="form-group">
+                    <label asp-for="Pin" class="form-label">
+                        @(Model.HasExistingPin ? "Change PIN" : "Set PIN") (min 4 digits)
+                    </label>
+                    <input asp-for="Pin" type="password" id="pinField" class="form-control w-25"  placeholder="@(Model.HasExistingPin ? "Enter new PIN to change" : "Enter PIN")" />
+                    <span asp-validation-for="Pin" class="text-danger"></span>
+                </div>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+@section PageFootContent {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            document.getElementById('copyBtn').addEventListener('click', function () {
+                const input = document.getElementById('checkInUrl');
+                navigator.clipboard.writeText(input.value);
+            });
+
+            const pinToggle = document.getElementById('pinToggle');
+            const pinSection = document.getElementById('pinSection');
+            pinToggle.addEventListener('change', function () {
+                pinSection.style.display = pinToggle.checked ? 'block' : 'none';
+            });
+        });
+    </script>
+}

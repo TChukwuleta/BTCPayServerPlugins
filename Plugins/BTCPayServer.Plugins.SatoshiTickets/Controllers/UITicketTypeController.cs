@@ -4,11 +4,9 @@ using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;
 using BTCPayServer.Data;
-using BTCPayServer.Models;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels;
-using BTCPayServer.Services;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -23,51 +21,9 @@ namespace BTCPayServer.Plugins.SatoshiTickets;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 [AutoValidateAntiforgeryToken]
 public class UITicketTypeController(SimpleTicketSalesDbContextFactory dbContextFactory,
-        ApplicationDbContextFactory context, 
-        UriResolver uriResolver,
-        StoreRepository storeRepo,
-        TicketService ticketService) : Controller
+        StoreRepository storeRepo) : Controller
 {
     private async Task<StoreData?> GetStoreData(string id) => await storeRepo.FindStore(id);
-
-
-    // COming here
-    [HttpGet("ticket-checkin")]
-    public async Task<IActionResult> TicketCheckin(string storeId, string eventId)
-    {
-        await using var ctx = dbContextFactory.CreateContext();
-        await using var dbMain = context.CreateContext();
-        var store = await dbMain.Stores.FirstOrDefaultAsync(a => a.Id == storeId);
-        if (store == null) return NotFound();
-
-        var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == storeId);
-        if (entity == null) return NotFound();
-
-        return View(new TicketScannerViewModel
-        {
-            EventName = entity.Title,
-            EventId = entity.Id,
-            StoreId = storeId,
-            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, uriResolver, store.GetStoreBlob())
-        });
-    }
-
-    // coming here too
-    [HttpPost("tickets/check-in")]
-    public async Task<IActionResult> Checkin(string storeId, string eventId, string ticketNumber)
-    {
-        var checkinTicket = await ticketService.CheckinTicket(eventId, ticketNumber, storeId);
-        if (checkinTicket.Success)
-        {
-            TempData["CheckInSuccessMessage"] = $"Ticket for {checkinTicket.Ticket.FirstName} {checkinTicket.Ticket.LastName} of ticket type: {checkinTicket.Ticket.TicketTypeName} checked-in successfully";
-        }
-        else
-        {
-            TempData["CheckInErrorMessage"] = checkinTicket.ErrorMessage;
-        }
-        return RedirectToAction(nameof(TicketCheckin), new { storeId, eventId });
-    }
-
 
     [HttpGet("list")]
     public async Task<IActionResult> List(string storeId, string eventId, string sortBy = "Name", string sortDir = "asc")
