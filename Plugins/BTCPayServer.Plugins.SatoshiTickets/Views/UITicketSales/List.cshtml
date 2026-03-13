@@ -1,22 +1,19 @@
-@using BTCPayServer.Abstractions.Contracts
 @using BTCPayServer.Abstractions.Models
 @using BTCPayServer.Plugins.SatoshiTickets.Data
 @using BTCPayServer.Plugins.SatoshiTickets.ViewModels
 @using BTCPayServer.Abstractions.Extensions
-@inject IScopeProvider ScopeProvider
 @model SalesTicketsEventsViewModel
 @{
     Layout = "_Layout";
     ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketIndex), "Satoshi Tickets Events") { ActiveCategory = nameof(SatoshiTicketNavPages) });
     var storeEmailSettingsConfigured = (bool)ViewData["StoreEmailSettingsConfigured"];
-    var storeId = ScopeProvider.GetCurrentStoreId();
 }
 
 
 <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
-        <a id="create-event" asp-action="ViewEvent" asp-route-storeId="@storeId"
+        <a id="create-event" asp-action="ViewEvent" asp-route-storeId="@Model.StoreId"
            class="btn btn-success @(storeEmailSettingsConfigured ? "" : "disabled")" role="button">
             Create Event
         </a>
@@ -29,13 +26,13 @@
     <div class="nav">
         <a id="all-view"
            asp-action="List"
-           asp-route-storeId="@storeId"
+           asp-route-storeId="@Model.StoreId"
            class="nav-link @(!Model.Expired ? "active" : "")"
            role="tab">All</a>
 
         <a id="expired-view"
            asp-action="List"
-           asp-route-storeId="@storeId"
+           asp-route-storeId="@Model.StoreId"
            asp-route-expired="true"
            class="nav-link @(Model.Expired ? "active" : "")"
            role="tab">Expired Events</a>
@@ -64,7 +61,7 @@
                     <tr id="user_@ticketEvent.Id" class="user-overview-row mass-action-row">
                         <td>
                             <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="ViewEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">@ticketEvent.Title</a>
+                                <a asp-action="ViewEvent" asp-route-storeId="@Model.StoreId" asp-route-eventId="@ticketEvent.Id">@ticketEvent.Title</a>
                             </div>
                         </td>
                         <td>@ticketEvent.EventDate.ToString("M/d/yy, hh:mm tt")</td>
@@ -80,7 +77,7 @@
                         <td>@ticketEvent.TicketSold</td>
                         <td class="actions-col">
                             <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-action="List" asp-controller="UITicketType" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">Ticket Tiers</a>
+                                <a asp-action="List" asp-controller="UITicketType" asp-route-storeId="@Model.StoreId" asp-route-eventId="@ticketEvent.Id">Ticket Tiers</a>
                             </div>
                         </td>
                         <td class="actions-col">
@@ -89,7 +86,7 @@
                                 <div class="d-inline-flex align-items-center gap-3">
                                     <a class="dropdown-item text-success"
                                        asp-action="ToggleTicketEventStatus"
-                                       asp-route-storeId="@storeId"
+                                       asp-route-storeId="@Model.StoreId"
                                        asp-route-eventId="@ticketEvent.Id"
                                        asp-route-enable="@(ticketEvent.EventState == EntityState.Disabled)">
                                         @(ticketEvent.EventState == EntityState.Disabled ? "Activate" : "Disable")
@@ -101,11 +98,11 @@
                             <div class="d-inline-flex align-items-center gap-3">
                                 @if (ticketEvent.TicketSold > 0)
                                 {
-                                    <a asp-action="ViewEventTicket" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id">Tickets</a>
+                                    <a asp-action="ViewEventTicket" asp-route-storeId="@Model.StoreId" asp-route-eventId="@ticketEvent.Id">Tickets</a>
                                 }
                                 @if (ticketEvent.TicketSold <= 0 || ticketEvent.EventDate <= DateTime.UtcNow)
                                 {
-                                    <a asp-action="DeleteEvent" asp-route-storeId="@storeId" asp-route-eventId="@ticketEvent.Id" class="text-danger">Delete</a>
+                                    <a asp-action="DeleteEvent" asp-route-storeId="@Model.StoreId" asp-route-eventId="@ticketEvent.Id" class="text-danger">Delete</a>
                                 }
                             </div>
                         </td>

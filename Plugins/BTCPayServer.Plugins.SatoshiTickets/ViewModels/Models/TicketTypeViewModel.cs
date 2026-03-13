@@ -14,6 +14,7 @@ public class TicketTypeViewModel
     public int QuantitySold { get; set; }
     public int QuantityAvailable { get; set; }
     public string EventId { get; set; }
+    public string StoreId { get; set; }
     public EntityState TicketTypeState { get; set; }
     public bool IsDefault { get; set; }
 }
@@ -23,5 +24,6 @@ public class TicketTypeListViewModel
     public string EventId { get; set; }
     public string SortBy { get; set; }
     public string SortDir { get; set; }
+    public string StoreId { get; set; }
     public List<TicketTypeViewModel> TicketTypes { get; set; }
 }

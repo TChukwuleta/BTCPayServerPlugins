@@ -17,4 +17,5 @@ public class SatoshiTicketsSettingsViewModel
 
     [Display(Name = "Reminder Email Body")]
     public string ReminderEmailBody { get; set; }
+    public string StoreId { get; set; }
 }

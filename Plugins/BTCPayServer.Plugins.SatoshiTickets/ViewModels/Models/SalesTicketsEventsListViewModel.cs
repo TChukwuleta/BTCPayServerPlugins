@@ -51,6 +51,7 @@ public class SalesTicketsEventsViewModel
 {
     public List<SalesTicketsEventsListViewModel> Events { get; set; }
     public List<SalesTicketsEventsListViewModel> DisplayedEvents { get; set; }
+    public string StoreId { get; set; }
     public bool Active { get; set; }
     public bool Expired { get; set; }
 }
