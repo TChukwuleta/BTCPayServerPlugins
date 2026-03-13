@@ -19,6 +19,7 @@ using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
@@ -41,6 +42,7 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         TicketService ticketService,
         InvoiceRepository invoiceRepository,
         UIInvoiceController invoiceController,
+        IDataProtectionProvider dataProtectionProvider,
         SimpleTicketSalesDbContextFactory dbContextFactory) : Controller
 {
     private const string SessionKeyOrder = "Ticket_Order_";
@@ -341,7 +343,7 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
     {
         await using var ctx = dbContextFactory.CreateContext();
         var ev = ctx.Events.FirstOrDefault(e => e.Id == eventId && e.StoreId == storeId);
-        if (ev == null || !CheckInTokenHelper.VerifyToken(token, eventId, storeId))
+        if (ev == null || !CheckInTokenHelper.VerifyToken(token, eventId, storeId, dataProtectionProvider))
             return NotFound();
 
         var allSettings = await storeRepo.GetSettingAsync<Dictionary<string, EventCheckInSettings>>(storeId, Plugin.CheckinSettingsName);
@@ -362,7 +364,7 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
     {
         await using var ctx = dbContextFactory.CreateContext();
         var ev = ctx.Events.FirstOrDefault(e => e.Id == eventId && e.StoreId == storeId);
-        if (ev == null || !CheckInTokenHelper.VerifyToken(token, eventId, storeId))
+        if (ev == null || !CheckInTokenHelper.VerifyToken(token, eventId, storeId, dataProtectionProvider))
             return NotFound();
 
         var allSettings = await storeRepo.GetSettingAsync<Dictionary<string, EventCheckInSettings>>(storeId, Plugin.CheckinSettingsName);
@@ -383,6 +385,11 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
     [HttpPost("{eventId}/check-in/{token}/ticket")]
     public async Task<IActionResult> Checkin(string storeId, string eventId, string token, string ticketNumber)
     {
+        await using var ctx = dbContextFactory.CreateContext();
+        var ev = ctx.Events.FirstOrDefault(e => e.Id == eventId && e.StoreId == storeId);
+        if (ev == null || !CheckInTokenHelper.VerifyToken(token, eventId, storeId, dataProtectionProvider))
+            return NotFound();
+
         var checkinTicket = await ticketService.CheckinTicket(eventId, ticketNumber, storeId);
         if (checkinTicket.Success)
         {
