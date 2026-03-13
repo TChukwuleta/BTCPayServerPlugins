@@ -490,68 +490,45 @@ public class UITicketSalesController(UriResolver uriResolver,
         catch (Exception ex)
         {
             TempData[WellKnownTempData.ErrorMessage] = $"An error occured when sending ticket details. {ex.Message}";
-            return RedirectToAction(nameof(ViewEventTicket), new { storeId = store.Id, eventId = model.EventId });
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId, eventId = model.EventId });
         }
         TempData[WellKnownTempData.SuccessMessage] = $"Ticket details has been sent to recipients via email";
-        return RedirectToAction(nameof(ViewEventTicket), new { storeId = store.Id, eventId = model.EventId });
+        return RedirectToAction(nameof(ViewEventTicket), new { storeId, eventId = model.EventId });
     }
 
-    [HttpGet("settings")]
-    public async Task<IActionResult> Settings(string storeId)
+    [HttpGet("{eventId}/delete-ticket/{ticketId}")]
+    public async Task<IActionResult> DeleteTicket(string storeId, string eventId, string ticketId)
     {
         if (await GetStoreData(storeId) is not { } store)
             return NotFound();
 
         await using var ctx = dbContextFactory.CreateContext();
-        var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == store.Id);
-
-        ViewData["StoreEmailSettingsConfigured"] = await emailService.IsEmailSettingsConfigured(store.Id);
-        var vm = new SatoshiTicketsSettingsViewModel
+        var ticket = ctx.Tickets.FirstOrDefault(t => t.Id == ticketId && t.StoreId == store.Id && t.EventId == eventId);
+        if (ticket == null)
         {
-            StoreId = store.Id,
-            EnableAutoReminders = settings?.EnableAutoReminders ?? false,
-            DefaultReminderDaysBeforeEvent = settings?.DefaultReminderDaysBeforeEvent ?? 3,
-            ReminderEmailBody = settings?.ReminderEmailBody,
-            ReminderEmailSubject = settings?.ReminderEmailSubject
-        };
-        return View(vm);
+            TempData[WellKnownTempData.ErrorMessage] = "Ticket not found";
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId, eventId });
+        }
+        return View("Confirm", new ConfirmModel("Delete ticket", $"Ticket for {ticket.FirstName} {ticket.LastName} will be permanently deleted. Are you sure?", "Delete"));
     }
 
-    [HttpPost("settings")]
-    public async Task<IActionResult> Settings(string storeId, SatoshiTicketsSettingsViewModel vm)
+    [HttpPost("{eventId}/delete-ticket/{ticketId}")]
+    public async Task<IActionResult> DeleteTicketPost(string storeId, string eventId, string ticketId)
     {
         if (await GetStoreData(storeId) is not { } store)
             return NotFound();
 
-        if (vm.EnableAutoReminders && vm.DefaultReminderDaysBeforeEvent <= 0)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Default reminder days must be greater than 0";
-            return RedirectToAction(nameof(Settings), new { storeId });
-        }
-
         await using var ctx = dbContextFactory.CreateContext();
-        var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == store.Id);
-        if (settings == null)
+        var ticket = ctx.Tickets.FirstOrDefault(t => t.Id == ticketId && t.StoreId == store.Id && t.EventId == eventId);
+        if (ticket == null)
         {
-            ctx.SatoshiTicketsSettings.Add(new SatoshiTicketsSetting
-            {
-                StoreId = store.Id,
-                EnableAutoReminders = vm.EnableAutoReminders,
-                DefaultReminderDaysBeforeEvent = vm.DefaultReminderDaysBeforeEvent,
-                ReminderEmailSubject = vm.ReminderEmailSubject,
-                ReminderEmailBody = vm.ReminderEmailBody
-            });
+            TempData[WellKnownTempData.ErrorMessage] = "Ticket not found";
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId, eventId });
         }
-        else
-        {
-            settings.EnableAutoReminders = vm.EnableAutoReminders;
-            settings.DefaultReminderDaysBeforeEvent = vm.DefaultReminderDaysBeforeEvent;
-            settings.ReminderEmailBody = vm.ReminderEmailBody;
-            settings.ReminderEmailSubject = vm.ReminderEmailSubject;
-        }
+        ctx.Tickets.Remove(ticket);
         await ctx.SaveChangesAsync();
-        TempData[WellKnownTempData.SuccessMessage] = "Reminder settings updated successfully";
-        return RedirectToAction(nameof(Settings), new { storeId });
+        TempData[WellKnownTempData.SuccessMessage] = $"Ticket {ticket.TicketNumber} deleted successfully";
+        return RedirectToAction(nameof(ViewEventTicket), new { storeId, eventId });
     }
 
     [HttpGet("{eventId}/export")]
@@ -656,6 +633,64 @@ public class UITicketSalesController(UriResolver uriResolver,
         await storeRepo.UpdateSetting(storeId, Plugin.CheckinSettingsName, allSettings);
         TempData[WellKnownTempData.SuccessMessage] = "Check-in settings saved";
         return RedirectToAction(nameof(CheckInSettings), new { storeId, eventId });
+    }
+
+    [HttpGet("settings")]
+    public async Task<IActionResult> Settings(string storeId)
+    {
+        if (await GetStoreData(storeId) is not { } store)
+            return NotFound();
+
+        await using var ctx = dbContextFactory.CreateContext();
+        var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == store.Id);
+
+        ViewData["StoreEmailSettingsConfigured"] = await emailService.IsEmailSettingsConfigured(store.Id);
+        var vm = new SatoshiTicketsSettingsViewModel
+        {
+            StoreId = store.Id,
+            EnableAutoReminders = settings?.EnableAutoReminders ?? false,
+            DefaultReminderDaysBeforeEvent = settings?.DefaultReminderDaysBeforeEvent ?? 3,
+            ReminderEmailBody = settings?.ReminderEmailBody,
+            ReminderEmailSubject = settings?.ReminderEmailSubject
+        };
+        return View(vm);
+    }
+
+    [HttpPost("settings")]
+    public async Task<IActionResult> Settings(string storeId, SatoshiTicketsSettingsViewModel vm)
+    {
+        if (await GetStoreData(storeId) is not { } store)
+            return NotFound();
+
+        if (vm.EnableAutoReminders && vm.DefaultReminderDaysBeforeEvent <= 0)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Default reminder days must be greater than 0";
+            return RedirectToAction(nameof(Settings), new { storeId });
+        }
+
+        await using var ctx = dbContextFactory.CreateContext();
+        var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == store.Id);
+        if (settings == null)
+        {
+            ctx.SatoshiTicketsSettings.Add(new SatoshiTicketsSetting
+            {
+                StoreId = store.Id,
+                EnableAutoReminders = vm.EnableAutoReminders,
+                DefaultReminderDaysBeforeEvent = vm.DefaultReminderDaysBeforeEvent,
+                ReminderEmailSubject = vm.ReminderEmailSubject,
+                ReminderEmailBody = vm.ReminderEmailBody
+            });
+        }
+        else
+        {
+            settings.EnableAutoReminders = vm.EnableAutoReminders;
+            settings.DefaultReminderDaysBeforeEvent = vm.DefaultReminderDaysBeforeEvent;
+            settings.ReminderEmailBody = vm.ReminderEmailBody;
+            settings.ReminderEmailSubject = vm.ReminderEmailSubject;
+        }
+        await ctx.SaveChangesAsync();
+        TempData[WellKnownTempData.SuccessMessage] = "Reminder settings updated successfully";
+        return RedirectToAction(nameof(Settings), new { storeId });
     }
 
     private string GetUserId() => userManager.GetUserId(User);
