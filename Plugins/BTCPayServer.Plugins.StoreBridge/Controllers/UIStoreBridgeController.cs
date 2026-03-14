@@ -18,7 +18,7 @@ using Newtonsoft.Json;
 namespace BTCPayServer.Plugins.StoreBridge;
 
 [Route("~/plugins/{storeId}/storebridge/")]
-[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
+[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
 public class UIStoreBridgeController : Controller
 {
     private readonly TemplateService _templateService;

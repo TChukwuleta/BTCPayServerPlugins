@@ -14,7 +14,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace BTCPayServer.Plugins.StoreBridge;
 
 [Route("~/plugins/{storeId}/storebridge/admin/")]
-[Authorize(Policy = Policies.CanModifyServerSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
+[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
 public class UIStoreBridgeAdminController : Controller
 {
     private readonly TemplateService _templateService;
