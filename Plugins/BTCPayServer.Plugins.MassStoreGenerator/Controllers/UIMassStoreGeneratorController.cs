@@ -17,7 +17,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 namespace BTCPayServer.Plugins.Template;
 
 [Route("~/plugins/storesgenerator")]
-[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
+[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
 public class UIMassStoreGeneratorController : Controller
 {
     private readonly RateFetcher _rateFactory;

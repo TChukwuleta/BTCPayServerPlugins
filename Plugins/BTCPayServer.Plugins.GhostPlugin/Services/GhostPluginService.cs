@@ -1,30 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
-using BTCPayServer.Client.Models;
-using BTCPayServer.Services.Apps;
-using BTCPayServer.Services.PaymentRequests;
-using System.Threading.Tasks;
-using System.Linq;
-using BTCPayServer.Data;
-using Newtonsoft.Json.Linq;
-using BTCPayServer.Controllers;
-using BTCPayServer.Plugins.GhostPlugin.Data;
-using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
-using BTCPayServer.Services.Invoices;
 using System.Globalization;
-using BTCPayServer.HostedServices;
-using Microsoft.Extensions.Logging;
-using System.Threading;
+using System.Linq;
 using System.Net.Http;
-using Microsoft.EntityFrameworkCore;
+using System.Threading;
+using System.Threading.Tasks;
+using BTCPayServer.Client.Models;
+using BTCPayServer.Controllers;
+using BTCPayServer.Data;
+using BTCPayServer.HostedServices;
+using BTCPayServer.Plugins.Emails.Services;
+using BTCPayServer.Plugins.GhostPlugin.Data;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
-using TransactionStatus = BTCPayServer.Plugins.GhostPlugin.Data.TransactionStatus;
-using Newtonsoft.Json;
-using static BTCPayServer.Plugins.GhostPlugin.Services.EmailService;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
+using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
+using BTCPayServer.Services.Apps;
+using BTCPayServer.Services.Invoices;
+using BTCPayServer.Services.PaymentRequests;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Identity;
-using BTCPayServer.Plugins.Emails.Services;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using static BTCPayServer.Plugins.GhostPlugin.Services.EmailService;
+using TransactionStatus = BTCPayServer.Plugins.GhostPlugin.Data.TransactionStatus;
 
 namespace BTCPayServer.Plugins.GhostPlugin.Services;
 
@@ -34,11 +35,10 @@ public class GhostPluginService : EventHostedServiceBase
     private readonly StoreRepository _storeRepo;
     private readonly EmailService _emailService;
     private readonly IHttpClientFactory _clientFactory;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly EmailSenderFactory _emailSenderFactory;
-    private readonly UIInvoiceController _invoiceController;
     private readonly GhostDbContextFactory _dbContextFactory;
-    private readonly UserManager<ApplicationUser> _userManager;
     private readonly PaymentRequestRepository _paymentRequestRepository;
 
     public GhostPluginService(
@@ -47,21 +47,18 @@ public class GhostPluginService : EventHostedServiceBase
         EmailService emailService,
         EventAggregator eventAggregator,
         IHttpClientFactory clientFactory,
+        IServiceScopeFactory scopeFactory,
         ILogger<GhostPluginService> logger,
         InvoiceRepository invoiceRepository,
         EmailSenderFactory emailSenderFactory,
-        UIInvoiceController invoiceController,
         GhostDbContextFactory dbContextFactory,
-        UserManager<ApplicationUser> userManager,
         PaymentRequestRepository paymentRequestRepository) : base(eventAggregator, logger)
     {
         _storeRepo = storeRepo;
         _appService = appService;
-        _userManager = userManager;
         _emailService = emailService;
         _clientFactory = clientFactory;
         _dbContextFactory = dbContextFactory;
-        _invoiceController = invoiceController;
         _invoiceRepository = invoiceRepository;
         _emailSenderFactory = emailSenderFactory;
         _paymentRequestRepository = paymentRequestRepository;
@@ -261,7 +258,6 @@ public class GhostPluginService : EventHostedServiceBase
         pr.SetBlob(new PaymentRequestBlob()
         {
             Description = $"{member.Name} Ghost membership renewal",
-            Title = $"{member.Name} Ghost Subscription",
             Email = member.Email,
             AllowCustomPaymentAmounts = false
         });
@@ -314,7 +310,9 @@ public class GhostPluginService : EventHostedServiceBase
                 RedirectURL = redirectUrl
             };
         }
-        var invoice = await _invoiceController.CreateInvoiceCoreRaw(invoiceRequest, store, url, new List<string>() { ghostSearchTerm });
+        using var scope = _scopeFactory.CreateScope();
+        var invoiceController = scope.ServiceProvider.GetRequiredService<UIInvoiceController>();
+        var invoice = await invoiceController.CreateInvoiceCoreRaw(invoiceRequest, store, url, new List<string>() { ghostSearchTerm });
         return invoice;
     }
 
@@ -369,8 +367,10 @@ public class GhostPluginService : EventHostedServiceBase
         var settingJson = JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) ?? new GhostSettingsPageViewModel();
         if (settingJson.SendReminderEmailsToAdmin)
         {
+            using var scope = _scopeFactory.CreateScope();
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var storeUser = await _storeRepo.GetStoreUser(ghostSetting.StoreId, ghostSetting.ApplicationUserId);
-            var storeUserDetails = await _userManager.FindByIdAsync(storeUser.ApplicationUserId);
+            var storeUserDetails = await userManager.FindByIdAsync(storeUser.ApplicationUserId);
             await _emailService.SendMembershipReminderToAdmin(emailRequest, Defaults.AdminMembershipReminderEmailSubject, Defaults.AdminMembershipReminderEmailBody, storeUserDetails.Email);
         }
     }

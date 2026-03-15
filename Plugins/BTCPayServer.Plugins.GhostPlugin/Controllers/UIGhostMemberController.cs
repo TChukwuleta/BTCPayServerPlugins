@@ -27,7 +27,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 
 [Route("~/plugins/{storeId}/ghost/members/")]
-[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
+[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
 public class UIGhostMemberController : Controller
 {
     private readonly StoreRepository _storeRepo;

@@ -7,7 +7,6 @@ using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;
-using BTCPayServer.Controllers;
 using BTCPayServer.Data;
 using BTCPayServer.Payments;
 using BTCPayServer.Plugins.Emails;
@@ -33,7 +32,7 @@ namespace BTCPayServer.Plugins.ShopifyPlugin;
 
 
 [Route("~/plugins/{storeId}/ghost/")]
-[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
+[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
 public class UIGhostController : Controller
 {
     private GhostHelper helper;

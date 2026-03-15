@@ -8,9 +8,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BTCPayServer.Plugins.Saleor;
-
+ 
 [Route("~/plugins/{storeId}/saleor/")]
-[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
+[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
 public class UISaleorAppController : Controller
 {
     private readonly SaleorAplService _apl;

@@ -21,21 +21,21 @@ namespace BTCPayServer.Plugins.NairaCheckout.Services;
 
 public class MavapayApiClientService
 {
-    private readonly IMemoryCache _cache;
+    private readonly IMemoryCache cache;
     private readonly HttpClient _httpClient;
-    private readonly InvoiceRepository _invoiceRepository;
-    private readonly PullPaymentHostedService _pullPaymentService;
-    private readonly NairaCheckoutDbContextFactory _dbContextFactory;
+    private readonly InvoiceRepository invoiceRepository;
+    private readonly PullPaymentHostedService pullPaymentService;
+    private readonly NairaCheckoutDbContextFactory dbContextFactory;
     public readonly string ApiUrl = "https://api.mavapay.co/api/v1"; //"https://staging.api.mavapay.co/api/v1";
     private readonly List<string> validStatuses = new List<string> { "success", "ok" };
 
     public MavapayApiClientService(IHttpClientFactory httpClientFactory, NairaCheckoutDbContextFactory dbContextFactory, 
         InvoiceRepository invoiceRepository, PullPaymentHostedService pullPaymentService, IMemoryCache cache)
     {
-        _cache = cache;
-        _dbContextFactory = dbContextFactory;
-        _invoiceRepository = invoiceRepository;
-        _pullPaymentService = pullPaymentService;
+        cache = cache;
+        dbContextFactory = dbContextFactory;
+        invoiceRepository = invoiceRepository;
+        pullPaymentService = pullPaymentService;
         _httpClient = httpClientFactory?.CreateClient(nameof(MavapayApiClientService)) ?? new HttpClient();
     }
 
@@ -51,7 +51,7 @@ public class MavapayApiClientService
                 _ => throw new ArgumentException($"Unsupported currency: {targetCurrency}")
             };
             var cacheKey = $"mavapay_bid_rate_{pair}";
-            if (_cache.TryGetValue<decimal>(cacheKey, out var cachedRate))
+            if (cache.TryGetValue<decimal>(cacheKey, out var cachedRate))
             {
                 return cachedRate;
             }
@@ -70,7 +70,7 @@ public class MavapayApiClientService
             if (bidRate <= 0)
                 return 0;
 
-            _cache.Set(cacheKey, bidRate, TimeSpan.FromMinutes(5));
+            cache.Set(cacheKey, bidRate, TimeSpan.FromMinutes(5));
             return bidRate;
         }
         catch (Exception) { return 0; }
@@ -203,7 +203,7 @@ public class MavapayApiClientService
 
     public async Task<(decimal amount, string lnInvoice)> GetLightningPaymentLink(string invoiceId)
     {
-        var entity = await _invoiceRepository.GetInvoice(invoiceId, true);
+        var entity = await invoiceRepository.GetInvoice(invoiceId, true);
         var prompt = entity.GetPaymentPrompts().FirstOrDefault(p => p.PaymentMethodId.ToString() == "BTC-LN");
         if (prompt is null || !prompt.Activated)
             return (0, string.Empty);
@@ -226,7 +226,7 @@ public class MavapayApiClientService
             MissingMemberHandling = MissingMemberHandling.Ignore,
             NullValueHandling = NullValueHandling.Include
         });
-        await _invoiceRepository.AddInvoiceLogs(invoiceId, result);
+        await invoiceRepository.AddInvoiceLogs(invoiceId, result);
         return responseModel.data;
     }
 
@@ -325,7 +325,7 @@ public class MavapayApiClientService
     public async Task ClaimPayout(NairaCheckoutDbContext ctx, CreatePayoutResponseModel responseModel, BTCPayServer.Data.StoreData store, string currency, string accountNumber, string invoiceId = null)
     {
         TimeSpan expirySpan = responseModel.expiry - DateTime.UtcNow;
-        var pullPaymentId = await _pullPaymentService.CreatePullPayment(store, new CreatePullPaymentRequest
+        var pullPaymentId = await pullPaymentService.CreatePullPayment(store, new CreatePullPaymentRequest
         {
             Name = $"Mavapay {currency} Payout - {accountNumber}",
             Amount = responseModel.totalAmountInSourceCurrency,
@@ -355,7 +355,7 @@ public class MavapayApiClientService
         });
         await ctx.SaveChangesAsync();
 
-        await _pullPaymentService.Claim(new ClaimRequest()
+        await pullPaymentService.Claim(new ClaimRequest()
         {
             Destination = new LNURLPayClaimDestinaton(responseModel.invoice),
             PullPaymentId = pullPaymentId,
@@ -438,7 +438,7 @@ public class MavapayApiClientService
 
     private async Task CreateOrderRecord(CreateQuoteResponseVm quoteResponse, string invoiceId, decimal amount, string storeId)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         ctx.NairaCheckoutOrders.Add(new NairaCheckoutOrder
         {
             StoreId = storeId,

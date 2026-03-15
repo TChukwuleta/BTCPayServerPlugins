@@ -29,22 +29,8 @@ using Newtonsoft.Json;
 namespace BTCPayServer.Plugins.Template;
 
 [Route("stores/{storeId}/mavapay/")]
-[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
-public class UIMavapayController : Controller
-{
-    private readonly IMemoryCache _cache;
-    private readonly StoreRepository _storeRepository;
-    private readonly IHttpClientFactory _clientFactory;
-    private readonly InvoiceRepository _invoiceRepository;
-    private readonly PaymentMethodHandlerDictionary _handler;
-    private readonly NairaStatusProvider _nairaStatusProvider;
-    private readonly UserManager<ApplicationUser> _userManager;
-    private readonly PullPaymentHostedService _pullPaymentService;
-    private readonly GeneralCheckoutService _generalCheckoutService;
-    private readonly NairaCheckoutDbContextFactory _dbContextFactory;
-    private readonly MavapayApiClientService _mavapayApiClientService;
-    public UIMavapayController
-        (IMemoryCache cache,
+[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
+public class UIMavapayController(IMemoryCache cache,
         StoreRepository storeRepository,
         IHttpClientFactory clientFactory,
         InvoiceRepository invoiceRepository,
@@ -54,21 +40,8 @@ public class UIMavapayController : Controller
         PullPaymentHostedService pullPaymentService,
         GeneralCheckoutService generalCheckoutService,
         MavapayApiClientService mavapayApiClientService,
-        NairaCheckoutDbContextFactory dbContextFactory)
-    {
-        _cache = cache;
-        _handler = handler;
-        _userManager = userManager;
-        _clientFactory = clientFactory;
-        _storeRepository = storeRepository;
-        _dbContextFactory = dbContextFactory;
-        _invoiceRepository = invoiceRepository;
-        _pullPaymentService = pullPaymentService;
-        _nairaStatusProvider = nairaStatusProvider;
-        _generalCheckoutService = generalCheckoutService;
-        _mavapayApiClientService = mavapayApiClientService;
-    }
-
+        NairaCheckoutDbContextFactory dbContextFactory) : Controller
+{
     private readonly List<string> lightningPaymentMethods = new List<string> { "BTC-LN" }; // "BTC-LNURL" Mavapay doeas not support LNURL yet
     private StoreData StoreData => HttpContext.GetStoreData();
 
@@ -78,11 +51,11 @@ public class UIMavapayController : Controller
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
-        var paymentMethods = StoreData.GetPaymentMethodConfigs(_handler, onlyEnabled: true);
+        var paymentMethods = StoreData.GetPaymentMethodConfigs(handler, onlyEnabled: true);
         var hasLightningPaymentMethod = paymentMethods.Keys.Any(key => lightningPaymentMethods.Contains(key.ToString()));
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var existingSetting = ctx.MavapaySettings.FirstOrDefault(m => m.StoreId == StoreData.Id);
-        var model = new NairaStoreViewModel { Enabled = await _nairaStatusProvider.NairaEnabled(StoreData.Id), WebhookSecret = existingSetting?.WebhookSecret, ApiKey = existingSetting?.ApiKey };
+        var model = new NairaStoreViewModel { Enabled = await nairaStatusProvider.NairaEnabled(StoreData.Id), WebhookSecret = existingSetting?.WebhookSecret, ApiKey = existingSetting?.ApiKey };
         return View(model);
     }
 
@@ -94,19 +67,19 @@ public class UIMavapayController : Controller
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
-        if (!StoreData.GetPaymentMethodConfigs(_handler, onlyEnabled: true).Keys.Any(k => lightningPaymentMethods.Contains(k.ToString())))
+        if (!StoreData.GetPaymentMethodConfigs(handler, onlyEnabled: true).Keys.Any(k => lightningPaymentMethods.Contains(k.ToString())))
         {
             TempData[WellKnownTempData.ErrorMessage] = "You need to enable lightning payment (BTC-LN) to use this plugin";
             return RedirectToAction(nameof(StoreConfig), new { StoreData.Id, paymentMethodId });
         }
 
         var blob = StoreData.GetStoreBlob();
-        var config = StoreData.GetPaymentMethodConfig<CashPaymentMethodConfig>(paymentMethodId, _handler) ?? new CashPaymentMethodConfig();
+        var config = StoreData.GetPaymentMethodConfig<CashPaymentMethodConfig>(paymentMethodId, handler) ?? new CashPaymentMethodConfig();
         var webhookSecret = !string.IsNullOrEmpty(viewModel.WebhookSecret) ? viewModel.WebhookSecret : Encoders.Base58.EncodeData(RandomUtils.GetBytes(10));
         var webhookUrl = Url.Action(nameof(UIMavapayPublicController.ReceiveMavapayWebhook), "UIMavapayPublic", new { storeId = StoreData.Id }, Request.Scheme);
 
-        await using var ctx = _dbContextFactory.CreateContext();
-        var apiClient = new MavapayApiClientService(_clientFactory, _dbContextFactory, _invoiceRepository, _pullPaymentService, _cache);
+        await using var ctx = dbContextFactory.CreateContext();
+        var apiClient = new MavapayApiClientService(clientFactory, dbContextFactory, invoiceRepository, pullPaymentService, cache);
         var entity = ctx.NairaCheckoutSettings.FirstOrDefault(c => c.Enabled) ?? new NairaCheckoutSetting { WalletName = Wallet.Mavapay.ToString() };
 
         bool webhookOk = true;
@@ -143,12 +116,12 @@ public class UIMavapayController : Controller
         }
 
         blob.SetExcluded(paymentMethodId, !viewModel.Enabled);
-        StoreData.SetPaymentMethodConfig(_handler[paymentMethodId], config);
+        StoreData.SetPaymentMethodConfig(handler[paymentMethodId], config);
         StoreData.SetStoreBlob(blob);
-        await _storeRepository.UpdateStore(StoreData);
+        await storeRepository.UpdateStore(StoreData);
 
         var checkout = ctx.NairaCheckoutSettings.FirstOrDefault(c => c.Enabled) ?? new NairaCheckoutSetting { WalletName = Wallet.Mavapay.ToString() };
-        checkout.Enabled = await _nairaStatusProvider.NairaEnabled(StoreData.Id);
+        checkout.Enabled = await nairaStatusProvider.NairaEnabled(StoreData.Id);
 
         if (string.IsNullOrEmpty(checkout.Id))
             ctx.NairaCheckoutSettings.Add(checkout);
@@ -166,9 +139,9 @@ public class UIMavapayController : Controller
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
-        var nairaEnabled = await _nairaStatusProvider.NairaEnabled(StoreData.Id);
+        var nairaEnabled = await nairaStatusProvider.NairaEnabled(StoreData.Id);
         var entity = ctx.NairaCheckoutSettings.FirstOrDefault(c => c.Enabled);
         if (mavapaySetting == null || string.IsNullOrEmpty(mavapaySetting.ApiKey) || !nairaEnabled || entity.WalletName != Wallet.Mavapay.ToString())
         {
@@ -185,7 +158,7 @@ public class UIMavapayController : Controller
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         var viewModel = await PayoutViewModel(mavapaySetting, model);
         if (string.IsNullOrWhiteSpace(model.NGN.AccountNumber) || model.NGN.AccountNumber.Length != 10)
@@ -193,7 +166,7 @@ public class UIMavapayController : Controller
             ModelState.AddModelError("NGN.AccountNumber", "Account number must be exactly 10 digits");
             return View(nameof(MavapayPayout), viewModel);
         }
-        var result = await _mavapayApiClientService.NGNNameEnquiry(model.NGN.BankCode, model.NGN.AccountNumber, mavapaySetting.ApiKey);
+        var result = await mavapayApiClientService.NGNNameEnquiry(model.NGN.BankCode, model.NGN.AccountNumber, mavapaySetting.ApiKey);
         if (result == null || string.IsNullOrEmpty(result.accountName))
         {
             ModelState.AddModelError("NGN.AccountNumber", "Account number cannot be verified at the moment");
@@ -209,14 +182,14 @@ public class UIMavapayController : Controller
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         if (string.IsNullOrWhiteSpace(model.NGN.AccountNumber) || model.NGN.AccountNumber.Length != 10)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Account number must be exactly 10 digits";
             return RedirectToAction(nameof(MavapayPayout), new { storeId = StoreData.Id });
         }
-        var result = await _mavapayApiClientService.NGNNameEnquiry(model.NGN.BankCode, model.NGN.AccountNumber, mavapaySetting.ApiKey);
+        var result = await mavapayApiClientService.NGNNameEnquiry(model.NGN.BankCode, model.NGN.AccountNumber, mavapaySetting.ApiKey);
         if (result == null || string.IsNullOrEmpty(result.accountName))
         {
             TempData[WellKnownTempData.ErrorMessage] = "Account number cannot be verified at the moment";
@@ -226,7 +199,7 @@ public class UIMavapayController : Controller
         model.NGN.BankName = model.NGN.BankCode;
         try
         {
-            var ngnPayout = await _mavapayApiClientService.MavapayNairaPayout(model.NGN, mavapaySetting.ApiKey);
+            var ngnPayout = await mavapayApiClientService.MavapayNairaPayout(model.NGN, mavapaySetting.ApiKey);
             if (!string.IsNullOrEmpty(ngnPayout.ErrorMessage))
             {
                 TempData[WellKnownTempData.ErrorMessage] = ngnPayout.ErrorMessage;
@@ -238,7 +211,7 @@ public class UIMavapayController : Controller
                 TempData[WellKnownTempData.ErrorMessage] = "Insufficient balance to process request";
                 return RedirectToAction(nameof(MavapayPayout), new { storeId = StoreData.Id });
             }
-            await _mavapayApiClientService.ClaimPayout(ctx, ngnPayout, StoreData, SupportedCurrency.NGN.ToString(), model.NGN.AccountNumber);
+            await mavapayApiClientService.ClaimPayout(ctx, ngnPayout, StoreData, SupportedCurrency.NGN.ToString(), model.NGN.AccountNumber);
             TempData[WellKnownTempData.SuccessMessage] = "Pauyout processed successfully";
             return RedirectToAction(nameof(MavapayPayout), new { storeId = StoreData.Id });
         }
@@ -255,7 +228,7 @@ public class UIMavapayController : Controller
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         if (string.IsNullOrWhiteSpace(model.ZAR.AccountNumber) || string.IsNullOrWhiteSpace(model.ZAR.AccountName) || model.ZAR.Amount <= 0)
         {
@@ -264,7 +237,7 @@ public class UIMavapayController : Controller
         }
         try
         {
-            var zarPayout = await _mavapayApiClientService.MavapayRandsPayout(model.ZAR, mavapaySetting.ApiKey);
+            var zarPayout = await mavapayApiClientService.MavapayRandsPayout(model.ZAR, mavapaySetting.ApiKey);
             if (!string.IsNullOrEmpty(zarPayout.ErrorMessage))
             {
                 TempData[WellKnownTempData.ErrorMessage] = zarPayout.ErrorMessage;
@@ -293,7 +266,7 @@ public class UIMavapayController : Controller
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         var viewModel = await PayoutViewModel(mavapaySetting, model);
 
@@ -302,7 +275,7 @@ public class UIMavapayController : Controller
             ModelState.AddModelError("KES.Identifier", "Identifier number must be provided");
             return View(nameof(MavapayPayout), viewModel);
         }
-        var result = await _mavapayApiClientService.KESNameEnquiry(model.KES.Identifier, model.KES.Method, mavapaySetting.ApiKey);
+        var result = await mavapayApiClientService.KESNameEnquiry(model.KES.Identifier, model.KES.Method, mavapaySetting.ApiKey);
         if (result == null || string.IsNullOrEmpty(result?.organization_name))
         {
             ModelState.AddModelError("KES.Identifier", "Till or Bill number cannot be verified at the moment");
@@ -318,7 +291,7 @@ public class UIMavapayController : Controller
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         if (string.IsNullOrWhiteSpace(model.KES.Identifier) || model.KES.Amount <= 0)
         {
@@ -327,7 +300,7 @@ public class UIMavapayController : Controller
         }
         try
         {
-            var kesPayout = await _mavapayApiClientService.MavapayKenyanShillingPayout(model.KES, mavapaySetting.ApiKey);
+            var kesPayout = await mavapayApiClientService.MavapayKenyanShillingPayout(model.KES, mavapaySetting.ApiKey);
             if (!string.IsNullOrEmpty(kesPayout.ErrorMessage))
             {
                 TempData[WellKnownTempData.ErrorMessage] = kesPayout.ErrorMessage;
@@ -356,12 +329,12 @@ public class UIMavapayController : Controller
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         if (mavapaySetting == null)
             return NotFound();
 
-        var settings = await _storeRepository.GetSettingAsync<MavapayCheckoutSettings>(storeId, NairaCheckoutPlugin.SettingsName) ?? new MavapayCheckoutSettings();
+        var settings = await storeRepository.GetSettingAsync<MavapayCheckoutSettings>(storeId, NairaCheckoutPlugin.SettingsName) ?? new MavapayCheckoutSettings();
         var viewModel = await PayoutViewModel(mavapaySetting);
         var model = new SplitPaymentSettingsViewModel
         {
@@ -433,12 +406,12 @@ public class UIMavapayController : Controller
                 return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
         }
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         if (mavapaySetting == null)
             return NotFound();
 
-        var settings = await _storeRepository.GetSettingAsync<MavapayCheckoutSettings>(StoreData.Id, NairaCheckoutPlugin.SettingsName) ?? new MavapayCheckoutSettings();
+        var settings = await storeRepository.GetSettingAsync<MavapayCheckoutSettings>(StoreData.Id, NairaCheckoutPlugin.SettingsName) ?? new MavapayCheckoutSettings();
         settings = new MavapayCheckoutSettings
         {
             EnableSplitPayment = vm.EnableSplitPayment,
@@ -456,7 +429,7 @@ public class UIMavapayController : Controller
             ZARAccountNumber = vm.SplitPayment.ZARAccountNumber,
             ZARAccountName = vm.SplitPayment.ZARAccountName
         };
-        await _storeRepository.UpdateSetting(StoreData.Id, NairaCheckoutPlugin.SettingsName, settings);
+        await storeRepository.UpdateSetting(StoreData.Id, NairaCheckoutPlugin.SettingsName, settings);
         TempData[WellKnownTempData.SuccessMessage] = "Mavapay checkout settings saved successfully";
         return RedirectToAction(nameof(MavapayCheckoutSettings), new { storeId = StoreData.Id });
     }
@@ -467,7 +440,7 @@ public class UIMavapayController : Controller
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var payoutTransactions = ctx.PayoutTransactions.Where(c => c.StoreId == StoreData.Id && c.Provider == Wallet.Mavapay.ToString());
         if (!string.IsNullOrEmpty(searchText))
         {
@@ -491,7 +464,7 @@ public class UIMavapayController : Controller
         if (string.IsNullOrEmpty(StoreData.Id))
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(c => c.StoreId == StoreData.Id);
         if (mavapaySetting == null || string.IsNullOrEmpty(mavapaySetting.ApiKey))
         {
@@ -504,11 +477,11 @@ public class UIMavapayController : Controller
             TempData[WellKnownTempData.ErrorMessage] = "Cannot find reference transaction";
             return RedirectToAction(nameof(ListMavapayPayouts), new { storeId = StoreData.Id });
         }
-        var verifiedTransaction = await _mavapayApiClientService.GetMavapayTransactionRecord(mavapaySetting.ApiKey, hash: externalReferemce);
+        var verifiedTransaction = await mavapayApiClientService.GetMavapayTransactionRecord(mavapaySetting.ApiKey, hash: externalReferemce);
         var successfulTransaction = verifiedTransaction?.All(c => c.status.Equals("SUCCESS", StringComparison.InvariantCultureIgnoreCase)) ?? false;
         if (successfulTransaction)
         {
-            await _mavapayApiClientService.MarkTransactionStatusAsSuccess(ctx, externalReferemce, StoreData.Id);
+            await mavapayApiClientService.MarkTransactionStatusAsSuccess(ctx, externalReferemce, StoreData.Id);
         }
         TempData[WellKnownTempData.SuccessMessage] = successfulTransaction ? "Transaction validated and completed successfully" : "Transaction queried successfully. Transaction pending completion from Mavapay";
         return RedirectToAction(nameof(ListMavapayPayouts), new { storeId = StoreData.Id });
@@ -517,7 +490,7 @@ public class UIMavapayController : Controller
     private async Task ClaimPayout(NairaCheckoutDbContext ctx, CreatePayoutResponseModel responseModel, string storeId, string currency, string accountNumber)
     {
         TimeSpan expirySpan = responseModel.expiry - DateTime.UtcNow;
-        var pullPaymentId = await _pullPaymentService.CreatePullPayment(StoreData, new Client.Models.CreatePullPaymentRequest
+        var pullPaymentId = await pullPaymentService.CreatePullPayment(StoreData, new Client.Models.CreatePullPaymentRequest
         {
             Name = $"Mavapay {currency} Payout - {accountNumber}",
             Amount = responseModel.totalAmountInSourceCurrency,
@@ -546,7 +519,7 @@ public class UIMavapayController : Controller
         });
         await ctx.SaveChangesAsync();
 
-        await _pullPaymentService.Claim(new ClaimRequest()
+        await pullPaymentService.Claim(new ClaimRequest()
         {
             Destination = new LNURLPayClaimDestinaton(responseModel.invoice),
             PullPaymentId = pullPaymentId,
@@ -558,8 +531,8 @@ public class UIMavapayController : Controller
 
     private async Task<MavapayPayoutViewModel> PayoutViewModel(MavapaySetting mavapaySetting, MavapayPayoutViewModel model = null)
     {
-        var ngnBanks = await _mavapayApiClientService.GetNGNBanks(mavapaySetting.ApiKey);
-        var zarBanks = await _mavapayApiClientService.GetZARBanks(mavapaySetting.ApiKey);
+        var ngnBanks = await mavapayApiClientService.GetNGNBanks(mavapaySetting.ApiKey);
+        var zarBanks = await mavapayApiClientService.GetZARBanks(mavapaySetting.ApiKey);
         var vm = new MavapayPayoutViewModel
         {
             KESPaymentMethod = Enum.GetValues(typeof(MpesaPaymentMethod)).Cast<MpesaPaymentMethod>().Select(s => new SelectListItem
@@ -587,13 +560,13 @@ public class UIMavapayController : Controller
         return vm;
     }
 
-    private string GetUserId() => _userManager.GetUserId(User);
+    private string GetUserId() => userManager.GetUserId(User);
 
     private string GetExternalReferenceId(string reference) => reference.Split(':', 2)[1];
 
     private async Task<long> GetLightningBalance(string storeId)
     {
-        var balance = await _generalCheckoutService.GetLightningNodeBalance(storeId);
+        var balance = await generalCheckoutService.GetLightningNodeBalance(storeId);
         return balance.MilliSatoshi / 1000;
     }
 }

@@ -16,7 +16,7 @@ namespace BTCPayServer.Plugins.NairaCheckout.Services;
 
 public class GeneralCheckoutService
 {
-    private readonly StoreRepository _storeRepository;
+    private readonly StoreRepository storeRepository;
     private readonly BTCPayWalletProvider _walletProvider;
     private readonly BTCPayNetworkProvider _btcPayNetworkProvider;
     private readonly IOptions<LightningNetworkOptions> _lightningNetworkOptions;
@@ -31,7 +31,7 @@ public class GeneralCheckoutService
         PaymentMethodHandlerDictionary paymentMethodHandlerDictionary)
     {
         _walletProvider = walletProvider;
-        _storeRepository = storeRepository;
+        storeRepository = storeRepository;
         _btcPayNetworkProvider = btcPayNetworkProvider;
         _lightningNetworkOptions = lightningNetworkOptions;
         _lightningClientFactoryService = lightningClientFactoryService;
@@ -60,7 +60,7 @@ public class GeneralCheckoutService
         {
             var onchainBalance = new Lazy<Task<LightMoney>>(async () =>
             {
-                var store = await _storeRepository.FindStore(storeId);
+                var store = await storeRepository.FindStore(storeId);
                 if (store is null) return null;
                 var settings = store.GetDerivationSchemeSettings(_paymentMethodHandlerDictionary, "BTC", true);
                 if (settings is null) return null;
@@ -77,7 +77,7 @@ public class GeneralCheckoutService
 
     private async Task<ILightningClient> ConstructLightningClient(string storeId)
     {
-        var store = await _storeRepository.FindStore(storeId);
+        var store = await storeRepository.FindStore(storeId);
 
         var network = _btcPayNetworkProvider.GetNetwork<BTCPayNetwork>("BTC");
         var id = PaymentTypes.LN.GetPaymentMethodId("BTC");

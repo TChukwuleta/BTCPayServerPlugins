@@ -17,12 +17,12 @@ namespace BTCPayServer.Plugins.Template;
 [Route("~/plugins/{storeId}/naira-checkout/api/", Order = 1)]
 public class UIMavapayPublicController : Controller
 {
-    private readonly MavapayApiClientService _mavapayApiClientService;
-    private readonly NairaCheckoutDbContextFactory _dbContextFactory;
+    private readonly MavapayApiClientService mavapayApiClientService;
+    private readonly NairaCheckoutDbContextFactory dbContextFactory;
     public UIMavapayPublicController(NairaCheckoutDbContextFactory dbContextFactory, MavapayApiClientService mavapayApiClientService)
     {
-        _dbContextFactory = dbContextFactory;
-        _mavapayApiClientService = mavapayApiClientService;
+        dbContextFactory = dbContextFactory;
+        mavapayApiClientService = mavapayApiClientService;
     }
 
 
@@ -42,7 +42,7 @@ public class UIMavapayPublicController : Controller
                 return Ok(new { message = "Ping event received. Webhook is active." });
             }
 
-            await using var ctx = _dbContextFactory.CreateContext();
+            await using var ctx = dbContextFactory.CreateContext();
             var mavapaySetting = ctx.MavapaySettings.FirstOrDefault(m => m.StoreId == storeId);
             if (mavapaySetting == null)
                 return BadRequest();
@@ -80,7 +80,7 @@ public class UIMavapayPublicController : Controller
                         await ctx.SaveChangesAsync();
                     }
                     //webhookResponse.data.@ref webhookResponse.data.hash
-                    await _mavapayApiClientService.MarkTransactionStatusAsSuccess(ctx, webhookResponse.data.hash, storeId);
+                    await mavapayApiClientService.MarkTransactionStatusAsSuccess(ctx, webhookResponse.data.hash, storeId);
                     break;
 
                 default:

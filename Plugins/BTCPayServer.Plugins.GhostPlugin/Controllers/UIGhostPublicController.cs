@@ -28,7 +28,6 @@ using BTCPayServer.Plugins.GhostPlugin;
 using NBitcoin.DataEncoders;
 using NBitcoin;
 using System.Security.Cryptography;
-using BTCPayServer.Abstractions.Constants;
 using System.ComponentModel.DataAnnotations;
 
 namespace BTCPayServer.Plugins.ShopifyPlugin;
