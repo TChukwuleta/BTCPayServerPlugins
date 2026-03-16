@@ -24,6 +24,7 @@
 	</ItemDefinitionGroup>
 
 	<ItemGroup Condition="$(Configuration) != 'Release'">
+		<PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.10.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
