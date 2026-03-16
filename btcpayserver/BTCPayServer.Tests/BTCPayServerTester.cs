@@ -26,6 +26,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -126,11 +127,12 @@ namespace BTCPayServer.Tests
                 config.AppendLine($"btc.explorer.cookiefile=0");
             }
 
+            var btcpayserverTestDataDir = Path.Combine(TestUtils.TryGetSolutionDirectoryInfo().FullName,"BTCPayServer.Tests", "TestData");
             if (UseLightning)
             {
                 config.AppendLine($"btc.lightning={IntegratedLightning}");
                 var localLndBackupFile = Path.Combine(_Directory, "walletunlock.json");
-                File.Copy(TestUtils.GetTestDataFullPath("LndSeedBackup/walletunlock.json"), localLndBackupFile, true);
+                File.Copy(Path.Combine(btcpayserverTestDataDir, "LndSeedBackup/walletunlock.json"), localLndBackupFile, true);
                 config.AppendLine($"btc.external.lndseedbackup={localLndBackupFile}");
             }
 
@@ -147,7 +149,7 @@ namespace BTCPayServer.Tests
             if (CheatMode)
                 config.AppendLine("cheatmode=1");
 
-            config.AppendLine($"torrcfile={TestUtils.GetTestDataFullPath("Tor/torrc")}");
+            config.AppendLine($"torrcfile={Path.Combine(btcpayserverTestDataDir, "Tor/torrc")}");
             config.AppendLine($"socksendpoint={SocksEndpoint}");
             config.AppendLine($"debuglog=debug.log");
             config.AppendLine($"nocsp={NoCSP.ToString().ToLowerInvariant()}");
@@ -224,6 +226,12 @@ namespace BTCPayServer.Tests
                         {
                             if (RuntimeCompilation)
                                 services.AddMvcCore().AddRazorRuntimeCompilation();
+
+                            services.AddMvcCore().ConfigureApplicationPartManager(apm =>
+                            {
+                                var assembly = typeof(BTCPayServerTester).Assembly;
+                                apm.ApplicationParts.Add(new AssemblyPart(assembly));
+                            }).AddControllersAsServices();
                             services.TryAddSingleton<IFeeProviderFactory>(
                                 new BTCPayServer.Services.Fees.FixedFeeProvider(new FeeRate(100L, 1)));
                         });
