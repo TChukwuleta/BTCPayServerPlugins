@@ -48,7 +48,7 @@
     <div class="alert alert-warning small">SMTP is not configured. Only bell notifications will be sent. Configure email in <strong>Server Settings → Emails</strong>.</div>
 }
 
-<form id="herald-form" asp-action="@(isNew ? "Create" : "Edit")" asp-route-id="@Model.Id" method="post" style="max-width:680px;">
+<form id="herald-form" asp-action="@(isNew ? "Create" : "Update")" asp-route-id="@Model.Id" method="post" style="max-width:680px;">
     <div asp-validation-summary="ModelOnly" class="alert alert-danger mb-4"></div>
 
     <div class="mb-3">
@@ -77,18 +77,6 @@
         <select asp-for="EmailScope" id="emailScopeSelect" class="form-select" asp-items="scopeItems"></select>
     </div>
 
-    @* <div id="storePicker" class="mb-3" style="display:none;">
-        <label class="form-label fw-semibold">Select stores</label>
-        <select name="SelectedStoreIds" class="form-select" multiple size="8">
-            @foreach (var store in Model.AllStores.OrderBy(s => s.StoreName))
-            {
-                var isSelected = Model.SelectedStoreIds.Contains(store.Id);
-                <option value="@store.Id" selected="@isSelected">@store.StoreName — @store.Id</option>
-            }
-        </select>
-        <div class="form-text">Hold Ctrl / Cmd to select multiple. Owners of selected stores receive the email.</div>
-    </div> *@
-
     <div id="storePicker" class="mb-3" style="display:none;">
         <label class="form-label fw-semibold">Select stores</label>
         <select name="SelectedStoreIds" id="storeSelect" class="form-select" multiple>
@@ -111,30 +99,41 @@
 
 </form>
 
-<script>
-    (function () {
-        const storeSelect = document.getElementById('storeSelect');
-        if (storeSelect) {
-            new Choices(storeSelect, {
-                removeItemButton: true,
-                searchPlaceholderValue: 'Search stores...',
-                placeholderValue: 'Select stores',
-                noResultsText: 'No stores found',
-                shouldSort: false
-            });
-        }
+@section PageFootContent {
+    <partial name="_ValidationScriptsPartial" />
+    <link rel="stylesheet" href="~/Resources/js/choices.min.css" asp-append-version="true" />
+    <script src="~/Resources/js/choices.min.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            const sel         = document.getElementById('emailScopeSelect');
+            const storePicker = document.getElementById('storePicker');
+            const customBox   = document.getElementById('customEmailBox');
+            let choicesInstance = null;
 
-        const sel         = document.getElementById('emailScopeSelect');
-        const storePicker = document.getElementById('storePicker');
-        const customBox   = document.getElementById('customEmailBox');
+            function update() {
+                const v          = parseInt(sel.value, 10);
+                const showStores = (v === @selectedStoresVal);
+                const showCustom = (v === @customEmailsVal);
 
-        function update() {
-            const v = parseInt(sel.value, 10);
-            storePicker.style.display = (v === @selectedStoresVal) ? '' : 'none';
-            customBox.style.display   = (v === @customEmailsVal)   ? '' : 'none';
-        }
+                storePicker.style.display = showStores ? '' : 'none';
+                customBox.style.display   = showCustom ? '' : 'none';
 
-        sel.addEventListener('change', update);
-        update();
-    })();
-</script>
+                if (showStores && !choicesInstance) {
+                    const storeSelect = document.getElementById('storeSelect');
+                    if (storeSelect) {
+                        choicesInstance = new Choices(storeSelect, {
+                            removeItemButton: true,
+                            searchPlaceholderValue: 'Search stores...',
+                            placeholderValue: 'Select stores',
+                            noResultsText: 'No stores found',
+                            shouldSort: false
+                        });
+                    }
+                }
+            }
+
+            sel.addEventListener('change', update);
+            update();
+        })();
+    </script>
+}

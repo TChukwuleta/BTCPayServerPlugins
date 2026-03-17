@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BTCPayServer.Plugins.ServerAlert;
 
-[Route("~/plugins/server-alerts/")]
+[Route("~/plugins/server/alerts/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyServerSettings)]
 public class UIServerAlertController(StoreRepository storeRepository, 
     ServerAlertService serverAlertService, 

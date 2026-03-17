@@ -8,12 +8,10 @@ using BTCPayServer.Plugins.Emails.Services;
 using BTCPayServer.Plugins.LightSpeed.Data;
 using BTCPayServer.Plugins.ServerAlert.Data;
 using BTCPayServer.Plugins.ServerAlert.ViewModels;
-using BTCPayServer.Services;
 using BTCPayServer.Services.Notifications;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using MimeKit;
 
 namespace BTCPayServer.Plugins.ServerAlert.Services;
@@ -21,48 +19,13 @@ namespace BTCPayServer.Plugins.ServerAlert.Services;
 public class ServerAlertService(StoreRepository storeRepository, 
         EmailSenderFactory emailSenderFactory,
         NotificationSender notificationSender,
-        SettingsRepository settingsRepository,
         UserManager<ApplicationUser> userManager,
-        ServerAlertDbContextFactory dbContextFactory,
-        ILogger<ServerAlertService> logger)
+        ServerAlertDbContextFactory dbContextFactory)
 {
-
-    public Task<ServerAlertSettings?> GetServerAlertSettings() => settingsRepository.GetSettingAsync<ServerAlertSettings>();
-
-    public Task SaveServerAlertSettings(ServerAlertSettings settings) => settingsRepository.UpdateSetting(settings);
-
-    public async Task<bool> GetUserEmailEnabled(string userId)
-    {
-        await using var ctx = dbContextFactory.CreateContext();
-        var entity = ctx.UserEmailPreferences.Find(userId);
-        return entity?.EmailEnabled ?? true;
-    }
-
     public async Task<Announcement> GetAnnouncement(string id)
     {
         await using var ctx = dbContextFactory.CreateContext();
         return ctx.Announcements.Find(id);
-    }
-
-    public async Task SetUserEmailEnabledAsync(string userId, bool enabled)
-    {
-        await using var ctx = dbContextFactory.CreateContext();
-        var entity = ctx.UserEmailPreferences.Find(userId);
-        if (entity is null)
-        {
-            ctx.UserEmailPreferences.Add(new UserEmailPreference
-            {
-                Id = userId,
-                EmailEnabled = enabled,
-                UpdatedAt = DateTimeOffset.UtcNow
-            });
-        }
-        else
-        {
-            entity.EmailEnabled = enabled;
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
-        }
-        await ctx.SaveChangesAsync();
     }
 
     public async Task<List<AnnouncementViewModel>> GetAllAnnouncement()
@@ -121,13 +84,8 @@ public class ServerAlertService(StoreRepository storeRepository,
         existingAnnouncement.Severity = vm.Severity;
         existingAnnouncement.EmailScope = vm.EmailScope;
         existingAnnouncement.UpdatedAt = DateTimeOffset.UtcNow;
-        if (!vm.IsPublished)
-        {
-            existingAnnouncement.IsPublished = false;
-            existingAnnouncement.BellNotificationsSent = false;
-            existingAnnouncement.EmailsSent = false;
-            existingAnnouncement.EmailsSentCount = 0;
-        }
+        existingAnnouncement.SelectedStoreIds = vm.EmailScope == EmailScope.SelectedStores ? string.Join(',', vm.SelectedStoreIds) : null;
+        existingAnnouncement.CustomEmailAddresses = vm.CustomEmailAddresses?.Trim();
         await ctx.SaveChangesAsync();
         return true;
     }
@@ -218,15 +176,10 @@ public class ServerAlertService(StoreRepository storeRepository,
                 cc: Array.Empty<MailboxAddress>(), 
                 bcc: bccList.ToArray(), 
                 subject: subject, 
-                message: BuildPlainText(entity, serverName));
-            logger.LogInformation("Herald: emailed '{Title}' to {Count} BCC recipients (scope: {Scope}).", entity.Title, bccList.Count, entity.EmailScope);
+                message: BuildEmailBody(entity, serverName));
             return bccList.Count;
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Herald: bulk BCC send failed for announcement '{Title}'.", entity.Title);
-            return 0;
-        }
+        catch (Exception){ return 0; }
     }
 
     private async Task<List<MailboxAddress>> BuildRecipientList(Announcement entity, ServerAlertDbContext ctx)
@@ -273,19 +226,16 @@ public class ServerAlertService(StoreRepository storeRepository,
         return (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
     }
 
-    public string BuildPlainText(Announcement entity, string serverName)
+    public string BuildEmailBody(Announcement entity, string serverName)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine($"BTCPay Server Alert — {serverName}");
-        sb.Append("\r\n");
-        sb.Append("\r\n");
-        sb.AppendLine($"[{entity.Severity.ToString().ToUpperInvariant()}] {entity.Title}");
-        sb.Append("\r\n");
-        sb.Append("\r\n");
-        sb.AppendLine(entity.Message);
-        sb.Append("\r\n");
-        sb.Append("\r\n");
-        sb.AppendLine($"You received this because you have an account on {serverName}.");
-        return sb.ToString();
+        var title = System.Net.WebUtility.HtmlEncode(entity.Title);
+        var message = System.Net.WebUtility.HtmlEncode(entity.Message).Replace("\n", "<br>");
+        var server = System.Net.WebUtility.HtmlEncode(serverName);
+        var severity = entity.Severity.ToString().ToUpperInvariant();
+
+        return $"BTCPay Server Alert — {server}<br><br>" +
+               $"[{severity}] {title}<br><br>" +
+               $"{message}<br><br>" +
+               $"You received this because you have an account on {server}.";
     }
 }

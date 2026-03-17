@@ -1,49 +1,54 @@
-﻿# BTCPay Server - Lightspeed HQ Plugin
+﻿# BTCPay Server - Server Alert Plugin
 
-Accept Bitcoin and Lightning Network payments directly from the Lightspeed Retail point of sale. When a customer chooses to pay with Bitcoin, 
-a BTCPay checkout appears inside the Lightspeed payment screen. Once the payment settles, Lightspeed automatically marks the sale as paid
+Broadcast server-wide announcements to all your store owners and users directly from BTCPay Server. Whether it's scheduled maintenance, a service outage, or an important update 
+this plugin ensures everyone on your server gets notified instantly via bell notifications and email.
 
 ## What you need?
 
 - A running BTCPay Server instance (self-hosted or hosted by a third party)
-- A Lightspeed retail account (ourstore.retail.lightspeed.app)
+- Server administrator access
+- SMTP configured in Server settings (optional, required for email notifications)
 
-BTCPay plugin for LightSpeed is Retail POS (X-Series) only
 
 
 ## Installation
 
-1. On the left navigation of BTCPay Server UI click **Manage Plugins** search for **Light Speed** plugin
+1. On the left navigation of BTCPay Server UI click Manage Plugins, search for **Server Alert**
 2. Install the plugin, and if BTCPay Server requests that you restart the instance, go ahead and restart.
-3. Once the plugin is installed, you should see `Lightspeed HQ` in the left navigation. Click on it to open the settings page.
-4. Enter your Lightspeed store URL (https://yourstore.retail.lightspeed.app) and then save. The plugin uses to validate payment requests coming from your Lightspeed store.
-5. Copy the Gateway URL shown (https://yourbtcpay.com/plugins/STOREID/lightspeedhq/gateway)
-6. Log into your Lightspeed retail account, and go to `Settings > Payment Methods > Add Payment Method`
-7. Choose `Other psyment method`, name it whatever you choose (Pay with Bitcoin, Pay with BTCPay Server)
-8. Paste the gateway url you copied from the plugin into the `Gateway URL` field and save.
+3. Once the plugin is installed, you should see Server Alerts under Server Settings in the left navigation.
 
-That's it. The payment type will now appear on your Lightspeed sell screen.
+### Sending alert notifications
 
-### How a payment works
+Navigate to `Server Settings` > `Server Alerts` click `Send Alert` button. Fill in:
 
-When a customer is ready to pay, the cashier clicks `Pay` on the sale in the Lightspeed and selects your Bitcoin payment type
+Notification Title — a short headline (e.g. Scheduled Maintenance)
 
-Lightspeed opens a payment window of which BTCPay Server invoice checkout page is displayed. 
+Notification Message — the full message in plain text
 
-The customer can then go ahead and pay with any of the payment option available.
+Severity — Info, Warning, or Critical
 
-Once payment is confirmed, the window will close and the sale will be marked as paid in Lightspeed.
 
-N.B: For improved UX around QR display, you can disable store header to show in checkout page by going to `Stores Settings > Checkout Appearance` and disable `Show the store header`
+Under Email Notifications, choose who receives an email:
 
-### Troubleshooting
+None — bell notification only
+All stores — owners of every store on the server
+All users — every registered user
+Admins only — server administrators only
+Selected store owners — pick specific stores from a searchable list
+Custom email list — enter any email addresses manually
 
-##### The payment window opens but shows "Plugin not configured"
-The store ID in the Gateway URL doesn't match a store with the plugin configured. Double-check that you copied the Gateway URL from the correct BTCPay store.
 
-##### The payment window opens but shows "Invalid origin"
-The Lightspeed Store URL saved in plugin settings doesn't match the actual domain your Lightspeed account is on. Go back to plugin settings and make sure the URL matches exactly, including https://.
+Click Send
 
+
+This plugin uses your server's existing SMTP configuration for email notifications. To enable email notifications, make sure SMTP is configured under `Server Settings` > `Emails`.
+
+#### Managing Alerts
+From the Server Alerts list you can:
+
+Edit — update the title, message, severity, or email scope
+Resend — re-dispatch bell and email notifications for an existing alert
+Delete — permanently remove an alert
 
 ## Contribute
 
