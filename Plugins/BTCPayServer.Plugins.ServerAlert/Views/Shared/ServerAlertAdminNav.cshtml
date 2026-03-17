@@ -1,0 +1,9 @@
+@using BTCPayServer.Client
+@using BTCPayServer.Plugins.SquareSpace
+@using Microsoft.AspNetCore.Mvc.TagHelpers
+@model BTCPayServer.Components.MainNav.MainNavViewModel
+
+
+<li class="nav-item nav-item-sub" permission="@Policies.CanModifyServerSettings">
+    <a asp-controller="UIServerAlert" asp-action="Index" layout-menu-item=@nameof(ServerAlertPlugin) text - translate = "true" > Server Alerts</a>
+</li>

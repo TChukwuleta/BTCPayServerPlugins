@@ -1,0 +1,86 @@
+﻿@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.ServerAlert.Data
+@using BTCPayServer.Plugins.ServerAlert.ViewModels
+@using BTCPayServer.Plugins.SquareSpace
+@model HeraldIndexViewModel
+@{
+    ViewData.SetLayoutModel(new LayoutModel(nameof(ServerAlertPlugin), "Server Alert").SetCategory(WellKnownCategories.Server));
+}
+
+<div class="sticky-header">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <a asp-action="Create" class="btn btn-primary">Send Alert</a>
+    </div>
+</div>
+<partial name="_StatusMessage" />
+
+@if (!Model.Announcements.Any())
+{
+    <div class="alert alert-info">No alerts yet. Send one now to your users and store owners.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Alert</th>
+                    <th>Severity</th>
+                    <th>Bell Notification</th>
+                    <th>Email Notification</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in Model.Announcements)
+                {
+                    var (badge, label) = a.Severity switch
+                    {
+                        AnnouncementSeverity.Critical => ("danger", "Critical"),
+                        AnnouncementSeverity.Warning => ("warning", "Warning"),
+                        _ => ("info", "Info")
+                    };
+                    <tr>
+                        <td style="max-width:280px;">
+                            <div class="fw-semibold text-truncate">@a.Title</div>
+                            <div class="text-secondary small text-truncate">
+                                @(a.Message.Length > 100 ? a.Message[..100] + "…" : a.Message)
+                            </div>
+                        </td>
+                        <td><span class="badge bg-@badge">@label</span></td>
+
+                        <td class="small">@(a.BellNotificationsSent ? "Sent" : "Pending")</td>
+                        <td class="small">
+                            @if (a.EmailScope == EmailScope.None)
+                            {
+                                <span class="text-secondary">Off</span>
+                            }
+                            else if (a.EmailsSent)
+                            {
+                                <span>@a.EmailsSentCount sent</span>
+                            }
+                            else
+                            {
+                                <span class="text-secondary">@a.EmailScope</span>
+                            }
+                        </td>
+
+                        <td class="text-end">
+                            <div class="d-inline-flex align-items-center gap-3">
+                                <a asp-action="Update" asp-route-id="@a.Id" class="btn btn-link p-0 text-decoration-none">Edit</a>
+
+                                <form asp-action="Resend" asp-route-id="@a.Id" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-link p-0 text-decoration-none">Resend</button>
+                                </form>
+
+                                <a asp-action="Delete" asp-route-id="@a.Id" class="btn btn-link p-0 text-decoration-none text-danger">Delete</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
