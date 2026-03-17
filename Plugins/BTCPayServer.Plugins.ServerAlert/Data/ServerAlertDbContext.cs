@@ -15,7 +15,6 @@ public class ServerAlertDbContext : DbContext
     }
 
     public DbSet<Announcement> Announcements { get; set; }
-    public DbSet<UserEmailPreference> UserEmailPreferences { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

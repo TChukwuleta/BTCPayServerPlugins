@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BTCPayServer.Plugins.ServerAlert.Data.Migrations
 {
     [DbContext(typeof(ServerAlertDbContext))]
-    [Migration("20260317103830_initialMigration")]
+    [Migration("20260317203553_initialMigration")]
     partial class initialMigration
     {
         /// <inheritdoc />
@@ -76,22 +76,6 @@ namespace BTCPayServer.Plugins.ServerAlert.Data.Migrations
                     b.HasIndex("IsPublished", "CreatedAt");
 
                     b.ToTable("Announcements", "BTCPayServer.Plugins.ServerAlert");
-                });
-
-            modelBuilder.Entity("BTCPayServer.Plugins.ServerAlert.Data.UserEmailPreference", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("EmailEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("UserEmailPreferences", "BTCPayServer.Plugins.ServerAlert");
                 });
 #pragma warning restore 612, 618
         }

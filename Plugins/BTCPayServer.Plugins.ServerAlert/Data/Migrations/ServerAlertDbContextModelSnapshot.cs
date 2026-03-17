@@ -74,22 +74,6 @@ namespace BTCPayServer.Plugins.ServerAlert.Data.Migrations
 
                     b.ToTable("Announcements", "BTCPayServer.Plugins.ServerAlert");
                 });
-
-            modelBuilder.Entity("BTCPayServer.Plugins.ServerAlert.Data.UserEmailPreference", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("EmailEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("UserEmailPreferences", "BTCPayServer.Plugins.ServerAlert");
-                });
 #pragma warning restore 612, 618
         }
     }

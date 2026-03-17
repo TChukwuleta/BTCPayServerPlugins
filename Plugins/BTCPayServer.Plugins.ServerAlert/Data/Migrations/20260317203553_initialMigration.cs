@@ -38,20 +38,6 @@ namespace BTCPayServer.Plugins.ServerAlert.Data.Migrations
                     table.PrimaryKey("PK_Announcements", x => x.Id);
                 });
 
-            migrationBuilder.CreateTable(
-                name: "UserEmailPreferences",
-                schema: "BTCPayServer.Plugins.ServerAlert",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    EmailEnabled = table.Column<bool>(type: "boolean", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_UserEmailPreferences", x => x.Id);
-                });
-
             migrationBuilder.CreateIndex(
                 name: "IX_Announcements_IsPublished_CreatedAt",
                 schema: "BTCPayServer.Plugins.ServerAlert",
@@ -64,10 +50,6 @@ namespace BTCPayServer.Plugins.ServerAlert.Data.Migrations
         {
             migrationBuilder.DropTable(
                 name: "Announcements",
-                schema: "BTCPayServer.Plugins.ServerAlert");
-
-            migrationBuilder.DropTable(
-                name: "UserEmailPreferences",
                 schema: "BTCPayServer.Plugins.ServerAlert");
         }
     }

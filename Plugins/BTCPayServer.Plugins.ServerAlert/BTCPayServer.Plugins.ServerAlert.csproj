@@ -7,7 +7,7 @@
   <PropertyGroup>
     <Product>Server Alert</Product>
     <Description>Allow server administrators send maintenance notices, outage warnings, and general news to every store owner/user on their BTCPay instance via the bell notification and email.</Description>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
   </PropertyGroup>
 
   <!-- Plugin development properties -->
