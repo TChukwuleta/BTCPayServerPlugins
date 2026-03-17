@@ -2,8 +2,6 @@ using System;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
-using BTCPayServer.Plugins.LightSpeed;
-using BTCPayServer.Plugins.LightSpeed.Data;
 using BTCPayServer.Plugins.ServerAlert.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -23,13 +21,6 @@ public class ServerAlertPlugin : BaseBTCPayServerPlugin
         services.AddScoped<ServerAlertService>();
 
         services.AddSingleton<INotificationHandler, ServerAlertNotificationHandler>();
-        services.AddSingleton<ServerAlertDbContextFactory>();
-        services.AddDbContext<ServerAlertDbContext>((provider, o) =>
-        {
-            var factory = provider.GetRequiredService<ServerAlertDbContextFactory>();
-            factory.ConfigureBuilder(o);
-        });
-        services.AddHostedService<PluginMigrationRunner>();
         services.AddSession(options =>
         {
             options.IdleTimeout = TimeSpan.FromMinutes(30);

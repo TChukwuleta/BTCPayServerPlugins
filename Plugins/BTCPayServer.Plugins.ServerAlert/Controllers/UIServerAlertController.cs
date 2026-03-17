@@ -27,7 +27,7 @@ public class UIServerAlertController(StoreRepository storeRepository,
     [HttpGet]
     public async Task<IActionResult> Index()
     {
-        return View(new HeraldIndexViewModel { Announcements = await serverAlertService.GetPublishedAnnouncement() });
+        return View(new HeraldIndexViewModel { Announcements = await serverAlertService.GetAllAnnouncement() });
     }
 
     [HttpGet("create")]

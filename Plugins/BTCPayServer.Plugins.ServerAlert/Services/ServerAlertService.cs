@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using BTCPayServer.Data;
 using BTCPayServer.Plugins.Emails.Services;
-using BTCPayServer.Plugins.LightSpeed.Data;
 using BTCPayServer.Plugins.ServerAlert.Data;
 using BTCPayServer.Plugins.ServerAlert.ViewModels;
+using BTCPayServer.Services;
 using BTCPayServer.Services.Notifications;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Identity;
@@ -18,21 +17,21 @@ namespace BTCPayServer.Plugins.ServerAlert.Services;
 
 public class ServerAlertService(StoreRepository storeRepository, 
         EmailSenderFactory emailSenderFactory,
+        SettingsRepository settingsRepository,
         NotificationSender notificationSender,
-        UserManager<ApplicationUser> userManager,
-        ServerAlertDbContextFactory dbContextFactory)
+        UserManager<ApplicationUser> userManager)
 {
-    public async Task<Announcement> GetAnnouncement(string id)
+    public async Task<AlertSettings?> GetAnnouncement(string id)
     {
-        await using var ctx = dbContextFactory.CreateContext();
-        return ctx.Announcements.Find(id);
+        var serverAlert = await settingsRepository.GetSettingAsync<ServerAlertSettings>() ?? new();
+        return serverAlert?.Alerts.FirstOrDefault(a => a.Id == id);
     }
 
     public async Task<List<AnnouncementViewModel>> GetAllAnnouncement()
     {
-        await using var ctx = dbContextFactory.CreateContext();
-        var entity = ctx.Announcements.OrderByDescending(c => c.CreatedAt).ToList();
-        return entity.Select(c => new AnnouncementViewModel
+        var serverAlert = await settingsRepository.GetSettingAsync<ServerAlertSettings>() ?? new();
+        var alertSettings = serverAlert.Alerts ?? new List<AlertSettings>();
+        return alertSettings.OrderByDescending(c => c.CreatedAt).Select(c => new AnnouncementViewModel
         {
             Id = c.Id,
             Title = c.Title,
@@ -46,103 +45,87 @@ public class ServerAlertService(StoreRepository storeRepository,
         }).ToList();
     }
 
-    public async Task<List<AnnouncementViewModel>> GetPublishedAnnouncement()
+    public async Task<PublishResult> CreateAndSendAnnouncement(AlertSettings entity, string serverName)
     {
-        await using var ctx = dbContextFactory.CreateContext();
-        var entity = ctx.Announcements.Where(c => c.IsPublished).OrderByDescending(c => c.CreatedAt).ToList();
-        return entity.Select(c => new AnnouncementViewModel
-        {
-            Id = c.Id,
-            Title = c.Title,
-            Message = c.Message,
-            Severity = c.Severity,
-            IsPublished = c.IsPublished,
-            BellNotificationsSent = c.BellNotificationsSent,
-            EmailScope = c.EmailScope,
-            EmailsSent = c.EmailsSent,
-            EmailsSentCount = c.EmailsSentCount
-        }).ToList();
-    }
-
-    public async Task<PublishResult> CreateAndSendAnnouncement(Announcement entity, string serverName)
-    {
-        await using var ctx = dbContextFactory.CreateContext();
+        var serverAlert = await settingsRepository.GetSettingAsync<ServerAlertSettings>() ?? new();
+        serverAlert.Alerts ??= new List<AlertSettings>();
         entity.CreatedAt = DateTimeOffset.UtcNow;
-        ctx.Announcements.Add(entity);
-        await ctx.SaveChangesAsync();
-        return await SendAlerts(entity, ctx, serverName);
+        serverAlert.Alerts.Add(entity);
+        await settingsRepository.UpdateSetting(serverAlert);
+        return await SendAlerts(serverAlert, entity, serverName);
     }
 
     public async Task<bool> UpdateAnnouncement(AnnouncementViewModel vm)
     {
-        await using var ctx = dbContextFactory.CreateContext();
-        var existingAnnouncement = ctx.Announcements.Find(vm.Id);
-        if (existingAnnouncement is null) return false;
+        var serverAlert = await settingsRepository.GetSettingAsync<ServerAlertSettings>() ?? new();
+        serverAlert.Alerts ??= new List<AlertSettings>();
+        var existingAlert = serverAlert.Alerts.FirstOrDefault(a => a.Id == vm.Id);
+        if (existingAlert is null) return false;
 
-        existingAnnouncement.Title = vm.Title;
-        existingAnnouncement.Message = vm.Message;
-        existingAnnouncement.Severity = vm.Severity;
-        existingAnnouncement.EmailScope = vm.EmailScope;
-        existingAnnouncement.UpdatedAt = DateTimeOffset.UtcNow;
-        existingAnnouncement.SelectedStoreIds = vm.EmailScope == EmailScope.SelectedStores ? string.Join(',', vm.SelectedStoreIds) : null;
-        existingAnnouncement.CustomEmailAddresses = vm.CustomEmailAddresses?.Trim();
-        await ctx.SaveChangesAsync();
+        existingAlert.Title = vm.Title;
+        existingAlert.Message = vm.Message;
+        existingAlert.Severity = vm.Severity;
+        existingAlert.EmailScope = vm.EmailScope;
+        existingAlert.UpdatedAt = DateTimeOffset.UtcNow;
+        existingAlert.SelectedStoreIds = vm.EmailScope == EmailScope.SelectedStores ? string.Join(',', vm.SelectedStoreIds) : null;
+        existingAlert.CustomEmailAddresses = vm.CustomEmailAddresses?.Trim();
+        await settingsRepository.UpdateSetting(serverAlert);
         return true;
     }
 
     public async Task DeleteAnnouncement(string Id)
     {
-        await using var ctx = dbContextFactory.CreateContext();
-        var existingAnnouncement = ctx.Announcements.Find(Id);
-        if (existingAnnouncement is null) return;
-
-        ctx.Announcements.Remove(existingAnnouncement);
-        await ctx.SaveChangesAsync();
+        var serverAlert = await settingsRepository.GetSettingAsync<ServerAlertSettings>() ?? new();
+        serverAlert.Alerts ??= new List<AlertSettings>();
+        var existingAlert = serverAlert.Alerts.FirstOrDefault(a => a.Id == Id);
+        if (existingAlert is not null)
+        {
+            serverAlert.Alerts.Remove(existingAlert);
+            await settingsRepository.UpdateSetting(serverAlert);
+        }
     }
 
     public async Task<PublishResult> RepublishAnnouncement(string Id, string serverName)
     {
-        await using var ctx = dbContextFactory.CreateContext();
-        var existingAnnouncement = ctx.Announcements.Find(Id);
-        if (existingAnnouncement is null) return new PublishResult { Found = false };
+        var serverAlert = await settingsRepository.GetSettingAsync<ServerAlertSettings>() ?? new();
+        serverAlert.Alerts ??= new List<AlertSettings>();
+        var existingAlert = serverAlert.Alerts.FirstOrDefault(a => a.Id == Id);
 
-        existingAnnouncement.BellNotificationsSent = false;
-        existingAnnouncement.EmailsSent = false;
-        existingAnnouncement.EmailsSentCount = 0;
-        await ctx.SaveChangesAsync();
+        if (existingAlert is null) return new PublishResult { Found = false };
 
-        return await SendAlerts(existingAnnouncement, ctx, serverName);
+        existingAlert.BellNotificationsSent = false;
+        existingAlert.EmailsSent = false;
+        existingAlert.EmailsSentCount = 0;
+        await settingsRepository.UpdateSetting(serverAlert);
+        return await SendAlerts(serverAlert, existingAlert, serverName);
     }
 
-    private async Task<PublishResult> SendAlerts(Announcement entity, ServerAlertDbContext ctx, string serverName)
+    private async Task<PublishResult> SendAlerts(ServerAlertSettings serverAlert, AlertSettings entity, string serverName)
     {
         var result = new PublishResult { Found = true, EmailScopeWasSet = entity.EmailScope != EmailScope.None };
+        entity.IsPublished = true;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
 
         if (!entity.BellNotificationsSent)
         {
             result.BellCount = await DispatchBellNotifications(entity);
-            entity.IsPublished = true;
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
             entity.BellNotificationsSent = true;
-            await ctx.SaveChangesAsync();
         }
 
         if (!entity.EmailsSent && entity.EmailScope != EmailScope.None)
         {
             result.EmailCount = await DispatchEmailNotifications(entity, serverName);
-            entity.IsPublished = true;
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
             entity.EmailsSent = true;
             entity.EmailsSentCount = result.EmailCount;
-            await ctx.SaveChangesAsync();
         }
+        await settingsRepository.UpdateSetting(serverAlert);
         return result;
     }
 
-    private async Task<int> DispatchBellNotifications(Announcement entity)
+    private async Task<int> DispatchBellNotifications(AlertSettings entity)
     {
         var blob = new ServerAlertAnnouncement(entity.Id, entity.Title, entity.Message, entity.Severity);
-        var userIds = await userManager.Users.Select(u => u.Id).ToListAsync();
+        var userIds = await GetScopedUserIds(entity);
         int sent = 0;
         foreach (var userId in userIds)
         {
@@ -156,7 +139,32 @@ public class ServerAlertService(StoreRepository storeRepository,
         return sent;
     }
 
-    private async Task<int> DispatchEmailNotifications(Announcement entity, string serverName)
+    private async Task<List<string>> GetScopedUserIds(AlertSettings entity)
+    {
+        return entity.EmailScope switch
+        {
+            EmailScope.AllUsers => await userManager.Users.Select(u => u.Id).ToListAsync(),
+
+            EmailScope.AdminsOnly => (await userManager.GetUsersInRoleAsync(Roles.ServerAdmin))
+                .Select(u => u.Id).ToList(),
+
+            EmailScope.SelectedStores => (await Task.WhenAll(
+                entity.GetSelectedStoreIds().Select(id =>
+                    storeRepository.GetStoreUsers(id, filterRoles: new[] { StoreRoleId.Owner }))))
+                .SelectMany(owners => owners.Select(o => o.Id))
+                .Distinct().ToList(),
+
+            EmailScope.AllStores => (await Task.WhenAll(
+                (await storeRepository.GetStores()).Select(s =>
+                    storeRepository.GetStoreUsers(s.Id, filterRoles: new[] { StoreRoleId.Owner }))))
+                .SelectMany(owners => owners.Select(o => o.Id))
+                .Distinct().ToList(),
+
+            _ => await userManager.Users.Select(u => u.Id).ToListAsync()
+        };
+    }
+
+    private async Task<int> DispatchEmailNotifications(AlertSettings entity, string serverName)
     {
         var emailSender = await emailSenderFactory.GetEmailSender();
         if (emailSender is null) return 0;
@@ -164,8 +172,7 @@ public class ServerAlertService(StoreRepository storeRepository,
         var emailSettings = await emailSender.GetEmailSettings();
         if (emailSettings is null || !emailSettings.IsComplete()) return 0;
 
-        await using var ctx = dbContextFactory.CreateContext();
-        List<MailboxAddress> bccList = await BuildRecipientList(entity, ctx);
+        List<MailboxAddress> bccList = await BuildRecipientList(entity);
         if (bccList.Count == 0) return 0;
 
         var subject = $"[{entity.Severity.ToString().ToUpperInvariant()}] {entity.Title}";
@@ -182,7 +189,7 @@ public class ServerAlertService(StoreRepository storeRepository,
         catch (Exception){ return 0; }
     }
 
-    private async Task<List<MailboxAddress>> BuildRecipientList(Announcement entity, ServerAlertDbContext ctx)
+    private async Task<List<MailboxAddress>> BuildRecipientList(AlertSettings entity)
     {
         var emails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         switch (entity.EmailScope)
@@ -226,7 +233,7 @@ public class ServerAlertService(StoreRepository storeRepository,
         return (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
     }
 
-    public string BuildEmailBody(Announcement entity, string serverName)
+    public string BuildEmailBody(AlertSettings entity, string serverName)
     {
         var title = System.Net.WebUtility.HtmlEncode(entity.Title);
         var message = System.Net.WebUtility.HtmlEncode(entity.Message).Replace("\n", "<br>");

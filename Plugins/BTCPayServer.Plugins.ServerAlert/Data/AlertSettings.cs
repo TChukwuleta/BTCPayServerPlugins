@@ -4,7 +4,11 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BTCPayServer.Plugins.ServerAlert.Data;
 
-public class Announcement
+public class ServerAlertSettings
+{
+    public List<AlertSettings> Alerts { get; set; }
+}
+public class AlertSettings
 {
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public string Id { get; set; }
@@ -14,8 +18,8 @@ public class Announcement
     public bool IsPublished { get; set; }
     public bool BellNotificationsSent { get; set; }
     public EmailScope EmailScope { get; set; } = EmailScope.None;
-    public string? SelectedStoreIds { get; set; } // used when EmailScope = SelectedStores
-    public string? CustomEmailAddresses { get; set; } // used when EmailScope = CustomEmails
+    public string? SelectedStoreIds { get; set; } 
+    public string? CustomEmailAddresses { get; set; }
     public bool EmailsSent { get; set; }
     public int EmailsSentCount { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -29,6 +33,6 @@ public class Announcement
 
 public enum AnnouncementSeverity { Info, Warning, Critical }
 
-public enum EmailScope { None, AllUsers, AdminsOnly, AllStores, SelectedStores, CustomEmails }// None means no email — bell notifications only.
+public enum EmailScope { None, AllUsers, AdminsOnly, AllStores, SelectedStores, CustomEmails }
 
 public enum ServerAlertNavPages { ServerAlertIndex, ServerAlertSettings }

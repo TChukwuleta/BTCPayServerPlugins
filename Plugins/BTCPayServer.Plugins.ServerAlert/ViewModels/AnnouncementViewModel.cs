@@ -33,7 +33,7 @@ public class AnnouncementViewModel
     public bool EmailEnabled { get; set; }
     public List<StoreData> AllStores { get; set; } = new();
 
-    public static AnnouncementViewModel FromEntity(Announcement a, List<StoreData>? stores = null) => new()
+    public static AnnouncementViewModel FromEntity(AlertSettings a, List<StoreData>? stores = null) => new()
     {
         Id = a.Id,
         Title = a.Title,
@@ -45,7 +45,7 @@ public class AnnouncementViewModel
         AllStores = stores ?? new()
     };
 
-    public Announcement ToEntity() => new()
+    public AlertSettings ToEntity() => new()
     {
         Id = Id ?? Guid.NewGuid().ToString(),
         Title = Title,
