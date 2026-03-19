@@ -874,26 +874,6 @@
             "type": "string",
             "nullable": true,
             "description": "Email body template. Same placeholders as `emailSubject`."
-          },
-          "hasMaximumCapacity": {
-            "type": "boolean",
-            "default": false,
-            "description": "Whether the event has a total ticket cap."
-          },
-          "maximumEventCapacity": {
-            "type": "integer",
-            "nullable": true,
-            "description": "Total ticket cap. Required and must be > 0 when `hasMaximumCapacity` is `true`."
-          },
-          "eventLogoFileId": {
-            "type": "string",
-            "nullable": true,
-            "description": "File ID of a previously uploaded image. Prefer using the dedicated logo upload endpoint instead."
-          },
-          "enable": {
-            "type": "boolean",
-            "default": false,
-            "description": "If `true`, activates the event immediately upon creation."
           }
         }
       },
@@ -950,20 +930,6 @@
             "type": "string",
             "nullable": true,
             "description": "Email body template."
-          },
-          "hasMaximumCapacity": {
-            "type": "boolean",
-            "description": "Whether the event has a total ticket cap."
-          },
-          "maximumEventCapacity": {
-            "type": "integer",
-            "nullable": true,
-            "description": "Total ticket cap."
-          },
-          "eventLogoFileId": {
-            "type": "string",
-            "nullable": true,
-            "description": "File ID of a previously uploaded image. Send empty string to remove logo, `null` to leave unchanged."
           }
         }
       },
@@ -1028,15 +994,6 @@
             "type": "string",
             "nullable": true,
             "description": "Email body template."
-          },
-          "hasMaximumCapacity": {
-            "type": "boolean",
-            "description": "Whether the event has a ticket cap."
-          },
-          "maximumEventCapacity": {
-            "type": "integer",
-            "nullable": true,
-            "description": "Total ticket cap."
           },
           "eventState": {
             "type": "string",
