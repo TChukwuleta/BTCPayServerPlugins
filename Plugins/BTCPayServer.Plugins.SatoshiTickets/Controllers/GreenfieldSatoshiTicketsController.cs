@@ -18,8 +18,7 @@ namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
 [ApiController]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield, Policy = Policies.CanModifyStoreSettings)]
 [EnableCors(CorsPolicies.All)]
-public class GreenfieldSatoshiTicketsController(TicketService ticketService,
-        EmailService emailService, SimpleTicketSalesDbContextFactory dbContextFactory) : ControllerBase
+public class GreenfieldSatoshiTicketsController(EmailService emailService, SimpleTicketSalesDbContextFactory dbContextFactory) : ControllerBase
 {
 
     [HttpGet("tickets")]
@@ -44,18 +43,7 @@ public class GreenfieldSatoshiTicketsController(TicketService ticketService,
     }
 
 
-    [HttpGet("tickets/export")]
-    public async Task<IActionResult> ExportTickets(string storeId, string eventId)
-    {
-        var result = await ticketService.ExportTicketsCsv(storeId, eventId);
-        if (result == null)
-            return this.CreateAPIError(404, "no-tickets", "No settled tickets found for this event");
-
-        return File(result.Value.data, "text/csv", result.Value.fileName);
-    }
-
-
-    [HttpPost("tickets/{ticketNumber}/check-in")]
+    /*[HttpPost("tickets/{ticketNumber}/check-in")]
     public async Task<IActionResult> CheckinTicket(string storeId, string eventId, string ticketNumber)
     {
         await using var ctx = dbContextFactory.CreateContext();
@@ -74,7 +62,7 @@ public class GreenfieldSatoshiTicketsController(TicketService ticketService,
             Ticket = checkinResult.Ticket != null ? ToTicketData(checkinResult.Ticket) : null
         };
         return Ok(result);
-    }
+    }*/
 
 
     [HttpGet("orders")]
@@ -189,16 +177,6 @@ public class GreenfieldSatoshiTicketsController(TicketService ticketService,
             PurchaseDate = entity.PurchaseDate,
             Tickets = entity.Tickets?.Select(ToTicketData).ToList() ?? new()
         };
-    }
-
-
-    private static string EscapeCsvField(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-            return "";
-        if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
-            return $"\"{value.Replace("\"", "\"\"")}\"";
-        return value;
     }
 
     private IActionResult EventNotFound()

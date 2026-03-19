@@ -3,11 +3,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Models.Api;
 
-public class CreateEventRequest : ApiEventRequest
-{
-    public bool Enable { get; set; }
-}
-
 public class ApiEventRequest
 {
 

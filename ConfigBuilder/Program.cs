@@ -4,7 +4,7 @@ using System.Text.Json;
 /*var excluded = new HashSet<string> { "BTCPayServer.Plugins.ShopifyPlugin", "BTCPayServer.Plugins.Salesforce", "BTCPayServer.Plugins.SquareUp" };
 var plugins = Directory.GetDirectories("../../../../Plugins").Where(p => !excluded.Contains(Path.GetFileName(p)));*/
 
-var included = new HashSet<string> { "BTCPayServer.Plugins.SatoshiTickets", "BTCPayServer.Plugins.JumpSeller", "BTCPayServer.Plugins.LightSpeed", "BTCPayServer.Plugins.NairaCheckout", "BTCPayServer.Plugins.ServerAlert" };
+var included = new HashSet<string> { "BTCPayServer.Plugins.SatoshiTickets", "BTCPayServer.Plugins.JumpSeller", "BTCPayServer.Plugins.LightSpeed", "BTCPayServer.Plugins.ServerAlert" };
 var plugins = Directory.GetDirectories("../../../../Plugins").Where(p => included.Contains(Path.GetFileName(p)));
 var p = "";
 foreach (var plugin in plugins)

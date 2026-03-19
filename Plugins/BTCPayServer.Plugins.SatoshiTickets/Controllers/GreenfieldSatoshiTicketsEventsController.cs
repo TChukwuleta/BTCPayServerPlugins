@@ -71,7 +71,7 @@ public class GreenfieldSatoshiTicketsEventsController(StoreRepository storeRepo,
 
 
     [HttpPost("events")]
-    public async Task<IActionResult> CreateEvent(string storeId, [FromBody] CreateEventRequest request)
+    public async Task<IActionResult> CreateEvent(string storeId, [FromBody] ApiEventRequest request)
     {
         if (request == null)
         {
@@ -118,7 +118,7 @@ public class GreenfieldSatoshiTicketsEventsController(StoreRepository storeRepo,
             EventType = parsedEventType,
             HasMaximumCapacity = request.HasMaximumCapacity,
             MaximumEventCapacity = request.MaximumEventCapacity,
-            EventState = request.Enable ? Data.EntityState.Active : Data.EntityState.Disabled,
+            EventState = Data.EntityState.Disabled,
             CreatedAt = DateTime.UtcNow
         };
         await using var ctx = dbContextFactory.CreateContext();

@@ -60,7 +60,7 @@ public class GreenfieldSatoshiTicketTypesController(SimpleTicketSalesDbContextFa
     }
 
     [HttpPost("events/{eventId}/ticket-types")]
-    public async Task<IActionResult> CreateTicketType(string storeId, string eventId, [FromBody] CreateTicketTypeRequest request)
+    public async Task<IActionResult> CreateTicketType(string storeId, string eventId, [FromBody] TicketTypeRequest request)
     {
         if (request == null)
         {
@@ -123,8 +123,7 @@ public class GreenfieldSatoshiTicketTypesController(SimpleTicketSalesDbContextFa
     }
 
     [HttpPut("events/{eventId}/ticket-types/{ticketTypeId}")]
-    public async Task<IActionResult> UpdateTicketType(string storeId, string eventId, string ticketTypeId,
-        [FromBody] UpdateTicketTypeRequest request)
+    public async Task<IActionResult> UpdateTicketType(string storeId, string eventId, string ticketTypeId, [FromBody] TicketTypeRequest request)
     {
         if (request == null)
         {
@@ -185,7 +184,7 @@ public class GreenfieldSatoshiTicketTypesController(SimpleTicketSalesDbContextFa
     }
 
 
-    [HttpDelete("ticket-types/{ticketTypeId}")]
+    [HttpDelete("events/{eventId}/ticket-types/{ticketTypeId}")]
     public async Task<IActionResult> DeleteTicketType(string storeId, string eventId, string ticketTypeId)
     {
         await using var ctx = dbContextFactory.CreateContext();
@@ -199,8 +198,6 @@ public class GreenfieldSatoshiTicketTypesController(SimpleTicketSalesDbContextFa
             return TicketTypeNotFound();
 
         ctx.TicketTypes.Remove(entity);
-
-        // If we're deleting the default, reassign default to another ticket type
         if (entity.IsDefault)
         {
             var newDefault = ctx.TicketTypes.Where(t => t.EventId == eventId && t.Id != ticketTypeId)
@@ -212,7 +209,7 @@ public class GreenfieldSatoshiTicketTypesController(SimpleTicketSalesDbContextFa
         return Ok();
     }
 
-    [HttpPut("ticket-types/{ticketTypeId}/toggle")]
+    [HttpPut("events/{eventId}/ticket-types/{ticketTypeId}/toggle")]
     public async Task<IActionResult> ToggleTicketTypeStatus(string storeId, string eventId, string ticketTypeId)
     {
         await using var ctx = dbContextFactory.CreateContext();
