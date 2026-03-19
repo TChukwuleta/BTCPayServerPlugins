@@ -9,13 +9,14 @@
     var storeEmailSettingsConfigured = (bool)ViewData["StoreEmailSettingsConfigured"];
 }
 
-
 <div class="sticky-header">
     <h2>
-        <span>@ViewData["Title"]</span>
-        <a href="#descriptor" data-bs-toggle="collapse"><vc:icon symbol="info" /></a>
+        @ViewData["Title"]
+        <a href="#descriptor" data-bs-toggle="collapse">
+            <vc:icon symbol="info" />
+        </a>
     </h2>
-    <div class="d-flex gap-3 mt-3 mt-sm-0">
+    <div>
         <a id="create-event" asp-action="ViewEvent" asp-route-storeId="@Model.StoreId"
            class="btn btn-success @(storeEmailSettingsConfigured ? "" : "disabled")" role="button">
             Create Event
