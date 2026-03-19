@@ -87,9 +87,6 @@ public class GreenfieldSatoshiTicketsEventsController(StoreRepository storeRepo,
         if (request.EndDate.HasValue && request.EndDate.Value < request.StartDate)
             ModelState.AddModelError(nameof(request.EndDate), "Event end date cannot be before start date");
 
-        if (request.HasMaximumCapacity && (!request.MaximumEventCapacity.HasValue || request.MaximumEventCapacity.Value <= 0))
-            ModelState.AddModelError(nameof(request.MaximumEventCapacity), "Maximum event capacity must be greater than zero when capacity is enabled");
-
         EventType parsedEventType = default;
         if (string.IsNullOrEmpty(request.EventType) || !Enum.TryParse<EventType>(request.EventType, true, out parsedEventType))
             ModelState.AddModelError(nameof(request.EventType), "Invalid event type. Valid values: Virtual, Physical");
@@ -116,8 +113,7 @@ public class GreenfieldSatoshiTicketsEventsController(StoreRepository storeRepo,
             EmailSubject = request.EmailSubject,
             EmailBody = request.EmailBody,
             EventType = parsedEventType,
-            HasMaximumCapacity = request.HasMaximumCapacity,
-            MaximumEventCapacity = request.MaximumEventCapacity,
+            HasMaximumCapacity = false,
             EventState = Data.EntityState.Disabled,
             CreatedAt = DateTime.UtcNow
         };
@@ -150,12 +146,6 @@ public class GreenfieldSatoshiTicketsEventsController(StoreRepository storeRepo,
         if (request.EndDate.HasValue && request.EndDate.Value < request.StartDate)
             ModelState.AddModelError(nameof(request.EndDate), "Event end date cannot be before start date");
 
-        if (request.HasMaximumCapacity)
-        {
-            var ticketTiersCount = ctx.TicketTypes.Where(t => t.EventId == eventId).Sum(c => c.Quantity);
-            if (request.MaximumEventCapacity < ticketTiersCount)
-                ModelState.AddModelError(nameof(request.MaximumEventCapacity), "Maximum capacity is less than the sum of all tiers capacity");
-        }
         if (!string.IsNullOrEmpty(request.EventType) && !Enum.TryParse<EventType>(request.EventType, true, out _))
             ModelState.AddModelError(nameof(request.EventType), "Invalid event type. Valid values: Virtual, Physical");
 
@@ -170,8 +160,7 @@ public class GreenfieldSatoshiTicketsEventsController(StoreRepository storeRepo,
         entity.RedirectUrl = request.RedirectUrl;
         entity.EmailSubject = request.EmailSubject;
         entity.EmailBody = request.EmailBody;
-        entity.HasMaximumCapacity = request.HasMaximumCapacity;
-        entity.MaximumEventCapacity = request.MaximumEventCapacity;
+        entity.HasMaximumCapacity = false;
 
         if (!string.IsNullOrEmpty(request.Currency))
             entity.Currency = request.Currency.Trim().ToUpperInvariant();

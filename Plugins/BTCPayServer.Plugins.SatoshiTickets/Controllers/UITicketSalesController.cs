@@ -153,12 +153,6 @@ public class UITicketSalesController(UriResolver uriResolver,
             TempData[WellKnownTempData.ErrorMessage] = "Event end date cannot be before start date";
             return RedirectToAction(nameof(ViewEvent), new { storeId });
         }
-        if (vm.HasMaximumCapacity && (!vm.MaximumEventCapacity.HasValue || vm.MaximumEventCapacity.Value <= 0))
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Kindly input the event capacity";
-            return RedirectToAction(nameof(ViewEvent), new { storeId });
-        }
-
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
@@ -201,12 +195,6 @@ public class UITicketSalesController(UriResolver uriResolver,
         {
             TempData[WellKnownTempData.ErrorMessage] = "Invalid event record specified for this store";
             return RedirectToAction(nameof(List), new { storeId });
-        }
-        var ticketTiersCount = ctx.TicketTypes.Where(t => t.EventId == eventId).Sum(c => c.Quantity);
-        if (vm.HasMaximumCapacity && vm.MaximumEventCapacity < ticketTiersCount)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Maximum capacity is less that the sum of all tiers capacity. Kindly increase capacity";
-            return RedirectToAction(nameof(ViewEvent), new { storeId, eventId });
         }
         if (vm.EndDate is DateTime endDate && endDate < vm.StartDate)
         {
@@ -727,8 +715,6 @@ public class UITicketSalesController(UriResolver uriResolver,
             EndDate = entity.EndDate,
             EventType = entity.EventType,
             EmailSubject = entity.EmailSubject,
-            HasMaximumCapacity = entity.HasMaximumCapacity,
-            MaximumEventCapacity = entity.MaximumEventCapacity,
             ReminderEnabled = entity.ReminderEnabled,
             ReminderDaysBeforeEvent = entity.ReminderDaysBeforeEvent
         };
@@ -752,8 +738,7 @@ public class UITicketSalesController(UriResolver uriResolver,
             e.EventType = model.EventType;
             e.RedirectUrl = model.RedirectUrl;
             e.EmailSubject = model.EmailSubject;
-            e.HasMaximumCapacity = model.HasMaximumCapacity;
-            e.MaximumEventCapacity = model.MaximumEventCapacity;
+            e.HasMaximumCapacity = false;
             e.ReminderEnabled = model.ReminderEnabled;
             e.ReminderDaysBeforeEvent = model.ReminderDaysBeforeEvent;
 

@@ -18,6 +18,4 @@ public class ApiEventRequest
     public string RedirectUrl { get; set; }
     public string EmailSubject { get; set; }
     public string EmailBody { get; set; }
-    public bool HasMaximumCapacity { get; set; }
-    public int? MaximumEventCapacity { get; set; }
 }
