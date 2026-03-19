@@ -54,6 +54,7 @@ public class SalesTicketsEventsViewModel
     public string StoreId { get; set; }
     public bool Active { get; set; }
     public bool Expired { get; set; }
+    public string ApiDocUrl { get; set; }
 }
 
 public class SendTicketReminderViewModel

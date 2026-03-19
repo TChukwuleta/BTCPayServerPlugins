@@ -3,8 +3,14 @@ using System.ComponentModel.DataAnnotations;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Models.Api;
 
-public class CreateEventRequest
+public class CreateEventRequest : ApiEventRequest
 {
+    public bool Enable { get; set; }
+}
+
+public class ApiEventRequest
+{
+
     [Required]
     public string Title { get; set; }
     public string Description { get; set; }
@@ -19,6 +25,4 @@ public class CreateEventRequest
     public string EmailBody { get; set; }
     public bool HasMaximumCapacity { get; set; }
     public int? MaximumEventCapacity { get; set; }
-    public string EventLogoFileId { get; set; }
-    public bool Enable { get; set; }
 }

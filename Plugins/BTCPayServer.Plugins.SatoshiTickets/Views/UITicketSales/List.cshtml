@@ -11,7 +11,10 @@
 
 
 <div class="sticky-header">
-    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <h2>
+        <span>@ViewData["Title"]</span>
+        <a href="#descriptor" data-bs-toggle="collapse"><vc:icon symbol="info" /></a>
+    </h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
         <a id="create-event" asp-action="ViewEvent" asp-route-storeId="@Model.StoreId"
            class="btn btn-success @(storeEmailSettingsConfigured ? "" : "disabled")" role="button">
@@ -19,8 +22,20 @@
         </a>
     </div>
 </div>
-<partial name="_StatusMessage" />
 
+<div id="descriptor" class="collapse">
+    <div class="d-flex px-4 py-4 mb-4 bg-tile rounded">
+        <div class="flex-fill">
+            <p text-translate="true" class="mb-2">APIs are now available for satoshi tickets. Click the link below to know how to integrate plugin API to your ticketing solution</p>
+            <a href="@Model.ApiDocUrl" target="_blank" rel="noreferrer noopener" text-translate="true">View Docs</a>
+        </div>
+        <button type="button" class="btn-close ms-auto" data-bs-toggle="collapse" data-bs-target="#descriptor" aria-expanded="false">
+            <vc:icon symbol="close" />
+        </button>
+    </div>
+</div>
+
+<partial name="_StatusMessage" />
 
 <nav id="SectionNav" class="mb-3">
     <div class="nav">

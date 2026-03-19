@@ -1,3 +1,4 @@
+using System;
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc;
 
@@ -40,13 +41,15 @@ public class SatoshiTicketsApiDocsController : Controller
         return File(stream, "application/json");
     }
 
-    [HttpGet("redoc.js")]
-    [ResponseCache(Duration = 86400)]
+    [HttpGet("redoc-script")]
     public IActionResult RedocScript()
     {
-        var stream = Assembly.GetManifestResourceStream(ResourcePrefix + "js/redoc.standalone.js");
+        var stream = Assembly.GetManifestResourceStream(ResourcePrefix + "js.redoc.standalone.js");
         if (stream == null)
+        {
+            Console.Error.WriteLine("Failed to load Redoc script from embedded resources.");
             return NotFound();
+        }
         return File(stream, "application/javascript");
     }
 }

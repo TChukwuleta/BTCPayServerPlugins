@@ -13,6 +13,7 @@ using BTCPayServer.Client;
 using BTCPayServer.Data;
 using BTCPayServer.Plugins.Emails;
 using BTCPayServer.Plugins.Emails.Controllers;
+using BTCPayServer.Plugins.SatoshiTickets.Controllers;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Helper;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
@@ -101,7 +102,8 @@ public class UITicketSalesController(UriResolver uriResolver,
                 Severity = StatusMessageModel.StatusSeverity.Info
             });
         }
-        var vm = new SalesTicketsEventsViewModel { DisplayedEvents = eventsViewModel, Expired = expired, StoreId = CurrentStore.Id };
+        var apiDocUrl = Url.Action(nameof(SatoshiTicketsApiDocsController.Index), "SatoshiTicketsApiDocs", new { storeId }, Request.Scheme);
+        var vm = new SalesTicketsEventsViewModel { DisplayedEvents = eventsViewModel, ApiDocUrl = apiDocUrl, Expired = expired, StoreId = CurrentStore.Id };
         return View(vm);
     }
 
@@ -555,46 +557,10 @@ public class UITicketSalesController(UriResolver uriResolver,
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
-        await using var ctx = dbContextFactory.CreateContext();
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == storeId);
-        if (ticketEvent == null) return NotFound();
+        var result = await ticketService.ExportTicketsCsv(storeId, eventId);
+        if (result == null) return NotFound();
 
-        var orders = ctx.Orders.AsNoTracking().Where(o => o.StoreId == storeId && o.EventId == eventId && o.PaymentStatus == TransactionStatus.Settled.ToString())
-            .Include(o => o.Tickets).ToList();
-
-        if (!orders.Any()) return NotFound();
-
-
-        var invoiceIds = orders.Select(o => o.InvoiceId).Distinct().ToArray();
-        var invoices = (await invoiceRepository.GetInvoices(new InvoiceQuery
-        {
-            InvoiceId = invoiceIds,
-            StoreId = new[] { storeId }
-        })).ToDictionary(i => i.Id);
-
-        var fileName = $"{ticketEvent.Title}_Tickets-{DateTime.Now:yyyy_MM_dd-HH_mm_ss}.csv";
-        var csvData = new StringBuilder();
-        csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency,Crypto Currency,Crypto Amount Paid,Attended Event");
-
-        foreach (var order in orders)
-        {
-            invoices.TryGetValue(order.InvoiceId, out var invoice);
-
-            var payments = invoice?.GetPayments(true).Where(p => p.Accounted).ToList();
-            var cryptoCurrency = payments?.FirstOrDefault()?.Currency ?? "";
-            var totalCryptoPaid = payments?.Sum(p => p.PaidAmount.Net) ?? 0m;
-
-            var totalFiatAmount = order.Tickets.Sum(t => t.Amount);
-
-            foreach (var ticket in order.Tickets)
-            {
-                var proportion = totalFiatAmount > 0 ? ticket.Amount / totalFiatAmount : 0m;
-                var cryptoForTicket = Math.Round(totalCryptoPaid * proportion, 8);
-
-                csvData.AppendLine($"{order.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{order.Currency},{cryptoCurrency},{cryptoForTicket},{ticket.UsedAt.HasValue}");
-            }
-        }
-        return File(Encoding.UTF8.GetBytes(csvData.ToString()), "text/csv", fileName);
+        return File(result.Value.data, "text/csv", result.Value.fileName);
     }
 
     [HttpGet("{eventId}/checkin-settings")]
