@@ -143,15 +143,22 @@ public class UITicketSalesController(UriResolver uriResolver,
     [HttpPost("create")]
     public async Task<IActionResult> CreateEvent(string storeId, [FromForm] UpdateSimpleTicketSalesEventViewModel vm)
     {
+        vm.EventTypes = Enum.GetValues(typeof(EventType)).Cast<EventType>()
+            .Select(e => new SelectListItem
+            {
+                Value = e.ToString(),
+                Text = e.ToString()
+            }).ToList();
+
         if (vm.StartDate <= DateTime.UtcNow)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Event date cannot be in the past";
-            return RedirectToAction(nameof(ViewEvent), new { storeId });
+            return View(nameof(ViewEvent), vm);
         }
         if (vm.EndDate.HasValue && vm.EndDate.Value < vm.StartDate)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Event end date cannot be before start date";
-            return RedirectToAction(nameof(ViewEvent), new { storeId });
+            return View(nameof(ViewEvent), vm);
         }
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
@@ -167,7 +174,7 @@ public class UITicketSalesController(UriResolver uriResolver,
             if (!imageUpload.Success)
             {
                 TempData[WellKnownTempData.ErrorMessage] = imageUpload.Response;
-                return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
+                return View(nameof(ViewEvent), vm);
             }
             else
             {
@@ -186,6 +193,13 @@ public class UITicketSalesController(UriResolver uriResolver,
     [HttpPost("update/{eventId}")]
     public async Task<IActionResult> UpdateEvent(string storeId, string eventId, UpdateSimpleTicketSalesEventViewModel vm, [FromForm] bool RemoveEventLogoFile = false)
     {
+        vm.EventTypes = Enum.GetValues(typeof(EventType)).Cast<EventType>()
+            .Select(e => new SelectListItem
+            {
+                Value = e.ToString(),
+                Text = e.ToString()
+            }).ToList();
+
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
@@ -199,7 +213,7 @@ public class UITicketSalesController(UriResolver uriResolver,
         if (vm.EndDate is DateTime endDate && endDate < vm.StartDate)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Event end date cannot be before start date";
-            return RedirectToAction(nameof(ViewEvent), new { storeId, eventId });
+            return View(nameof(ViewEvent), vm);
         }
         entity = TicketSalesEventViewModelToEntity(vm, entity, CurrentStore.Id);
         UploadImageResultModel imageUpload = null;
@@ -209,7 +223,7 @@ public class UITicketSalesController(UriResolver uriResolver,
             if (!imageUpload.Success)
             {
                 TempData[WellKnownTempData.ErrorMessage] = imageUpload.Response;
-                return RedirectToAction(nameof(ViewEvent), new { storeId, eventId });
+                return View(nameof(ViewEvent), vm);
             }
         }
         if (imageUpload?.Success is true)
