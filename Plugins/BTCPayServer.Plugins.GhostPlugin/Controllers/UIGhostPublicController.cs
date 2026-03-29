@@ -24,13 +24,12 @@ using Microsoft.AspNetCore.Routing;
 using Newtonsoft.Json;
 using System.Text;
 using System.IO;
-using BTCPayServer.Plugins.GhostPlugin;
 using NBitcoin.DataEncoders;
 using NBitcoin;
 using System.Security.Cryptography;
 using System.ComponentModel.DataAnnotations;
 
-namespace BTCPayServer.Plugins.ShopifyPlugin;
+namespace BTCPayServer.Plugins.GhostPlugin;
 
 // This api route is used in GhostPluginService ... If you change here, go change there too
 [AllowAnonymous]
