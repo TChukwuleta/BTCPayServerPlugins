@@ -25,8 +25,7 @@ namespace BTCPayServer.Plugins.GhostPlugin;
 
 [Route("~/plugins/{storeId}/ghost/members/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
-public class UIGhostMemberController(EmailService emailService,
-        GhostDbContextFactory dbContextFactory) : Controller
+public class UIGhostMemberController(EmailService emailService, GhostDbContextFactory dbContextFactory) : Controller
 {
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
@@ -49,7 +48,7 @@ public class UIGhostMemberController(EmailService emailService,
         var ghostMembers = ctx.GhostMembers.Where(c => c.StoreId == CurrentStore.Id && !string.IsNullOrEmpty(c.MemberId)).ToList();
         var ghostTransactions = ctx.GhostTransactions.AsNoTracking().Where(t => t.StoreId == CurrentStore.Id && t.TransactionStatus == TransactionStatus.Settled).ToList();
 
-        var ghostPluginSetting = ghostSetting.Setting != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) : new GhostSettingsPageViewModel();
+        var ghostPluginSetting = ghostSetting.Setting != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) : new();
         var reminderDay = ghostPluginSetting?.ReminderStartDaysBeforeExpiration.GetValueOrDefault(4) switch
         {
             0 => 4,
