@@ -173,14 +173,12 @@ This means subscription management remains the admin’s responsibility. However
 
    ![BTCPay Server Ghost img 21](./img/Ghost/Membership_Url_Ghost_View.png)   
 
-2. Head over to your Ghost admin portal, click on Settings >> Portal Settings, click on the 'Customize' button.
+2. Head over to your Ghost admin portal, click on `Settings` >> `Membership` >> `Signup Portal` click on the `Customize` button.
 
-   ![BTCPay Server Ghost img 22](./img/Ghost/Setup_Membership_Portal.png)
+   ![BTCPay Server Ghost img 22](./img/Ghost/Setup_Membership_Portal_2.png)
 
-   ![BTCPay Server Ghost img 23](./img/Ghost/Setup_Membership_Portal.png)   
-
-3. Edit the field at 'Display notice at signup' in the right sidebar and to include instructions on how to signup with Bitcoin as payment option, directing users to use the link. For instance: "Sign up with Bitcoin using this link". **Important**: Mark "this link" with your mouse and add a link with the URL copied from the plugin.
-   ![BTCPay Server Ghost img 24](./img/Ghost/Membership_Portal_Setup.png)
+3. Edit the field at `Display notice at signup` in the right sidebar and to include instructions on how to signup with Bitcoin as payment option, directing users to use the link. For instance: "Sign up with Bitcoin using this link". **Important**: Mark "this link" with your mouse and add a link with the URL copied from the plugin.
+   ![BTCPay Server Ghost img 24](./img/Ghost/Membership_Portal_Setup_3.png)
 
 4. Save the changes and the close to the portal. You can navigate to the signup page to view your changes. It should look similar to this:   
    ![Membership_signup.png](./img/Ghost/Membership_signup.png)

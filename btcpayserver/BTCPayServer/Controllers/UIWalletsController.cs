@@ -617,13 +617,21 @@ namespace BTCPayServer.Controllers
             // We can't filter at the database level if we need to apply label filter
             var preFiltering = string.IsNullOrEmpty(labelFilter);
             var model = new ListTransactionsViewModel { Skip = skip, Count = count };
+            const int maxVisibleLabels = 20;
 
             model.PendingTransactions = await _pendingTransactionService.GetPendingTransactions(walletId.CryptoCode, walletId.StoreId);
             model.Rates = GetCurrentStore().GetStoreBlob().GetTrackedRates().ToList();
 
-            model.Labels.AddRange(
-                (await WalletRepository.GetWalletLabelsByLinkedType(walletId, WalletObjectData.Types.Tx))
-                .Select(c => (c.Label, c.Color, ColorPalette.Default.TextColor(c.Color))));
+            var labelsWithUsage = await WalletRepository.GetWalletLabelsByLinkedTypeWithUsage(walletId, WalletObjectData.Types.Tx, includeUnusedLabels: true);
+            model.Labels.AddRange(labelsWithUsage
+                .Select(c => (c.Label, c.Color, ColorPalette.Default.TextColor(c.Color), c.UsageCount)));
+            model.PopularLabels = labelsWithUsage
+                .OrderByDescending(c => c.UsageCount)
+                .ThenBy(c => c.Label, StringComparer.OrdinalIgnoreCase)
+                .Take(maxVisibleLabels)
+                .OrderBy(c => c.Label, StringComparer.OrdinalIgnoreCase)
+                .Select(c => (c.Label, c.Color, ColorPalette.Default.TextColor(c.Color), c.UsageCount))
+                .ToList();
 
             IList<TransactionHistoryLine>? transactions = null;
             Dictionary<string, WalletTransactionInfo>? walletTransactionsInfo = null;
@@ -1282,7 +1290,8 @@ namespace BTCPayServer.Controllers
                 PayJoinBIP21 = vm.PayJoinBIP21,
                 EnforceLowR = psbtResponse.Suggestions?.ShouldEnforceLowR,
                 ChangeAddress = psbtResponse.ChangeAddress?.ToString(),
-                PSBT = psbt.ToHex()
+                PSBT = psbt.ToHex(),
+                Comment = vm.Comment
             };
 
             if (!psbt.IsReadyToSign() && command == "sign")
@@ -1459,6 +1468,7 @@ namespace BTCPayServer.Controllers
             redirectVm.FormParameters.Add("SigningContext.ChangeAddress", signingContext.ChangeAddress);
             redirectVm.FormParameters.Add("SigningContext.PendingTransactionId", signingContext.PendingTransactionId);
             redirectVm.FormParameters.Add("SigningContext.BalanceChangeFromReplacement", signingContext.BalanceChangeFromReplacement.ToString());
+            redirectVm.FormParameters.Add("SigningContext.Comment", signingContext.Comment);
         }
 
         private IActionResult RedirectToWalletPSBT(WalletPSBTViewModel vm)

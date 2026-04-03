@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Net.Http;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Extensions;
@@ -8,12 +7,10 @@ using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;
 using BTCPayServer.Plugins.Emails;
 using BTCPayServer.Plugins.Emails.Controllers;
-using BTCPayServer.Plugins.Emails.Services;
 using BTCPayServer.Plugins.GhostPlugin.Data;
 using BTCPayServer.Plugins.GhostPlugin.Services;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
-using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -23,37 +20,19 @@ using Newtonsoft.Json;
 using static BTCPayServer.Plugins.GhostPlugin.Services.EmailService;
 using StoreData = BTCPayServer.Data.StoreData;
 
-namespace BTCPayServer.Plugins.ShopifyPlugin;
+namespace BTCPayServer.Plugins.GhostPlugin;
 
 
 [Route("~/plugins/{storeId}/ghost/members/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
-public class UIGhostMemberController : Controller
+public class UIGhostMemberController(EmailService emailService, GhostDbContextFactory dbContextFactory) : Controller
 {
-    private readonly StoreRepository _storeRepo;
-    private readonly EmailService _emailService;
-    private readonly IHttpClientFactory _clientFactory;
-    private readonly EmailSenderFactory _emailSenderFactory;
-    private readonly GhostDbContextFactory _dbContextFactory;
-    public UIGhostMemberController
-        (EmailService emailService, 
-        StoreRepository storeRepo,
-        IHttpClientFactory clientFactory,
-        EmailSenderFactory emailSenderFactory,
-        GhostDbContextFactory dbContextFactory)
-    {
-        _storeRepo = storeRepo;
-        _emailService = emailService;
-        _clientFactory = clientFactory;
-        _dbContextFactory = dbContextFactory;
-        _emailSenderFactory = emailSenderFactory;
-    }
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
     [HttpGet("list")]
     public async Task<IActionResult> List(string storeId, string filter)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         if (ghostSetting == null)
         {
@@ -69,7 +48,7 @@ public class UIGhostMemberController : Controller
         var ghostMembers = ctx.GhostMembers.Where(c => c.StoreId == CurrentStore.Id && !string.IsNullOrEmpty(c.MemberId)).ToList();
         var ghostTransactions = ctx.GhostTransactions.AsNoTracking().Where(t => t.StoreId == CurrentStore.Id && t.TransactionStatus == TransactionStatus.Settled).ToList();
 
-        var ghostPluginSetting = ghostSetting.Setting != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) : new GhostSettingsPageViewModel();
+        var ghostPluginSetting = ghostSetting.Setting != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(ghostSetting.Setting) : new();
         var reminderDay = ghostPluginSetting?.ReminderStartDaysBeforeExpiration.GetValueOrDefault(4) switch
         {
             0 => 4,
@@ -124,8 +103,7 @@ public class UIGhostMemberController : Controller
             };
         }).ToList();
 
-        var emailSender = await _emailSenderFactory.GetEmailSender(storeId);
-        var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+        var isEmailSettingsConfigured = await emailService.IsEmailSettingsConfigured(CurrentStore.Id);
         ViewData["StoreEmailSettingsConfigured"] = isEmailSettingsConfigured;
         if (!isEmailSettingsConfigured)
         {
@@ -158,7 +136,7 @@ public class UIGhostMemberController : Controller
         if (CurrentStore is null)
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var entity = ctx.GhostMembers.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == memberId);
         if (entity == null)
             return NotFound();
@@ -174,7 +152,7 @@ public class UIGhostMemberController : Controller
         if (CurrentStore is null)
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var entity = ctx.GhostMembers.FirstOrDefault(c => c.StoreId == CurrentStore.Id && c.Id == memberId);
         if (entity == null)
             return NotFound();
@@ -193,7 +171,7 @@ public class UIGhostMemberController : Controller
     [HttpPost]
     public  IActionResult PreviewInvitationEmail(string storeId)
     {
-        var templateContent = _emailService.GetEmbeddedResourceContent("Templates.SubscriptionExpirationReminder.cshtml");
+        var templateContent = emailService.GetEmbeddedResourceContent("Templates.SubscriptionExpirationReminder.cshtml");
         return Content(templateContent, "text/html");
     }
 
@@ -201,14 +179,12 @@ public class UIGhostMemberController : Controller
     [HttpGet("send-reminder/{memberId}")]
     public async Task<IActionResult> SendReminder(string storeId, string memberId)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         var member = ctx.GhostMembers.AsNoTracking().FirstOrDefault(c => c.Id == memberId && c.StoreId == CurrentStore.Id);
         if (ghostSetting == null || member == null) return NotFound();
 
-        var emailSender = await _emailSenderFactory.GetEmailSender(ghostSetting.StoreId);
-        var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
-        if (!isEmailConfigured)
+        if (!await emailService.IsEmailSettingsConfigured(CurrentStore.Id))
         {
             TempData[WellKnownTempData.ErrorMessage] = $"Email settings not setup. Kindly configure Email SMTP in the admin settings";
             return RedirectToAction(nameof(List), new { storeId = CurrentStore.Id });
@@ -232,7 +208,7 @@ public class UIGhostMemberController : Controller
         };
         try
         {
-            await _emailService.SendMembershipSubscriptionReminderEmail(emailRequest);
+            await emailService.SendMembershipSubscriptionReminderEmail(emailRequest);
         }
         catch (Exception ex)
         {

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Extensions;
@@ -11,7 +10,6 @@ using BTCPayServer.Data;
 using BTCPayServer.Payments;
 using BTCPayServer.Plugins.Emails;
 using BTCPayServer.Plugins.Emails.Controllers;
-using BTCPayServer.Plugins.Emails.Services;
 using BTCPayServer.Plugins.GhostPlugin.Data;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
 using BTCPayServer.Plugins.GhostPlugin.Services;
@@ -28,40 +26,21 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StoreData = BTCPayServer.Data.StoreData;
 
-namespace BTCPayServer.Plugins.ShopifyPlugin;
+namespace BTCPayServer.Plugins.GhostPlugin;
 
 
 [Route("~/plugins/{storeId}/ghost/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
-public class UIGhostController : Controller
-{
-    private GhostHelper helper;
-    private readonly AppService _appService;
-    private readonly StoreRepository _storeRepo;
-    private readonly IHttpClientFactory _clientFactory;
-    private readonly EmailSenderFactory _emailSenderFactory;
-    private readonly BTCPayNetworkProvider _networkProvider;
-    private readonly GhostDbContextFactory _dbContextFactory;
-    private readonly UserManager<ApplicationUser> _userManager;
-    public UIGhostController
-        (AppService appService,
+public class UIGhostController(AppService appService,
         StoreRepository storeRepo,
-        IHttpClientFactory clientFactory,
-        EmailSenderFactory emailSenderFactory,
+        EmailService emailService,
         BTCPayNetworkProvider networkProvider,
         GhostDbContextFactory dbContextFactory,
-        UserManager<ApplicationUser> userManager)
-    {
-        _storeRepo = storeRepo;
-        _appService = appService;
-        helper = new GhostHelper(_appService);
-        _userManager = userManager;
-        _clientFactory = clientFactory;
-        _networkProvider = networkProvider;
-        _dbContextFactory = dbContextFactory;
-        _emailSenderFactory = emailSenderFactory;
-    }
+        UserManager<ApplicationUser> userManager) : Controller
+{
+    private GhostHelper helper = new GhostHelper(appService);
     public StoreData CurrentStore => HttpContext.GetStoreData();
+    private string GetUserId() => userManager.GetUserId(User);
 
     [HttpGet]
     public async Task<IActionResult> Index(string storeId)
@@ -69,25 +48,31 @@ public class UIGhostController : Controller
         if (string.IsNullOrEmpty(storeId))
             return NotFound();
 
-        var storeData = await _storeRepo.FindStore(storeId);
+        var storeData = await storeRepo.FindStore(storeId);
         var storeHasWallet = GetPaymentMethodConfigs(storeData, true).Any();
         if (!storeHasWallet)
         {
             return View(new GhostSettingViewModel
             {
-                CryptoCode = _networkProvider.DefaultNetwork.CryptoCode,
+                CryptoCode = networkProvider.DefaultNetwork.CryptoCode,
                 StoreId = storeId,
                 HasWallet = false
             });
         }
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id) ?? new GhostSetting();
         var viewModel = helper.GhostSettingsToViewModel(ghostSetting);
-        viewModel.MemberCreationUrl = Url.Action("CreateMember", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
-        viewModel.DonationUrl = Url.Action("Donate", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
-        viewModel.WebhookUrl = Url.Action("ReceiveWebhook", "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
-        var emailSender = await _emailSenderFactory.GetEmailSender(storeId);
-        var isEmailSettingsConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+
+        viewModel.MemberCreationUrl = Url.Action(
+        nameof(UIGhostPublicController.CreateMember), "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
+
+        viewModel.DonationUrl = Url.Action(
+        nameof(UIGhostPublicController.Donate), "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
+
+        viewModel.WebhookUrl = Url.Action(
+        nameof(UIGhostPublicController.ReceiveWebhook), "UIGhostPublic", new { storeId = CurrentStore.Id }, Request.Scheme);
+
+        var isEmailSettingsConfigured = await emailService.IsEmailSettingsConfigured(CurrentStore.Id);
         if (!isEmailSettingsConfigured && !string.IsNullOrEmpty(ghostSetting?.AdminApiKey))
         {
             TempData.SetStatusMessageModel(new StatusMessageModel
@@ -109,11 +94,10 @@ public class UIGhostController : Controller
     [HttpPost]
     public async Task<IActionResult> Index(string storeId, GhostSettingViewModel vm, string command = "")
     {
-        JsonConvert.SerializeObject(vm, Formatting.Indented);
         try
         {
-            await using var ctx = _dbContextFactory.CreateContext();
-            var store = await _storeRepo.FindStore(CurrentStore.Id);
+            await using var ctx = dbContextFactory.CreateContext();
+            var store = await storeRepo.FindStore(CurrentStore.Id);
             switch (command)
             {
                 case "GhostSaveCredentials":
@@ -130,11 +114,13 @@ public class UIGhostController : Controller
                         entity.StoreId = CurrentStore.Id;
                         entity.StoreName = CurrentStore.StoreName;
                         entity.ApplicationUserId = GetUserId();
-                        var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStore.Id);
-                        var isEmailSetup = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
-                        if (isEmailSetup)
+                        if (await emailService.IsEmailSettingsConfigured(CurrentStore.Id))
                         {
-                            entity.Setting = JsonConvert.SerializeObject(new GhostSettingsPageViewModel { ReminderStartDaysBeforeExpiration = 4, EnableAutomatedEmailReminders = true });
+                            entity.Setting = JsonConvert.SerializeObject(new GhostSettingsPageViewModel
+                            {
+                                ReminderStartDaysBeforeExpiration = 4,
+                                EnableAutomatedEmailReminders = true
+                            });
                         }
                         var storeBlob = store.GetStoreBlob();
                         var newApp = await helper.CreateGhostApp(CurrentStore.Id, storeBlob.DefaultCurrency);
@@ -192,13 +178,10 @@ public class UIGhostController : Controller
         if (CurrentStore is null)
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var settingJson = ctx.GhostSettings.AsNoTracking().Where(c => c.StoreId == CurrentStore.Id).Select(c => c.Setting).FirstOrDefault();
-
-        var ghostSetting = settingJson != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(settingJson) : new GhostSettingsPageViewModel();
-
-        var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStore.Id);
-        ViewData["StoreEmailSettingsConfigured"] = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+        var ghostSetting = settingJson != null ? JsonConvert.DeserializeObject<GhostSettingsPageViewModel>(settingJson) : new();
+        ViewData["StoreEmailSettingsConfigured"] = await emailService.IsEmailSettingsConfigured(CurrentStore.Id);   
         return View(ghostSetting);
     }
 
@@ -211,14 +194,10 @@ public class UIGhostController : Controller
 
         if (model.EnableAutomatedEmailReminders && model.ReminderStartDaysBeforeExpiration == null)
         {
-            TempData.SetStatusMessageModel(new StatusMessageModel()
-            {
-                Message = $"Kindly specify the number of days to initiate reminder notifications",
-                Severity = StatusMessageModel.StatusSeverity.Error
-            });
+            TempData[WellKnownTempData.ErrorMessage] = "Kindly specify the number of days to initiate reminder notifications";
             return RedirectToAction(nameof(Settings), new { storeId = CurrentStore.Id });
         }
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var entity = ctx.GhostSettings.AsNoTracking().FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         entity.Setting = JsonConvert.SerializeObject(model);
         ctx.Update(entity);
@@ -250,5 +229,4 @@ public class UIGhostController : Controller
         return paymentMethodConfigurations;
     }
 
-    private string GetUserId() => _userManager.GetUserId(User);
 }

@@ -170,6 +170,20 @@ namespace BTCPayServer.Plugins.Subscriptions.Controllers
         }
 
         [Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield, Policy = SubscriptionsPolicies.CanManageSubscribers)]
+        [HttpDelete("~/api/v1/stores/{storeId}/offerings/{offeringId}/subscribers/{customerSelector}")]
+        public async Task<IActionResult> DeleteSubscriber(string storeId, string offeringId,
+            [ModelBinder<CustomerSelectorModelBinder>]
+            CustomerSelector customerSelector)
+        {
+            var subscriber = await ctx.Subscribers.GetBySelector(offeringId, customerSelector, storeId);
+            if (subscriber is null)
+                return SubscriberNotFound();
+            ctx.Subscribers.Remove(subscriber);
+            await ctx.SaveChangesAsync();
+            return NoContent();
+        }
+
+        [Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield, Policy = SubscriptionsPolicies.CanManageSubscribers)]
         [HttpGet("~/api/v1/stores/{storeId}/offerings/{offeringId}/subscribers/{customerSelector}/credits/{currency}")]
         public async Task<IActionResult> GetCredit(string storeId, string offeringId,
             [ModelBinder<CustomerSelectorModelBinder>]
@@ -237,6 +251,27 @@ namespace BTCPayServer.Plugins.Subscriptions.Controllers
             if (subscriber is null)
                 return SubscriberNotFound();
             await subscriptionHostedService.Unsuspend(subscriber.Id);
+            ctx.ChangeTracker.Clear();
+            return await GetSubscriber(storeId, offeringId, customerSelector);
+        }
+
+        [Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield, Policy = SubscriptionsPolicies.CanManageSubscribers)]
+        [HttpPut("~/api/v1/stores/{storeId}/offerings/{offeringId}/subscribers/{customerSelector}/dates")]
+        public async Task<IActionResult> UpdateSubscriberDates(string storeId, string offeringId,
+            [ModelBinder<CustomerSelectorModelBinder>]
+            CustomerSelector customerSelector,
+            [FromBody] UpdateSubscriberDatesRequest? request)
+        {
+            var subscriber = await ctx.Subscribers.GetBySelector(offeringId, customerSelector, storeId);
+            if (subscriber is null)
+                return SubscriberNotFound();
+            if (request is null or { StartDate: null, ExpirationDate: null })
+                return await GetSubscriber(storeId, offeringId, customerSelector);
+            var startDate = (request.StartDate ?? subscriber.PlanStarted).ToUniversalTime();
+            var expirationDate = request.ExpirationDate?.ToUniversalTime();
+            if (expirationDate is { } exp && exp <= startDate)
+                return this.CreateAPIError(400, "invalid-dates", "Expiration date must be after the start date.");
+            await subscriptionHostedService.UpdateDates(subscriber.Id, startDate, expirationDate);
             ctx.ChangeTracker.Clear();
             return await GetSubscriber(storeId, offeringId, customerSelector);
         }

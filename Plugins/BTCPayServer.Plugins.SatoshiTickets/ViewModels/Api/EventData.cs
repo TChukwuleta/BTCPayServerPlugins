@@ -19,8 +19,6 @@ public class EventData
     public bool HasMaximumCapacity { get; set; }
     public int? MaximumEventCapacity { get; set; }
     public string EventState { get; set; }
-    public string EventLogoFileId { get; set; }
-    public string EventLogoUrl { get; set; }
     public string PurchaseLink { get; set; }
     public int TicketsSold { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

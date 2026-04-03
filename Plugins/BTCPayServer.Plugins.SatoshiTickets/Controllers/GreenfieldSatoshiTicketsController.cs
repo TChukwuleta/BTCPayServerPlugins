@@ -1,11 +1,9 @@
 using System;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Client;
-using BTCPayServer.Plugins.Emails.Services;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Models.Api;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
@@ -20,38 +18,18 @@ namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
 [ApiController]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Greenfield, Policy = Policies.CanModifyStoreSettings)]
 [EnableCors(CorsPolicies.All)]
-public class GreenfieldSatoshiTicketsController : ControllerBase
+public class GreenfieldSatoshiTicketsController(EmailService emailService, SimpleTicketSalesDbContextFactory dbContextFactory) : ControllerBase
 {
-    private readonly TicketService _ticketService;
-    private readonly EmailService _emailService;
-    private readonly EmailSenderFactory _emailSenderFactory;
-    private readonly SimpleTicketSalesDbContextFactory _dbContextFactory;
-
-    public GreenfieldSatoshiTicketsController(
-        TicketService ticketService,
-        EmailService emailService,
-        EmailSenderFactory emailSenderFactory,
-        SimpleTicketSalesDbContextFactory dbContextFactory)
-    {
-        _ticketService = ticketService;
-        _emailService = emailService;
-        _emailSenderFactory = emailSenderFactory;
-        _dbContextFactory = dbContextFactory;
-    }
-
-    private string CurrentStoreId => HttpContext.GetStoreData()?.Id;
 
     [HttpGet("tickets")]
     public async Task<IActionResult> GetTickets(string storeId, string eventId, [FromQuery] string searchText = null)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
-        var eventExists = ctx.Events.Any(c => c.Id == eventId && c.StoreId == CurrentStoreId);
+        await using var ctx = dbContextFactory.CreateContext();
+        var eventExists = ctx.Events.Any(c => c.Id == eventId && c.StoreId == storeId);
         if (!eventExists)
             return EventNotFound();
 
-        var query = ctx.Tickets.AsNoTracking().Where(t => t.EventId == eventId && t.StoreId == CurrentStoreId
-                        && t.PaymentStatus == TransactionStatus.Settled.ToString());
-
+        var query = ctx.Tickets.AsNoTracking().Where(t => t.EventId == eventId && t.StoreId == storeId && t.PaymentStatus == TransactionStatus.Settled.ToString());
         if (!string.IsNullOrEmpty(searchText))
         {
             searchText = searchText.Trim();
@@ -65,64 +43,15 @@ public class GreenfieldSatoshiTicketsController : ControllerBase
     }
 
 
-    [HttpGet("tickets/export")]
-    public async Task<IActionResult> ExportTickets(string storeId, string eventId)
-    {
-        await using var ctx = _dbContextFactory.CreateContext();
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
-        if (ticketEvent == null)
-            return EventNotFound();
-
-        var ordersWithTickets = ctx.Orders.AsNoTracking()
-            .Where(o => o.StoreId == CurrentStoreId && o.EventId == eventId
-                        && o.PaymentStatus == TransactionStatus.Settled.ToString())
-            .SelectMany(o => o.Tickets.Select(t => new
-            {
-                o.PurchaseDate,
-                t.TxnNumber,
-                t.FirstName,
-                t.LastName,
-                t.Email,
-                t.TicketTypeName,
-                t.Amount,
-                o.Currency,
-                t.UsedAt
-            })).ToList();
-
-        if (!ordersWithTickets.Any())
-            return this.CreateAPIError(404, "no-tickets", "No settled tickets found for this event");
-
-        var fileName = $"{ticketEvent.Title}_Tickets-{DateTime.UtcNow:yyyy_MM_dd-HH_mm_ss}.csv";
-        var csvData = new StringBuilder();
-        csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency,Attended Event");
-        foreach (var ticket in ordersWithTickets)
-        {
-            csvData.AppendLine(string.Join(",",
-                EscapeCsvField(ticket.PurchaseDate?.ToString("MM/dd/yy HH:mm")),
-                EscapeCsvField(ticket.TxnNumber),
-                EscapeCsvField(ticket.FirstName),
-                EscapeCsvField(ticket.LastName),
-                EscapeCsvField(ticket.Email),
-                EscapeCsvField(ticket.TicketTypeName),
-                EscapeCsvField(ticket.Amount.ToString()),
-                EscapeCsvField(ticket.Currency),
-                EscapeCsvField(ticket.UsedAt.HasValue.ToString())));
-        }
-
-        byte[] fileBytes = Encoding.UTF8.GetBytes(csvData.ToString());
-        return File(fileBytes, "text/csv", fileName);
-    }
-
-
-    [HttpPost("tickets/{ticketNumber}/check-in")]
+    /*[HttpPost("tickets/{ticketNumber}/check-in")]
     public async Task<IActionResult> CheckinTicket(string storeId, string eventId, string ticketNumber)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
-        var ticketExist = ctx.Events.Any(c => c.Id == eventId && c.StoreId == CurrentStoreId);
+        await using var ctx = dbContextFactory.CreateContext();
+        var ticketExist = ctx.Events.Any(c => c.Id == eventId && c.StoreId == storeId);
         if (!ticketExist)
             return EventNotFound();
 
-        var checkinResult = await _ticketService.CheckinTicket(eventId, ticketNumber, CurrentStoreId);
+        var checkinResult = await ticketService.CheckinTicket(eventId, ticketNumber, storeId);
         if (!checkinResult.Success)
             return this.CreateAPIError(422, "checkin-failed", checkinResult.ErrorMessage);
 
@@ -133,19 +62,19 @@ public class GreenfieldSatoshiTicketsController : ControllerBase
             Ticket = checkinResult.Ticket != null ? ToTicketData(checkinResult.Ticket) : null
         };
         return Ok(result);
-    }
+    }*/
 
 
     [HttpGet("orders")]
     public async Task<IActionResult> GetOrders(string storeId, string eventId, [FromQuery] string searchText = null)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
-        var ticketExist = ctx.Events.Any(c => c.Id == eventId && c.StoreId == CurrentStoreId);
+        await using var ctx = dbContextFactory.CreateContext();
+        var ticketExist = ctx.Events.Any(c => c.Id == eventId && c.StoreId == storeId);
         if (!ticketExist)
             return EventNotFound();
 
         var query = ctx.Orders.AsNoTracking().Include(c => c.Tickets)
-            .Where(c => c.EventId == eventId && c.StoreId == CurrentStoreId && c.PaymentStatus == TransactionStatus.Settled.ToString());
+            .Where(c => c.EventId == eventId && c.StoreId == storeId && c.PaymentStatus == TransactionStatus.Settled.ToString());
 
         if (!string.IsNullOrEmpty(searchText))
         {
@@ -166,14 +95,14 @@ public class GreenfieldSatoshiTicketsController : ControllerBase
     [HttpPost("orders/{orderId}/tickets/{ticketId}/send-reminder")]
     public async Task<IActionResult> SendReminder(string storeId, string eventId, string orderId, string ticketId)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
 
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStoreId);
+        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == storeId);
         if (ticketEvent == null)
             return EventNotFound();
 
         var order = ctx.Orders.AsNoTracking().Include(c => c.Tickets)
-            .FirstOrDefault(o => o.Id == orderId && o.StoreId == CurrentStoreId && o.EventId == eventId && o.Tickets.Any());
+            .FirstOrDefault(o => o.Id == orderId && o.StoreId == storeId && o.EventId == eventId && o.Tickets.Any());
         if (order == null)
             return this.CreateAPIError(404, "order-not-found", "The order was not found");
 
@@ -181,8 +110,7 @@ public class GreenfieldSatoshiTicketsController : ControllerBase
         if (ticket == null)
             return this.CreateAPIError(404, "ticket-not-found", "The ticket was not found");
 
-        var emailSender = await _emailSenderFactory.GetEmailSender(CurrentStoreId);
-        var isEmailConfigured = (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+        var isEmailConfigured = await emailService.IsEmailSettingsConfigured(storeId);
         if (!isEmailConfigured)
         {
             return this.CreateAPIError(422, "email-not-configured",
@@ -190,7 +118,7 @@ public class GreenfieldSatoshiTicketsController : ControllerBase
         }
         try
         {
-            var emailResponse = await _emailService.SendTicketRegistrationEmail(CurrentStoreId, ticket, ticketEvent);
+            var emailResponse = await emailService.SendTicketRegistrationEmail(storeId, ticket, ticketEvent);
             if (emailResponse.IsSuccessful)
             {
                 order.EmailSent = true;
@@ -249,16 +177,6 @@ public class GreenfieldSatoshiTicketsController : ControllerBase
             PurchaseDate = entity.PurchaseDate,
             Tickets = entity.Tickets?.Select(ToTicketData).ToList() ?? new()
         };
-    }
-
-
-    private static string EscapeCsvField(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-            return "";
-        if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
-            return $"\"{value.Replace("\"", "\"\"")}\"";
-        return value;
     }
 
     private IActionResult EventNotFound()

@@ -2,18 +2,17 @@ using System;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
-using BTCPayServer.Plugins.LightSpeed;
 using BTCPayServer.Plugins.LightSpeed.Data;
 using BTCPayServer.Plugins.LightSpeed.Services;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace BTCPayServer.Plugins.SquareSpace;
+namespace BTCPayServer.Plugins.LightSpeed;
 
 public class LightSpeedPlugin : BaseBTCPayServerPlugin
 {
     public override IBTCPayServerPlugin.PluginDependency[] Dependencies { get; } =
     {
-        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.3.6" }
+        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.3.7" }
     };
 
     public override void Execute(IServiceCollection services)

@@ -4,10 +4,10 @@
 @using BTCPayServer.Plugins.GhostPlugin.Services
 @using Microsoft.AspNetCore.Mvc.TagHelpers
 @inject IScopeProvider ScopeProvider
-@inject GhostPluginService PluginService
+@inject GhostHostedService GhostHostedService
 @{
     var storeId = ScopeProvider.GetCurrentStoreId();
-    var pluginNotification = PluginService.HasNotification(storeId).GetAwaiter().GetResult();
+    var pluginNotification = GhostHostedService.HasNotification(storeId).GetAwaiter().GetResult();
 }
 
 @if (!string.IsNullOrEmpty(storeId))

@@ -1,0 +1,139 @@
+﻿@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.ServerAlert.Data
+@using BTCPayServer.Plugins.ServerAlert.ViewModels
+@using BTCPayServer.Plugins.ServerAlert
+@model AnnouncementViewModel
+@{
+    var isNew = string.IsNullOrEmpty(Model.Id);
+    ViewData.SetLayoutModel(new LayoutModel(nameof(ServerAlertPlugin), isNew ? "New Server Alert" : "Edit Server Alert").SetCategory(WellKnownCategories.Server));
+
+
+    var selectedStoresVal = (int)EmailScope.SelectedStores;
+    var customEmailsVal = (int)EmailScope.CustomEmails;
+
+    var scopeItems = new SelectList(
+        !Model.EmailEnabled
+            ? new[]
+            {
+                new { Value = (int)EmailScope.None, Text = "None — bell notification only" }
+            }
+            : new[]
+            {
+                new { Value = (int)EmailScope.None, Text = "All stores — bell notification only" },
+                new { Value = (int)EmailScope.AllStores, Text = "All stores" },
+                new { Value = (int)EmailScope.AllUsers, Text = "All users" },
+                new { Value = (int)EmailScope.AdminsOnly, Text = "Admins only" },
+                new { Value = (int)EmailScope.SelectedStores, Text = "Selected store owners" },
+                new { Value = (int)EmailScope.CustomEmails, Text = "Custom email list" }
+            },
+        "Value", "Text", (int)Model.EmailScope);
+}
+
+<div class="d-flex align-items-start justify-content-between gap-3 mb-4 flex-wrap">
+    <div>
+        <h2 class="mb-1">@(isNew ? "New Server Alert" : "Edit Server Alert")</h2>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" form="herald-form" class="btn btn-primary">
+            <span class="fa fa-bullhorn me-1"></span>@(isNew ? "Send" : "Save changes")
+        </button>
+    </div>
+</div>
+
+
+@if (!Model.EmailEnabled)
+{
+    <div class="alert alert-warning small">SMTP is not configured. Only bell notifications will be sent. Configure email in <strong>Server Settings → Emails</strong>.</div>
+}
+
+<form id="herald-form" asp-action="@(isNew ? "Create" : "Update")" asp-route-id="@Model.Id" method="post" style="max-width:680px;">
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger mb-4"></div>
+
+    <div class="mb-3">
+        <label asp-for="Title" class="form-label fw-semibold"></label>
+        <input asp-for="Title" class="form-control"
+               placeholder="e.g. Scheduled Maintenance – December 1st" />
+        <span asp-validation-for="Title" class="text-danger small"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Message" class="form-label fw-semibold"></label>
+        <textarea asp-for="Message" class="form-control" rows="5" placeholder="Plain text. Newlines are preserved."></textarea>
+        <span asp-validation-for="Message" class="text-danger small"></span>
+    </div>
+
+    <div class="mb-4">
+        <label asp-for="Severity" class="form-label fw-semibold">Severity</label>
+        <select asp-for="Severity" class="form-select" style="max-width:220px;" asp-items="Html.GetEnumSelectList<AnnouncementSeverity>()"></select>
+    </div>
+
+    <hr class="mb-4">
+
+    <h6 class="text-muted text-uppercase fw-bold small mb-3">Email Notifications</h6>
+    <div class="mb-3" style="max-width:300px;">
+        <label asp-for="EmailScope" class="form-label fw-semibold">Send notification to</label>
+        <select asp-for="EmailScope" id="emailScopeSelect" class="form-select" asp-items="scopeItems"></select>
+    </div>
+
+    <div id="storePicker" class="mb-3" style="display:none;">
+        <label class="form-label fw-semibold">Select stores</label>
+        <select name="SelectedStoreIds" id="storeSelect" class="form-select" multiple>
+            @foreach (var store in Model.AllStores.OrderBy(s => s.StoreName))
+            {
+                var isSelected = Model.SelectedStoreIds.Contains(store.Id);
+                <option value="@store.Id" selected="@isSelected">
+                    @store.StoreName — @store.Id[..8]
+                </option>
+            }
+        </select>
+        <div class="form-text">Owners of selected stores receive the email.</div>
+    </div>
+
+    <div id="customEmailBox" class="mb-3" style="display:none;">
+        <label asp-for="CustomEmailAddresses" class="form-label fw-semibold">Email addresses</label>
+        <textarea asp-for="CustomEmailAddresses" class="form-control font-monospace" rows="5" placeholder="alice@example.com&#10;bob@example.com&#10;carol@example.com"></textarea>
+        <div class="form-text">One address per line. Commas and semicolons also work.</div>
+    </div>
+
+</form>
+
+@section PageFootContent {
+    <partial name="_ValidationScriptsPartial" />
+    <link rel="stylesheet" href="~/Resources/js/choices.min.css" asp-append-version="true" />
+    <script src="~/Resources/js/choices.min.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            const sel         = document.getElementById('emailScopeSelect');
+            const storePicker = document.getElementById('storePicker');
+            const customBox   = document.getElementById('customEmailBox');
+            let choicesInstance = null;
+
+            function update() {
+                const v          = parseInt(sel.value, 10);
+                const showStores = (v === @selectedStoresVal);
+                const showCustom = (v === @customEmailsVal);
+
+                storePicker.style.display = showStores ? '' : 'none';
+                customBox.style.display   = showCustom ? '' : 'none';
+
+                if (showStores && !choicesInstance) {
+                    const storeSelect = document.getElementById('storeSelect');
+                    if (storeSelect) {
+                        choicesInstance = new Choices(storeSelect, {
+                            removeItemButton: true,
+                            searchPlaceholderValue: 'Search stores...',
+                            placeholderValue: 'Select stores',
+                            noResultsText: 'No stores found',
+                            shouldSort: false
+                        });
+                    }
+                }
+            }
+
+            sel.addEventListener('change', update);
+            update();
+        })();
+    </script>
+}

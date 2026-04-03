@@ -1,6 +1,6 @@
 namespace BTCPayServer.Plugins.SatoshiTickets.Models.Api;
 
-public class UpdateTicketTypeRequest
+public class TicketTypeRequest
 {
     public string Name { get; set; }
     public decimal Price { get; set; }

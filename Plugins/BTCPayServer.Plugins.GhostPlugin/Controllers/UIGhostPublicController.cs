@@ -24,66 +24,40 @@ using Microsoft.AspNetCore.Routing;
 using Newtonsoft.Json;
 using System.Text;
 using System.IO;
-using BTCPayServer.Plugins.GhostPlugin;
 using NBitcoin.DataEncoders;
 using NBitcoin;
 using System.Security.Cryptography;
 using System.ComponentModel.DataAnnotations;
 
-namespace BTCPayServer.Plugins.ShopifyPlugin;
+namespace BTCPayServer.Plugins.GhostPlugin;
 
 // This api route is used in GhostPluginService ... If you change here, go change there too
 [AllowAnonymous]
 [Route("~/plugins/{storeId}/ghost/public/", Order = 0)]
 [Route("~/plugins/{storeId}/ghost/api/", Order = 1)]
-public class UIGhostPublicController : Controller
-{
-    private readonly UriResolver _uriResolver;
-    private readonly StoreRepository _storeRepo;
-    private readonly EmailService _emailService;
-    private readonly LinkGenerator _linkGenerator;
-    private readonly IHttpClientFactory _clientFactory;
-    private readonly ApplicationDbContextFactory _context;
-    private readonly GhostPluginService _ghostPluginService;
-    private readonly UIInvoiceController _invoiceController;
-    private readonly GhostDbContextFactory _dbContextFactory;
-    public UIGhostPublicController
-        (EmailService emailService,
+public class UIGhostPublicController(EmailService emailService,
         UriResolver uriResolver,
         StoreRepository storeRepo,
-        LinkGenerator linkGenerator,
         IHttpClientFactory clientFactory,
-        ApplicationDbContextFactory context,
-        GhostPluginService ghostPluginService,
+        GhostHostedService ghostHostedService,
         UIInvoiceController invoiceController,
-        GhostDbContextFactory dbContextFactory)
-    {
-        _context = context;
-        _storeRepo = storeRepo;
-        _uriResolver = uriResolver;
-        _emailService = emailService;
-        _linkGenerator = linkGenerator;
-        _clientFactory = clientFactory;
-        _dbContextFactory = dbContextFactory;
-        _invoiceController = invoiceController;
-        _ghostPluginService = ghostPluginService;
-    }
-
+        GhostDbContextFactory dbContextFactory) : Controller
+{
 
     [HttpGet("donate")]
     public async Task<IActionResult> Donate(string storeId)
     {
-        var store = await _storeRepo.FindStore(storeId);
+        var store = await storeRepo.FindStore(storeId);
         if (store == null) return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated()) return NotFound();
 
         var storeBlob = store.GetStoreBlob();
         string id = Guid.NewGuid().ToString();
 
-        InvoiceEntity invoice = await _invoiceController.CreateInvoiceCoreRaw(new CreateInvoiceRequest()
+        InvoiceEntity invoice = await invoiceController.CreateInvoiceCoreRaw(new CreateInvoiceRequest()
         {
             Amount = null,
             Currency = storeBlob.DefaultCurrency,
@@ -104,15 +78,16 @@ public class UIGhostPublicController : Controller
     public async Task<IActionResult> CreateMember(string storeId)
     {
         var vm = new CreateMemberViewModel();
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated())
             return NotFound();
-        var storeData = await _storeRepo.FindStore(ghostSetting.StoreId);
+
+        var storeData = await storeRepo.FindStore(ghostSetting.StoreId);
         List<Tier> ghostTiers = new();
         try
         {
-            var contentApiClient = new GhostContentApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
+            var contentApiClient = new GhostContentApiClient(clientFactory, ghostSetting.CreateGhsotApiCredentials());
             ghostTiers = await contentApiClient.RetrieveGhostTiers();
             ghostTiers = ghostTiers.Where(tier => tier.monthly_price > 0 || tier.yearly_price > 0).ToList();
         }
@@ -126,7 +101,7 @@ public class UIGhostPublicController : Controller
             StoreId = ghostSetting.StoreId,
             StoreName = storeData?.StoreName,
             ShopName = ghostSetting.StoreName,
-            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, _uriResolver, storeData?.GetStoreBlob()),
+            StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, uriResolver, storeData?.GetStoreBlob()),
         });
     }
 
@@ -134,7 +109,7 @@ public class UIGhostPublicController : Controller
     [HttpPost("create-member")]
     public async Task<IActionResult> CreateMember(CreateMemberViewModel vm, string storeId)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (ghostSetting == null || !ghostSetting.CredentialsPopulated()) return NotFound();
 
@@ -143,9 +118,9 @@ public class UIGhostPublicController : Controller
         {
             return BadRequest("Invalid email address.");
         }
-        var storeData = await _storeRepo.FindStore(ghostSetting.StoreId);
-        var apiClient = new GhostAdminApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
-        var contentApiClient = new GhostContentApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
+        var storeData = await storeRepo.FindStore(ghostSetting.StoreId);
+        var apiClient = new GhostAdminApiClient(clientFactory, ghostSetting.CreateGhsotApiCredentials());
+        var contentApiClient = new GhostContentApiClient(clientFactory, ghostSetting.CreateGhsotApiCredentials());
         try
         {
             var ghostTiers = await contentApiClient.RetrieveGhostTiers();
@@ -177,7 +152,7 @@ public class UIGhostPublicController : Controller
             ctx.GhostMembers.Add(entity);
             await ctx.SaveChangesAsync();
             var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
-            InvoiceEntity invoice = await _ghostPluginService.CreateMemberInvoiceAsync(storeData, tier, entity, txnId, Request.GetAbsoluteRoot(), $"https://{ghostSetting.ApiUrl}/#/portal/signin");
+            InvoiceEntity invoice = await ghostHostedService.CreateMemberInvoice(storeData, tier, entity, txnId, Request.GetAbsoluteRoot(), $"https://{ghostSetting.ApiUrl}/#/portal/signin");
             if (invoice == null)
             {
                 ViewBag.ErrorMessage = "Unable to create invoice";
@@ -199,13 +174,13 @@ public class UIGhostPublicController : Controller
     {
         try
         {
-            await using var ctx = _dbContextFactory.CreateContext();
+            await using var ctx = dbContextFactory.CreateContext();
             var member = ctx.GhostMembers.FirstOrDefault(c => c.Id == memberId && c.StoreId == storeId);
             var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
             if (member == null || ghostSetting == null || !ghostSetting.CredentialsPopulated())
                 return NotFound();
 
-            var contentApiClient = new GhostContentApiClient(_clientFactory, ghostSetting.CreateGhsotApiCredentials());
+            var contentApiClient = new GhostContentApiClient(clientFactory, ghostSetting.CreateGhsotApiCredentials());
             var ghostTiers = await contentApiClient.RetrieveGhostTiers();
             if (ghostTiers == null)
                 return NotFound();
@@ -214,15 +189,15 @@ public class UIGhostPublicController : Controller
             if (tier == null)
                 return NotFound();
 
-            var storeData = await _storeRepo.FindStore(storeId);
-            var latestTransaction = ctx.GhostTransactions.Where(t => t.StoreId == storeId && t.TransactionStatus == GhostPlugin.Data.TransactionStatus.Settled && t.MemberId == memberId)
+            var storeData = await storeRepo.FindStore(storeId);
+            var latestTransaction = ctx.GhostTransactions.Where(t => t.StoreId == storeId && t.TransactionStatus == Data.TransactionStatus.Settled && t.MemberId == memberId)
                 .OrderByDescending(t => t.PeriodEnd).First();
 
             var endDate = DateTime.UtcNow.Date > latestTransaction.PeriodEnd.Date ? DateTime.UtcNow.Date.AddDays(1) : latestTransaction.PeriodEnd.AddHours(1);
             var txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(20));
-            var pr = await _ghostPluginService.CreatePaymentRequest(member, tier, ghostSetting.AppId, endDate);
+            var pr = await ghostHostedService.CreatePaymentRequest(member, tier, ghostSetting.AppId, endDate);
             await SaveTransaction(ctx, tier, member, null, pr, txnId);
-            return RedirectToAction("ViewPaymentRequest", "UIPaymentRequest", new { payReqId = pr.Id });
+            return RedirectToAction(nameof(UIPaymentRequestController.ViewPaymentRequest), "UIPaymentRequest", new { payReqId = pr.Id });
         }
         catch (Exception)
         {
@@ -236,7 +211,7 @@ public class UIGhostPublicController : Controller
     {
         try
         {
-            await using var ctx = _dbContextFactory.CreateContext();
+            await using var ctx = dbContextFactory.CreateContext();
             var ghostSetting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
             if (ghostSetting == null)
                 return BadRequest();
@@ -302,18 +277,18 @@ public class UIGhostPublicController : Controller
     [EnableCors("AllowAllOrigins")]
     public async Task<IActionResult> GetBtcPayGhostPaywallJavascript(string storeId)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var userStore = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (userStore == null || !userStore.CredentialsPopulated())
             return BadRequest("Invalid BTCPay store specified");
 
-        var store = await _storeRepo.FindStore(storeId);
+        var store = await storeRepo.FindStore(storeId);
         if (store == null)
             return NotFound();
 
         var storeBlob = store.GetStoreBlob();
         StringBuilder combinedJavascript = new StringBuilder();
-        var fileContent = _emailService.GetEmbeddedResourceContent("Resources.js.btcpay_paywall_ghost.js");
+        var fileContent = emailService.GetEmbeddedResourceContent("Resources.js.btcpay_paywall_ghost.js");
 
         combinedJavascript.AppendLine(fileContent);
         string jsVariables = $"var BTCPAYSERVER_URL = '{Request.GetAbsoluteRoot()}'; var BTCPAYSERVER_STORE_ID = '{userStore.StoreId}'; var STORE_CURRENCY = '{storeBlob.DefaultCurrency}';";
@@ -326,13 +301,13 @@ public class UIGhostPublicController : Controller
     [EnableCors("AllowAllOrigins")]
     public async Task<IActionResult> GetBtcPayJavascript(string storeId)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var userStore = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (userStore == null || !userStore.CredentialsPopulated())
         {
             return BadRequest("Invalid BTCPay store specified");
         }
-        var fileContent = _emailService.GetEmbeddedResourceContent("Resources.js.btcpay_ghost.js");
+        var fileContent = emailService.GetEmbeddedResourceContent("Resources.js.btcpay_ghost.js");
         return Content(fileContent, "text/javascript");
     }
 
@@ -344,13 +319,13 @@ public class UIGhostPublicController : Controller
     {
         try
         {
-            await using var ctx = _dbContextFactory.CreateContext();
+            await using var ctx = dbContextFactory.CreateContext();
             var userStore = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
             if (userStore == null || !userStore.CredentialsPopulated())
             {
                 return BadRequest("Invalid BTCPay store specified");
             }
-            var store = await _storeRepo.FindStore(storeId);
+            var store = await storeRepo.FindStore(storeId);
             if (store == null)
                 return NotFound();
 
@@ -360,7 +335,7 @@ public class UIGhostPublicController : Controller
             {
                 OrderId = orderId,
             };
-            var result = await _invoiceController.CreateInvoiceCoreRaw(new Client.Models.CreateInvoiceRequest()
+            var result = await invoiceController.CreateInvoiceCoreRaw(new CreateInvoiceRequest()
             {
                 Amount = amount,
                 Currency = storeBlob.DefaultCurrency,
@@ -397,7 +372,7 @@ public class UIGhostPublicController : Controller
             InvoiceId = invoice?.Id,
             PaymentRequestId = paymentRequest?.Id,
             MemberId = member.Id,
-            TransactionStatus = GhostPlugin.Data.TransactionStatus.New,
+            TransactionStatus = Data.TransactionStatus.New,
             TierId = member.TierId,
             Frequency = member.Frequency,
             CreatedAt = DateTime.UtcNow,

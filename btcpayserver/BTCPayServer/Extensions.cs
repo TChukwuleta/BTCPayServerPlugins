@@ -457,6 +457,20 @@ namespace BTCPayServer
             return services;
         }
 
+        /// <summary>
+        /// Add a raw SQL migration to run when BTCPay Server starts
+        /// </summary>
+        /// <param name="services"></param>
+        /// <param name="migrationId">A unique id for the migration. Migrations execute in alphabetic order, so we suggest to prefix the date of creation of the migration. (eg. 20260106_cleanupappidentities)</param>
+        /// <param name="sql">The raw SQL of the migration</param>
+        /// <returns></returns>
+        public static IServiceCollection AddMigration(this IServiceCollection services, string migrationId, string sql)
+        {
+            services.TryAddSingleton<IMigrationExecutor, MigrationExecutor<ApplicationDbContext>>();
+            services.AddSingleton<MigrationBase<ApplicationDbContext>, RawSqlMigration>(_ => new RawSqlMigration(migrationId, sql));
+            return services;
+        }
+
         public static IServiceCollection AddMigration<TDbContext, TMigration>(this IServiceCollection services)
             where TDbContext : DbContext
             where TMigration : MigrationBase<TDbContext>
@@ -787,6 +801,12 @@ namespace BTCPayServer
             ctx.SetStoreData(storeData);
             return new ActionDisposable(() => { ctx.SetStoreData(old); });
         }
+        public static IDisposable SwitchNavRendering(this HttpContext ctx)
+        {
+            var old = ctx.Items["BTCPAY.NAVRENDERING"] ;
+            ctx.Items["BTCPAY.NAVRENDERING"] = true;
+            return new ActionDisposable(() => { ctx.Items["BTCPAY.NAVRENDERING"] = old; });
+        }
 
         /// <summary>
         /// Set after authorization succeed. If your route is authorized, this is guaranteed to not be null.
@@ -801,7 +821,11 @@ namespace BTCPayServer
         /// <param name="ctx"></param>
         /// <returns></returns>
         public static StoreData GetStoreData(this HttpContext ctx)
-            => GetStoreDataOrNull(ctx) ?? throw new InvalidOperationException("StoreData is not set");
+        // Give times for extensions to switch to MainNavViewModel.Store
+        // or HttpContext.GetStoreDataOrNull
+            => GetStoreDataOrNull(ctx) ??
+               (ctx.Items["BTCPAY.NAVRENDERING"]  is true ? null
+               : throw new InvalidOperationException("StoreData is not set"));
         public static void SetStoreData(this HttpContext ctx, StoreData? storeData)
             => ctx.Items["BTCPAY.STOREDATA"] = storeData;
         public static string? GetCurrentStoreId(this HttpContext ctx)
@@ -837,6 +861,8 @@ namespace BTCPayServer
         public static void SetPullPaymentData(this HttpContext ctx, PullPaymentData? pullPaymentData)
             => ctx.Items["BTCPAY.PULLPAYMENTDATA"] = pullPaymentData;
 
+        public static AppData? GetAppData(this HttpContext ctx)
+            => GetAppDataOrNull(ctx) ?? throw new InvalidOperationException("AppData is not set");
         public static AppData? GetAppDataOrNull(this HttpContext ctx)
         => ctx.Items.TryGet("BTCPAY.APPDATA") as AppData;
 

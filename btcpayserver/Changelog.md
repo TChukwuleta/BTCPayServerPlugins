@@ -1,5 +1,58 @@
 # Changelog
 
+## 2.3.7
+
+This release is the first release using .NET 10.
+We invite plugin developers to [follow our guide](https://blog.btcpayserver.org/migrating-to-net10/) for a smoother migration.
+
+We recommend that users update their plugins after upgrading to 2.3.7.
+
+### New Features
+
+* Wallets: Add the ability to add comment to the transaction on the Send view (#6687 #7265) @Abhijay007
+* Subscriptions: Add manual subscription date editing for admins (#7231 #7257) @Abhijay007
+* Invoices: When the lightning provider supports it, top-up invoices now generate an amount-less BOLT11 instead of LNURL. (#7263) @bigg-bb
+* Plugins: Add the Update button to the disabled plugins section (#7051 #7260) @rollforsats
+* Subscriptions: SubscriberDisabled webhook now includes the reason why the subscriber has been disabled (#7270) @NicolasDorier
+* Greenfield: Implement UpdateCrowdfundApp endpoint and client method (#7202) @webiumsk
+* Subscriptions/API: Can delete subscribers via UI and API (#7206 #7254) @NicolasDorier
+* Invoices: Add RTL Language support (Arabic, Hebrew, and Farsi) for invoice checkout (#444 #7259) @Abhijay007
+* Invoices: Show payment method on receipt (#7174 #7226) @TChukwuleta
+* Subscriptions: Allow upgrade/downgrade at the period end (#7147 #7258) @TChukwuleta
+
+### Fixes
+
+* Fix: If an admin was accessing a user's store from a user list, it was returning error 404 @NicolasDorier
+* Emails: skip SMTP AUTH when Login and Password are empty (#7267 #7269) @ThomsenDrake
+* Fix: Wallet balance time period switch was broken (#7246 #7247) @Abhijay007
+* Exclude trial subscribers from monthly revenue (#7272 #7273) @Abhijay007
+
+## 2.3.6
+
+### New Features
+
+* Wallets: Add filtering using search bar on the label filter dropdown when labels exceed more than 20 (#7210 #7109) @rollforsats
+* API: Include a payment method in the Get invoices endpoint (#6757 #2394) @TChukwuleta
+* BTCPay Invoice Modal: Add a `paymentMethodId` parameter (#7209 #7208) @pwnfoo
+* Security: Include API key permission analysis metadata (#6771 #3196) @TChukwuleta
+* A plugin can now create new permission policies (#7215 #7156) @NicolasDorier
+
+### Fixes
+
+* Fix: Dashboard layout issues on mobile, regression from 2.3.5 (#7223 #7217) @NicolasDorier
+* Fix: Subscriber portal sessions can be created again via API (#7200 #7198) @NicolasDorier
+* Fix: Can't upgrade/downgrade a Lifetime subscription (#7194 #7193) @NicolasDorier
+
+### Improvements
+
+* Update Wasabi wallet folder access instructions (#7192) @nopara73
+* Security: Apply CSRF protection globally to UI controllers (#7199) @NicolasDorier
+* Update many missing translations from the language packs @Abhijay007
+
+### Regression
+
+* Revert: Dashboard: Support multi-crypto wallet balance widgets (#7223) @NicolasDorier
+
 ## 2.3.5
 
 ### New Features

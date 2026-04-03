@@ -4,16 +4,15 @@ using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
 using BTCPayServer.Plugins.JumpSeller.Data;
 using BTCPayServer.Plugins.JumpSeller.Services;
-using BTCPayServer.Plugins.LightSpeed;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace BTCPayServer.Plugins.SquareSpace;
+namespace BTCPayServer.Plugins.JumpSeller;
 
 public class JumpSellerPlugin : BaseBTCPayServerPlugin
 {
     public override IBTCPayServerPlugin.PluginDependency[] Dependencies { get; } =
     {
-        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.3.6" }
+        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.3.7" }
     };
 
     public override void Execute(IServiceCollection services)

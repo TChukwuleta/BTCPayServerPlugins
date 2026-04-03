@@ -13,6 +13,7 @@ using BTCPayServer.Client;
 using BTCPayServer.Data;
 using BTCPayServer.Plugins.Emails;
 using BTCPayServer.Plugins.Emails.Controllers;
+using BTCPayServer.Plugins.SatoshiTickets.Controllers;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Helper;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
@@ -101,7 +102,8 @@ public class UITicketSalesController(UriResolver uriResolver,
                 Severity = StatusMessageModel.StatusSeverity.Info
             });
         }
-        var vm = new SalesTicketsEventsViewModel { DisplayedEvents = eventsViewModel, Expired = expired, StoreId = CurrentStore.Id };
+        var apiDocUrl = Url.Action(nameof(SatoshiTicketsApiDocsController.Index), "SatoshiTicketsApiDocs", new { storeId }, Request.Scheme);
+        var vm = new SalesTicketsEventsViewModel { DisplayedEvents = eventsViewModel, ApiDocUrl = apiDocUrl, Expired = expired, StoreId = CurrentStore.Id };
         return View(vm);
     }
 
@@ -141,22 +143,23 @@ public class UITicketSalesController(UriResolver uriResolver,
     [HttpPost("create")]
     public async Task<IActionResult> CreateEvent(string storeId, [FromForm] UpdateSimpleTicketSalesEventViewModel vm)
     {
+        vm.EventTypes = Enum.GetValues(typeof(EventType)).Cast<EventType>()
+            .Select(e => new SelectListItem
+            {
+                Value = e.ToString(),
+                Text = e.ToString()
+            }).ToList();
+
         if (vm.StartDate <= DateTime.UtcNow)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Event date cannot be in the past";
-            return RedirectToAction(nameof(ViewEvent), new { storeId });
+            return View(nameof(ViewEvent), vm);
         }
         if (vm.EndDate.HasValue && vm.EndDate.Value < vm.StartDate)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Event end date cannot be before start date";
-            return RedirectToAction(nameof(ViewEvent), new { storeId });
+            return View(nameof(ViewEvent), vm);
         }
-        if (vm.HasMaximumCapacity && (!vm.MaximumEventCapacity.HasValue || vm.MaximumEventCapacity.Value <= 0))
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Kindly input the event capacity";
-            return RedirectToAction(nameof(ViewEvent), new { storeId });
-        }
-
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
@@ -171,7 +174,7 @@ public class UITicketSalesController(UriResolver uriResolver,
             if (!imageUpload.Success)
             {
                 TempData[WellKnownTempData.ErrorMessage] = imageUpload.Response;
-                return RedirectToAction(nameof(ViewEvent), new { storeId = CurrentStore.Id });
+                return View(nameof(ViewEvent), vm);
             }
             else
             {
@@ -190,6 +193,13 @@ public class UITicketSalesController(UriResolver uriResolver,
     [HttpPost("update/{eventId}")]
     public async Task<IActionResult> UpdateEvent(string storeId, string eventId, UpdateSimpleTicketSalesEventViewModel vm, [FromForm] bool RemoveEventLogoFile = false)
     {
+        vm.EventTypes = Enum.GetValues(typeof(EventType)).Cast<EventType>()
+            .Select(e => new SelectListItem
+            {
+                Value = e.ToString(),
+                Text = e.ToString()
+            }).ToList();
+
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
@@ -200,16 +210,10 @@ public class UITicketSalesController(UriResolver uriResolver,
             TempData[WellKnownTempData.ErrorMessage] = "Invalid event record specified for this store";
             return RedirectToAction(nameof(List), new { storeId });
         }
-        var ticketTiersCount = ctx.TicketTypes.Where(t => t.EventId == eventId).Sum(c => c.Quantity);
-        if (vm.HasMaximumCapacity && vm.MaximumEventCapacity < ticketTiersCount)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Maximum capacity is less that the sum of all tiers capacity. Kindly increase capacity";
-            return RedirectToAction(nameof(ViewEvent), new { storeId, eventId });
-        }
         if (vm.EndDate is DateTime endDate && endDate < vm.StartDate)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Event end date cannot be before start date";
-            return RedirectToAction(nameof(ViewEvent), new { storeId, eventId });
+            return View(nameof(ViewEvent), vm);
         }
         entity = TicketSalesEventViewModelToEntity(vm, entity, CurrentStore.Id);
         UploadImageResultModel imageUpload = null;
@@ -219,7 +223,7 @@ public class UITicketSalesController(UriResolver uriResolver,
             if (!imageUpload.Success)
             {
                 TempData[WellKnownTempData.ErrorMessage] = imageUpload.Response;
-                return RedirectToAction(nameof(ViewEvent), new { storeId, eventId });
+                return View(nameof(ViewEvent), vm);
             }
         }
         if (imageUpload?.Success is true)
@@ -555,46 +559,10 @@ public class UITicketSalesController(UriResolver uriResolver,
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
 
-        await using var ctx = dbContextFactory.CreateContext();
-        var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == storeId);
-        if (ticketEvent == null) return NotFound();
+        var result = await ticketService.ExportTicketsCsv(storeId, eventId);
+        if (result == null) return NotFound();
 
-        var orders = ctx.Orders.AsNoTracking().Where(o => o.StoreId == storeId && o.EventId == eventId && o.PaymentStatus == TransactionStatus.Settled.ToString())
-            .Include(o => o.Tickets).ToList();
-
-        if (!orders.Any()) return NotFound();
-
-
-        var invoiceIds = orders.Select(o => o.InvoiceId).Distinct().ToArray();
-        var invoices = (await invoiceRepository.GetInvoices(new InvoiceQuery
-        {
-            InvoiceId = invoiceIds,
-            StoreId = new[] { storeId }
-        })).ToDictionary(i => i.Id);
-
-        var fileName = $"{ticketEvent.Title}_Tickets-{DateTime.Now:yyyy_MM_dd-HH_mm_ss}.csv";
-        var csvData = new StringBuilder();
-        csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency,Crypto Currency,Crypto Amount Paid,Attended Event");
-
-        foreach (var order in orders)
-        {
-            invoices.TryGetValue(order.InvoiceId, out var invoice);
-
-            var payments = invoice?.GetPayments(true).Where(p => p.Accounted).ToList();
-            var cryptoCurrency = payments?.FirstOrDefault()?.Currency ?? "";
-            var totalCryptoPaid = payments?.Sum(p => p.PaidAmount.Net) ?? 0m;
-
-            var totalFiatAmount = order.Tickets.Sum(t => t.Amount);
-
-            foreach (var ticket in order.Tickets)
-            {
-                var proportion = totalFiatAmount > 0 ? ticket.Amount / totalFiatAmount : 0m;
-                var cryptoForTicket = Math.Round(totalCryptoPaid * proportion, 8);
-
-                csvData.AppendLine($"{order.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{order.Currency},{cryptoCurrency},{cryptoForTicket},{ticket.UsedAt.HasValue}");
-            }
-        }
-        return File(Encoding.UTF8.GetBytes(csvData.ToString()), "text/csv", fileName);
+        return File(result.Value.data, "text/csv", result.Value.fileName);
     }
 
     [HttpGet("{eventId}/checkin-settings")]
@@ -761,8 +729,6 @@ public class UITicketSalesController(UriResolver uriResolver,
             EndDate = entity.EndDate,
             EventType = entity.EventType,
             EmailSubject = entity.EmailSubject,
-            HasMaximumCapacity = entity.HasMaximumCapacity,
-            MaximumEventCapacity = entity.MaximumEventCapacity,
             ReminderEnabled = entity.ReminderEnabled,
             ReminderDaysBeforeEvent = entity.ReminderDaysBeforeEvent
         };
@@ -786,8 +752,7 @@ public class UITicketSalesController(UriResolver uriResolver,
             e.EventType = model.EventType;
             e.RedirectUrl = model.RedirectUrl;
             e.EmailSubject = model.EmailSubject;
-            e.HasMaximumCapacity = model.HasMaximumCapacity;
-            e.MaximumEventCapacity = model.MaximumEventCapacity;
+            e.HasMaximumCapacity = false;
             e.ReminderEnabled = model.ReminderEnabled;
             e.ReminderDaysBeforeEvent = model.ReminderDaysBeforeEvent;
 

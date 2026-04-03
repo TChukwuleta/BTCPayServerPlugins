@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -134,7 +134,41 @@ public class SubscriptionHostedService(
             await ctx.SaveChangesAsync();
             await UpdateSubscriptionStates(subCtx, move.MemberSelector);
         }
+        else if (evt is UpdateDatesRequest datesRequest)
+        {
+            var ctx = subCtx.Context;
+            var sub = await ctx.Subscribers.IncludeAll().FirstOrDefaultAsync(s => s.Id == datesRequest.SubId, cancellationToken);
+            if (sub is null)
+                throw new InvalidOperationException("Subscriber not found");
+
+            sub.PlanStarted = datesRequest.StartDate;
+            sub.PaymentReminded = false;
+
+            if (datesRequest.ExpirationDate is { } expDate)
+            {
+                if (sub.TrialEnd is not null)
+                {
+                    sub.TrialEnd = expDate;
+                    sub.ReminderDate = expDate - TimeSpan.FromDays(sub.PaymentReminderDaysOrDefault);
+                }
+                else if (sub.Plan.RecurringType != PlanData.RecurringInterval.Lifetime)
+                {
+                    sub.PeriodEnd = expDate;
+                    sub.TrialEnd = null;
+                    sub.GracePeriodEnd = sub.Plan.GracePeriodDays > 0 ? expDate.AddDays(sub.Plan.GracePeriodDays) : (DateTimeOffset?)null;
+                    sub.ReminderDate = expDate - TimeSpan.FromDays(sub.PaymentReminderDaysOrDefault);
+                }
+            }
+
+            await ctx.SaveChangesAsync(cancellationToken);
+            await UpdateSubscriptionStates(subCtx, datesRequest.SubId);
+        }
     }
+
+    record UpdateDatesRequest(long SubId, DateTimeOffset StartDate, DateTimeOffset? ExpirationDate);
+
+    public Task UpdateDates(long subId, DateTimeOffset startDate, DateTimeOffset? expirationDate)
+        => RunEvent(new UpdateDatesRequest(subId, startDate, expirationDate));
 
     SubscriptionContext CreateContext() => CreateContext(CancellationToken);
 
@@ -259,7 +293,6 @@ public class SubscriptionHostedService(
                             m.StartNextPlan(now);
                             subCtx.AddEvent(new SubscriptionEvent.PlanStarted(m, planBefore)
                             {
-                                PreviousPlan = planBefore,
                                 AutoRenew = planBefore.Id == m.PlanId
                             });
                         }
@@ -270,14 +303,20 @@ public class SubscriptionHostedService(
                     }
                 }
 
+                if (newPhase is PhaseTypes.Expired or PhaseTypes.Grace && m is { NewPlan: not null, NewPlanId: not null } && m.NewPlanId != m.PlanId)
+                {
+                    var prevPlan = m.Plan;
+                    (m.PlanId, m.Plan) = (m.NewPlanId, m.NewPlan);
+                    (m.NewPlanId, m.NewPlan) = (null, null);
+                    subCtx.AddEvent(new SubscriptionEvent.PlanStarted(m, prevPlan)
+                    {
+                        AutoRenew = false
+                    });
+                }
+
                 if (newPhase is PhaseTypes.Expired)
                 {
                     m.PaidAmount = null;
-                    if (m is { NewPlan: not null, NewPlanId: not null } && m.NewPlanId != m.PlanId)
-                    {
-                        (m.PlanId, m.Plan) = (m.NewPlanId, m.NewPlan);
-                        (m.NewPlanId, m.NewPlan) = (null, null);
-                    }
                 }
 
                 if (prevPhase != newPhase)
@@ -304,7 +343,10 @@ public class SubscriptionHostedService(
                 if (newActive)
                     subCtx.AddEvent(new SubscriptionEvent.SubscriberActivated(m));
                 else
-                    subCtx.AddEvent(new SubscriptionEvent.SubscriberDisabled(m));
+                    subCtx.AddEvent(new SubscriptionEvent.SubscriberDisabled(
+                        m,
+                        m.IsSuspended ? SubscriptionEvent.DisabledReason.Suspension : SubscriptionEvent.DisabledReason.Expired,
+                        m.SuspensionReason));
             }
         }
 
@@ -336,7 +378,9 @@ public class SubscriptionHostedService(
             {
                 var expired = pc.PreviousPhase is PhaseTypes.Expired;
                 var newExpired = pc.Subscriber.Phase is PhaseTypes.Expired;
-                if (expired != newExpired)
+                var wasTrial = pc.PreviousPhase is PhaseTypes.Trial;
+                var isTrial = pc.Subscriber.Phase is PhaseTypes.Trial;
+                if (expired != newExpired || wasTrial != isTrial)
                     plansToUpdate.Add(evt.Subscriber.PlanId);
             }
         }
@@ -496,10 +540,7 @@ public class SubscriptionHostedService(
             }
         }
         if (checkout.PlanStarted)
-            subCtx.AddEvent(new SubscriptionEvent.PlanStarted(sub, prevPlan)
-            {
-                PreviousPlan = prevPlan
-            });
+            subCtx.AddEvent(new SubscriptionEvent.PlanStarted(sub, prevPlan));
     }
 
     record MoveTimeRequest(MemberSelector MemberSelector, TimeSpan Period);
@@ -564,7 +605,7 @@ public class SubscriptionHostedService(
                                                                         WHEN 'Quarterly' THEN sp.price / 3.0::numeric
                                                                         WHEN 'Yearly' THEN sp.price / 12.0::numeric
                                                                         WHEN 'Lifetime' THEN 0
-                                                                      END) AS monthly_revenue
+                                                                      END) FILTER (WHERE ss.phase != 'Trial') AS monthly_revenue
                               FROM subs_subscribers ss
                               JOIN subs_plans sp ON ss.plan_id = sp.id
                               WHERE ss.plan_id = @id AND ss.active
@@ -636,14 +677,39 @@ public class SubscriptionHostedService(
         return checkout.InvoiceId;
     }
 
-    public async Task<string?> CreatePlanMigrationCheckout(string portalSessionId, string? planId, PlanCheckoutData.OnPayBehavior migrationType,
+    public async Task<PlanMigrationResult> CreatePlanMigrationCheckout(string portalSessionId, string? planId, PlanCheckoutData.OnPayBehavior migrationType,
         RequestBaseUrl requestBaseUrl)
     {
         await using var ctx = applicationDbContextFactory.CreateContext();
         var portal = await ctx.PortalSessions.GetActiveById(portalSessionId);
-        var plan = planId is null ? null : await ctx.Plans.GetPlanFromId(planId);
         if (portal is null)
-            return null;
+            return new PlanMigrationResult.NotFound();
+
+        PlanData? plan = null;
+        if (planId is not null)
+        {
+            plan = await ctx.Plans.GetPlanFromId(planId, portal.Subscriber.OfferingId);
+            if (plan is null)
+                return new PlanMigrationResult.NotFound();
+
+            var planChangeRecord  = portal.Subscriber.Plan.PlanChanges
+                .FirstOrDefault(pc => pc.PlanId == portal.Subscriber.PlanId && pc.PlanChangeId == planId);
+            if (planChangeRecord == null)
+                return new PlanMigrationResult.NotFound();
+
+            if (planChangeRecord.Timing == PlanChangeData.ChangeTiming.AtPeriodEnd)
+            {
+                if (portal.Subscriber.PeriodEnd is not null && portal.Subscriber.PeriodEnd > DateTimeOffset.UtcNow
+                    && portal.Subscriber.Phase == PhaseTypes.Normal)
+                {
+                    portal.Subscriber.NewPlanId = planId;
+                    portal.Subscriber.NewPlan = plan;
+                    await ctx.SaveChangesAsync();
+                    return new PlanMigrationResult.Scheduled();
+                }
+            }
+        }
+
         var checkout = new PlanCheckoutData(portal.Subscriber, plan)
         {
             SuccessRedirectUrl = linkGenerator.SubscriberPortalLink(portalSessionId, requestBaseUrl),
@@ -652,6 +718,13 @@ public class SubscriptionHostedService(
         };
         ctx.PlanCheckouts.Add(checkout);
         await ctx.SaveChangesAsync();
-        return checkout.Id;
+        return new PlanMigrationResult.Checkout(checkout.Id);
+    }
+
+    public abstract record PlanMigrationResult
+    {
+        public record Checkout(string CheckoutId) : PlanMigrationResult;
+        public record Scheduled : PlanMigrationResult;
+        public record NotFound : PlanMigrationResult;
     }
 }

@@ -40,7 +40,7 @@
     },
     {
       "name": "Tickets",
-      "description": "List sold tickets, export CSV, and check-in attendees"
+      "description": "List sold tickets"
     },
     {
       "name": "Orders",
@@ -639,95 +639,6 @@
         "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
       }
     },
-    "/events/{eventId}/tickets/export": {
-      "get": {
-        "tags": ["Tickets"],
-        "summary": "Export tickets as CSV",
-        "description": "Downloads a CSV file with all settled tickets. Columns: Purchase Date, Ticket Number, First Name, Last Name, Email, Ticket Tier, Amount, Currency, Attended Event.",
-        "operationId": "exportTickets",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/eventId"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "CSV file download",
-            "content": {
-              "text/csv": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No settled tickets found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GreenfieldError"
-                },
-                "example": {
-                  "code": "no-tickets",
-                  "message": "No settled tickets found for this event"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
-      }
-    },
-    "/events/{eventId}/tickets/{ticketNumber}/check-in": {
-      "post": {
-        "tags": ["Tickets"],
-        "summary": "Check-in ticket",
-        "description": "Marks a ticket as checked in. Accepts either the full `ticketNumber` (e.g. `EVT-abc123-260615-xK9mP2qR`) or just the short `txnNumber` (e.g. `xK9mP2qR`).",
-        "operationId": "checkinTicket",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/eventId"
-          },
-          {
-            "name": "ticketNumber",
-            "in": "path",
-            "description": "Full ticket number or short transaction number.",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Check-in result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CheckinResultData"
-                }
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/EventNotFound"
-          },
-          "422": {
-            "description": "Check-in failed (invalid ticket or already checked in)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GreenfieldError"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "API_Key": ["btcpay.store.canmodifystoresettings"] }]
-      }
-    },
     "/events/{eventId}/orders": {
       "get": {
         "tags": ["Orders"],
@@ -963,26 +874,6 @@
             "type": "string",
             "nullable": true,
             "description": "Email body template. Same placeholders as `emailSubject`."
-          },
-          "hasMaximumCapacity": {
-            "type": "boolean",
-            "default": false,
-            "description": "Whether the event has a total ticket cap."
-          },
-          "maximumEventCapacity": {
-            "type": "integer",
-            "nullable": true,
-            "description": "Total ticket cap. Required and must be > 0 when `hasMaximumCapacity` is `true`."
-          },
-          "eventLogoFileId": {
-            "type": "string",
-            "nullable": true,
-            "description": "File ID of a previously uploaded image. Prefer using the dedicated logo upload endpoint instead."
-          },
-          "enable": {
-            "type": "boolean",
-            "default": false,
-            "description": "If `true`, activates the event immediately upon creation."
           }
         }
       },
@@ -1039,20 +930,6 @@
             "type": "string",
             "nullable": true,
             "description": "Email body template."
-          },
-          "hasMaximumCapacity": {
-            "type": "boolean",
-            "description": "Whether the event has a total ticket cap."
-          },
-          "maximumEventCapacity": {
-            "type": "integer",
-            "nullable": true,
-            "description": "Total ticket cap."
-          },
-          "eventLogoFileId": {
-            "type": "string",
-            "nullable": true,
-            "description": "File ID of a previously uploaded image. Send empty string to remove logo, `null` to leave unchanged."
           }
         }
       },
@@ -1118,29 +995,10 @@
             "nullable": true,
             "description": "Email body template."
           },
-          "hasMaximumCapacity": {
-            "type": "boolean",
-            "description": "Whether the event has a ticket cap."
-          },
-          "maximumEventCapacity": {
-            "type": "integer",
-            "nullable": true,
-            "description": "Total ticket cap."
-          },
           "eventState": {
             "type": "string",
             "enum": ["Active", "Disabled"],
             "description": "Current event state."
-          },
-          "eventLogoFileId": {
-            "type": "string",
-            "nullable": true,
-            "description": "File ID of the event logo."
-          },
-          "eventLogoUrl": {
-            "type": "string",
-            "nullable": true,
-            "description": "Fully resolved public URL of the event logo image."
           },
           "purchaseLink": {
             "type": "string",

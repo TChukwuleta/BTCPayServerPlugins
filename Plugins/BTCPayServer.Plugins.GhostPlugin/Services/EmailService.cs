@@ -21,6 +21,12 @@ public class EmailService
         _emailSender = emailSender;
     }
 
+    public async Task<bool> IsEmailSettingsConfigured(string storeId)
+    {
+        var emailSender = await _emailSender.GetEmailSender(storeId);
+        return (await emailSender.GetEmailSettings() ?? new EmailSettings()).IsComplete();
+    }
+
     private async Task SendBulkEmail(string storeId, IEnumerable<EmailRecipient> recipients)
     {
         var settings = await (await _emailSender.GetEmailSender(storeId)).GetEmailSettings();

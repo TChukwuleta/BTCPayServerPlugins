@@ -43,12 +43,6 @@ public class UpdateSimpleTicketSalesEventViewModel
     [Display(Name = "Email Body")]
     public string EmailBody { get; set; }
 
-    [Display(Name = "Limit Ticket Sales")]
-    public bool HasMaximumCapacity { get; set; }
-
-    [Display(Name = "Maximum number of ticket for sale")]
-    public int? MaximumEventCapacity { get; set; }
-
     [Display(Name = "Redirect Url after ticket purchase")]
     public string RedirectUrl { get; set; }
 

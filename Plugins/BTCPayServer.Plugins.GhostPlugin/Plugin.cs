@@ -13,19 +13,17 @@ public class Plugin : BaseBTCPayServerPlugin
 {
     public override IBTCPayServerPlugin.PluginDependency[] Dependencies { get; } =
     {
-        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.3.6" }
+        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.3.7" }
     };
 
     public override void Execute(IServiceCollection services)
     {
         services.AddSingleton<IUIExtension>(new UIExtension("GhostPluginHeaderNav", "header-nav"));
         services.AddSingleton<EmailService>();
-        services.AddSingleton<GhostHostedService>();
         services.AddSingleton<GhostDbContextFactory>();
-        services.AddSingleton<GhostPluginService>();
-        services.AddHostedService<GhostHostedService>();
-        services.AddHostedService<ApplicationPartsLogger>();
-        services.AddSingleton<IHostedService, GhostPluginService>();
+        services.AddSingleton<GhostHostedService>();
+        services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<GhostHostedService>());
+        services.AddScheduledTask<GhostHostedService>(TimeSpan.FromMinutes(3));
         services.AddDbContext<GhostDbContext>((provider, o) =>
         {
             var factory = provider.GetRequiredService<GhostDbContextFactory>();

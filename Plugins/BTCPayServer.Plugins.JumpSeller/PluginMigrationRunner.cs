@@ -4,7 +4,7 @@ using BTCPayServer.Plugins.JumpSeller.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 
-namespace BTCPayServer.Plugins.LightSpeed;
+namespace BTCPayServer.Plugins.JumpSeller;
 
 public class PluginMigrationRunner : IHostedService
 {
