@@ -758,10 +758,6 @@ namespace BTCPayServer.Controllers
                 displayedPaymentMethods.Remove(lnurlId);
             }
 
-            // BOLT11 doesn't really support payment without amount
-            if (invoice.IsUnsetTopUp())
-                displayedPaymentMethods.Remove(lnId);
-
             // Exclude lnurl if bolt11 is available
             if (displayedPaymentMethods.Contains(lnId) && displayedPaymentMethods.Contains(lnurlId))
                 displayedPaymentMethods.Remove(lnurlId);
@@ -985,6 +981,7 @@ namespace BTCPayServer.Controllers
         [HttpGet("invoice/{invoiceId}/status")]
         [HttpGet("invoice/{invoiceId}/{implicitPaymentMethodId}/status")]
         [HttpGet("invoice/status")]
+        [IgnoreAntiforgeryToken]
         public async Task<IActionResult> GetStatus(string invoiceId, string? paymentMethodId = null, string? implicitPaymentMethodId = null, [FromQuery] string? lang = null)
         {
             if (string.IsNullOrEmpty(paymentMethodId))
@@ -1000,6 +997,7 @@ namespace BTCPayServer.Controllers
         [Route("invoice/{invoiceId}/status/ws")]
         [Route("invoice/{invoiceId}/{paymentMethodId}/status")]
         [Route("invoice/status/ws")]
+        [IgnoreAntiforgeryToken]
         public async Task<IActionResult> GetStatusWebSocket(string invoiceId, CancellationToken cancellationToken)
         {
             if (!HttpContext.WebSockets.IsWebSocketRequest)

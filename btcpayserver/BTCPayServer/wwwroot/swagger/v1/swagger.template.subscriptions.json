@@ -260,6 +260,41 @@
                         "description": "Subscriber not found."
                     }
                 }
+            },
+            "delete": {
+                "summary": "Delete a subscriber",
+                "description": "Deletes a subscriber for a specific offering by customer selector.",
+                "operationId": "DeleteSubscriber",
+                "tags": [
+                    "Subscriptions"
+                ],
+                "security": [
+                    {
+                        "API_Key": [
+                            "btcpay.store.canmanagesubscribers"
+                        ],
+                        "Basic": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/StoreId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/OfferingId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/CustomerSelector"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Subscriber deleted successfully."
+                    },
+                    "404": {
+                        "description": "Subscriber not found."
+                    }
+                }
             }
         },
         "/api/v1/stores/{storeId}/offerings/{offeringId}/subscribers/{customerSelector}/credits/{currency}": {
@@ -443,6 +478,69 @@
                         }
                     },
                     "400": { "description": "Invalid request data." }
+                }
+            }
+        },
+        "/api/v1/stores/{storeId}/offerings/{offeringId}/subscribers/{customerSelector}/dates": {
+            "put": {
+                "summary": "Update subscriber dates",
+                "description": "Manually overrides the subscription start date and/or expiration date for a subscriber.\n\nOmitting a field leaves the corresponding date unchanged. An empty body `{}` is a no-op and returns the subscriber unchanged.\n\nWhen `expirationDate` is provided, the grace period end and reminder date are recalculated automatically from the plan settings.",
+                "operationId": "UpdateSubscriberDates",
+                "tags": ["Subscriptions"],
+                "security": [
+                    {
+                        "API_Key": [
+                            "btcpay.store.canmanagesubscribers"
+                        ],
+                        "Basic": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/StoreId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/OfferingId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/CustomerSelector"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "description": "Dates to update. All fields are optional — omitting a field leaves it unchanged.",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateSubscriberDatesRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Subscriber dates updated (or unchanged if no fields were provided).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SubscriberModel"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Error code: `invalid-dates`. The expiration date must be after the start date.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Subscriber not found."
+                    }
                 }
             }
         },
@@ -885,6 +983,26 @@
                     }
                 }
             },
+            "UpdateSubscriberDatesRequest": {
+                "type": "object",
+                "description": "Request payload for updating subscriber dates. All fields are optional — omitting a field leaves the corresponding date unchanged.",
+                "properties": {
+                    "startDate": {
+                        "type": "integer",
+                        "format": "unix-time",
+                        "nullable": true,
+                        "description": "New subscription start date as a Unix timestamp. Omit to leave the current start date unchanged.",
+                        "example": 1710000000
+                    },
+                    "expirationDate": {
+                        "type": "integer",
+                        "format": "unix-time",
+                        "nullable": true,
+                        "description": "New expiration date as a Unix timestamp. Updates `trialEnd` if the subscriber is in a trial, otherwise updates `periodEnd`. Grace period end and reminder date are recalculated automatically. Omit to leave the current expiration date unchanged.",
+                        "example": 1712678400
+                    }
+                }
+            },
             "CustomerSelector": {
                 "type": "string",
                 "description": "Flexible identifier for selecting a customer. Supports: customer ID (e.g., `cust_abc123`), an email (e.g., `user@example.com`), or a key/value identity (e.g., `Email:user@example.com`).",
@@ -1059,6 +1177,18 @@
                         "$ref": "#/components/schemas/OfferingPlanModel",
                         "nullable": true,
                         "description": "Plan scheduled for next billing cycle."
+                    },
+                    "scheduledPlan": {
+                        "$ref": "#/components/schemas/OfferingPlanModel",
+                        "nullable": true,
+                        "description": "Plan scheduled to activate at the end of the current billing period."
+                    },
+                    "scheduledPlanActivatesAt": {
+                        "type": "integer",
+                        "format": "unix-time",
+                        "nullable": true,
+                        "description": "Timestamp when the scheduled plan change will activate.",
+                        "example": 1713200000
                     },
                     "phase": {
                         "$ref": "#/components/schemas/SubscriptionPhase"
@@ -1530,6 +1660,39 @@
                     }
                 ]
             },
+            "WebhookSubscriberDisabledReason": {
+                "type": "string",
+                "description": "Reason why the subscriber was disabled.",
+                "enum": [
+                    "Suspension",
+                    "Expired"
+                ],
+                "example": "Suspension"
+            },
+            "WebhookSubscriberDisabledEvent": {
+                "description": "Callback sent if the `type` is `SubscriberDisabled`",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/WebhookSubscriberEvent"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "reason": {
+                                "$ref": "#/components/schemas/WebhookSubscriberDisabledReason",
+                                "description": "Whether the subscriber was disabled because of a suspension or expiration.",
+                                "example": "Suspension"
+                            },
+                            "suspensionReason": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "Suspension reason provided by the merchant when `reason` is `Suspension`.",
+                                "example": "Spam behavior detected."
+                            }
+                        }
+                    }
+                ]
+            },
             "WebhookPlanStartedEvent": {
                 "description": "Callback sent if the `type` is `PlanStarted`",
                 "allOf": [
@@ -1795,7 +1958,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/WebhookSubscriberEvent"
+                                "$ref": "#/components/schemas/WebhookSubscriberDisabledEvent"
                             }
                         }
                     }
@@ -1954,4 +2117,3 @@
         }
     ]
 }
-

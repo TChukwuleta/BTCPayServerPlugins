@@ -428,7 +428,6 @@ namespace BTCPayServer.Hosting
             services.AddSingleton<DefaultRulesCollection>();
             services.AddSingleton<IHostedService, NBXplorerWaiters>();
             services.AddSingleton<IHostedService, InvoiceEventSaverService>();
-            services.AddSingleton<IHostedService, BitpayIPNSender>();
             services.AddSingleton<IHostedService, InvoiceWatcher>();
             services.AddScheduledDbScript("Invoice Cleanup",
                 """
@@ -446,6 +445,12 @@ namespace BTCPayServer.Hosting
                 )
                 SELECT COUNT(*) FROM deleted_invoices;
                 """);
+            services.AddMigration("20260402_idx_invoices_expired_cleanup",
+                                  """
+                                  CREATE INDEX IF NOT EXISTS idx_invoices_expired_cleanup
+                                  ON "Invoices" ("Created", "Id")
+                                  WHERE "Status" = 'Expired' AND "ExceptionStatus" = '';
+                                  """);
 
             services.AddSingleton<RatesHostedService>();
             services.AddSingleton<IHostedService>(s => s.GetRequiredService<RatesHostedService>());
@@ -471,13 +476,7 @@ namespace BTCPayServer.Hosting
             services.TryAddSingleton<ExplorerClientProvider>();
             services.AddSingleton<IExplorerClientProvider, ExplorerClientProvider>(x =>
                 x.GetRequiredService<ExplorerClientProvider>());
-            services.TryAddSingleton<Bitpay>(o =>
-            {
-                if (o.GetRequiredService<BTCPayServerOptions>().NetworkType == ChainName.Mainnet)
-                    return new Bitpay(new Key(), new Uri("https://bitpay.com/"));
-                else
-                    return new Bitpay(new Key(), new Uri("https://test.bitpay.com/"));
-            });
+
             RegisterRateSources(services);
             services.TryAddSingleton<RateProviderFactory>();
             services.TryAddSingleton<RateFetcher>();
@@ -491,7 +490,6 @@ namespace BTCPayServer.Hosting
             services.AddSingleton<InvoiceActivator>();
 
             services.AddPayoutProcesors();
-            services.AddForms();
 
             services.AddSingleton<APIKeyRepository>();
             services.AddSingleton<IPermissionHandler, BuiltInPermissionHandler>();

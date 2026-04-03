@@ -5,14 +5,14 @@ using BTCPayServer.Abstractions.Services;
 using BTCPayServer.Plugins.ServerAlert.Services;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace BTCPayServer.Plugins.SquareSpace;
+namespace BTCPayServer.Plugins.ServerAlert;
 
 public class ServerAlertPlugin : BaseBTCPayServerPlugin
 {
     public const string Area = "ServerAlert";
     public override IBTCPayServerPlugin.PluginDependency[] Dependencies { get; } =
     {
-        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.3.6" }
+        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=2.3.7" }
     };
 
     public override void Execute(IServiceCollection services)
