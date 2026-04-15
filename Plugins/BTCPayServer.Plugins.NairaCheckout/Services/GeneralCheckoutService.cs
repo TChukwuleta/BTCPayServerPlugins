@@ -14,31 +14,13 @@ using NBitcoin;
 
 namespace BTCPayServer.Plugins.NairaCheckout.Services;
 
-public class GeneralCheckoutService
-{
-    private readonly StoreRepository storeRepository;
-    private readonly BTCPayWalletProvider _walletProvider;
-    private readonly BTCPayNetworkProvider _btcPayNetworkProvider;
-    private readonly IOptions<LightningNetworkOptions> _lightningNetworkOptions;
-    private readonly LightningClientFactoryService _lightningClientFactoryService;
-    private readonly PaymentMethodHandlerDictionary _paymentMethodHandlerDictionary;
-
-    public GeneralCheckoutService(StoreRepository storeRepository,
+public class GeneralCheckoutService(StoreRepository storeRepository,
         BTCPayWalletProvider walletProvider,
         BTCPayNetworkProvider btcPayNetworkProvider,
         IOptions<LightningNetworkOptions> lightningNetworkOptions,
         LightningClientFactoryService lightningClientFactoryService,
         PaymentMethodHandlerDictionary paymentMethodHandlerDictionary)
-    {
-        _walletProvider = walletProvider;
-        storeRepository = storeRepository;
-        _btcPayNetworkProvider = btcPayNetworkProvider;
-        _lightningNetworkOptions = lightningNetworkOptions;
-        _lightningClientFactoryService = lightningClientFactoryService;
-        _paymentMethodHandlerDictionary = paymentMethodHandlerDictionary;
-    }
-
-
+{
     public async Task<LightMoney> GetLightningNodeBalance(string storeId)
     {
         try
@@ -62,9 +44,9 @@ public class GeneralCheckoutService
             {
                 var store = await storeRepository.FindStore(storeId);
                 if (store is null) return null;
-                var settings = store.GetDerivationSchemeSettings(_paymentMethodHandlerDictionary, "BTC", true);
+                var settings = store.GetDerivationSchemeSettings(paymentMethodHandlerDictionary, "BTC", true);
                 if (settings is null) return null;
-                var wallet = _walletProvider.GetWallet("BTC");
+                var wallet = walletProvider.GetWallet("BTC");
                 var res = await wallet.GetBalance(settings.AccountDerivation);
                 return new LightMoney(Money.Coins(res.Available.GetValue(wallet.Network)));
             });
@@ -79,18 +61,18 @@ public class GeneralCheckoutService
     {
         var store = await storeRepository.FindStore(storeId);
 
-        var network = _btcPayNetworkProvider.GetNetwork<BTCPayNetwork>("BTC");
+        var network = btcPayNetworkProvider.GetNetwork<BTCPayNetwork>("BTC");
         var id = PaymentTypes.LN.GetPaymentMethodId("BTC");
         var existing =
             store.GetPaymentMethodConfig<LightningPaymentMethodConfig>(id,
-                _paymentMethodHandlerDictionary);
+                paymentMethodHandlerDictionary);
         if (existing?.GetExternalLightningUrl() is { } connectionString)
         {
-            return _lightningClientFactoryService.Create(connectionString,
+            return lightningClientFactoryService.Create(connectionString,
                 network);
         }
         else if (existing?.IsInternalNode is true &&
-                 _lightningNetworkOptions.Value.InternalLightningByCryptoCode
+                 lightningNetworkOptions.Value.InternalLightningByCryptoCode
                      .TryGetValue(network.CryptoCode,
                          out var internalLightningNode))
         {

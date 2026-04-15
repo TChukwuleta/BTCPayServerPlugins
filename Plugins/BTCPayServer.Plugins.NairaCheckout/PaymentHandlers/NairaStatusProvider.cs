@@ -5,9 +5,7 @@ using BTCPayServer.Services.Stores;
 
 namespace BTCPayServer.Plugins.NairaCheckout.PaymentHandlers;
 
-public class NairaStatusProvider(
-    StoreRepository storeRepository,
-    PaymentMethodHandlerDictionary handlers)
+public class NairaStatusProvider(StoreRepository storeRepository, PaymentMethodHandlerDictionary handlers)
 {
     public async Task<bool> NairaEnabled(string storeId)
     {
