@@ -24,5 +24,6 @@ namespace BTCPayServer.Plugins.MassStoreGenerator.ViewModels
 
         public SelectList Exchanges { get; set; }
         public JObject RecommendedExchanges { get; set; } = StoreBlobHelper.RecommendedExchanges;
+        public string StoreId { get; set; }
     }
 }

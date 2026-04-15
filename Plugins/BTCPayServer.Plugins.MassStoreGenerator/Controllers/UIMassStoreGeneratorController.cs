@@ -14,36 +14,25 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
-namespace BTCPayServer.Plugins.Template;
+namespace BTCPayServer.Plugins.MassStoreGenerator;
 
-[Route("~/plugins/storesgenerator")]
+[Route("~/plugins/{storeId}/storesgenerator/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
-public class UIMassStoreGeneratorController : Controller
+[AutoValidateAntiforgeryToken]
+public class UIMassStoreGeneratorController(RateFetcher rateFactory, StoreRepository storeRepository,
+        UserManager<ApplicationUser> userManager, IAuthorizationService authorizationService) : Controller
 {
-    private readonly RateFetcher _rateFactory;
-    private readonly StoreRepository _storeRepository;
-    private readonly IAuthorizationService _authorizationService;
-    private readonly UserManager<ApplicationUser> _userManager;
-    public UIMassStoreGeneratorController
-        (RateFetcher rateFactory, StoreRepository storeRepository,
-        UserManager<ApplicationUser> userManager,IAuthorizationService authorizationService)
-    {
-        _userManager = userManager;
-        _rateFactory = rateFactory;
-        _storeRepository = storeRepository;
-        _authorizationService = authorizationService;
-    }
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
-    // GET
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string storeId)
     {
         if (CurrentStore is null)
             return NotFound();
 
-        var hasPermission = await _authorizationService.AuthorizeAsync(User, CurrentStore.Id, Policies.CanModifyStoreSettingsUnscoped);
+        var hasPermission = await authorizationService.AuthorizeAsync(User, CurrentStore.Id, Policies.CanModifyStoreSettingsUnscoped);
         CreateStoreViewModel vm = new CreateStoreViewModel
         {
+            StoreId = CurrentStore.Id,
             HasStoreCreationPermission = hasPermission.Succeeded,
             DefaultCurrency = StoreBlobHelper.StandardDefaultCurrency,
             Exchanges = GetExchangesSelectList(null)
@@ -51,7 +40,7 @@ public class UIMassStoreGeneratorController : Controller
         return View(vm);
     }
 
-    [HttpPost("~/create")]
+    [HttpPost("create")]
     public async Task<IActionResult> Create(List<CreateStoreViewModel> model)
     {
         if (CurrentStore is null)
@@ -61,24 +50,25 @@ public class UIMassStoreGeneratorController : Controller
 
         foreach (var vm in model)
         {
-            var store = new StoreData { StoreName = vm.Name };
+            var store = await storeRepository.GetDefaultStoreTemplate();
+            store.StoreName = vm.Name;
             var blob = store.GetStoreBlob();
             blob.DefaultCurrency = vm.DefaultCurrency;
             var rate = blob.GetOrCreateRateSettings(false);
             rate.PreferredExchange = vm.PreferredExchange;
             rate.RateScripting = false;
             store.SetStoreBlob(blob);
-            await _storeRepository.CreateStore(userId, store);
+            await storeRepository.CreateStore(userId, store);
         }
         TempData[WellKnownTempData.SuccessMessage] = "Store(s) successfully created";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { storeId = CurrentStore.Id });
     }
 
-    private string GetUserId() => _userManager.GetUserId(User);
+    private string GetUserId() => userManager.GetUserId(User);
 
     private SelectList GetExchangesSelectList(string selected)
     {
-        var exchanges = _rateFactory.RateProviderFactory
+        var exchanges = rateFactory.RateProviderFactory
             .AvailableRateProviders
             .OrderBy(s => s.Id, StringComparer.OrdinalIgnoreCase)
             .ToList();

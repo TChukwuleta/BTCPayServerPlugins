@@ -1,11 +1,12 @@
 @using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
 @using BTCPayServer.Abstractions.Services
 @using BTCPayServer.Client
 @using BTCPayServer.Data
 @using BTCPayServer.Plugins.MassStoreGenerator.Views
 @model BTCPayServer.Plugins.MassStoreGenerator.ViewModels.CreateStoreViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Plugin Template");
+    ViewData.SetLayoutModel(new LayoutModel(nameof(PluginNavPages.Index), "Mass Stores Generator") { ActiveCategory = nameof(PluginNavPages) });
 }
 
 <h1>Create Stores</h1>
@@ -15,7 +16,8 @@
 @if (Model.HasStoreCreationPermission)
 {
     <div class="container mt-5">
-        <form id="input-form" method="post" asp-action="Create">
+        <form id="input-form" method="post" asp-action="Create" asp-route-storeId="@Model.StoreId">
+            @Html.AntiForgeryToken()
             <div class="d-flex justify-content-end mb-2">
                 <button type="submit" class="btn btn-primary" id="Create">Create</button>
             </div>
