@@ -1,37 +1,34 @@
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using BTCPayServer.Data;
-using Microsoft.AspNetCore.Identity;
-using System.Linq;
-using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
-using BTCPayServer.Plugins.BigCommercePlugin.Services;
-using Microsoft.AspNetCore.Http;
-using BTCPayServer.Plugins.BigCommercePlugin.Data;
-using BTCPayServer.Abstractions.Extensions;
 using System;
-using Microsoft.AspNetCore.Authorization;
-using BTCPayServer.Plugins.BigCommercePlugin.Helper;
-using BTCPayServer.Controllers;
-using BTCPayServer.Client;
-using BTCPayServer.Abstractions.Constants;
-using Microsoft.Extensions.Logging;
-using System.Web;
-using Newtonsoft.Json;
-using BTCPayServer.Services.Stores;
-using BTCPayServer.Services.Invoices;
-using Microsoft.AspNetCore.Cors;
-using BTCPayServer.Payments;
-using Newtonsoft.Json.Linq;
-using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
-using BTCPayServer.Filters;
 using System.Text;
+using System.Threading.Tasks;
+using System.Web;
+using BTCPayServer.Abstractions.Constants;
+using BTCPayServer.Abstractions.Extensions;
+using BTCPayServer.Client;
+using BTCPayServer.Controllers;
+using BTCPayServer.Data;
+using BTCPayServer.Filters;
+using BTCPayServer.Plugins.BigCommercePlugin.Data;
+using BTCPayServer.Plugins.BigCommercePlugin.Helper;
+using BTCPayServer.Plugins.BigCommercePlugin.Services;
+using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
+using BTCPayServer.Services.Invoices;
+using BTCPayServer.Services.Stores;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
 
 [Route("~/stores/{storeId}/plugins/bigcommerce")]
-[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
+[Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
 public class UIBigCommerceController : Controller
 {
     private readonly HttpClient _client;
@@ -89,16 +86,6 @@ public class UIBigCommerceController : Controller
             TempData.Remove("ErrorMessage");
         }
 
-        var storeHasWallet = GetPaymentMethodConfigs(storeData, true).Any();
-        if (!storeHasWallet)
-        {
-            return View(new InstallBigCommerceViewModel
-            {
-                CryptoCode = _networkProvider.DefaultNetwork.CryptoCode,
-                StoreId = storeId,
-                HasStore = false
-            });
-        }
         var bigCommerceStore = ctx.BigCommerceStores.SingleOrDefault(c => c.StoreId == storeId);
         if (bigCommerceStore == null)
         {
@@ -139,14 +126,14 @@ public class UIBigCommerceController : Controller
         if (hasConflictingStore)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Cannot create BigCommerce store. A different store is using the client credentials";
-            return RedirectToAction(nameof(Index), "UIBigCommerce", new { storeId = CurrentStore.Id });
+            return RedirectToAction(nameof(Index), new { storeId = CurrentStore.Id });
         }
         userStore.ClientId = model.ClientId;
         userStore.ClientSecret = model.ClientSecret;
         ctx.Update(userStore);
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Big commerce record saved successfully";
-        return RedirectToAction(nameof(Index), "UIBigCommerce", new { storeId = CurrentStore.Id });
+        return RedirectToAction(nameof(Index), new { storeId = CurrentStore.Id });
     }
 
 
@@ -340,24 +327,6 @@ public class UIBigCommerceController : Controller
         combinedJavascript.AppendLine(fileContent);
         var jsFile = combinedJavascript.ToString();
         return Content(jsFile, "text/javascript");
-    }
-
-    private static Dictionary<PaymentMethodId, JToken> GetPaymentMethodConfigs(StoreData storeData, bool onlyEnabled = false)
-    {
-        if (string.IsNullOrEmpty(storeData.DerivationStrategies))
-            return new Dictionary<PaymentMethodId, JToken>();
-        var excludeFilter = onlyEnabled ? storeData.GetStoreBlob().GetExcludedPaymentMethods() : null;
-        var paymentMethodConfigurations = new Dictionary<PaymentMethodId, JToken>();
-        JObject strategies = JObject.Parse(storeData.DerivationStrategies);
-        foreach (var strat in strategies.Properties())
-        {
-            if (!PaymentMethodId.TryParse(strat.Name, out var paymentMethodId))
-                continue;
-            if (excludeFilter?.Match(paymentMethodId) is true)
-                continue;
-            paymentMethodConfigurations.Add(paymentMethodId, strat.Value);
-        }
-        return paymentMethodConfigurations;
     }
 
     private string BigCommerceIframeResponse(BigCommerceStore bigCommerceStore)

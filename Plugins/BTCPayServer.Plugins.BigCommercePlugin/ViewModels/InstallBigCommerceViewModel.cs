@@ -31,7 +31,5 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.ViewModels
         public string CheckoutScriptUrl { get; set; }
 
         public string CryptoCode { get; set; }
-
-        public bool HasStore { get; set; } = true;
     }
 }

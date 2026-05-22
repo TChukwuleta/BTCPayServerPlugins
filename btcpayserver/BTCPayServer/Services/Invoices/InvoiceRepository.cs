@@ -77,6 +77,18 @@ namespace BTCPayServer.Services.Invoices
             return row is null ? null : ToEntity(row);
         }
 
+        public async Task AddAddressInvoice(string invoiceId, PaymentMethodId paymentMethodId, string address)
+        {
+            await using var context = _applicationDbContextFactory.CreateContext();
+            await UpsertAddressInvoice(context, invoiceId, paymentMethodId.ToString(), address);
+        }
+
+        private static async Task UpsertAddressInvoice(ApplicationDbContext context, string invoiceId, string paymentMethodId, string address)
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""INSERT INTO "AddressInvoices" ("Address", "PaymentMethodId", "InvoiceDataId") VALUES ({address}, {paymentMethodId}, {invoiceId}) ON CONFLICT ("Address", "PaymentMethodId") DO NOTHING""");
+        }
+
         /// <summary>
         /// Returns all invoices which either:
         /// * Have the <paramref name="paymentMethodId"/> activated and are pending
@@ -330,7 +342,9 @@ retry:
                 }
             }
         }
-        public async Task UpdatePrompt(string invoiceId, PaymentPrompt prompt)
+        public Task UpdatePrompt(string invoiceId, PaymentPrompt prompt)
+        => UpdatePrompt(invoiceId, prompt, null);
+        public async Task UpdatePrompt(string invoiceId, PaymentPrompt prompt, IEnumerable<string> trackedDestinations)
         {
 retry:
             using (var context = _applicationDbContextFactory.CreateContext())
@@ -346,7 +360,20 @@ retry:
                         return;
                     invoiceEntity.SetPaymentPrompt(prompt.PaymentMethodId, prompt);
                     invoice.SetBlob(invoiceEntity);
+                    // Persist the blob update first, on its own SaveChanges.
+                    // A DbUpdateConcurrencyException here must propagate so the
+                    // outer catch can retry; a unique-key violation on
+                    // AddressInvoices must not be able to roll this back.
                     await context.SaveChangesAsync();
+
+                    if (trackedDestinations is not null)
+                    {
+                        var pmi = prompt.PaymentMethodId.ToString();
+                        foreach (var tracked in trackedDestinations)
+                        {
+                            await UpsertAddressInvoice(context, invoiceId, pmi, tracked);
+                        }
+                    }
                 }
                 catch (DbUpdateConcurrencyException)
                 {
@@ -367,14 +394,10 @@ retry:
                 var existing = invoiceEntity.GetPaymentPrompt(prompt.PaymentMethodId);
                 if (existing.Destination != prompt.Destination && prompt.Activated && prompt.Destination is not null)
                 {
+                    var pmi = paymentPromptContext.PaymentMethodId.ToString();
                     foreach (var tracked in paymentPromptContext.TrackedDestinations)
                     {
-                        await context.AddressInvoices.AddAsync(new AddressInvoiceData()
-                        {
-                            InvoiceDataId = invoiceId,
-                            Address = tracked,
-                            PaymentMethodId = paymentPromptContext.PaymentMethodId.ToString()
-                        });
+                        await UpsertAddressInvoice(context, invoiceId, pmi, tracked);
                     }
                     AddToTextSearch(context, invoice, prompt.Destination);
                 }
@@ -1016,6 +1039,20 @@ retry:
         public bool IncludeArchived { get; set; } = true;
         public bool IncludeRefunds { get; set; }
         public bool OrderByDesc { get; set; } = true;
+
+        public void FillFromSearchText(SearchString fs, int timezoneOffset)
+        {
+            TextSearch = fs.TextSearch;
+            Unusual = fs.GetFilterBool("unusual");
+            IncludeArchived = fs.GetFilterBool("includearchived") ?? false;
+            Status = fs.GetFilterArray("status");
+            ExceptionStatus = fs.GetFilterArray("exceptionstatus");
+            StoreId = fs.GetFilterArray("storeid");
+            ItemCode = fs.GetFilterArray("itemcode");
+            OrderId = fs.GetFilterArray("orderid");
+            StartDate = fs.GetFilterDate("startdate", timezoneOffset);
+            EndDate = fs.GetFilterDate("enddate", timezoneOffset);
+        }
     }
 
     public class InvoiceStatistics : Dictionary<string, InvoiceStatistics.Contribution>

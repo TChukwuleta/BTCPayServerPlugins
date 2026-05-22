@@ -15,6 +15,7 @@ using BTCPayServer.HostedServices;
 using BTCPayServer.Plugins.Emails.HostedServices;
 using BTCPayServer.Plugins.Subscriptions;
 using BTCPayServer.Tests.PMO;
+using BTCPayServer.Views.Stores;
 using Microsoft.Playwright;
 using NBitcoin;
 using NBXplorer;
@@ -277,6 +278,15 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
             expectedBalance = 0m;
             await portal.AssertCredit(creditBalance: $"${expectedBalance.ToString("F2", CultureInfo.InvariantCulture)}");
         }
+        await s.GoToStore(s.StoreId);
+        await s.GoToStore(s.StoreId, StoreNavPages.Reporting);
+        await s.Page.ClickAsync("a[data-view='Subscribers']");
+        await s.Page.ClickAsync("#searchBtn");
+        await s.Page.WaitForSelectorAsync("#raw-data-table table");
+
+        await s.Page.ClickAsync("a[data-view='Credit History']");
+        await s.Page.ClickAsync("#searchBtn");
+        await s.Page.WaitForSelectorAsync("#raw-data-table table");
     }
 
     [Fact]
@@ -396,15 +406,64 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
             Price = 10m,
             Features = ["can-access"]
         });
+        Assert.Contains("can-access", plan.Features);
+        plan = await client.UpdateOfferingPlan(user.StoreId, offering.Id, plan.Id, new()
+        {
+            Name = "NewPlanV2",
+            Description = "Updated plan",
+            Price = 10m,
+            Features = []
+        });
+        Assert.Equal(("NewPlanV2", 10m), (plan.Name, plan.Price));
+        Assert.Equal("Updated plan", plan.Description);
+        Assert.DoesNotContain("can-access", plan.Features);
+        plan = await client.UpdateOfferingPlan(user.StoreId, offering.Id, plan.Id, new()
+        {
+            Name = "NewPlanV2",
+            Description = "Updated plan",
+            Price = 10m,
+            Features = ["can-access"]
+        });
+        Assert.Contains("can-access", plan.Features);
+        await AssertEx.AssertValidationError(new[] { "Features" }, () => client.UpdateOfferingPlan(user.StoreId, offering.Id, plan.Id, new()
+        {
+            Name = "NewPlanV2",
+            Description = "Updated plan",
+            Price = 10m,
+            Features = ["can-access2222"]
+        }));
+
         await client.CreateOfferingPlan(user.StoreId, offering.Id, new()
         {
             Name = "2NewPlan2",
             Price = 100m,
             Features = ["can-access2"]
         });
-        Assert.Equal(("NewPlan", 10m, "USD"), (plan.Name, plan.Price, plan.Currency));
+
+        offering = await client.UpdateOffering(user.StoreId, offering.Id, new OfferingModel()
+        {
+            AppName = "Test Updated",
+            SuccessRedirectUrl = "https://example.com/ok",
+            Metadata = new JObject()
+            {
+                ["subscription"] = "updated"
+            },
+            Features =
+            [
+                new() { Id = "can-access", Description = "Can access the subscription API v2" },
+                new() { Id = "can-access3", Description = "Can access premium endpoints" }
+            ]
+        });
+
+        Assert.Equal("Test Updated", offering.AppName);
+        Assert.Equal("https://example.com/ok", offering.SuccessRedirectUrl);
+        Assert.Equal("updated", offering.Metadata["subscription"]?.ToString());
+        Assert.Equal(2, offering.Features.Count);
+        Assert.Contains(offering.Features, f => f.Id == "can-access3");
+
+        Assert.Equal(("NewPlanV2", 10m, "USD"), (plan.Name, plan.Price, plan.Currency));
         plan = await client.GetOfferingPlan(user.StoreId, offering.Id, plan.Id);
-        Assert.Equal(("NewPlan", 10m, "USD"), (plan.Name, plan.Price, plan.Currency));
+        Assert.Equal(("NewPlanV2", 10m, "USD"), (plan.Name, plan.Price, plan.Currency));
         Assert.Contains("can-access", plan.Features);
 
         offering = await client.GetOffering(offering.StoreId, offering.Id);
@@ -439,7 +498,7 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
         await AssertEx.AssertApiError(400, "invoice-creation-error", () => client.ProceedPlanCheckout(planCheckout.Id));
         await user.RegisterDerivationSchemeAsync("BTC", importKeysToNBX: true);
         planCheckout = await client.ProceedPlanCheckout(planCheckout.Id);
-        var invoice = await client.GetInvoice(user.StoreId, planCheckout.InvoiceId);
+        var invoice = await client.GetInvoice(planCheckout.InvoiceId);
         Assert.NotNull(invoice);
         Assert.Equal("test@gmail.com", invoice.Metadata["buyerEmail"]?.ToString());
         Assert.Equal("invtest", invoice.Metadata["inv"]?.ToString());
@@ -450,7 +509,7 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
         var oldInvoiceId = invoice.Id;
         planCheckout = await client.ProceedPlanCheckout(planCheckout.Id);
         Assert.Equal(oldInvoiceId, planCheckout.InvoiceId);
-        invoice = await client.GetInvoice(user.StoreId, planCheckout.InvoiceId);
+        invoice = await client.GetInvoice(planCheckout.InvoiceId);
         Assert.Null(planCheckout.Subscriber);
 
         await s.ExplorerNode.GenerateAsync(1);
@@ -727,7 +786,7 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
         Assert.Equal("basic2@example.com", invoice.Metadata["buyerEmail"]?.ToString());
 
         var waiting = offering.WaitEvent<SubscriptionEvent.SubscriberDisabled>();
-        await api.MarkInvoiceStatus(storeId, invoiceId, new()
+        await api.MarkInvoiceStatus(invoiceId, new()
         {
             Status = InvoiceStatus.Invalid
         });

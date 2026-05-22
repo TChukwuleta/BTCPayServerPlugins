@@ -239,7 +239,7 @@ namespace BTCPayServer.Tests
             }
         }
 
-        [Fact]
+        [Fact(Timeout = 30_000)]
         [Trait("Playwright", "Playwright-2")]
         public async Task CanUsePayjoinForTopUp()
         {
@@ -247,11 +247,11 @@ namespace BTCPayServer.Tests
             await s.StartAsync();
             await s.RegisterNewUser(true);
             var receiver = await s.CreateNewStore();
-            await s.GenerateWallet("BTC", "", true, true);
+            await s.GenerateWallet("BTC", "", true);
             var receiverWalletId = new WalletId(receiver.storeId, "BTC");
 
             var sender = await s.CreateNewStore();
-            await s.GenerateWallet("BTC", "", true, true);
+            await s.GenerateWallet("BTC", "", true);
             var senderWalletId = new WalletId(sender.storeId, "BTC");
 
             await s.Server.ExplorerNode.GenerateAsync(1);
@@ -315,7 +315,7 @@ namespace BTCPayServer.Tests
             {
                 var cryptoCode = "BTC";
                 var receiver = await s.CreateNewStore();
-                await s.GenerateWallet(cryptoCode, "", true, true, format);
+                await s.GenerateWallet(cryptoCode, "", true, format);
                 var receiverWalletId = new WalletId(receiver.storeId, cryptoCode);
 
                 //payjoin is enabled by default.
@@ -328,7 +328,7 @@ namespace BTCPayServer.Tests
                 await Expect(s.Page.Locator("#PayJoinEnabled")).ToBeCheckedAsync();
 
                 var sender = await s.CreateNewStore();
-                await s.GenerateWallet(cryptoCode, "", true, true, format);
+                await s.GenerateWallet(cryptoCode, "", true, format);
                 var senderWalletId = new WalletId(sender.storeId, cryptoCode);
                 await s.Server.ExplorerNode.GenerateAsync(1);
                 await s.FundStoreWallet(senderWalletId);
@@ -480,7 +480,7 @@ namespace BTCPayServer.Tests
                     changeIndex = i;
             }
 
-            var derivationSchemeSettings = alice.GetController<UIWalletsController>().GetDerivationSchemeSettings(new WalletId(alice.StoreId, "BTC"));
+            var derivationSchemeSettings = alice.GetController<UIWalletsController>().GetDerivationSchemeSettings("BTC");
             var signingAccount = derivationSchemeSettings.GetFirstAccountKeySettings();
             psbt.SignAll(derivationSchemeSettings.AccountDerivation, alice.GenerateWalletResponseV.AccountHDKey, signingAccount.GetRootedKeyPath());
             using var fakeServer = new FakeServer();

@@ -1455,7 +1455,7 @@ bc1qfzu57kgu5jthl934f9xrdzzx8mmemx7gn07tf0grnvz504j6kzusu2v0ku
             Assert.Equal("hekki", search.TextSearch);
             Assert.Equal("orderid:MYORDERID,orderid:MYORDERID_2", search.TextFilters);
             Assert.Equal("orderid:MYORDERID,orderid:MYORDERID_2,hekki", search.TextCombined);
-            Assert.Equal("StartDate:2019-04-25 01:00 AM", search.WithoutSearchText());
+            Assert.Equal("startdate:2019-04-25 01:00 AM", search.WithoutSearchText());
             Assert.Equal(filter, search.ToString());
 
             // modify search
@@ -1499,6 +1499,9 @@ bc1qfzu57kgu5jthl934f9xrdzzx8mmemx7gn07tf0grnvz504j6kzusu2v0ku
             Assert.Single(modified.GetFilterArray("enddate"), "-7d");
             modified = new SearchString(modified.Toggle("enddate", "-7d"));
             Assert.Null(modified.GetFilterArray("enddate"));
+
+            search = new SearchString("7,startdate:-7d");
+            Assert.Equal("startdate:-7d", search.WithoutSearchText());
         }
 
         [Fact]
@@ -2192,9 +2195,8 @@ bc1qfzu57kgu5jthl934f9xrdzzx8mmemx7gn07tf0grnvz504j6kzusu2v0ku
             //a master fingerprint must always be present if youre providing rooted path
             Assert.ThrowsAny<FormatException>(() => mainnetParser.ParseOD("pkh([44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)"));
 
-
             parsedDescriptor = mainnetParser.ParseOD(
-                "pkh(xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/0/*)");
+                "pkh([d34db33f]xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/<0;1>/*)");
             Assert.Equal("xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL-[legacy]", parsedDescriptor.AccountDerivation.ToString());
 
             //but a different deriv path from standard (0/*) is not supported

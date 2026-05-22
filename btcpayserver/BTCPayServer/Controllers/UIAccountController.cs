@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Extensions;
@@ -41,7 +42,6 @@ namespace BTCPayServer.Controllers
         BTCPayServerEnvironment btcPayServerEnvironment,
         EventAggregator eventAggregator,
         Fido2Service fido2Service,
-        UserLoginCodeService userLoginCodeService,
         LnurlAuthService lnurlAuthService,
         EmailSenderFactory emailSenderFactory,
         CallbackGenerator callbackGenerator,
@@ -87,8 +87,12 @@ namespace BTCPayServer.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Login(string returnUrl = null, string email = null, bool allowLimitedLogin = false)
         {
-            if (User.Identity?.IsAuthenticated is true && string.IsNullOrEmpty(returnUrl))
-                return RedirectToLocal();
+            var allowRedirect =
+                (email is null && User.Identity?.IsAuthenticated is true) ||
+                (email is not null && User.FindFirst(ClaimTypes.Email)?.Value == email);
+
+            if (allowRedirect)
+                return RedirectToLocal(returnUrl);
 
             // Clear the existing external cookie to ensure a clean login process
             await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
@@ -100,51 +104,6 @@ namespace BTCPayServer.Controllers
 
             ViewData["ReturnUrl"] = returnUrl;
             return View(nameof(Login), new LoginViewModel { Email = email, AllowLimitedLogin = allowLimitedLogin });
-        }
-
-        // GET is for signin via the POS backend
-        [HttpGet("/login/code")]
-        [AllowAnonymous]
-        [RateLimitsFilter(ZoneLimits.Login, Scope = RateLimitsScope.RemoteAddress)]
-        public async Task<IActionResult> LoginUsingCode(string loginCode, string returnUrl = null)
-        {
-            return await LoginCodeResult(loginCode, returnUrl);
-        }
-
-        [HttpPost("/login/code")]
-        [AllowAnonymous]
-        [ValidateAntiForgeryToken]
-        [RateLimitsFilter(ZoneLimits.Login, Scope = RateLimitsScope.RemoteAddress)]
-        public async Task<IActionResult> LoginWithCode(string loginCode, string returnUrl = null)
-        {
-            return await LoginCodeResult(loginCode, returnUrl);
-        }
-
-        private async Task<IActionResult> LoginCodeResult(string loginCode, string returnUrl)
-        {
-            if (!string.IsNullOrEmpty(loginCode))
-            {
-                var code = loginCode.Split(';').First();
-                var userId = userLoginCodeService.Verify(code);
-                if (userId is null)
-                {
-                    TempData[WellKnownTempData.ErrorMessage] = StringLocalizer["Login code was invalid"].Value;
-                    return await Login(returnUrl);
-                }
-
-                var user = await userManager.FindByIdAsync(userId);
-                var loginContext = CreateLoginContext(user);
-                if (!await userService.CanLogin(loginContext))
-                {
-                    TempData.SetStatusLoginResult(loginContext);
-                    return await Login(returnUrl);
-                }
-
-                _logger.LogInformation("User {Email} logged in with a login code", user!.Email);
-                await signInManager.SignInAsync(user, false, "LoginCode");
-                return RedirectToLocal(returnUrl);
-            }
-            return await Login(returnUrl);
         }
 
         private UserService.CanLoginContext CreateLoginContext(ApplicationUser user)
@@ -223,6 +182,7 @@ namespace BTCPayServer.Controllers
                     ModelState.AddModelError(string.Empty, errorMessage!);
                     return View(model);
                 }
+
 
                 var result = await signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: true);
                 if (result.Succeeded)

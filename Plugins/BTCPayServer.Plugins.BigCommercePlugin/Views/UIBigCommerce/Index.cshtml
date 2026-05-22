@@ -1,8 +1,4 @@
 @using BTCPayServer.Abstractions.Extensions
-@using BTCPayServer.Abstractions.Services
-@using BTCPayServer.Client
-@using BTCPayServer.Controllers
-@using BTCPayServer.Data
 @using BTCPayServer.Plugins.BigCommercePlugin.Views
 @model BTCPayServer.Plugins.BigCommercePlugin.ViewModels.InstallBigCommerceViewModel
 @{
@@ -37,64 +33,48 @@
 
 
 <div class="container mt-5">
-    @if (Model.HasStore)
-    {
-        <div class="alert alert-warning alert-dismissible mb-4" role="alert">
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
-                <vc:icon symbol="close" />
-            </button>
-            <h5 class="alert-heading">Important Notice Regarding BigCommerce Plugin</h5>
-            <p class="mb-0">
-                Once you enter the Client ID and Client Secret, you will only be able to update them; deletion is not possible. To remove the credentials entirely, you must uninstall the BTCPay-BigCommerce app from your BigCommerce account.
-            </p>
-        </div>
-        <form id="input-form" method="post" asp-action="Create">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label asp-for="ClientId" class="form-label"></label>
-                        <input asp-for="ClientId" class="form-control" />
-                    </div>
-                    <div class="form-group">
-                        <label asp-for="ClientSecret" class="form-label"></label>
-                        <input asp-for="ClientSecret" class="form-control" />
-                    </div>
-                    <div class="form-group">
-                        <label asp-for="AuthCallBackUrl" class="form-label"></label>
-                        <input asp-for="AuthCallBackUrl" class="form-control" readonly />
-                    </div>
-                    <div class="form-group">
-                        <label asp-for="LoadCallbackUrl" class="form-label"></label>
-                        <input asp-for="LoadCallbackUrl" class="form-control" readonly />
-                    </div>
-                    <div class="form-group">
-                        <label asp-for="UninstallCallbackUrl" class="form-label"></label>
-                        <input asp-for="UninstallCallbackUrl" class="form-control" readonly />
-                    </div>
-                    <div class="form-group">
-                        <label asp-for="CheckoutScriptUrl" class="form-label"></label>
-                        <input asp-for="CheckoutScriptUrl" class="form-control" readonly />
-                    </div>
+    <div class="alert alert-warning alert-dismissible mb-4" role="alert">
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
+            <vc:icon symbol="close" />
+        </button>
+        <h5 class="alert-heading">Important Notice Regarding BigCommerce Plugin</h5>
+        <p class="mb-0">
+            Once you enter the Client ID and Client Secret, you will only be able to update them; deletion is not possible. To remove the credentials entirely, you must uninstall the BTCPay-BigCommerce app from your BigCommerce account.
+        </p>
+    </div>
+    <form id="input-form" method="post" asp-action="Create">
+        @Html.AntiForgeryToken()
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label asp-for="ClientId" class="form-label"></label>
+                    <input asp-for="ClientId" class="form-control" />
+                </div>
+                <div class="form-group">
+                    <label asp-for="ClientSecret" class="form-label"></label>
+                    <input asp-for="ClientSecret" class="form-control" />
+                </div>
+                <div class="form-group">
+                    <label asp-for="AuthCallBackUrl" class="form-label"></label>
+                    <input asp-for="AuthCallBackUrl" class="form-control" readonly />
+                </div>
+                <div class="form-group">
+                    <label asp-for="LoadCallbackUrl" class="form-label"></label>
+                    <input asp-for="LoadCallbackUrl" class="form-control" readonly />
+                </div>
+                <div class="form-group">
+                    <label asp-for="UninstallCallbackUrl" class="form-label"></label>
+                    <input asp-for="UninstallCallbackUrl" class="form-control" readonly />
+                </div>
+                <div class="form-group">
+                    <label asp-for="CheckoutScriptUrl" class="form-label"></label>
+                    <input asp-for="CheckoutScriptUrl" class="form-control" readonly />
                 </div>
             </div>
-
-            <div class="d-flex mt-3">
-                <input type="submit" value="Save" class="btn btn-primary btn-sm" id="Create" />
-            </div>
-        </form>
-
-    }
-    else
-    {
-
-        <div class="alert alert-warning alert-dismissible mb-4" role="alert">
-            <p class="mb-0" style="font-size: 0.9rem;">
-                To proceed with BigCommerce plugin on this store, you need to
-                <a href="@Url.Action(nameof(UIStoresController.SetupWallet), "UIStores", new { cryptoCode = Model.CryptoCode, storeId = Model.StoreId })" class="alert-link">
-                    set up a wallet
-                </a>
-                first.
-            </p>
         </div>
-    }
+
+        <div class="d-flex mt-3">
+            <input type="submit" value="Save" class="btn btn-primary btn-sm" id="Create" />
+        </div>
+    </form>
 </div>
