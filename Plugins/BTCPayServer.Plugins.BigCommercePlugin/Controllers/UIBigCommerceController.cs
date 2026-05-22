@@ -242,6 +242,7 @@ public class UIBigCommerceController : Controller
 
 
     [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
     [HttpPost("~/stores/{storeId}/plugins/bigcommerce/create-order")]
     [EnableCors("AllowAllOrigins")]
     public async Task<IActionResult> CreateOrder([FromBody] CreateBigCommerceStoreRequest requestModel)
