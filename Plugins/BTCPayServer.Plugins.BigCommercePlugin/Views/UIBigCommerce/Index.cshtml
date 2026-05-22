@@ -42,7 +42,7 @@
             Once you enter the Client ID and Client Secret, you will only be able to update them; deletion is not possible. To remove the credentials entirely, you must uninstall the BTCPay-BigCommerce app from your BigCommerce account.
         </p>
     </div>
-    <form id="input-form" method="post" asp-action="Create">
+    <form id="input-form" method="post" asp-action="Create" asp-route-storeId="@Model.StoreId">
         @Html.AntiForgeryToken()
         <div class="row">
             <div class="col-md-6">

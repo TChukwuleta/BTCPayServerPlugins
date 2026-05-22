@@ -101,6 +101,7 @@ public class UIBigCommerceController : Controller
         }
         return View(new InstallBigCommerceViewModel
         {
+            StoreId = CurrentStore.Id,
             ClientId = bigCommerceStore.ClientId,
             ClientSecret = bigCommerceStore.ClientSecret,
             AuthCallBackUrl = Url.Action(nameof(Install), "UIBigCommerce", new { storeId = CurrentStore.Id }, Request.Scheme),
@@ -111,7 +112,8 @@ public class UIBigCommerceController : Controller
         });
     }
 
-    [HttpPost("~/plugins/bigcommerce/create")]
+
+    [HttpPost("~/stores/{storeId}/plugins/bigcommerce/create")]
     public async Task<IActionResult> Create(InstallBigCommerceViewModel model)
     {
         if (CurrentStore is null)
