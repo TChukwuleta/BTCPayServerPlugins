@@ -5,7 +5,7 @@
 @using BTCPayServer.Plugins.ServerAlert
 @model HeraldIndexViewModel
 @{
-    ViewData.SetLayoutModel(new LayoutModel(nameof(ServerAlertPlugin), "Server Alert").SetCategory(WellKnownCategories.Server));
+    ViewData.SetLayoutModel(new LayoutModel(nameof(ServerAlertNavPages.ServerAlertIndex), "Server Alert") { ActiveCategory = nameof(ServerAlertNavPages) });
 }
 
 <div class="sticky-header">

@@ -35,4 +35,4 @@ public enum AnnouncementSeverity { Info, Warning, Critical }
 
 public enum EmailScope { None, AllUsers, AdminsOnly, AllStores, SelectedStores, CustomEmails }
 
-public enum ServerAlertNavPages { ServerAlertIndex, ServerAlertSettings }
+public enum ServerAlertNavPages { ServerAlertIndex, ServerAlertSettings, ServerAlertMonitor }

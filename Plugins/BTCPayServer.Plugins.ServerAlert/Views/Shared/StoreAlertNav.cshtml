@@ -1,0 +1,8 @@
+@using Microsoft.AspNetCore.Routing
+
+<li class="nav-item nav-item-sub">
+    <a asp-controller="UIServerAlert"
+       asp-action="StoreMonitorSettings" asp-route-storeId="@Context.GetRouteValue("storeId")"  layout-menu-item="StoreMonitor">
+        Health Monitor
+    </a>
+</li>

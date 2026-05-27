@@ -21,6 +21,10 @@ public class ServerAlertService(StoreRepository storeRepository,
         NotificationSender notificationSender,
         UserManager<ApplicationUser> userManager)
 {
+    public async Task<ServerMonitorSettings> GetServerMonitorSettings() => await settingsRepository.GetSettingAsync<ServerMonitorSettings>() ?? new();
+
+    public async Task SaveServerMonitorSettings(ServerMonitorSettings settings) => await settingsRepository.UpdateSetting(settings);
+
     public async Task<AlertSettings?> GetAnnouncement(string id)
     {
         var serverAlert = await settingsRepository.GetSettingAsync<ServerAlertSettings>() ?? new();

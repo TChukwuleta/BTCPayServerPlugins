@@ -7,7 +7,7 @@
   <PropertyGroup>
     <Product>Server Alert</Product>
     <Description>Allow server administrators send maintenance notices, outage warnings, and general news to every store owner/user on their BTCPay instance via the bell notification and email.</Description>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
   </PropertyGroup>
 
   <!-- Plugin development properties -->
@@ -42,10 +42,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
   </ItemGroup>
 
   <ItemGroup>
+	<PackageReference Include="MimeKit" Version="4.16.0" />
     <PackageReference Include="Microsoft.CodeAnalysis" Version="5.3.0" />
   </ItemGroup>
 

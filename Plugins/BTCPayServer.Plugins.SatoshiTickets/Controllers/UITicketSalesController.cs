@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
-using System.Text;
 using System.Threading.Tasks;
-using AngleSharp.Dom;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Extensions;
@@ -20,7 +18,6 @@ using BTCPayServer.Plugins.SatoshiTickets.Services;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels.Models;
 using BTCPayServer.Services;
-using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -42,7 +39,6 @@ public class UITicketSalesController(UriResolver uriResolver,
         StoreRepository storeRepo,
         EmailService emailService,
         TicketService ticketService,
-        InvoiceRepository invoiceRepository,
         SimpleTicketSalesDbContextFactory dbContextFactory,
         UserManager<ApplicationUser> userManager) : Controller
 {

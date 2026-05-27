@@ -1,0 +1,101 @@
+﻿@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.ServerAlert.Data
+@using BTCPayServer.Plugins.ServerAlert.ViewModels
+@model ServerMonitorViewModel
+@{
+    ViewData.SetLayoutModel(new LayoutModel(nameof(ServerAlertNavPages.ServerAlertMonitor), "Server Monitor") { ActiveCategory = nameof(ServerAlertNavPages) });
+}
+
+<div class="sticky-header">
+    <h2>Health Monitor</h2>
+</div>
+<partial name="_StatusMessage" />
+<partial name="_Nav" model="@ServerAlertNavPages.ServerAlertSettings" />
+
+<form method="post" asp-action="ServerMonitorSettings">
+    <div class="row">
+        <div class="col-xl-8 col-xxl-constrain">
+
+            <div class="form-group mb-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <label class="form-label mb-0 fw-semibold">Enable Server Health Monitor</label>
+                    <div class="form-check form-switch mb-0">
+                        <input asp-for="Enabled" class="form-check-input" type="checkbox" role="switch" />
+                    </div>
+                </div>
+                <small class="text-secondary">When enabled, the server will check node health on the interval below and alert admins when issues are detected.</small>
+            </div>
+
+            <div id="monitor-settings" class="@(Model.Enabled ? "" : "d-none")">
+                <div class="form-group mb-4">
+                    <label class="form-label fw-semibold">Checks to Run</label>
+                    <div class="d-flex flex-column gap-2">
+                        <div class="form-check">
+                            <input asp-for="MonitorBitcoinNode" class="form-check-input" type="checkbox" />
+                            <label asp-for="MonitorBitcoinNode" class="form-check-label">
+                                Bitcoin Node / NBXplorer — alerts if the node goes offline or falls behind chain tip
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group mb-4">
+                    <label asp-for="Delivery" class="form-label fw-semibold">Alert Delivery</label>
+                    <select asp-for="Delivery" class="form-select" style="max-width:280px;">
+                        <option value="@AlertDelivery.BellOnly">Bell notification only</option>
+                        <option value="@AlertDelivery.EmailOnly">Email only</option>
+                        <option value="@AlertDelivery.BothBellAndEmail">Bell and email</option>
+                    </select>
+                </div>
+
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+    </div>
+</form>
+
+@if (Model.RecentAlerts.Any())
+{
+    <div class="mt-5">
+        <h5 class="fw-semibold mb-3">Recent Check Log</h5>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Check</th>
+                        <th>Status</th>
+                        <th>Message</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var log in Model.RecentAlerts)
+                    {
+                        var (badge, label) = log.Status switch
+                        {
+                            MonitorStatus.Critical => ("danger", "Critical"),
+                            MonitorStatus.Warning => ("warning", "Warning"),
+                            _ => ("success", "Healthy")
+                        };
+                        <tr>
+                            <td>@log.CheckName</td>
+                            <td><span class="badge bg-@badge">@label</span></td>
+                            <td class="text-secondary small">@log.Message</td>
+                            <td class="small text-secondary">@log.FiredAt.ToString("MMM dd HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@section PageFootContent {
+    <script>
+        document.getElementById('Enabled').addEventListener('change', function () {
+            document.getElementById('monitor-settings').classList.toggle('d-none', !this.checked);
+        });
+    </script>
+}

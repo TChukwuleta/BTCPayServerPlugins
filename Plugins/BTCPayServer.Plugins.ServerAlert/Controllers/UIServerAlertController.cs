@@ -123,4 +123,23 @@ public class UIServerAlertController(StoreRepository storeRepository,
             msg += " No emails sent — SMTP not configured or no recipients matched.";
         return msg;
     }
+
+    [HttpGet("monitor")]
+    public async Task<IActionResult> ServerMonitorSettings()
+    {
+        var settings = await serverAlertService.GetServerMonitorSettings();
+        return View(ServerMonitorViewModel.FromSettings(settings));
+    }
+
+    [HttpPost("monitor")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ServerMonitorSettings(ServerMonitorViewModel model)
+    {
+        if (!ModelState.IsValid)
+            return View(model);
+
+        await serverAlertService.SaveServerMonitorSettings(model.ToSettings());
+        TempData[WellKnownTempData.SuccessMessage] = "Health monitor settings saved.";
+        return RedirectToAction(nameof(ServerMonitorSettings));
+    }
 }
