@@ -1,21 +1,11 @@
 @using BTCPayServer.Abstractions.Extensions
 @using BTCPayServer.Client
-@using BTCPayServer.Plugins.ServerAlert
 @using BTCPayServer.Plugins.ServerAlert.Data
 @model BTCPayServer.Components.MainNav.MainNavViewModel
 
 
 <li class="nav-item nav-item-sub" permission="@Policies.CanModifyServerSettings">
-    <a asp-controller="UIServerAlert" asp-action="Index" layout-menu-item=@nameof(ServerAlertPlugin)> Server Alerts</a>
-</li>
-
-
-<li class="nav-item nav-item-sub" permission="@Policies.CanModifyServerSettings">
     <a asp-controller="UIServerAlert" asp-action="Index" layout-menu-item="@nameof(ServerAlertNavPages.ServerAlertIndex)">
-        <svg width="20" height="20" viewBox="0 0 64 64" id="ticket">
-            <path fill="currentColor" d="M24 64.414 16.586 57l.707-.707C18.617 54.969 19 54.006 19 52c0-4.056-2.944-7-7-7-2.006 0-2.969.383-4.293 1.707L7 47.414-.414 40 40-.414 47.414 7l-.707.707C45.383 9.031 45 9.994 45 12c0 4.056 2.944 7 7 7 2.006 0 2.969-.383 4.293-1.707l.707-.707L64.414 24 24 64.414zm-4.614-7.443L24 61.586 61.586 24l-4.61４-４．６１４C55．５５ ２０．５７８ ５４．１８１ ２１ ５２ ２１c-５．１３１ ０-９-３．８６９-９-９ ０-２．１８１．４２２-３．５５ １．６１４-４．９７１L４０ ２．４１４ ２．４１４ ４０l４．６１４ ４．６１４C８．４５ ４３．４２２ ９．８１９ ４３ １２ ４３c５．１３１ ０ ９ ３．８６９ ９ ９ ０ ２．１８１-.４２２３．５５-１．６１４　４．９７１z"></path>
-            <path fill="currentColor" d="m26.707　14.293　四　四　－１．４１４　１．４１４　－四　四zM forty-five点七零七　 thirty-three点二九三　四　四　－１． forty-five点七零七　－四zM thirty-two点七零七　 twenty-point二九三　四　四　－１． forty-five点七零七　－四zM thirty-nine点七零七　 twenty-seven点二九三　四　四　－１． forty-five点七零七　－四z"></path>
-        </svg>
         <span text-translate="true">Server Alerts</span>
     </a>
     @if (ViewData.IsCategory(nameof(ServerAlertNavPages)))
@@ -30,7 +20,7 @@
                    text-translate="true">Settings</a>
             </li> *@
             <li class="nav-item nav-item-sub">
-                <a layout-menu-item="@nameof(ServerAlertNavPages.ServerAlertMonitor)" asp-controller="UIServerAlert" asp-action="Monitor"
+                <a layout-menu-item="@nameof(ServerAlertNavPages.ServerAlertMonitor)" asp-controller="UIServerAlert" asp-action="ServerMonitorSettings"
                    text-translate="true">Monitor</a>
             </li>
         </ul>

@@ -24,7 +24,7 @@ public class ServerAlertPlugin : BaseBTCPayServerPlugin
         services.AddSingleton<IUIExtension>(new UIExtension("StoreAlertNav", "store-nav"));*/
 
 
-        services.AddSingleton<ServerAlertService>();
+        services.AddScoped<ServerAlertService>();
 
         services.AddSingleton<HealthMonitorService>();
         services.AddSingleton<IHostedService>(p => p.GetRequiredService<HealthMonitorService>());

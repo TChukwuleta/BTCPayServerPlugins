@@ -14,17 +14,15 @@ using BTCPayServer.Plugins.ServerAlert.Data;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BTCPayServer.Plugins.ServerAlert.Services;
 
 
 public class HealthMonitorService(
     EventAggregator eventAggregator,
-    StoreRepository storeRepository,
-    SettingsRepository settingsRepository,
-    ServerAlertService serverAlertService,
+    IServiceScopeFactory scopeFactory,
     BTCPayNetworkProvider networkProvider,
-    PullPaymentHostedService pullPaymentService,
     ExplorerClientProvider explorerClientProvider,
     PaymentMethodHandlerDictionary paymentHandlers,
     LightningClientFactoryService lightningClientFactory,
@@ -34,40 +32,44 @@ public class HealthMonitorService(
 
     public async Task Do(CancellationToken cancellationToken)
     {
-        var serverSettings = await settingsRepository.GetSettingAsync<ServerMonitorSettings>() ?? new();
-        if (serverSettings.Enabled)
+        await WithScope(async (alertService, storeRepo, settingsRepo, pullPaymentService) =>
         {
-            PushEvent(new ServerCheckEvent { Settings = serverSettings });
-        }
+            var serverSettings = await settingsRepo.GetSettingAsync<ServerMonitorSettings>() ?? new();
+            if (serverSettings.Enabled)
+                PushEvent(new ServerCheckEvent { Settings = serverSettings });
 
-        var stores = await storeRepository.GetStores();
-        foreach (var store in stores)
-        {
-            var key = $"StoreMonitor_{store.Id}";
-            var storeSettings = await settingsRepository.GetSettingAsync<StoreMonitorSettings>(key) ?? new();
-            if (!storeSettings.Enabled) continue;
-
-            PushEvent(new StoreCheckEvent { Store = store, Settings = storeSettings });
-        }
+            var stores = await storeRepo.GetStores();
+            foreach (var store in stores)
+            {
+                var key = $"StoreMonitor_{store.Id}";
+                var storeSettings = await settingsRepo.GetSettingAsync<StoreMonitorSettings>(key) ?? new();
+                if (!storeSettings.Enabled) continue;
+                PushEvent(new StoreCheckEvent { Store = store, Settings = storeSettings });
+            }
+        });
     }
 
     protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
     {
-        switch (evt)
+        await WithScope(async (alertService, storeRepo, settingsRepo, pullPaymentService) =>
         {
-            case ServerCheckEvent s:
-                if (s.Settings.MonitorBitcoinNode)
-                    await RunServerCheck("server:bitcoin", "Bitcoin Node / NBXplorer", CheckBitcoinNode, s.Settings);
+            switch (evt)
+            {
+                case ServerCheckEvent s:
+                    if (s.Settings.MonitorBitcoinNode)
+                        await RunServerCheck("server:bitcoin", "Bitcoin Node / NBXplorer", CheckBitcoinNode, s.Settings, alertService, settingsRepo);
+                    break;
 
-                break;
-            case StoreCheckEvent e:
-                await RunStoreChecks(e.Store, e.Settings);
-                break;
-        }
+                case StoreCheckEvent e:
+                    await RunStoreChecks(e.Store, e.Settings, settingsRepo, storeRepo, alertService, pullPaymentService);
+                    break;
+            }
+        });
         await base.ProcessEvent(evt, cancellationToken);
     }
 
-    private async Task RunServerCheck(string key, string name, Func<Task<(MonitorStatus, string)>> fn, ServerMonitorSettings settings)
+    private async Task RunServerCheck(string key, string name, Func<Task<(MonitorStatus, string)>> fn, ServerMonitorSettings settings,
+        ServerAlertService serverAlertService, SettingsRepository settingsRepository)
     {
         var (status, message) = await fn();
 
@@ -90,7 +92,9 @@ public class HealthMonitorService(
             message: message,
             status: status,
             emailScope: settings.Delivery == AlertDelivery.BellOnly ? EmailScope.None : EmailScope.AdminsOnly,
-            customEmails: null);
+            customEmails: null,
+            settingsRepository: settingsRepository,
+            serverAlertService: serverAlertService);
     }
 
     private async Task<(MonitorStatus, string)> CheckBitcoinNode()
@@ -116,7 +120,8 @@ public class HealthMonitorService(
         }
     }
 
-    private async Task RunStoreChecks(BTCPayServer.Data.StoreData store, StoreMonitorSettings settings)
+    private async Task RunStoreChecks(BTCPayServer.Data.StoreData store, StoreMonitorSettings settings, 
+        SettingsRepository settingsRepository, StoreRepository storeRepository, ServerAlertService serverAlertService, PullPaymentHostedService pullPaymentService)
     {
         if (settings.AlertOnUnprocessedPayout)
         {
@@ -141,7 +146,9 @@ public class HealthMonitorService(
                     : string.Empty,
                 status: isStale ? MonitorStatus.Warning : MonitorStatus.Healthy,
                 emailScope: settings.Delivery == AlertDelivery.BellOnly ? EmailScope.None : EmailScope.CustomEmails,
-                customEmails: await GetOwnerEmails(store.Id));
+                customEmails: await GetOwnerEmails(store.Id, storeRepository),
+                serverAlertService: serverAlertService,
+                settingsRepository: settingsRepository);
         }
 
         if (settings.AlertOnLightningNodeOffline || settings.AlertOnLowLightningInbound)
@@ -173,7 +180,9 @@ public class HealthMonitorService(
                             message: $"Could not connect to Lightning node: {ex.Message}",
                             status: MonitorStatus.Critical,
                             emailScope: settings.Delivery == AlertDelivery.BellOnly ? EmailScope.None : EmailScope.CustomEmails,
-                            customEmails: await GetOwnerEmails(store.Id));
+                            customEmails: await GetOwnerEmails(store.Id, storeRepository),
+                            serverAlertService: serverAlertService,
+                            settingsRepository: settingsRepository);
                     }
                     return;
                 }
@@ -189,7 +198,9 @@ public class HealthMonitorService(
                         message: isOffline ? "The Lightning node returned no information. It may be starting up or offline." : string.Empty,
                         status: isOffline ? MonitorStatus.Critical : MonitorStatus.Healthy,
                         emailScope: settings.Delivery == AlertDelivery.BellOnly ? EmailScope.None : EmailScope.CustomEmails,
-                        customEmails: await GetOwnerEmails(store.Id));
+                        customEmails: await GetOwnerEmails(store.Id, storeRepository),
+                        serverAlertService: serverAlertService,
+                        settingsRepository: settingsRepository);
 
                     if (isOffline) return;
                 }
@@ -214,7 +225,9 @@ public class HealthMonitorService(
                             : string.Empty,
                         status: isLow ? MonitorStatus.Warning : MonitorStatus.Healthy,
                         emailScope: settings.Delivery == AlertDelivery.BellOnly ? EmailScope.None : EmailScope.CustomEmails,
-                        customEmails: await GetOwnerEmails(store.Id));
+                        customEmails: await GetOwnerEmails(store.Id, storeRepository),
+                        serverAlertService: serverAlertService,
+                        settingsRepository: settingsRepository);
                 }
             }
             catch (Exception ex)
@@ -226,12 +239,15 @@ public class HealthMonitorService(
                     message: $"An error occurred while checking Lightning: {ex.Message}",
                     status: MonitorStatus.Warning,
                     emailScope: settings.Delivery == AlertDelivery.BellOnly ? EmailScope.None : EmailScope.CustomEmails,
-                    customEmails: await GetOwnerEmails(store.Id));
+                    customEmails: await GetOwnerEmails(store.Id, storeRepository),
+                    serverAlertService: serverAlertService,
+                    settingsRepository: settingsRepository);
             }
         }
     }
 
-    private async Task HandleResult(string key, string title, string recoveryTitle, string message, MonitorStatus status, EmailScope emailScope, string customEmails)
+    private async Task HandleResult(string key, string title, string recoveryTitle, string message, MonitorStatus status, EmailScope emailScope, string customEmails,
+        ServerAlertService serverAlertService, SettingsRepository settingsRepository)
     {
         var isUnhealthy = status == MonitorStatus.Critical;
         var alreadyFired = _alertFired.TryGetValue(key, out var prev) && prev;
@@ -243,7 +259,7 @@ public class HealthMonitorService(
                 message: message,
                 severity: status == MonitorStatus.Critical ? AnnouncementSeverity.Critical : AnnouncementSeverity.Warning,
                 emailScope: emailScope,
-                customEmails: customEmails);
+                customEmails: customEmails, serverAlertService, settingsRepository);
         }
         else if (!isUnhealthy && alreadyFired)
         {
@@ -253,17 +269,18 @@ public class HealthMonitorService(
                 message: $"{title} has been resolved.",
                 severity: AnnouncementSeverity.Info,
                 emailScope: emailScope,
-                customEmails: customEmails);
+                customEmails: customEmails, serverAlertService, settingsRepository);
         }
     }
 
-    private async Task<string> GetOwnerEmails(string storeId)
+    private async Task<string> GetOwnerEmails(string storeId, StoreRepository storeRepository)
     {
         var owners = await storeRepository.GetStoreUsers(storeId, filterRoles: new[] { StoreRoleId.Owner });
         return string.Join(",", owners.Where(o => !string.IsNullOrEmpty(o.Email)).Select(o => o.Email));
     }
 
-    private async Task SendAlert(string title, string message, AnnouncementSeverity severity, EmailScope emailScope, string customEmails)
+    private async Task SendAlert(string title, string message, AnnouncementSeverity severity, EmailScope emailScope, string customEmails, 
+        ServerAlertService serverAlertService, SettingsRepository settingsRepository)
     {
         var s = await settingsRepository.GetSettingAsync<ServerSettings>();
         var serverName = string.IsNullOrWhiteSpace(s?.ServerName) ? "BTCPay Server" : s.ServerName;
@@ -277,6 +294,16 @@ public class HealthMonitorService(
             CustomEmailAddresses = customEmails,
             CreatedAt = DateTimeOffset.UtcNow
         }, serverName);
+    }
+
+    private async Task WithScope(Func<ServerAlertService, StoreRepository, SettingsRepository, PullPaymentHostedService, Task> action)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var alertService = scope.ServiceProvider.GetRequiredService<ServerAlertService>();
+        var storeRepo = scope.ServiceProvider.GetRequiredService<StoreRepository>();
+        var settingsRepo = scope.ServiceProvider.GetRequiredService<SettingsRepository>();
+        var pullPaymentService = scope.ServiceProvider.GetRequiredService<PullPaymentHostedService>();
+        await action(alertService, storeRepo, settingsRepo, pullPaymentService);
     }
 
     public class ServerCheckEvent
