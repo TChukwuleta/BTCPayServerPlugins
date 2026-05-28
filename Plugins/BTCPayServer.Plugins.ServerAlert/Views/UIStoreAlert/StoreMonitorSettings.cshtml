@@ -1,0 +1,99 @@
+﻿@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.ServerAlert.Data
+@using BTCPayServer.Plugins.ServerAlert.ViewModels
+@model StoreMonitorViewModel
+@{
+    ViewData.SetLayoutModel(new LayoutModel("StoreMonitor", "Store Health Monitor"));
+}
+
+<form method="post" asp-action="StoreMonitorSettings" asp-route-storeId="@Model.StoreId">
+    <div class="sticky-header">
+        <h2>Store Health Monitor: @Model.StoreName</h2>
+        <div class="d-flex gap-3 mt-3 mt-sm-0">
+            <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+    </div>
+    <partial name="_StatusMessage" />
+
+    <div class="row">
+        <div class="col-xl-8 col-xxl-constrain">
+            <div class="form-group">
+                <div class="d-flex align-items-center">
+                    <input asp-for="Enabled" type="checkbox" class="btcpay-toggle me-3" id="Enabled" />
+                    <label for="Enabled" class="form-check-label">
+                        <span class="fw-semibold">Enable Store Health Monitor</span>
+                        <div class="text-secondary">Monitor this store for issues and receive alerts when action is needed.</div>
+                    </label>
+                </div>
+            </div>
+
+            <div id="store-monitor-settings" class="@(Model.Enabled ? "" : "d-none")">
+                <div class="form-group">
+                    <label class="form-label fw-semibold">Payouts</label>
+                    <div class="d-flex align-items-center">
+                        <input asp-for="AlertOnUnprocessedPayout" type="checkbox" class="btcpay-toggle me-3" id="AlertOnUnprocessedPayout" />
+                        <label for="AlertOnUnprocessedPayout" class="form-check-label">
+                            <span class="fw-semibold">Alert on unprocessed payouts</span>
+                            <div class="text-secondary">Fires when approved payouts have not been sent within the threshold below.</div>
+                        </label>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 mt-3 ms-5">
+                        <span class="text-secondary small">Alert after</span>
+                        <input asp-for="UnprocessedPayoutThresholdHours" class="form-control form-control-sm" type="number" min="1" max="168" style="max-width:80px;" />
+                        <span class="text-secondary small">hours without processing</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label fw-semibold">Lightning</label>
+                    <div class="d-flex flex-column gap-4">
+
+                        <div class="d-flex align-items-center">
+                            <input asp-for="AlertOnLightningNodeOffline" type="checkbox" class="btcpay-toggle me-3" id="AlertOnLightningNodeOffline" />
+                            <label for="AlertOnLightningNodeOffline" class="form-check-label">
+                                <span class="fw-semibold">Alert when store's Lightning node is offline</span>
+                            </label>
+                        </div>
+
+                        <div>
+                            <div class="d-flex align-items-center">
+                                <input asp-for="AlertOnLowLightningInbound" type="checkbox" class="btcpay-toggle me-3" id="AlertOnLowLightningInbound" />
+                                <label for="AlertOnLowLightningInbound" class="form-check-label">
+                                    <span class="fw-semibold">Alert when inbound capacity is low</span>
+                                    <div class="text-secondary">
+                                        Fires when the percentage of channel capacity available to receive payments falls below the threshold.
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 mt-3 ms-5">
+                                <span class="text-secondary small">Alert when below</span>
+                                <input asp-for="LowLightningInboundThresholdPercent" class="form-control form-control-sm" type="number" min="1" max="100" style="max-width:80px;" />
+                                <span class="text-secondary small">% of total channel capacity</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Delivery" class="form-label fw-semibold">Alert Delivery</label>
+                    <select asp-for="Delivery" class="form-select w-auto">
+                        <option value="@AlertDelivery.BellOnly">Bell notification only</option>
+                        <option value="@AlertDelivery.EmailOnly">Email only</option>
+                        <option value="@AlertDelivery.BothBellAndEmail">Bell and email</option>
+                    </select>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</form>
+
+@section PageFootContent {
+    <script>
+        document.getElementById('Enabled').addEventListener('change', function () {
+            document.getElementById('store-monitor-settings').classList.toggle('d-none', !this.checked);
+        });
+    </script>
+}

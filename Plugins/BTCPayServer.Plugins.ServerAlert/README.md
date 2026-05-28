@@ -1,14 +1,29 @@
 ﻿# BTCPay Server - Server Alert Plugin
 
-Broadcast server-wide announcements to all your store owners and users directly from BTCPay Server. Whether it's scheduled maintenance, a service outage, or an important update 
-this plugin ensures everyone on your server gets notified instantly via bell notifications and email.
+A BTCPay Server plugin that gives server administrators two tools in one: broadcast announcements to users and store owners, and monitor server and store health with automatic alerts when something needs attention.
+
+## Features
+
+### Announcements
+Broadcast server-wide messages to all store owners and users directly from BTCPay Server. Whether it is scheduled maintenance, a service outage, or an
+important update, everyone on your server gets notified instantly via bell notifications and email.
+
+### Health Monitor
+Automatically monitor your server and store infrastructure on a schedule. Get alerted the moment something goes wrong and also when it recovers without having to check the dashboard manually.
+
+**Server-level checks:**
+- Bitcoin node connectivity and sync status
+
+**Store-level checks:**
+- Approved payouts sitting unprocessed beyond a configurable threshold
+- Lightning node offline or unreachable
+- Lightning inbound capacity below a configurable threshold
 
 ## What you need?
 
 - A running BTCPay Server instance (self-hosted or hosted by a third party)
 - Server administrator access
 - SMTP configured in Server settings (optional, required for email notifications)
-
 
 
 ## Installation
@@ -43,12 +58,37 @@ Click Send
 
 This plugin uses your server's existing SMTP configuration for email notifications. To enable email notifications, make sure SMTP is configured under `Server Settings` > `Emails`.
 
-#### Managing Alerts
+### Managing Alerts
 From the Server Alerts list you can:
 
 Edit — update the title, message, severity, or email scope
 Resend — re-dispatch bell and email notifications for an existing alert
 Delete — permanently remove an alert
+
+### Server Monitor
+
+Navigate to Server Settings -> Server Alerts -> Health Monitor.
+
+Enable the monitor and configure:
+
+- Bitcoin Node: checks whether the node is online and fully synced. Alerts admins if the node goes offline and sends a recovery notification when it comes back.
+- Alert Delivery: bell notification only, email only, or both
+
+The monitor runs on a background schedule. Alerts fire once when a problem is detected and once again when it resolves. No repeat spam between state changes.
+
+### Store Monitor
+
+Click on the store health monitor on the left navigation.
+
+Enable the monitor and configure:
+
+- Unprocessed payouts: alerts when approved payouts have not been sent within a configurable number of hours
+- Lightning node offline: alerts when the store's Lightning node is unreachable or not responding
+- Low inbound capacity: alerts when the percentage of channel capacity available for incoming payments falls below a configurable threshold.
+- Alert Delivery: bell notification only, email only, or both
+
+Store alerts go to the store owner's email and bell notifications. Each store owner configures their own thresholds independently.
+
 
 ## Contribute
 

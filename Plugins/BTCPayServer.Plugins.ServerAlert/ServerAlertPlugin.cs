@@ -19,23 +19,11 @@ public class ServerAlertPlugin : BaseBTCPayServerPlugin
     public override void Execute(IServiceCollection services)
     {
         services.AddSingleton<IUIExtension>(new UIExtension("ServerAlertAdminNav", "server-nav"));
-
-        /*services.AddSingleton<IUIExtension>(new UIExtension("ServerAlertAdminNav", "server-nav"));
-        services.AddSingleton<IUIExtension>(new UIExtension("StoreAlertNav", "store-nav"));*/
-
-
+        services.AddSingleton<IUIExtension>(new UIExtension("StoreAlertNav", "header-nav"));
         services.AddScoped<ServerAlertService>();
-
         services.AddSingleton<HealthMonitorService>();
         services.AddSingleton<IHostedService>(p => p.GetRequiredService<HealthMonitorService>());
-        services.AddScheduledTask<HealthMonitorService>(TimeSpan.FromMinutes(20));
-
+        services.AddScheduledTask<HealthMonitorService>(TimeSpan.FromSeconds(20));
         services.AddSingleton<INotificationHandler, ServerAlertNotificationHandler>();
-        services.AddSession(options =>
-        {
-            options.IdleTimeout = TimeSpan.FromMinutes(30);
-            options.Cookie.HttpOnly = true;
-            options.Cookie.IsEssential = true;
-        });
     }
 }

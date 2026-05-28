@@ -15,6 +15,7 @@ using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace BTCPayServer.Plugins.ServerAlert.Services;
 
@@ -26,15 +27,24 @@ public class HealthMonitorService(
     ExplorerClientProvider explorerClientProvider,
     PaymentMethodHandlerDictionary paymentHandlers,
     LightningClientFactoryService lightningClientFactory,
+    ILogger<HealthMonitorService> logger,
     Logs logs) : EventHostedServiceBase(eventAggregator, logs), IPeriodicTask
 {
     private readonly Dictionary<string, bool> _alertFired = new();
 
+    protected override void SubscribeToEvents()
+    {
+        Subscribe<StoreCheckEvent>();
+        Subscribe<ServerCheckEvent>();
+    }
+
     public async Task Do(CancellationToken cancellationToken)
     {
+        logger.LogInformation("HealthMonitorService: Do() triggered");
         await WithScope(async (alertService, storeRepo, settingsRepo, pullPaymentService) =>
         {
             var serverSettings = await settingsRepo.GetSettingAsync<ServerMonitorSettings>() ?? new();
+            logger.LogInformation("HealthMonitorService: Server monitor enabled = {Enabled}", serverSettings.Enabled);
             if (serverSettings.Enabled)
                 PushEvent(new ServerCheckEvent { Settings = serverSettings });
 
@@ -101,11 +111,13 @@ public class HealthMonitorService(
     {
         try
         {
+            logger.LogInformation("HealthMonitorService: Running Bitcoin node check");
             var client = explorerClientProvider.GetExplorerClient("BTC");
             if (client is null)
                 return (MonitorStatus.Critical, "Cannot reach Bitcoin node — explorer client unavailable.");
 
             var status = await client.GetStatusAsync();
+            logger.LogInformation("HealthMonitorService: Bitcoin node status — synced={Synced}, height={Height}", status.IsFullySynched, status.ChainHeight);
             if (status is null)
                 return (MonitorStatus.Critical, "Bitcoin node is not responding.");
 
@@ -116,9 +128,15 @@ public class HealthMonitorService(
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "HealthMonitorService: Bitcoin node check threw exception");
             return (MonitorStatus.Critical, $"Bitcoin node check failed: {ex.Message}");
         }
     }
+
+    /*private Task<(MonitorStatus, string)> CheckBitcoinNode()
+    {
+        return Task.FromResult((MonitorStatus.Critical, "Test alert — simulated failure"));
+    }*/
 
     private async Task RunStoreChecks(BTCPayServer.Data.StoreData store, StoreMonitorSettings settings, 
         SettingsRepository settingsRepository, StoreRepository storeRepository, ServerAlertService serverAlertService, PullPaymentHostedService pullPaymentService)
@@ -251,6 +269,7 @@ public class HealthMonitorService(
     {
         var isUnhealthy = status == MonitorStatus.Critical;
         var alreadyFired = _alertFired.TryGetValue(key, out var prev) && prev;
+        logger.LogInformation("HealthMonitorService: HandleResult key={Key} status={Status} alreadyFired={AlreadyFired}", key, status, alreadyFired);
         if (isUnhealthy && !alreadyFired)
         {
             _alertFired[key] = true;

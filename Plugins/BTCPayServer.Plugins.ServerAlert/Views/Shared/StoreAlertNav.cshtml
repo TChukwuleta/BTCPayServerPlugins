@@ -1,8 +1,16 @@
+@using BTCPayServer.Abstractions.Contracts
 @using Microsoft.AspNetCore.Routing
 
-<li class="nav-item nav-item-sub">
-    <a asp-controller="UIServerAlert"
-       asp-action="StoreMonitorSettings" asp-route-storeId="@Context.GetRouteValue("storeId")"  layout-menu-item="StoreMonitor">
-        Health Monitor
-    </a>
-</li>
+@inject IScopeProvider ScopeProvider
+@{
+    var storeId = ScopeProvider.GetCurrentStoreId();
+}
+
+@if (!string.IsNullOrEmpty(storeId))
+{
+    <li class="nav-item">
+        <a layout-menu-item="StoreMonitor" asp-controller="UIStoreAlert" asp-action="StoreMonitorSettings" asp-route-storeId="@storeId">
+            <span text-translate="true">Store Health Monitor</span>
+        </a>
+    </li>
+}

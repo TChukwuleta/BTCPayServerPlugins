@@ -69,11 +69,9 @@
         <select asp-for="Severity" class="form-select" style="max-width:220px;" asp-items="Html.GetEnumSelectList<AnnouncementSeverity>()"></select>
     </div>
 
-    <hr class="mb-4">
-
-    <h6 class="text-muted text-uppercase fw-bold small mb-3">Email Notifications</h6>
+    <h6 class="text-muted text-uppercase fw-bold small mb-3">Notifications</h6>
     <div class="mb-3" style="max-width:300px;">
-        <label asp-for="EmailScope" class="form-label fw-semibold">Send notification to</label>
+        <label asp-for="EmailScope" class="form-label fw-semibold">Notification Type</label>
         <select asp-for="EmailScope" id="emailScopeSelect" class="form-select" asp-items="scopeItems"></select>
     </div>
 
