@@ -134,6 +134,14 @@ const showBTCPayModal = function(data) {
                 if (invoice_paid === true) {
                     showOrderConfirmation(data.orderId, data.id);
                 }
+                else {
+                    const paymentButton = document.getElementById('checkout-payment-continue');
+                    if (paymentButton) {
+                        paymentButton.textContent = 'Pay with Bitcoin';
+                        paymentButton.onclick = handleBitcoinPayment;
+                    }
+                    pollInterval = setInterval(observePaymentOptions, 300);
+                }
                 console.log('Modal closed.')
             }
         }
@@ -209,4 +217,4 @@ const loadModalScript = () => {
 
 // Entrypoint.
 loadModalScript();
-const pollInterval = setInterval(observePaymentOptions, 300);
+let pollInterval = setInterval(observePaymentOptions, 300);
