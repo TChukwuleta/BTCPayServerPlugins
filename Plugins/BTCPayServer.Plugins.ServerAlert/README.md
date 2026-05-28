@@ -85,6 +85,7 @@ Enable the monitor and configure:
 - Unprocessed payouts: alerts when approved payouts have not been sent within a configurable number of hours
 - Lightning node offline: alerts when the store's Lightning node is unreachable or not responding
 - Low inbound capacity: alerts when the percentage of channel capacity available for incoming payments falls below a configurable threshold.
+- Channel close detection: compares channel state between checks. If a channel disappears it may indicate a force close. You will be notified to investigate your Lightning node.
 - Alert Delivery: bell notification only, email only, or both
 
 Store alerts go to the store owner's email and bell notifications. Each store owner configures their own thresholds independently.

@@ -7,6 +7,7 @@ public class StoreMonitorViewModel
     public string StoreId { get; set; }
     public string StoreName { get; set; }
     public bool Enabled { get; set; }
+    public bool AlertOnChannelClose { get; set; } = true;
     public bool AlertOnUnprocessedPayout { get; set; } = true;
     public int UnprocessedPayoutThresholdHours { get; set; } = 24;
     public bool AlertOnLightningNodeOffline { get; set; } = true;
@@ -20,6 +21,7 @@ public class StoreMonitorViewModel
         StoreName = storeName,
         Enabled = s.Enabled,
         AlertOnUnprocessedPayout = s.AlertOnUnprocessedPayout,
+        AlertOnChannelClose = s.AlertOnChannelClose,
         UnprocessedPayoutThresholdHours = s.UnprocessedPayoutThresholdHours,
         AlertOnLightningNodeOffline = s.AlertOnLightningNodeOffline,
         AlertOnLowLightningInbound = s.AlertOnLowLightningInbound,
@@ -30,6 +32,7 @@ public class StoreMonitorViewModel
     public StoreMonitorSettings ToSettings() => new()
     {
         Enabled = Enabled,
+        AlertOnChannelClose = AlertOnChannelClose,
         AlertOnUnprocessedPayout = AlertOnUnprocessedPayout,
         UnprocessedPayoutThresholdHours = UnprocessedPayoutThresholdHours,
         AlertOnLightningNodeOffline = AlertOnLightningNodeOffline,

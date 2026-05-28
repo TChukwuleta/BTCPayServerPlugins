@@ -23,7 +23,7 @@ public class ServerAlertPlugin : BaseBTCPayServerPlugin
         services.AddScoped<ServerAlertService>();
         services.AddSingleton<HealthMonitorService>();
         services.AddSingleton<IHostedService>(p => p.GetRequiredService<HealthMonitorService>());
-        services.AddScheduledTask<HealthMonitorService>(TimeSpan.FromSeconds(20));
+        services.AddScheduledTask<HealthMonitorService>(TimeSpan.FromHours(1));
         services.AddSingleton<INotificationHandler, ServerAlertNotificationHandler>();
     }
 }

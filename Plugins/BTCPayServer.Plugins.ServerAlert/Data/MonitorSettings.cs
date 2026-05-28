@@ -16,6 +16,7 @@ public class StoreMonitorSettings
 {
     public bool Enabled { get; set; } = false;
     public bool AlertOnUnprocessedPayout { get; set; } = true;
+    public bool AlertOnChannelClose { get; set; } = true;
     public int UnprocessedPayoutThresholdHours { get; set; } = 24;
     public bool AlertOnLightningNodeOffline { get; set; } = true;
     public bool AlertOnLowLightningInbound { get; set; } = true;

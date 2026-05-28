@@ -27,10 +27,10 @@ public class HealthMonitorService(
     ExplorerClientProvider explorerClientProvider,
     PaymentMethodHandlerDictionary paymentHandlers,
     LightningClientFactoryService lightningClientFactory,
-    ILogger<HealthMonitorService> logger,
     Logs logs) : EventHostedServiceBase(eventAggregator, logs), IPeriodicTask
 {
     private readonly Dictionary<string, bool> _alertFired = new();
+    private readonly Dictionary<string, List<string>> _channelCache = new();
 
     protected override void SubscribeToEvents()
     {
@@ -40,11 +40,9 @@ public class HealthMonitorService(
 
     public async Task Do(CancellationToken cancellationToken)
     {
-        logger.LogInformation("HealthMonitorService: Do() triggered");
         await WithScope(async (alertService, storeRepo, settingsRepo, pullPaymentService) =>
         {
             var serverSettings = await settingsRepo.GetSettingAsync<ServerMonitorSettings>() ?? new();
-            logger.LogInformation("HealthMonitorService: Server monitor enabled = {Enabled}", serverSettings.Enabled);
             if (serverSettings.Enabled)
                 PushEvent(new ServerCheckEvent { Settings = serverSettings });
 
@@ -111,13 +109,11 @@ public class HealthMonitorService(
     {
         try
         {
-            logger.LogInformation("HealthMonitorService: Running Bitcoin node check");
             var client = explorerClientProvider.GetExplorerClient("BTC");
             if (client is null)
                 return (MonitorStatus.Critical, "Cannot reach Bitcoin node — explorer client unavailable.");
 
             var status = await client.GetStatusAsync();
-            logger.LogInformation("HealthMonitorService: Bitcoin node status — synced={Synced}, height={Height}", status.IsFullySynched, status.ChainHeight);
             if (status is null)
                 return (MonitorStatus.Critical, "Bitcoin node is not responding.");
 
@@ -128,7 +124,6 @@ public class HealthMonitorService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "HealthMonitorService: Bitcoin node check threw exception");
             return (MonitorStatus.Critical, $"Bitcoin node check failed: {ex.Message}");
         }
     }
@@ -138,7 +133,7 @@ public class HealthMonitorService(
         return Task.FromResult((MonitorStatus.Critical, "Test alert — simulated failure"));
     }*/
 
-    private async Task RunStoreChecks(BTCPayServer.Data.StoreData store, StoreMonitorSettings settings, 
+    private async Task RunStoreChecks(BTCPayServer.Data.StoreData store, StoreMonitorSettings settings,
         SettingsRepository settingsRepository, StoreRepository storeRepository, ServerAlertService serverAlertService, PullPaymentHostedService pullPaymentService)
     {
         if (settings.AlertOnUnprocessedPayout)
@@ -169,11 +164,10 @@ public class HealthMonitorService(
                 settingsRepository: settingsRepository);
         }
 
-        if (settings.AlertOnLightningNodeOffline || settings.AlertOnLowLightningInbound)
+        if (settings.AlertOnLightningNodeOffline || settings.AlertOnLowLightningInbound || settings.AlertOnChannelClose)
         {
             try
             {
-
                 var paymentMethodId = PaymentMethodId.Parse("BTC-LN");
                 var config = store.GetPaymentMethodConfig<LightningPaymentMethodConfig>(paymentMethodId, paymentHandlers, onlyEnabled: true);
                 if (config is null || string.IsNullOrEmpty(config.ConnectionString)) return;
@@ -185,6 +179,7 @@ public class HealthMonitorService(
                 LightningNodeInformation info = null;
                 var offlineKey = $"store:{store.Id}:lightning:offline";
                 var inboundKey = $"store:{store.Id}:lightning:inbound";
+                var channelKey = $"store:{store.Id}:lightning:channel";
 
                 try { info = await client.GetInfo(); }
                 catch (Exception ex)
@@ -222,19 +217,19 @@ public class HealthMonitorService(
 
                     if (isOffline) return;
                 }
-                if (settings.AlertOnLowLightningInbound && info is not null)
-                {
-                    var channels = await client.ListChannels();
-                    if (channels is null || channels.Length == 0) return;
+                var channels = await client.ListChannels();
+                if (channels is null) return;
 
+                if (settings.AlertOnLowLightningInbound && channels.Length > 0 && info is not null)
+                {
                     var totalCapacity = channels.Sum(c => c.Capacity.MilliSatoshi);
                     var totalLocalBalance = channels.Sum(c => c.LocalBalance.MilliSatoshi);
                     var totalInbound = totalCapacity - totalLocalBalance;
-                    if (totalCapacity == 0) return;
-
-                    var inboundPercent = (int)((totalInbound * 100) / totalCapacity);
-                    var isLow = inboundPercent <= settings.LowLightningInboundThresholdPercent;
-                    await HandleResult(
+                    if (totalCapacity > 0)
+                    {
+                        var inboundPercent = (int)((totalInbound * 100) / totalCapacity);
+                        var isLow = inboundPercent <= settings.LowLightningInboundThresholdPercent;
+                        await HandleResult(
                         key: inboundKey,
                         title: $"Store '{store.StoreName}': Low Lightning inbound liquidity",
                         recoveryTitle: $"Store '{store.StoreName}': Lightning inbound liquidity restored",
@@ -246,6 +241,32 @@ public class HealthMonitorService(
                         customEmails: await GetOwnerEmails(store.Id, storeRepository),
                         serverAlertService: serverAlertService,
                         settingsRepository: settingsRepository);
+                    }
+                }
+
+                if (settings.AlertOnChannelClose)
+                {
+                    var currentChannelPoints = channels.Select(c => c.ChannelPoint?.ToString()).Where(cp => cp is not null).ToList();
+                    var hadPreviousSnapshot = _channelCache.TryGetValue(store.Id, out var previousChannelPoints);
+                    if (hadPreviousSnapshot && previousChannelPoints.Any())
+                    {
+                        var disappeared = previousChannelPoints.Except(currentChannelPoints).ToList();
+                        if (disappeared.Any())
+                        {
+                            var closureKey = $"{channelKey}:{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+                            await HandleResult(
+                                key: closureKey,
+                                title: $"Store '{store.StoreName}': {disappeared.Count} Lightning channel(s) closed",
+                                recoveryTitle: string.Empty,
+                                message: $"{disappeared.Count} channel(s) that existed at the last check are no longer present. This may indicate a force close. Review your Lightning node for details.",
+                                status: MonitorStatus.Warning,
+                                emailScope: settings.Delivery == AlertDelivery.BellOnly ? EmailScope.None : EmailScope.CustomEmails,
+                                customEmails: await GetOwnerEmails(store.Id, storeRepository),
+                                serverAlertService: serverAlertService,
+                                settingsRepository: settingsRepository);
+                        }
+                    }
+                    _channelCache[store.Id] = currentChannelPoints;
                 }
             }
             catch (Exception ex)
@@ -269,7 +290,6 @@ public class HealthMonitorService(
     {
         var isUnhealthy = status == MonitorStatus.Critical;
         var alreadyFired = _alertFired.TryGetValue(key, out var prev) && prev;
-        logger.LogInformation("HealthMonitorService: HandleResult key={Key} status={Status} alreadyFired={AlreadyFired}", key, status, alreadyFired);
         if (isUnhealthy && !alreadyFired)
         {
             _alertFired[key] = true;
