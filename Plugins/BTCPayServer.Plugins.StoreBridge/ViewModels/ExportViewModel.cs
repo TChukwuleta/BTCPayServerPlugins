@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 
 namespace BTCPayServer.Plugins.StoreBridge.ViewModels;
+
 public class ExportViewModel
 {
     public string StoreId { get; set; }
@@ -15,7 +16,9 @@ public class ExportViewModel
         "Webhooks",
         "Roles",
         "Forms",
-        "Subscriptions"
+        "Subscriptions",
+        "PullPayments",
+        "StoreUsers"
     };
     public bool IsSelected(string option) => SelectedOptions?.Contains(option) ?? false;
 
@@ -28,6 +31,8 @@ public class ExportViewModel
         ["Webhooks"] = ("Webhooks", "Webhook configurations and endpoints"),
         ["Roles"] = ("Roles & Permissions", "Store roles and access permissions"),
         ["Forms"] = ("Forms", "Custom forms and their configurations"),
-        ["Subscriptions"] = ("Subscription Offerings & Plans", "Subscription offerings, plans, and features")
+        ["Subscriptions"] = ("Subscription Offerings & Plans", "Subscription offerings, plans, and features"),
+        ["PullPayments"] = ("Pull Payments", "Pull payment configurations and payout history"),
+        ["StoreUsers"] = ("Store Users", "List of users and their roles")
     };
 }

@@ -9,12 +9,38 @@
     var storeId = ScopeProvider.GetCurrentStoreId();
     ViewData.SetLayoutModel(new LayoutModel("StoreBridge-Export", "Store Bridge - Export") { ActiveCategory = "StoreBridge" });
 }
-<div class="sticky-header">
+@* <div class="sticky-header">
     <h2 text-translate="true">@ViewData["Title"]</h2>
     <div class="d-flex gap-3 mt-3 mt-sm-0">
         <button type="submit" form="exportForm" class="btn btn-primary">Export Store</button>
     </div>
+</div> *@
+<div class="sticky-header">
+    <h2 text-translate="true">@ViewData["Title"]</h2>
+    <div class="d-flex gap-3 mt-3 mt-sm-0">
+        <div class="btn-group">
+            <button type="submit" name="ExportFormat" value="Json" form="exportForm" class="btn btn-primary">
+                Export as JSON
+            </button>
+            <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="visually-hidden">Toggle Dropdown</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    <button type="submit" name="ExportFormat" value="Json" form="exportForm" class="dropdown-item">
+                        Export as JSON
+                    </button>
+                </li>
+                <li>
+                    <button type="submit" name="ExportFormat" value="StoreBridge" form="exportForm" class="dropdown-item">
+                        Export as .storebridge
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
 </div>
+
 <partial name="_StatusMessage" />
 <form method="post" asp-action="ExportStorePost" asp-route-storeId="@storeId" id="exportForm">
     <input type="hidden" asp-for="StoreId" />

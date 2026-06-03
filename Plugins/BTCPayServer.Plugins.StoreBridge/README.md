@@ -11,6 +11,7 @@ Export and import store configurations in BTCPay Server.
 - Webhooks
 - Roles and Permissions
 - Custom Forms
+- Subscription e.t.c.
 
 
 ## Installation
@@ -24,10 +25,10 @@ Now that you have installed the plugin, you can go ahead and export store settin
 in the same instance or across other instance. 
 
 Go to `Export Plugin Config` of the Store Bridge plugin. There you would see all the store configuration that are open to be exported. 
-Toggle off the settings/configuration you don't want to export. Once done, click the `Export Store` button and it would download
-.storebridge file on your local computer. 
+Toggle off the settings/configuration you don't want to export. Once done, click the `Export Store`, you can choose to either export as json or export
+as .storebridge file on your local computer. 
 
-Log in to the store you want to import the configuration to. Go to the Store bridge plugin > `Import Store Config`, and upload the 
+If you want to import the configuration in a different instance and store, Log in to the store, go to the Store bridge plugin > `Import Store Config`, and upload the 
 .storebridge file that was downloaded in the export. 
 
 There you would see all the available store configuration that you can import based on what was selected during export. 

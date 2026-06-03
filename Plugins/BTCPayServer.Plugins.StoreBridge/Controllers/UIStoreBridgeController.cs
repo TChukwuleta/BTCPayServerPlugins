@@ -49,7 +49,7 @@ public class UIStoreBridgeController : Controller
         });
     }
 
-    [HttpPost("export")]
+    /*[HttpPost("export")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ExportStorePost(string storeId, ExportViewModel vm)
     {
@@ -60,6 +60,36 @@ public class UIStoreBridgeController : Controller
             var encryptedData = await _service.ExportStore(GetBaseUrl(), GetUserId(), store, vm.SelectedOptions);
             var filename = $"btcpay-store-{DateTime.UtcNow.Ticks}.storebridge";
             return File(encryptedData, "application/octet-stream", filename);
+        }
+        catch (Exception ex)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = $"Export failed: {ex.Message}";
+            return RedirectToAction(nameof(ExportStore), new { storeId });
+        }
+    }*/
+
+    [HttpPost("export")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ExportStorePost(string storeId, ExportViewModel vm, string exportFormat = "Json")
+    {
+        if (CurrentStore == null) return NotFound();
+        try
+        {
+            var store = await _storeRepository.FindStore(CurrentStore.Id);
+            var timestamp = DateTime.UtcNow.Ticks;
+
+            if (exportFormat == "StoreBridge")
+            {
+                var encryptedData = await _service.ExportStore(GetBaseUrl(), GetUserId(), store, vm.SelectedOptions);
+                return File(encryptedData, "application/octet-stream", $"btcpay-store-{timestamp}.storebridge");
+            }
+            else // Json (default)
+            {
+                var exportData = await _service.GetExportData(GetBaseUrl(), GetUserId(), store, vm.SelectedOptions);
+                var json = Newtonsoft.Json.JsonConvert.SerializeObject(exportData, Newtonsoft.Json.Formatting.Indented);
+                var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+                return File(bytes, "application/json", $"btcpay-store-{timestamp}.json");
+            }
         }
         catch (Exception ex)
         {

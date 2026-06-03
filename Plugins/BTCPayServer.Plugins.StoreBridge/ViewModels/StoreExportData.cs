@@ -16,7 +16,65 @@ public class StoreExportData
     public List<FormExport> Forms { get; set; }
     public List<PaymentMethodExportData> PaymentMethods { get; set; }
     public List<SubscriptionOfferingExportData> SubscriptionOfferings { get; set; }
+    public List<InvoiceExport> Invoices { get; set; }
+    public List<PaymentRequestExport> PaymentRequests { get; set; }
+    public List<PullPaymentExport> PullPayments { get; set; }
+    public List<StoreUserExport> StoreUsers { get; set; }
+
     public StoreBridgeData Store { get; set; } = new();
+}
+
+public class InvoiceExport
+{
+    public string InvoiceId { get; set; }
+    public string OrderId { get; set; }
+    public decimal Price { get; set; }
+    public string Currency { get; set; }
+    public string Status { get; set; }
+    public DateTimeOffset InvoiceTime { get; set; }
+    public DateTimeOffset ExpirationTime { get; set; }
+    public string BuyerEmail { get; set; }
+    public string MetadataJson { get; set; }
+}
+
+public class PaymentRequestExport
+{
+    public string Title { get; set; }
+    public decimal Amount { get; set; }
+    public string Currency { get; set; }
+    public string Description { get; set; }
+    public DateTimeOffset? ExpiryDate { get; set; }
+    public bool AllowCustomPaymentAmounts { get; set; }
+    public string FormId { get; set; }
+    public string Email { get; set; }
+    public string Status { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+public class PullPaymentExport
+{
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public decimal Amount { get; set; }
+    public string Currency { get; set; }
+    public DateTimeOffset StartsAt { get; set; }
+    public DateTimeOffset? ExpiresAt { get; set; }
+    public bool AutoApproveClaims { get; set; }
+    public List<PayoutExport> Payouts { get; set; }
+}
+
+public class PayoutExport
+{
+    public decimal Amount { get; set; }
+    public string Currency { get; set; }
+    public string State { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+public class StoreUserExport
+{
+    public string Email { get; set; }
+    public string Role { get; set; }
 }
 
 public class AppExport
