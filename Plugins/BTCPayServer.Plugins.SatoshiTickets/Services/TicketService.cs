@@ -51,7 +51,7 @@ public class TicketService(SimpleTicketSalesDbContextFactory dbContextFactory, I
 
         var fileName = $"{ticketEvent.Title}_Tickets-{DateTime.Now:yyyy_MM_dd-HH_mm_ss}.csv";
         var csvData = new StringBuilder();
-        csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Amount,Currency,Crypto Currency,Crypto Amount Paid,Attended Event");
+        csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Face Value,Currency,Order Subtotal,Discount Code,Order Discount,Order Net Total,Crypto Currency,Crypto Amount Paid,Attended Event");
 
         foreach (var order in orders)
         {
@@ -60,12 +60,14 @@ public class TicketService(SimpleTicketSalesDbContextFactory dbContextFactory, I
             var cryptoCurrency = payments?.FirstOrDefault()?.Currency ?? "";
             var totalCryptoPaid = payments?.Sum(p => p.PaidAmount.Net) ?? 0m;
             var totalFiatAmount = order.Tickets.Sum(t => t.Amount);
+            var orderSubtotal = order.SubtotalAmount ?? totalFiatAmount;
+            var discountCode = string.IsNullOrEmpty(order.DiscountCodeValue) ? "" : order.DiscountCodeValue;
 
             foreach (var ticket in order.Tickets)
             {
                 var proportion = totalFiatAmount > 0 ? ticket.Amount / totalFiatAmount : 0m;
                 var cryptoForTicket = Math.Round(totalCryptoPaid * proportion, 8);
-                csvData.AppendLine($"{order.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{order.Currency},{cryptoCurrency},{cryptoForTicket},{ticket.UsedAt.HasValue}");
+                csvData.AppendLine($"{order.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{order.Currency},{orderSubtotal},{discountCode},{order.DiscountAmount},{order.TotalAmount},{cryptoCurrency},{cryptoForTicket},{ticket.UsedAt.HasValue}");
             }
         }
         return (Encoding.UTF8.GetBytes(csvData.ToString()), fileName);

@@ -17,6 +17,7 @@ public class SimpleTicketSalesDbContext : DbContext
     public DbSet<Event> Events { get; set; }
     public DbSet<Ticket> Tickets { get; set; }
     public DbSet<TicketType> TicketTypes { get; set; }
+    public DbSet<DiscountCode> DiscountCodes { get; set; }
     public DbSet<Order> Orders { get; set; }
     public DbSet<SatoshiTicketsSetting> SatoshiTicketsSettings { get; set; }
 

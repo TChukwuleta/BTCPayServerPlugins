@@ -24,6 +24,11 @@ public class EventTicketOrdersVm
     public string LastName { get; set; }
     public string Email { get; set; }
     public DateTimeOffset PurchaseDate { get; set; }
+    public decimal? Subtotal { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public string DiscountCode { get; set; }
+    public decimal Total { get; set; }
+    public string Currency { get; set; }
     public List<EventContactPersonTicketVm> Tickets { get; set; }
 }
 

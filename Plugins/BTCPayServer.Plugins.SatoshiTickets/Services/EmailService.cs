@@ -199,6 +199,7 @@ Click the link to view your tickets: {ticket.QRCodeLink}";
                 .Replace("{{EventDate}}", ticketEvent.StartDate.ToString("MMMM dd, yyyy"))
                 .Replace("{{Currency}}", ticketEvent.Currency);
 
+            emailBody = ApplyOrderFinancials(emailBody, null, ticketEvent.Currency);
             try
             {
                 recipients.Add(new EmailRecipient
@@ -244,5 +245,34 @@ Click the link to view your tickets: {ticket.QRCodeLink}";
     {
         public List<string> FailedRecipients { get; set; } = new();
         public bool IsSuccessful { get; set; }
+    }
+
+    private static string ApplyOrderFinancials(string body, Order order, string currency)
+    {
+        if (string.IsNullOrEmpty(body))
+            return body;
+
+        if (order == null)
+        {
+            return body
+                .Replace("{{Subtotal}}", string.Empty)
+                .Replace("{{Discount}}", string.Empty)
+                .Replace("{{DiscountCode}}", string.Empty)
+                .Replace("{{DiscountLine}}", string.Empty)
+                .Replace("{{Total}}", string.Empty);
+        }
+
+        var subtotal = order.SubtotalAmount ?? order.TotalAmount;
+        var hasDiscount = order.DiscountAmount > 0;
+        var discountLine = hasDiscount
+            ? $"Discount ({order.DiscountCodeValue}): -{order.DiscountAmount:N2} {currency}"
+            : string.Empty;
+
+        return body
+            .Replace("{{Subtotal}}", $"{subtotal:N2} {currency}")
+            .Replace("{{Discount}}", hasDiscount ? $"-{order.DiscountAmount:N2} {currency}" : string.Empty)
+            .Replace("{{DiscountCode}}", hasDiscount ? order.DiscountCodeValue : string.Empty)
+            .Replace("{{DiscountLine}}", discountLine)
+            .Replace("{{Total}}", $"{order.TotalAmount:N2} {currency}");
     }
 }
