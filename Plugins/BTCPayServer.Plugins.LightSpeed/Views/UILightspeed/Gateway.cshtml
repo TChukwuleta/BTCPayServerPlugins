@@ -93,7 +93,15 @@
         }
         else
         {
-            <iframe id="btcpay-frame" src="@invoiceUrl" allowtransparency="true" title="Bitcoin Payment"></iframe>
+            <iframe id="btcpay-frame"
+                    src="@invoiceUrl"
+                    allowtransparency="true"
+                    allow="payment; clipboard-write; clipboard-read"
+                    title="Bitcoin Payment"></iframe>
+
+            <a id="open-invoice" href="@invoiceUrl" target="_blank"
+               rel="noopener noreferrer" class="open-btn">Open payment in new tab</a>
+
             <div id="status-msg" class="status-msg"></div>
 
             <script>

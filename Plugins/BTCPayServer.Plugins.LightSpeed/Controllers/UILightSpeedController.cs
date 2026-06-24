@@ -1,8 +1,6 @@
 using System;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using Azure;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Client;
@@ -142,6 +140,10 @@ public class UILightSpeedController : Controller
     [AllowAnonymous]
     public async Task<IActionResult> Status(string storeId, string invoiceId)
     {
+        Response.Headers.Append("Content-Type", "text/event-stream");
+        Response.Headers.Append("Cache-Control", "no-cache");
+        Response.Headers.Append("Connection", "keep-alive");
+
         var payment = await _lightSpeedService.GetPayment(invoiceId);
         var store = await _storeRepository.FindStore(storeId);
         if (store is null || payment is null)
