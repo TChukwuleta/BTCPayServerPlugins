@@ -14,16 +14,19 @@ public class SimpleTicketSalesDbContext : DbContext
         _designTime = designTime;
     }
 
+    public DbSet<Order> Orders { get; set; }
     public DbSet<Event> Events { get; set; }
     public DbSet<Ticket> Tickets { get; set; }
     public DbSet<TicketType> TicketTypes { get; set; }
     public DbSet<DiscountCode> DiscountCodes { get; set; }
-    public DbSet<Order> Orders { get; set; }
     public DbSet<SatoshiTicketsSetting> SatoshiTicketsSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.SatoshiTickets");
+
+        modelBuilder.Entity<DiscountCode>()
+            .HasIndex(d => new { d.EventId, d.Code }).IsUnique();
     }
 }

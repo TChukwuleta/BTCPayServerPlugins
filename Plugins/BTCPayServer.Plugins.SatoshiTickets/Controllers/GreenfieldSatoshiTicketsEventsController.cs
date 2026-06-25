@@ -114,7 +114,7 @@ public class GreenfieldSatoshiTicketsEventsController(StoreRepository storeRepo,
             EmailBody = request.EmailBody,
             EventType = parsedEventType,
             HasMaximumCapacity = false,
-            EventState = Data.EntityState.Disabled,
+            EventState = Data.DiscountCodeState.Disabled,
             CreatedAt = DateTime.UtcNow
         };
         await using var ctx = dbContextFactory.CreateContext();
@@ -211,12 +211,12 @@ public class GreenfieldSatoshiTicketsEventsController(StoreRepository storeRepo,
             return EventNotFound();
 
         var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == eventId).ToList();
-        if (!ticketTypes.Any() && entity.EventState == Data.EntityState.Disabled)
+        if (!ticketTypes.Any() && entity.EventState == Data.DiscountCodeState.Disabled)
         {
             return this.CreateAPIError(422, "no-ticket-types",
                 "Cannot activate event without ticket types. Create at least one ticket type first.");
         }
-        entity.EventState = entity.EventState == Data.EntityState.Active ? Data.EntityState.Disabled : Data.EntityState.Active;
+        entity.EventState = entity.EventState == Data.DiscountCodeState.Active ? Data.DiscountCodeState.Disabled : Data.DiscountCodeState.Active;
         ctx.Events.Update(entity);
         await ctx.SaveChangesAsync();
 
@@ -302,7 +302,7 @@ public class GreenfieldSatoshiTicketsEventsController(StoreRepository storeRepo,
             MaximumEventCapacity = entity.MaximumEventCapacity,
             EventState = entity.EventState.ToString(),
             CreatedAt = entity.CreatedAt,
-            PurchaseLink = entity.EventState == Data.EntityState.Disabled ? null : Url.Action(nameof(UITicketSalesPublicController.EventSummary), "UITicketSalesPublic",
+            PurchaseLink = entity.EventState == Data.DiscountCodeState.Disabled ? null : Url.Action(nameof(UITicketSalesPublicController.EventSummary), "UITicketSalesPublic",
                 new { storeId = entity.StoreId, eventId = entity.Id }, Request.Scheme)
         };
     }

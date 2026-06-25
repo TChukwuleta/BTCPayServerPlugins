@@ -74,7 +74,7 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicT
             await using var ctx = _dbContextFactory.CreateContext();
             var now = DateTimeOffset.UtcNow;
 
-            var upcomingEvents = ctx.Events.Where(e => e.EventState == Data.EntityState.Active && e.StartDate > now.UtcDateTime
+            var upcomingEvents = ctx.Events.Where(e => e.EventState == Data.DiscountCodeState.Active && e.StartDate > now.UtcDateTime
                          && e.ReminderSentAt == null && e.StoreId == sequentialExecute.StoreId).ToList();
 
             if (!upcomingEvents.Any()) return;

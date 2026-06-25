@@ -80,8 +80,8 @@
                                    asp-route-storeId="@Model.StoreId"
                                    asp-route-eventId="@ticketType.EventId"
                                    asp-route-ticketTypeId="@ticketType.TicketTypeId"
-                                   asp-route-enable="@(ticketType.TicketTypeState == EntityState.Disabled)">
-                                    @(ticketType.TicketTypeState == EntityState.Disabled ? "Activate" : "Disable")
+                                   asp-route-enable="@(ticketType.TicketTypeState == DiscountCodeState.Disabled)">
+                                    @(ticketType.TicketTypeState == DiscountCodeState.Disabled ? "Activate" : "Disable")
                                 </a>
 
                                 <a asp-action="DeleteTicketType"

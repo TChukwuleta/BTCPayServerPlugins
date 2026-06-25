@@ -75,7 +75,6 @@ public class ContactInfoPageViewModel : BaseSimpleTicketPublicViewModel
     public string EventTitle { get; set; }
     public List<TicketSelectionViewModel> Tickets { get; set; }
     public List<TicketContactInfoViewModel> ContactInfo { get; set; } = new List<TicketContactInfoViewModel>();
-
     public string DiscountCode { get; set; }
     public decimal? DiscountAmount { get; set; }
     public string DiscountMessage { get; set; }

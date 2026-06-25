@@ -162,7 +162,7 @@ public class UITicketSalesController(UriResolver uriResolver,
         await using var ctx = dbContextFactory.CreateContext();
 
         var entity = TicketSalesEventViewModelToEntity(vm, null, CurrentStore.Id);
-        entity.EventState = Data.EntityState.Disabled;
+        entity.EventState = Data.DiscountCodeState.Disabled;
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
         {
@@ -280,7 +280,7 @@ public class UITicketSalesController(UriResolver uriResolver,
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
 
-        ticketEvent.EventState = enable ? Data.EntityState.Active : Data.EntityState.Disabled;
+        ticketEvent.EventState = enable ? Data.DiscountCodeState.Active : Data.DiscountCodeState.Disabled;
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = $"Event {(enable ? "activated" : "disabled")} successfully";
         return RedirectToAction(nameof(List), new { storeId });
@@ -396,6 +396,11 @@ public class UITicketSalesController(UriResolver uriResolver,
                     LastName = firstTicket?.LastName,
                     Email = firstTicket?.Email,
                     PurchaseDate = o.PurchaseDate!.Value,
+                    Subtotal = o.SubtotalAmount,
+                    DiscountAmount = o.DiscountAmount,
+                    DiscountCode = o.DiscountCodeValue,
+                    Total = o.TotalAmount,
+                    Currency = o.Currency,
                     Tickets = settledOrderTickets.Select(t => new EventContactPersonTicketVm
                     {
                         Id = t.Id,

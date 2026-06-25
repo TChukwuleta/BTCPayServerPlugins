@@ -1,0 +1,91 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.SatoshiTickets.Data
+@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@model UpsertDiscountCodeViewModel
+@{
+    var isEdit = !string.IsNullOrEmpty(Model.Id);
+    var title = isEdit ? "Edit Discount Code" : "Create Discount Code";
+    ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketIndex), title) { ActiveCategory = nameof(SatoshiTicketNavPages) });
+}
+
+<div class="sticky-header">
+    <h2>
+        @title
+        <span class="text-muted h5 ms-2">@Model.EventTitle</span>
+    </h2>
+    <a asp-controller="UITicketSettings" asp-action="DiscountCodes" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId"
+       class="btn btn-secondary" role="button">Back to list</a>
+</div>
+
+<partial name="_StatusMessage" />
+
+<div class="row">
+    <div class="col-xl-8 col-xxl-constrain">
+        <form asp-controller="UITicketSettings" asp-action="SaveDiscountCode" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" method="post">
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="StoreId" />
+            <input type="hidden" asp-for="EventId" />
+
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="form-group mb-3">
+                <label asp-for="Code" class="form-label"></label>
+                <input asp-for="Code" class="form-control" placeholder="e.g. EARLYBIRD" style="text-transform:uppercase" />
+                <span asp-validation-for="Code" class="text-danger"></span>
+            </div>
+
+            <div class="row">
+                <div class="form-group mb-3 col-md-6">
+                    <label asp-for="DiscountType" class="form-label"></label>
+                    <select asp-for="DiscountType" class="form-select" asp-items="Html.GetEnumSelectList<DiscountType>()"></select>
+                </div>
+                <div class="form-group mb-3 col-md-6">
+                    <label asp-for="Value" class="form-label"></label>
+                    <input asp-for="Value" type="number" step="0.01" class="form-control" />
+                    <span asp-validation-for="Value" class="text-danger"></span>
+                    <div class="form-text">For a percentage, use 1–99.</div>
+                </div>
+            </div>
+
+            <div class="form-group mb-3">
+                <label asp-for="TicketTypeId" class="form-label"></label>
+                <select asp-for="TicketTypeId" class="form-select">
+                    <option value="">All ticket types</option>
+                    @foreach (var opt in Model.TicketTypeOptions)
+                    {
+                        <option value="@opt.Id">@opt.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="row">
+                <div class="form-group mb-3 col-md-6">
+                    <label asp-for="MaxUses" class="form-label"></label>
+                    <input asp-for="MaxUses" type="number" min="1" class="form-control" />
+                </div>
+                <div class="form-group mb-3 col-md-6">
+                    <label asp-for="MinQuantity" class="form-label"></label>
+                    <input asp-for="MinQuantity" type="number" min="1" class="form-control" />
+                </div>
+            </div>
+
+            <div class="form-group mb-3">
+                <label asp-for="ExpiryDate" class="form-label"></label>
+                <input asp-for="ExpiryDate" type="datetime-local" class="form-control" />
+                <div class="form-text">Optional.</div>
+            </div>
+
+            <div class="form-check mb-4">
+                <input asp-for="IsActive" class="btcpay-toggle me-2" type="checkbox" />
+                <label asp-for="IsActive" class="form-check-label"></label>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save Discount Code</button>
+        </form>
+    </div>
+</div>
+
+@section PageFootContent {
+    <partial name="_ValidationScriptsPartial" />
+}

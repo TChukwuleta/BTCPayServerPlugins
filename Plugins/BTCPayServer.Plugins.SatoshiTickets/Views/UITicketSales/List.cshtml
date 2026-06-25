@@ -104,8 +104,8 @@
                                        asp-action="ToggleTicketEventStatus"
                                        asp-route-storeId="@Model.StoreId"
                                        asp-route-eventId="@ticketEvent.Id"
-                                       asp-route-enable="@(ticketEvent.EventState == EntityState.Disabled)">
-                                        @(ticketEvent.EventState == EntityState.Disabled ? "Activate" : "Disable")
+                                       asp-route-enable="@(ticketEvent.EventState == DiscountCodeState.Disabled)">
+                                        @(ticketEvent.EventState == DiscountCodeState.Disabled ? "Activate" : "Disable")
                                     </a>
                                 </div>
                             }

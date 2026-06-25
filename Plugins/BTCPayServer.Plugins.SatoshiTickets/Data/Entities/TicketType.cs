@@ -13,5 +13,5 @@ public class TicketType
     public int Quantity { get; set; }
     public int QuantitySold { get; set; }
     public string EventId { get; set; }
-    public EntityState TicketTypeState { get; set; }
+    public DiscountCodeState TicketTypeState { get; set; }
 }

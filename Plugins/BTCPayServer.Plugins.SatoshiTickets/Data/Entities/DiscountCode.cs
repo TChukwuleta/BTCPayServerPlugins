@@ -18,6 +18,6 @@ public class DiscountCode
     public int UsesCount { get; set; }
     public DateTimeOffset? ExpiryDate { get; set; }
     public int? MinQuantity { get; set; }
-    public EntityState DiscountCodeState { get; set; }
+    public DiscountCodeState DiscountCodeState { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }

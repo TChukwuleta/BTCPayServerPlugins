@@ -20,6 +20,7 @@
         @if (!string.IsNullOrEmpty(Model.EventId))
         {
             <a asp-controller="UITicketType" asp-action="List" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Ticket Tiers</a>
+            <a asp-controller="UITicketSettings" asp-action="DiscountCodes" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Discount Codes</a>
         }
         <button type="submit" form="event-form" class="btn btn-success">@(isEditMode ? "Update Event" : "Create Event")</button>
     </div>

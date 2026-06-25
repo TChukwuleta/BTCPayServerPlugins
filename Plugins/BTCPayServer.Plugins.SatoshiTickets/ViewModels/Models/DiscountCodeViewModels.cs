@@ -25,7 +25,7 @@ public class DiscountCodeListItemViewModel
     public int? MaxUses { get; set; }
     public int UsesCount { get; set; }
     public DateTimeOffset? ExpiryDate { get; set; }
-    public EntityState DiscountCodeState { get; set; }
+    public DiscountCodeState DiscountCodeState { get; set; }
 }
 
 public class UpsertDiscountCodeViewModel
@@ -58,7 +58,7 @@ public class UpsertDiscountCodeViewModel
     public int? MinQuantity { get; set; }
 
     [Display(Name = "Expiry Date (optional)")]
-    public DateTime? ExpiryDate { get; set; }
+    public DateTimeOffset? ExpiryDate { get; set; }
 
     [Display(Name = "Active")]
     public bool IsActive { get; set; } = true;

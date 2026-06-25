@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
-using EntityState = BTCPayServer.Plugins.SatoshiTickets.Data.EntityState;
+using DiscountCodeState = BTCPayServer.Plugins.SatoshiTickets.Data.DiscountCodeState;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Controllers;
 
@@ -100,7 +100,7 @@ public class GreenfieldSatoshiTicketTypesController(SimpleTicketSalesDbContextFa
             Quantity = request.Quantity,
             Description = request.Description,
             IsDefault = request.IsDefault,
-            TicketTypeState = EntityState.Active
+            TicketTypeState = DiscountCodeState.Active
         };
         var currentDefault = ctx.TicketTypes.FirstOrDefault(c => c.EventId == eventId && c.IsDefault);
         if (currentDefault == null)
@@ -222,7 +222,7 @@ public class GreenfieldSatoshiTicketTypesController(SimpleTicketSalesDbContextFa
         if (entity == null)
             return TicketTypeNotFound();
 
-        entity.TicketTypeState = entity.TicketTypeState == EntityState.Active ? EntityState.Disabled : EntityState.Active;
+        entity.TicketTypeState = entity.TicketTypeState == DiscountCodeState.Active ? DiscountCodeState.Disabled : DiscountCodeState.Active;
         await ctx.SaveChangesAsync();
         return Ok(ToTicketTypeData(entity));
     }
