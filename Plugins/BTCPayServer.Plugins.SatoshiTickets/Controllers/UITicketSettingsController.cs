@@ -148,9 +148,7 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
             vm.TicketTypeOptions = GetTicketTypeOptions(ctx, eventId);
             return View("UpsertDiscountCode", vm);
         }
-
         var ticketTypeId = string.IsNullOrEmpty(vm.TicketTypeId) ? null : vm.TicketTypeId;
-
         DateTimeOffset? expiry = vm.ExpiryDate;
         if (string.IsNullOrEmpty(vm.Id))
         {
@@ -185,7 +183,6 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
             existingCode.ExpiryDate = expiry;
             existingCode.DiscountCodeState = vm.IsActive ? DiscountCodeState.Active : DiscountCodeState.Disabled;
         }
-
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Discount code saved successfully";
         return RedirectToAction(nameof(DiscountCodes), new { storeId, eventId });
@@ -224,7 +221,6 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
             TempData[WellKnownTempData.ErrorMessage] = "Cannot delete discount code as it has been used";
             return RedirectToAction(nameof(DiscountCodes), new { storeId, eventId });
         }
-
         ctx.DiscountCodes.Remove(code);
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Discount code deleted";
@@ -239,7 +235,6 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
 
         await using var ctx = dbContextFactory.CreateContext();
         var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == CurrentStore.Id);
-
         ViewData["StoreEmailSettingsConfigured"] = await emailService.IsEmailSettingsConfigured(CurrentStore.Id);
         var vm = new SatoshiTicketsSettingsViewModel
         {
