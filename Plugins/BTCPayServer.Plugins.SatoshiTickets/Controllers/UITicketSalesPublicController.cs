@@ -164,16 +164,23 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
             return NotFound();
 
         var contactInfo = new List<TicketContactInfoViewModel>();
+        var saved = order.ContactInfo ?? new List<TicketContactInfoViewModel>();
+        var flatIndex = 0;
         foreach (var ticket in order.Tickets)
         {
             for (int i = 0; i < ticket.Quantity; i++)
             {
+                var prior = flatIndex < saved.Count ? saved[flatIndex] : null;
                 contactInfo.Add(new TicketContactInfoViewModel
                 {
                     TicketTypeId = ticket.TicketTypeId,
                     TicketTypeName = ticket.TicketTypeName,
-                    Quantity = 1
+                    Quantity = 1,
+                    FirstName = prior?.FirstName,
+                    LastName = prior?.LastName,
+                    Email = prior?.Email
                 });
+                flatIndex++;
             }
         }
 
