@@ -162,7 +162,7 @@ public class UITicketSalesController(UriResolver uriResolver,
         await using var ctx = dbContextFactory.CreateContext();
 
         var entity = TicketSalesEventViewModelToEntity(vm, null, CurrentStore.Id);
-        entity.EventState = Data.EntityState.Disabled;
+        entity.EventState = Data.DiscountCodeState.Disabled;
         UploadImageResultModel imageUpload = null;
         if (vm.EventImageFile != null)
         {
@@ -280,7 +280,7 @@ public class UITicketSalesController(UriResolver uriResolver,
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
 
-        ticketEvent.EventState = enable ? Data.EntityState.Active : Data.EntityState.Disabled;
+        ticketEvent.EventState = enable ? Data.DiscountCodeState.Active : Data.DiscountCodeState.Disabled;
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = $"Event {(enable ? "activated" : "disabled")} successfully";
         return RedirectToAction(nameof(List), new { storeId });
@@ -368,9 +368,7 @@ public class UITicketSalesController(UriResolver uriResolver,
         {
             ordersQuery = ordersQuery.Where(o =>
                 o.InvoiceId.Contains(searchText) ||
-                o.Tickets.Any(t =>
-                    t.TxnNumber.Contains(searchText) || t.FirstName.Contains(searchText) ||
-                    t.LastName.Contains(searchText) || t.Email.Contains(searchText)));
+                o.Tickets.Any(t => t.TxnNumber.Contains(searchText) || t.FirstName.Contains(searchText) || t.LastName.Contains(searchText) || t.Email.Contains(searchText)));
         }
         var orders = ordersQuery.ToList();
 
@@ -396,6 +394,11 @@ public class UITicketSalesController(UriResolver uriResolver,
                     LastName = firstTicket?.LastName,
                     Email = firstTicket?.Email,
                     PurchaseDate = o.PurchaseDate!.Value,
+                    Subtotal = o.SubtotalAmount,
+                    DiscountAmount = o.DiscountAmount,
+                    DiscountCode = o.DiscountCodeValue,
+                    Total = o.TotalAmount,
+                    Currency = o.Currency,
                     Tickets = settledOrderTickets.Select(t => new EventContactPersonTicketVm
                     {
                         Id = t.Id,
@@ -647,64 +650,6 @@ public class UITicketSalesController(UriResolver uriResolver,
         await storeRepo.UpdateSetting(storeId, Plugin.CheckinSettingsName, allSettings);
         TempData[WellKnownTempData.SuccessMessage] = "Check-in link regenerated. Previous link is now invalid.";
         return RedirectToAction(nameof(CheckInSettings), new { storeId, eventId });
-    }
-
-    [HttpGet("settings")]
-    public async Task<IActionResult> Settings(string storeId)
-    {
-        if (string.IsNullOrEmpty(CurrentStore.Id))
-            return NotFound();
-
-        await using var ctx = dbContextFactory.CreateContext();
-        var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == CurrentStore.Id);
-
-        ViewData["StoreEmailSettingsConfigured"] = await emailService.IsEmailSettingsConfigured(CurrentStore.Id);
-        var vm = new SatoshiTicketsSettingsViewModel
-        {
-            StoreId = CurrentStore.Id,
-            EnableAutoReminders = settings?.EnableAutoReminders ?? false,
-            DefaultReminderDaysBeforeEvent = settings?.DefaultReminderDaysBeforeEvent ?? 3,
-            ReminderEmailBody = settings?.ReminderEmailBody,
-            ReminderEmailSubject = settings?.ReminderEmailSubject
-        };
-        return View(vm);
-    }
-
-    [HttpPost("settings")]
-    public async Task<IActionResult> Settings(string storeId, SatoshiTicketsSettingsViewModel vm)
-    {
-        if (string.IsNullOrEmpty(CurrentStore.Id))
-            return NotFound();
-
-        if (vm.EnableAutoReminders && vm.DefaultReminderDaysBeforeEvent <= 0)
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "Default reminder days must be greater than 0";
-            return RedirectToAction(nameof(Settings), new { storeId });
-        }
-
-        await using var ctx = dbContextFactory.CreateContext();
-        var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == CurrentStore.Id);
-        if (settings == null)
-        {
-            ctx.SatoshiTicketsSettings.Add(new SatoshiTicketsSetting
-            {
-                StoreId = CurrentStore.Id,
-                EnableAutoReminders = vm.EnableAutoReminders,
-                DefaultReminderDaysBeforeEvent = vm.DefaultReminderDaysBeforeEvent,
-                ReminderEmailSubject = vm.ReminderEmailSubject,
-                ReminderEmailBody = vm.ReminderEmailBody
-            });
-        }
-        else
-        {
-            settings.EnableAutoReminders = vm.EnableAutoReminders;
-            settings.DefaultReminderDaysBeforeEvent = vm.DefaultReminderDaysBeforeEvent;
-            settings.ReminderEmailBody = vm.ReminderEmailBody;
-            settings.ReminderEmailSubject = vm.ReminderEmailSubject;
-        }
-        await ctx.SaveChangesAsync();
-        TempData[WellKnownTempData.SuccessMessage] = "Reminder settings updated successfully";
-        return RedirectToAction(nameof(Settings), new { storeId });
     }
 
     private string GetUserId() => userManager.GetUserId(User);

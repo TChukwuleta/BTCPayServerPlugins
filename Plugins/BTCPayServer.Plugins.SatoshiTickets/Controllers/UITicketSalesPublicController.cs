@@ -41,6 +41,7 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         TicketService ticketService,
         InvoiceRepository invoiceRepository,
         UIInvoiceController invoiceController,
+        DiscountCodeService discountCodeService,
         SimpleTicketSalesDbContextFactory dbContextFactory) : Controller
 {
     private const string SessionKeyOrder = "Ticket_Order_";
@@ -85,7 +86,7 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         if (!ValidateEvent(ctx, storeId, eventId))
             return NotFound();
 
-        var ticketTypes = ctx.TicketTypes.Where(t => t.EventId == eventId && t.TicketTypeState == Data.EntityState.Active)
+        var ticketTypes = ctx.TicketTypes.Where(t => t.EventId == eventId && t.TicketTypeState == Data.DiscountCodeState.Active)
                               .Select(t => new TicketTypeViewModel
                               {
                                   StoreId = storeId,
@@ -163,19 +164,27 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
             return NotFound();
 
         var contactInfo = new List<TicketContactInfoViewModel>();
+        var saved = order.ContactInfo ?? new List<TicketContactInfoViewModel>();
+        var flatIndex = 0;
         foreach (var ticket in order.Tickets)
         {
             for (int i = 0; i < ticket.Quantity; i++)
             {
+                var prior = flatIndex < saved.Count ? saved[flatIndex] : null;
                 contactInfo.Add(new TicketContactInfoViewModel
                 {
                     TicketTypeId = ticket.TicketTypeId,
                     TicketTypeName = ticket.TicketTypeName,
-                    Quantity = 1
+                    Quantity = 1,
+                    FirstName = prior?.FirstName,
+                    LastName = prior?.LastName,
+                    Email = prior?.Email
                 });
+                flatIndex++;
             }
         }
-        return View(new ContactInfoPageViewModel
+
+        var vm = new ContactInfoPageViewModel
         {
             TxnId = txnId,
             EventId = eventId,
@@ -185,9 +194,34 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
             Tickets = order.Tickets,
             EventTitle = ticketEvent.Title,
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, uriResolver, storeData.GetStoreBlob()),
-            ContactInfo = contactInfo
-        });
+            ContactInfo = contactInfo,
+            DiscountCode = order.DiscountCode
+        };
+
+        if (!string.IsNullOrEmpty(order.DiscountCode))
+        {
+            var application = await discountCodeService.Evaluate(storeId, eventId, order.DiscountCode, BuildCart(order.Tickets));
+            if (application.IsValid)
+            {
+                vm.DiscountApplied = true;
+                vm.DiscountAmount = application.DiscountAmount;
+            }
+            else
+            {
+                order.DiscountCode = null;
+                HttpContext.Session.SetObject(sessionKey, order);
+                vm.DiscountMessage = application.ErrorMessage;
+            }
+        }
+        if (!string.IsNullOrEmpty(order.DiscountMessage))
+        {
+            vm.DiscountMessage = order.DiscountMessage;
+            order.DiscountMessage = null;
+            HttpContext.Session.SetObject(sessionKey, order);
+        }
+        return View(vm);
     }
+
 
     [HttpPost("save-contact-details")]
     public async Task<IActionResult> SaveContactDetails(string storeId, string eventId, ContactInfoPageViewModel model)
@@ -275,7 +309,25 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
             }
         }
         order.Tickets = tickets;
-        order.TotalAmount = tickets.Sum(t => t.Amount);
+        var subtotal = tickets.Sum(t => t.Amount);
+        order.SubtotalAmount = subtotal;
+        order.TotalAmount = subtotal;
+        if(!string.IsNullOrEmpty(orderViewModel.DiscountCode))
+        {
+            var application = await discountCodeService.Evaluate(storeId, eventId, orderViewModel.DiscountCode, BuildCart(orderViewModel.Tickets));
+            if (application.IsValid && application.DiscountAmount > 0)
+            {
+                order.DiscountCodeId = application.Code.Id;
+                order.DiscountCodeValue = application.Code.Code;
+                order.DiscountAmount = application.DiscountAmount;
+                order.TotalAmount = subtotal - application.DiscountAmount;
+            }
+            else
+            {
+                orderViewModel.DiscountCode = null;
+                HttpContext.Session.SetObject(sessionKey, orderViewModel);
+            }
+        }
         var invoice = await CreateInvoice(storeData, order, ticketEvent.Currency, Request.GetAbsoluteRoot(), ticketEvent.RedirectUrl ?? string.Empty);
         order.InvoiceId = invoice.Id;
         order.InvoiceStatus = invoice.Status.ToString();
@@ -283,6 +335,7 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         await ctx.SaveChangesAsync();
         return RedirectToAction(nameof(UIInvoiceController.Checkout), "UIInvoice", new { invoiceId = invoice.Id });
     }
+
 
     [HttpGet("event/{eventId}/ticket/{orderId}/summary")]
     public async Task<IActionResult> EventTicketDisplay(string storeId, string eventId, string orderId, string txnNumber)
@@ -325,6 +378,49 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
             }).ToList(),
             StoreBranding = await StoreBrandingViewModel.CreateAsync(Request, uriResolver, store.GetStoreBlob()),
         });
+    }
+
+    [HttpPost("event/{eventId}/summary/contact/apply-discount")]
+    public async Task<IActionResult> ApplyDiscount(string storeId, string eventId, ContactInfoPageViewModel model)
+    {
+        Console.WriteLine($"ApplyDiscount called with discount code: {model.DiscountCode}... and txnid: {model.TxnId}");
+        Console.WriteLine($"ApplyDiscount saving contactInfo count: {model.ContactInfo?.Count ?? -1}, first name: {model.ContactInfo?.FirstOrDefault()?.FirstName}");
+        var sessionKey = $"{SessionKeyOrder}{eventId}_{model.TxnId}";
+        var order = HttpContext.Session.GetObject<TicketOrderViewModel>(sessionKey);
+        if (order?.Tickets?.Any() != true)
+            return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
+
+        if (model.ContactInfo is { Count: > 0 })
+            order.ContactInfo = model.ContactInfo;
+
+        var normalized = DiscountCodeService.Normalize(model.DiscountCode);
+        if (string.IsNullOrEmpty(normalized))
+        {
+            var wasApplied = !string.IsNullOrEmpty(order.DiscountCode);
+            order.DiscountCode = null;
+            order.DiscountMessage = wasApplied ? null : "Enter a discount code";
+            HttpContext.Session.SetObject(sessionKey, order);
+            return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, txnId = model.TxnId });
+        }
+
+        var application = await discountCodeService.Evaluate(storeId, eventId, normalized, BuildCart(order.Tickets));
+        if (application.IsValid)
+        {
+            order.DiscountCode = normalized;
+            order.DiscountMessage = null;
+        }
+        else
+        {
+            order.DiscountCode = null;
+            order.DiscountMessage = application.ErrorMessage;
+        }
+        HttpContext.Session.SetObject(sessionKey, order);
+        return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, txnId = model.TxnId });
+    }
+
+    private static IReadOnlyList<DiscountCartLine> BuildCart(IEnumerable<TicketSelectionViewModel> tickets)
+    {
+        return tickets.Select(t => new DiscountCartLine(t.TicketTypeId, t.Price, t.Quantity)).ToList();
     }
 
     [HttpGet("satoshiticket/jsqr_min.js")]
@@ -475,7 +571,7 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
     {
         var now = DateTime.UtcNow;
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
-        if (ticketEvent == null || ticketEvent.EventState == Data.EntityState.Disabled || ticketEvent.StartDate.Date < now.Date || (ticketEvent.EndDate.HasValue && ticketEvent.EndDate.Value.Date < now.Date))
+        if (ticketEvent == null || ticketEvent.EventState == Data.DiscountCodeState.Disabled || ticketEvent.StartDate.Date < now.Date || (ticketEvent.EndDate.HasValue && ticketEvent.EndDate.Value.Date < now.Date))
             return false;
 
         if (ticketEvent.HasMaximumCapacity)

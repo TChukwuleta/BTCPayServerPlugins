@@ -15,7 +15,7 @@ public class SalesTicketsEventsListViewModel
     public string StoreId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public string Location { get; set; }
-    public EntityState EventState { get; set; }
+    public DiscountCodeState EventState { get; set; }
     public bool IsPublished { get; set; }
     public long TicketSold { get; set; }
 }

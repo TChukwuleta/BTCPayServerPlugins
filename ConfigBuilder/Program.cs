@@ -6,6 +6,7 @@ var plugins = Directory.GetDirectories("../../../../Plugins").Where(p => !exclud
 
 var included = new HashSet<string> { "BTCPayServer.Plugins.BigCommercePlugin", "BTCPayServer.Plugins.ServerAlert", "BTCPayServer.Plugins.LightSpeed", "BTCPayServer.Plugins.StoreBridge" };
 var plugins = Directory.GetDirectories("../../../../Plugins").Where(p => included.Contains(Path.GetFileName(p)));
+
 var p = "";
 foreach (var plugin in plugins)
 {

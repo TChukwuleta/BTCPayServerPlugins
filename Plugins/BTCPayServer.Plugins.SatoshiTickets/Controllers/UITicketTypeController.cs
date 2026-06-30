@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
-using EntityState = BTCPayServer.Plugins.SatoshiTickets.Data.EntityState;
+using DiscountCodeState = BTCPayServer.Plugins.SatoshiTickets.Data.DiscountCodeState;
 
 namespace BTCPayServer.Plugins.SatoshiTickets;
 
@@ -222,7 +222,7 @@ public class UITicketTypeController(SimpleTicketSalesDbContextFactory dbContextF
             TempData[WellKnownTempData.ErrorMessage] = "Invalid route specified";
             return RedirectToAction(nameof(List), new { storeId, eventId });
         }
-        ticketType.TicketTypeState = enable ? EntityState.Active : EntityState.Disabled;
+        ticketType.TicketTypeState = enable ? DiscountCodeState.Active : DiscountCodeState.Disabled;
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = $"Ticket type {(enable ? "activated" : "disabled")} successfully";
         return RedirectToAction(nameof(List), new { storeId, eventId });
@@ -298,7 +298,7 @@ public class UITicketTypeController(SimpleTicketSalesDbContextFactory dbContextF
             EventId = eventId,
             Quantity = model.Quantity,
             QuantitySold = model.QuantitySold,
-            TicketTypeState = EntityState.Active,
+            TicketTypeState = DiscountCodeState.Active,
             Description = model.Description,
             IsDefault = model.IsDefault
         };

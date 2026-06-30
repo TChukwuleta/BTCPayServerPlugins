@@ -1,6 +1,4 @@
-﻿@using BTCPayServer.Plugins.SatoshiTickets.Data
-@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
-@using System.Globalization
+﻿@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
 @model ContactInfoPageViewModel
 @{
     ViewData["Title"] = Model.EventTitle;
@@ -115,10 +113,45 @@
                                 <span>Subtotal</span>
                                 <span>@Model.Tickets.Sum(t => t.Quantity * t.Price).ToString("N0")</span>
                             </div>
+
+                            <div class="mb-3">
+                                @if (Model.DiscountApplied)
+                                {
+                                    <div class="d-flex justify-content-between align-items-center text-success mb-2">
+                                        <span>Discount (@Model.DiscountCode)</span>
+                                        <span>-@((Model.DiscountAmount ?? 0).ToString("N0"))</span>
+                                    </div>
+                                    <button type="submit"
+                                            formaction="@Url.Action("ApplyDiscount", new { storeId = Model.StoreId, eventId = Model.EventId })"
+                                            formnovalidate
+                                            class="btn btn-link p-0 small text-danger">
+                                        Remove discount
+                                    </button>
+                                }
+                                else
+                                {
+                                    <label class="form-label small">Discount code</label>
+                                    <div class="input-group">
+                                        <input type="text" name="DiscountCode" value="@Model.DiscountCode"
+                                               class="form-control" placeholder="Enter code" style="text-transform:uppercase" />
+                                        <button type="submit"
+                                                formaction="@Url.Action("ApplyDiscount", new { storeId = Model.StoreId, eventId = Model.EventId })"
+                                                formnovalidate
+                                                class="btn btn-outline-secondary">
+                                            Apply
+                                        </button>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(Model.DiscountMessage))
+                                    {
+                                        <div class="form-text text-danger">@Model.DiscountMessage</div>
+                                    }
+                                }
+                            </div>
+
                             <hr>
                             <div class="d-flex justify-content-between mb-4">
                                 <span class="fw-bold">Total</span>
-                                <span class="fw-bold">@Model.Tickets.Sum(t => t.Quantity * t.Price).ToString("N0")</span>
+                                <span class="fw-bold">@((Model.Tickets.Sum(t => t.Quantity * t.Price) - (Model.DiscountApplied ? (Model.DiscountAmount ?? 0) : 0)).ToString("N0"))</span>
                             </div>
                             <button id="complete-payment-btn" type="submit" class="btn btn-success w-100 py-3" disabled>Complete Payment</button>
                         </div>

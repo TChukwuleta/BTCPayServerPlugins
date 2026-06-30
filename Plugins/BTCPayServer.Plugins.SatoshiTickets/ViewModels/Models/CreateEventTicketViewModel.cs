@@ -26,13 +26,6 @@ public class CreateEventTicketViewModel : BaseSimpleTicketPublicViewModel
     public int Quantity { get; set; }
     public string FormattedEventDate => EventDate.ToString("dddd, MMMM d yyyy");
     public string FormattedEventTime => EventDate.ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture);
-
-    /*public DateTime EventEndDate { get; set; }
-
-    public string FormattedEventTime => EventStartDate.ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture)
-                                      + " - " +
-                                      EventEndDate.ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture)
-                                      + " UTC";*/
 }
 
 public class TicketTypePurchaseViewModel
@@ -82,6 +75,10 @@ public class ContactInfoPageViewModel : BaseSimpleTicketPublicViewModel
     public string EventTitle { get; set; }
     public List<TicketSelectionViewModel> Tickets { get; set; }
     public List<TicketContactInfoViewModel> ContactInfo { get; set; } = new List<TicketContactInfoViewModel>();
+    public string DiscountCode { get; set; }
+    public decimal? DiscountAmount { get; set; }
+    public string DiscountMessage { get; set; }
+    public bool DiscountApplied { get; set; }
 }
 
 public class TicketPageViewModel
@@ -117,6 +114,8 @@ public class TicketOrderViewModel
     public string EventTitle { get; set; }
     public List<TicketSelectionViewModel> Tickets { get; set; } = new List<TicketSelectionViewModel>();
     public List<TicketContactInfoViewModel> ContactInfo { get; set; } = new List<TicketContactInfoViewModel>();
+    public string DiscountCode { get; set; }
+    public string DiscountMessage { get; set; }
     public bool IsStepOneComplete { get; set; } // Tickets
     public bool IsStepTwoComplete { get; set; } // Contact
     public bool IsStepThreeComplete { get; set; } // Payment

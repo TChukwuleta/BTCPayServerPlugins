@@ -1,6 +1,6 @@
 ﻿namespace BTCPayServer.Plugins.SatoshiTickets.Data;
 
-public enum EntityState
+public enum DiscountCodeState
 {
     Disabled = 1,
     Active

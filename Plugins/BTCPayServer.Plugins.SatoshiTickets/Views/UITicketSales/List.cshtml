@@ -94,6 +94,7 @@
                         <td class="actions-col">
                             <div class="d-inline-flex align-items-center gap-3">
                                 <a asp-action="List" asp-controller="UITicketType" asp-route-storeId="@Model.StoreId" asp-route-eventId="@ticketEvent.Id">Ticket Tiers</a>
+                                <a asp-controller="UITicketSettings" asp-action="DiscountCodes" asp-route-storeId="@Model.StoreId" asp-route-eventId="@ticketEvent.Id">Discount Codes</a>
                             </div>
                         </td>
                         <td class="actions-col">
@@ -104,8 +105,8 @@
                                        asp-action="ToggleTicketEventStatus"
                                        asp-route-storeId="@Model.StoreId"
                                        asp-route-eventId="@ticketEvent.Id"
-                                       asp-route-enable="@(ticketEvent.EventState == EntityState.Disabled)">
-                                        @(ticketEvent.EventState == EntityState.Disabled ? "Activate" : "Disable")
+                                       asp-route-enable="@(ticketEvent.EventState == DiscountCodeState.Disabled)">
+                                        @(ticketEvent.EventState == DiscountCodeState.Disabled ? "Activate" : "Disable")
                                     </a>
                                 </div>
                             }

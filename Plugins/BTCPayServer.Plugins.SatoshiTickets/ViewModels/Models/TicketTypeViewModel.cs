@@ -15,7 +15,7 @@ public class TicketTypeViewModel
     public int QuantityAvailable { get; set; }
     public string EventId { get; set; }
     public string StoreId { get; set; }
-    public EntityState TicketTypeState { get; set; }
+    public DiscountCodeState TicketTypeState { get; set; }
     public bool IsDefault { get; set; }
 }
 

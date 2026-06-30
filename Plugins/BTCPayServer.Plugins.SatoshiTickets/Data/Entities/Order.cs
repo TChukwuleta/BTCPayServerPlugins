@@ -20,4 +20,11 @@ public class Order
     public bool EmailSent { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? PurchaseDate { get; set; }
+
+    // Discount tracking. SubtotalAmount is the pre-discount sum of ticket prices;
+    // TotalAmount is what the buyer is actually invoiced (subtotal - DiscountAmount).
+    public decimal? SubtotalAmount { get; set; }
+    public string DiscountCodeId { get; set; }
+    public string DiscountCodeValue { get; set; }
+    public decimal DiscountAmount { get; set; }
 }
