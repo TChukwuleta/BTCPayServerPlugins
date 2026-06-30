@@ -14,8 +14,7 @@
         @title
         <span class="text-muted h5 ms-2">@Model.EventTitle</span>
     </h2>
-    <a asp-controller="UITicketSettings" asp-action="DiscountCodes" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId"
-       class="btn btn-secondary" role="button">Back to list</a>
+    <a asp-controller="UITicketSettings" asp-action="DiscountCodes" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" class="btn btn-secondary" role="button">Back to list</a>
 </div>
 
 <partial name="_StatusMessage" />
@@ -26,6 +25,7 @@
             <input type="hidden" asp-for="Id" />
             <input type="hidden" asp-for="StoreId" />
             <input type="hidden" asp-for="EventId" />
+            <input type="hidden" asp-for="DiscountType" value="@DiscountType.Percentage" />
 
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
@@ -33,34 +33,23 @@
                 <label asp-for="Code" class="form-label"></label>
                 <input asp-for="Code" class="form-control" placeholder="e.g. EARLYBIRD" style="text-transform:uppercase" />
                 <span asp-validation-for="Code" class="text-danger"></span>
-                <div class="form-text">Buyers enter this at checkout. Case-insensitive.</div>
             </div>
 
             <div class="row">
                 <div class="form-group mb-3 col-md-6">
-                    <label asp-for="DiscountType" class="form-label"></label>
-                    <select asp-for="DiscountType" class="form-select" asp-items="Html.GetEnumSelectList<DiscountType>()"></select>
+                    <label asp-for="TicketTypeId" class="form-label"></label>
+                    <select asp-for="TicketTypeId" class="form-select">
+                        <option value="">All ticket types</option>
+                        @foreach (var opt in Model.TicketTypeOptions)
+                        {
+                            <option value="@opt.Id">@opt.Name</option>
+                        }
+                    </select>
                 </div>
                 <div class="form-group mb-3 col-md-6">
                     <label asp-for="Value" class="form-label"></label>
                     <input asp-for="Value" type="number" step="0.01" class="form-control" />
                     <span asp-validation-for="Value" class="text-danger"></span>
-                    <div class="form-text">For a percentage, use 1–99.</div>
-                </div>
-            </div>
-
-            <div class="form-group mb-3">
-                <label asp-for="TicketTypeId" class="form-label"></label>
-                <select asp-for="TicketTypeId" class="form-select">
-                    <option value="">All ticket types</option>
-                    @foreach (var opt in Model.TicketTypeOptions)
-                    {
-                        <option value="@opt.Id">@opt.Name</option>
-                    }
-                </select>
-                <div class="form-text">
-                    Leave as "All ticket types" for a code that works on any ticket (e.g. speakers/volunteers).
-                    Pick one type to restrict it (e.g. early-bird, General Admission only).
                 </div>
             </div>
 
@@ -78,19 +67,16 @@
             <div class="form-group mb-3">
                 <label asp-for="ExpiryDate" class="form-label"></label>
                 <input asp-for="ExpiryDate" type="datetime-local" class="form-control" />
-                <div class="form-text">Optional.</div>
             </div>
 
-            <div class="form-check mb-4">
-                <input asp-for="IsActive" class="btcpay-toggle me-2" type="checkbox" />
-                <label asp-for="IsActive" class="form-check-label"></label>
+            <div class="form-group mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <input asp-for="IsActive" type="checkbox" class="btcpay-toggle" />
+                    <label asp-for="IsActive" class="form-label mb-0">Active</label>
+                </div>
             </div>
 
             <button type="submit" class="btn btn-primary">Save Discount Code</button>
         </form>
     </div>
 </div>
-
-@section PageFootContent {
-    <partial name="_ValidationScriptsPartial" />
-}

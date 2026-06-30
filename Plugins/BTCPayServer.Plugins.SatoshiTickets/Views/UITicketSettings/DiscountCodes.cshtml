@@ -12,8 +12,13 @@
         Discount Codes
         <span class="text-muted h5 ms-2">@Model.EventTitle</span>
     </h2>
-    <a asp-controller="UITicketSettings" asp-action="CreateDiscountCode" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId"
-       class="btn btn-primary" role="button">Create Discount Code</a>
+
+    <div class="d-flex gap-3">
+        <a asp-controller="UITicketSales" asp-action="List" asp-route-storeId="@Model.StoreId" class="btn btn-secondary" role="button">
+            <span class="fa fa-arrow-left me-1"></span> Back to Events
+        </a>
+        <a asp-controller="UITicketSettings" asp-action="CreateDiscountCode" asp-route-storeId="@Model.StoreId" asp-route-eventId="@Model.EventId" class="btn btn-primary" role="button">Create Discount Code</a>
+    </div>
 </div>
 
 <partial name="_StatusMessage" />

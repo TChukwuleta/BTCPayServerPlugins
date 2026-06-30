@@ -178,10 +178,14 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicT
                     ticketType.QuantitySold += count;
                 }
             }
-        }
-
-        if (success)
-        {
+            if (!string.IsNullOrEmpty(order.DiscountCodeId))
+            {
+                var discountCode = ctx.DiscountCodes.FirstOrDefault(d => d.Id == order.DiscountCodeId && d.StoreId == order.StoreId && d.EventId == order.EventId);
+                if (discountCode != null)
+                {
+                    discountCode.UsesCount += 1;
+                }
+            }
             var isEmailConfigured = await _emailService.IsEmailSettingsConfigured(invoice.StoreId);
             if (isEmailConfigured)
             {

@@ -43,11 +43,10 @@ public class UpsertDiscountCodeViewModel
     [Display(Name = "Discount Type")]
     public DiscountType DiscountType { get; set; } = DiscountType.Percentage;
 
-    [Display(Name = "Value")]
-    [Range(0.01, 1000000)]
+    [Display(Name = "Percentage Value")]
+    [Range(0.01, 99)]
     public decimal Value { get; set; }
 
-    // Empty => applies to all ticket types in the event.
     [Display(Name = "Applies To Ticket Type")]
     public string TicketTypeId { get; set; }
 
@@ -63,7 +62,6 @@ public class UpsertDiscountCodeViewModel
     [Display(Name = "Active")]
     public bool IsActive { get; set; } = true;
 
-    // For the ticket-type dropdown.
     public List<DiscountTicketTypeOption> TicketTypeOptions { get; set; } = new();
 }
 

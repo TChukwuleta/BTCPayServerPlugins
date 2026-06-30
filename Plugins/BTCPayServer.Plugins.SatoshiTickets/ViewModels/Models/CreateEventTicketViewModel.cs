@@ -115,6 +115,7 @@ public class TicketOrderViewModel
     public List<TicketSelectionViewModel> Tickets { get; set; } = new List<TicketSelectionViewModel>();
     public List<TicketContactInfoViewModel> ContactInfo { get; set; } = new List<TicketContactInfoViewModel>();
     public string DiscountCode { get; set; }
+    public string DiscountMessage { get; set; }
     public bool IsStepOneComplete { get; set; } // Tickets
     public bool IsStepTwoComplete { get; set; } // Contact
     public bool IsStepThreeComplete { get; set; } // Payment

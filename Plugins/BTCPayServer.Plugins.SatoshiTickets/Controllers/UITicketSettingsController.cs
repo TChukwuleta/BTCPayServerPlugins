@@ -3,16 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
-using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Client;
 using BTCPayServer.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Services;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels;
-using BTCPayServer.Services;
-using BTCPayServer.Services.Stores;
+using BTCPayServer.Plugins.SatoshiTickets.ViewModels.Models;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.CodeAnalysis;
@@ -24,15 +21,8 @@ namespace BTCPayServer.Plugins.SatoshiTickets;
 [Route("~/plugins/{storeId}/satoshi-tickets/event/")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
 [AutoValidateAntiforgeryToken]
-public class UITicketSettingsController(UriResolver uriResolver,
-        IFileService fileService,
-        StoreRepository storeRepo,
-        EmailService emailService,
-        TicketService ticketService,
-        SimpleTicketSalesDbContextFactory dbContextFactory,
-        UserManager<ApplicationUser> userManager) : Controller
+public class UITicketSettingsController(EmailService emailService, SimpleTicketSalesDbContextFactory dbContextFactory) : Controller
 {
-
     private StoreData CurrentStore => HttpContext.GetStoreData();
 
 
@@ -89,7 +79,7 @@ public class UITicketSettingsController(UriResolver uriResolver,
             Currency = ticketEvent.Currency ?? CurrentStore.GetStoreBlob().DefaultCurrency.Trim().ToUpperInvariant(),
             TicketTypeOptions = GetTicketTypeOptions(ctx, eventId)
         };
-        return View(vm);
+        return View("UpsertDiscountCode", vm);
     }
 
     [HttpGet("{eventId}/discount-codes/{discountCodeId}/edit")]
@@ -239,6 +229,63 @@ public class UITicketSettingsController(UriResolver uriResolver,
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Discount code deleted";
         return RedirectToAction(nameof(DiscountCodes), new { storeId, eventId });
+    }
+
+    [HttpGet("settings")]
+    public async Task<IActionResult> Settings(string storeId)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = dbContextFactory.CreateContext();
+        var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == CurrentStore.Id);
+
+        ViewData["StoreEmailSettingsConfigured"] = await emailService.IsEmailSettingsConfigured(CurrentStore.Id);
+        var vm = new SatoshiTicketsSettingsViewModel
+        {
+            StoreId = CurrentStore.Id,
+            EnableAutoReminders = settings?.EnableAutoReminders ?? false,
+            DefaultReminderDaysBeforeEvent = settings?.DefaultReminderDaysBeforeEvent ?? 3,
+            ReminderEmailBody = settings?.ReminderEmailBody,
+            ReminderEmailSubject = settings?.ReminderEmailSubject
+        };
+        return View(vm);
+    }
+
+    [HttpPost("settings")]
+    public async Task<IActionResult> Settings(string storeId, SatoshiTicketsSettingsViewModel vm)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        if (vm.EnableAutoReminders && vm.DefaultReminderDaysBeforeEvent <= 0)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Default reminder days must be greater than 0";
+            return RedirectToAction(nameof(Settings), new { storeId });
+        }
+        await using var ctx = dbContextFactory.CreateContext();
+        var settings = ctx.SatoshiTicketsSettings.FirstOrDefault(s => s.StoreId == CurrentStore.Id);
+        if (settings == null)
+        {
+            ctx.SatoshiTicketsSettings.Add(new SatoshiTicketsSetting
+            {
+                StoreId = CurrentStore.Id,
+                EnableAutoReminders = vm.EnableAutoReminders,
+                DefaultReminderDaysBeforeEvent = vm.DefaultReminderDaysBeforeEvent,
+                ReminderEmailSubject = vm.ReminderEmailSubject,
+                ReminderEmailBody = vm.ReminderEmailBody
+            });
+        }
+        else
+        {
+            settings.EnableAutoReminders = vm.EnableAutoReminders;
+            settings.DefaultReminderDaysBeforeEvent = vm.DefaultReminderDaysBeforeEvent;
+            settings.ReminderEmailBody = vm.ReminderEmailBody;
+            settings.ReminderEmailSubject = vm.ReminderEmailSubject;
+        }
+        await ctx.SaveChangesAsync();
+        TempData[WellKnownTempData.SuccessMessage] = "Reminder settings updated successfully";
+        return RedirectToAction(nameof(Settings), new { storeId });
     }
 
     private static List<DiscountTicketTypeOption> GetTicketTypeOptions(SimpleTicketSalesDbContext ctx, string eventId)

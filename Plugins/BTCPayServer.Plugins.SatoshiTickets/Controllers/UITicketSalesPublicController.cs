@@ -201,11 +201,16 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
             }
             else
             {
-                // Code became invalid since it was entered; drop it.
                 order.DiscountCode = null;
                 HttpContext.Session.SetObject(sessionKey, order);
                 vm.DiscountMessage = application.ErrorMessage;
             }
+        }
+        if (!string.IsNullOrEmpty(order.DiscountMessage))
+        {
+            vm.DiscountMessage = order.DiscountMessage;
+            order.DiscountMessage = null;
+            HttpContext.Session.SetObject(sessionKey, order);
         }
         return View(vm);
     }
@@ -300,7 +305,6 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         var subtotal = tickets.Sum(t => t.Amount);
         order.SubtotalAmount = subtotal;
         order.TotalAmount = subtotal;
-
         if(!string.IsNullOrEmpty(orderViewModel.DiscountCode))
         {
             var application = await discountCodeService.Evaluate(storeId, eventId, orderViewModel.DiscountCode, BuildCart(orderViewModel.Tickets));
@@ -313,11 +317,8 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
             }
             else
             {
-                // The code expired or hit its limit between entry and checkout.
-                // Don't block the sale; just proceed at full price and clear it.
                 orderViewModel.DiscountCode = null;
                 HttpContext.Session.SetObject(sessionKey, orderViewModel);
-                TempData[WellKnownTempData.ErrorMessage] = application.ErrorMessage ?? "The discount code could not be applied and was removed.";
             }
         }
         var invoice = await CreateInvoice(storeData, order, ticketEvent.Currency, Request.GetAbsoluteRoot(), ticketEvent.RedirectUrl ?? string.Empty);
@@ -372,39 +373,42 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         });
     }
 
-
-
     [HttpPost("event/{eventId}/summary/contact/apply-discount")]
-    public async Task<IActionResult> ApplyDiscount(string storeId, string eventId, string txnId, string discountCode)
+    public async Task<IActionResult> ApplyDiscount(string storeId, string eventId, ContactInfoPageViewModel model)
     {
-        var sessionKey = $"{SessionKeyOrder}{eventId}_{txnId}";
+        Console.WriteLine($"ApplyDiscount called with discount code: {model.DiscountCode}... and txnid: {model.TxnId}");
+        Console.WriteLine($"ApplyDiscount saving contactInfo count: {model.ContactInfo?.Count ?? -1}, first name: {model.ContactInfo?.FirstOrDefault()?.FirstName}");
+        var sessionKey = $"{SessionKeyOrder}{eventId}_{model.TxnId}";
         var order = HttpContext.Session.GetObject<TicketOrderViewModel>(sessionKey);
         if (order?.Tickets?.Any() != true)
             return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
 
-        var normalized = DiscountCodeService.Normalize(discountCode);
-        if(string.IsNullOrEmpty(normalized))
+        if (model.ContactInfo is { Count: > 0 })
+            order.ContactInfo = model.ContactInfo;
+
+        var normalized = DiscountCodeService.Normalize(model.DiscountCode);
+        if (string.IsNullOrEmpty(normalized))
         {
+            var wasApplied = !string.IsNullOrEmpty(order.DiscountCode);
             order.DiscountCode = null;
+            order.DiscountMessage = wasApplied ? null : "Enter a discount code";
             HttpContext.Session.SetObject(sessionKey, order);
-            TempData[WellKnownTempData.ErrorMessage] = "Enter a discount code";
-            return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, txnId });
+            return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, txnId = model.TxnId });
         }
 
         var application = await discountCodeService.Evaluate(storeId, eventId, normalized, BuildCart(order.Tickets));
         if (application.IsValid)
         {
             order.DiscountCode = normalized;
-            HttpContext.Session.SetObject(sessionKey, order);
-            TempData[WellKnownTempData.SuccessMessage] = $"Discount applied: {application.DiscountAmount.ToString("N2")} {order.Tickets.FirstOrDefault()?.TicketTypeName ?? ""}".Trim();
+            order.DiscountMessage = null;
         }
         else
         {
             order.DiscountCode = null;
-            HttpContext.Session.SetObject(sessionKey, order);
-            TempData[WellKnownTempData.ErrorMessage] = application.ErrorMessage;
+            order.DiscountMessage = application.ErrorMessage;
         }
-        return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, txnId });
+        HttpContext.Session.SetObject(sessionKey, order);
+        return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, txnId = model.TxnId });
     }
 
     private static IReadOnlyList<DiscountCartLine> BuildCart(IEnumerable<TicketSelectionViewModel> tickets)

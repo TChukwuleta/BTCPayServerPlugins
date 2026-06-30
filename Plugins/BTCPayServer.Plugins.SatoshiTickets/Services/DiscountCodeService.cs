@@ -50,7 +50,7 @@ public class DiscountCodeService(SimpleTicketSalesDbContextFactory dbContextFact
         if (code == null)
             return DiscountApplication.Invalid(DiscountValidationStatus.NotFound, subtotal, "That discount code wasn't found");
 
-        if (code.DiscountCodeState != Data.DiscountCodeState.Active)
+        if (code.DiscountCodeState != DiscountCodeState.Active)
             return DiscountApplication.Invalid(DiscountValidationStatus.Inactive, subtotal, "That discount code is no longer active");
 
         if (code.ExpiryDate.HasValue && code.ExpiryDate.Value < DateTimeOffset.UtcNow)
