@@ -1,0 +1,12 @@
+@using BTCPayServer.Client
+@{
+	var path = ViewContext.HttpContext.Request.Path.Value ?? "";
+    var active = path.StartsWith("/plugins/phoenixd", StringComparison.OrdinalIgnoreCase);
+}
+
+<li class="nav-item" permission="@Policies.CanModifyServerSettings">
+    <a asp-area="" asp-controller="PhoenixdManager" asp-action="Index" class="nav-link @(active ? "active" : "")" id="Nav-PhoenixdManager">
+        <span class="me-2">&#9889;</span>
+        <span>Phoenixd</span>
+    </a>
+</li>
