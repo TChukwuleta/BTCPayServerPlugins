@@ -5,11 +5,8 @@ namespace BTCPayServer.Plugins.PhoenixdManager.ViewModels;
 
 public class PhoenixdSettings
 {
-    // e.g. http://phoenixd:9740  (no trailing slash needed)
     public string ServerUrl { get; set; } = "http://127.0.0.1:9740";
-    // full-access http-password from phoenix.conf
     public string Password { get; set; } = "";
-    // optional: limited-access password, used for read-only calls if provided
     public string? LimitedAccessPassword { get; set; }
 }
 
@@ -36,17 +33,6 @@ public class ChannelInfo
     [JsonPropertyName("inboundLiquiditySat")] public long InboundLiquiditySat { get; set; }
     [JsonPropertyName("capacitySat")] public long CapacitySat { get; set; }
     [JsonPropertyName("fundingTxId")] public string? FundingTxId { get; set; }
-}
-
-public class OfferInfo
-{
-    // getoffer returns the raw BOLT12 offer string as the body; wrapped for the view.
-    public string? Offer { get; set; }
-}
-
-public class LnAddressInfo
-{
-    public string? LnAddress { get; set; }
 }
 
 public class CreatedInvoice
@@ -133,9 +119,33 @@ public class DashboardViewModel
     public List<OutgoingPayment> RecentOutgoing { get; set; } = new();
 }
 
-public class ApiActionResult
+public class ReceiveViewModel
 {
-    public bool Success { get; set; }
-    public string? Message { get; set; }
-    public string? RawJson { get; set; }
+    public bool Configured { get; set; }
+    public string? Error { get; set; }
+    public string? Invoice { get; set; }
+    public long? AmountSat { get; set; }
+    public string? Description { get; set; }
+    public string? PaymentHash { get; set; }
+    public bool HasResult => !string.IsNullOrEmpty(Invoice);
+}
+
+public class SendViewModel
+{
+    public bool Configured { get; set; }
+    public string? Error { get; set; }
+    public string ActiveTab { get; set; } = "invoice";
+    public bool HasResult { get; set; }
+    public long? RecipientAmountSat { get; set; }
+    public long? RoutingFeeSat { get; set; }
+    public string? PaymentHash { get; set; }
+    public string? PaymentPreimage { get; set; }
+}
+
+public enum PhoenixdViewAction
+{
+    Summary,
+    Actions,
+    Receive,
+    Send
 }

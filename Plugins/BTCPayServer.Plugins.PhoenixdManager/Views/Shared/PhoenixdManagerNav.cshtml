@@ -1,12 +1,39 @@
+@using BTCPayServer.Abstractions.Extensions
 @using BTCPayServer.Client
+@using BTCPayServer.Plugins.PhoenixdManager.ViewModels
 @{
 	var path = ViewContext.HttpContext.Request.Path.Value ?? "";
     var active = path.StartsWith("/plugins/phoenixd", StringComparison.OrdinalIgnoreCase);
 }
 
 <li class="nav-item" permission="@Policies.CanModifyServerSettings">
-    <a asp-area="" asp-controller="PhoenixdManager" asp-action="Index" class="nav-link @(active ? "active" : "")" id="Nav-PhoenixdManager">
+    <a layout-menu-item="@nameof(PhoenixdViewAction.Summary)" asp-area="" asp-controller="PhoenixdManager" asp-action="Index" class="nav-link @(active ? "active" : "")" id="Nav-PhoenixdManager">
         <span class="me-2">&#9889;</span>
-        <span>Phoenixd</span>
+        <span text-translate="true">Phoenixd</span>
     </a>
+    @if (ViewData.IsCategory(nameof(PhoenixdViewAction)))
+    {
+        <ul style="list-style:none;">
+            <li class="nav-item nav-item-sub">
+                <a layout-menu-item="@nameof(PhoenixdViewAction.Summary)" asp-controller="PhoenixdManager" asp-action="Index">
+                    <span text-translate="true">Summary</span>
+                </a>
+            </li>
+            <li class="nav-item nav-item-sub">
+                <a layout-menu-item="@nameof(PhoenixdViewAction.Receive)" asp-controller="PhoenixdManager" asp-action="Receive">
+                    <span text-translate="true">Receive</span>
+                </a>
+            </li>
+            <li class="nav-item nav-item-sub">
+                <a layout-menu-item="@nameof(PhoenixdViewAction.Send)" asp-controller="PhoenixdManager" asp-action="Send">
+                    <span text-translate="true">Send</span>
+                </a>
+            </li>
+            <li class="nav-item nav-item-sub">
+                <a layout-menu-item="@nameof(PhoenixdViewAction.Actions)" asp-controller="PhoenixdManager" asp-action="Action">
+                    <span text-translate="true">Actions</span>
+                </a>
+            </li>
+        </ul>
+    }
 </li>

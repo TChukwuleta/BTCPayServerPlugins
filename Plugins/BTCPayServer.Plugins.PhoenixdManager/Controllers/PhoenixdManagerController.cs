@@ -31,7 +31,6 @@ public class PhoenixdManagerController(PhoenixdClient _client, PhoenixdSettingsS
             vm.NodeInfo = await _client.GetInfo();
             vm.Balance = await _client.GetBalance();
             vm.Channels = (await _client.ListChannels()) ?? new();
-            vm.Offer = SafeString(await TryAsync(() => _client.GetOffer()));
             vm.LnAddress = SafeString(await TryAsync(() => _client.GetLnAddress()));
             vm.RecentIncoming = (await _client.ListIncomingPayments(all: true, null, limit: 20, offset: 0)) ?? new();
             vm.RecentOutgoing = (await _client.ListOutgoingPayments(all: true, limit: 20, offset: 0)) ?? new();
@@ -46,7 +45,6 @@ public class PhoenixdManagerController(PhoenixdClient _client, PhoenixdSettingsS
         }
         return View(vm);
     }
-
 
     [HttpGet("settings")]
     public async Task<IActionResult> Settings()
@@ -69,16 +67,102 @@ public class PhoenixdManagerController(PhoenixdClient _client, PhoenixdSettingsS
         return RedirectToAction(nameof(Index));
     }
 
-    [HttpPost("receive")]
-    public async Task<IActionResult> CreateInvoice(long? amountSat, string description, string? externalId)
+    [HttpGet("send")]
+    public async Task<IActionResult> Send()
     {
+        return View(new SendViewModel { Configured = await _settings.IsConfigured() });
+    }
+
+    [HttpPost("send/invoice")]
+    public async Task<IActionResult> SendInvoice(string invoice, long? amountSat)
+    {
+        var vm = new SendViewModel { Configured = await _settings.IsConfigured(), ActiveTab = "invoice" };
+        try
+        {
+            var r = await _client.PayInvoice(invoice, amountSat);
+            FillResult(vm, r);
+        }
+        catch (Exception ex) { vm.Error = Describe(ex); }
+        return View(nameof(Send), vm);
+    }
+
+    [HttpPost("send/offer")]
+    public async Task<IActionResult> SendOffer(string offer, long amountSat, string? message)
+    {
+        var vm = new SendViewModel { Configured = await _settings.IsConfigured(), ActiveTab = "offer" };
+        try
+        {
+            var r = await _client.PayOffer(offer, amountSat, message);
+            FillResult(vm, r);
+        }
+        catch (Exception ex) { vm.Error = Describe(ex); }
+        return View(nameof(Send), vm);
+    }
+
+    [HttpPost("send/address")]
+    public async Task<IActionResult> SendAddress(string address, long amountSat, string? message)
+    {
+        var vm = new SendViewModel { Configured = await _settings.IsConfigured(), ActiveTab = "address" };
+        try
+        {
+            var r = await _client.PayLnAddress(address, amountSat, message);
+            FillResult(vm, r);
+        }
+        catch (Exception ex) { vm.Error = Describe(ex); }
+        return View(nameof(Send), vm);
+    }
+
+    private static void FillResult(SendViewModel vm, PaymentResult? r)
+    {
+        if (r is null) return;
+        vm.HasResult = true;
+        vm.RecipientAmountSat = r.RecipientAmountSat;
+        vm.RoutingFeeSat = r.RoutingFeeSat;
+        vm.PaymentHash = r.PaymentHash;
+        vm.PaymentPreimage = r.PaymentPreimage;
+    }
+
+
+    [HttpGet("actions")]
+    public async Task<IActionResult> Action()
+    {
+        var vm = new DashboardViewModel();
+        if (!await _settings.IsConfigured()) 
+        { 
+            vm.Configured = false; return View(vm); 
+        }
+        vm.Configured = true;
+        try { 
+            vm.Channels = (await _client.ListChannels()) ?? new(); 
+        }
+        catch (Exception ex) { vm.Error = ex.Message; }
+        return View(vm);
+    }
+
+    [HttpGet("receive")]
+    public async Task<IActionResult> Receive()
+    {
+        var vm = new ReceiveViewModel { Configured = await _settings.IsConfigured() };
+        return View(vm);
+    }
+
+    [HttpPost("receive")]
+    public async Task<IActionResult> Receive(long? amountSat, string description, string? externalId)
+    {
+        var vm = new ReceiveViewModel { Configured = await _settings.IsConfigured() };
         try
         {
             var inv = await _client.CreateInvoice(amountSat, description ?? "", externalId);
-            TempData["SuccessMessage"] = $"Invoice created: {inv?.Serialized}";
+            vm.Invoice = inv?.Serialized;
+            vm.AmountSat = inv?.AmountSat;
+            vm.Description = description;
+            vm.PaymentHash = inv?.PaymentHash;
         }
-        catch (Exception ex) { TempData["ErrorMessage"] = Describe(ex); }
-        return RedirectToAction(nameof(Index));
+        catch (Exception ex)
+        {
+            vm.Error = Describe(ex);
+        }
+        return View(vm);
     }
 
 

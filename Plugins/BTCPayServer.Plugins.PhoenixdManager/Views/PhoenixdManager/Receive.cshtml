@@ -1,0 +1,97 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.PhoenixdManager.ViewModels
+
+@model ReceiveViewModel
+@{
+    ViewData.SetLayoutModel(new LayoutModel(nameof(PhoenixdViewAction.Receive), "Receive Payment") { ActiveCategory = nameof(PhoenixdViewAction) });
+    string Sat(long v) => v.ToString("N0");
+}
+
+<div class="sticky-header d-flex align-items-center justify-content-between">
+    <h2 class="mb-0">Receive</h2>
+</div>
+
+<partial name="_StatusMessage" />
+
+@if (!Model.Configured)
+{
+    <div class="alert alert-warning">
+        Phoenixd is not configured yet. <a asp-action="Settings" class="alert-link">Add your server URL and password</a> to begin.
+    </div>
+    return;
+}
+
+@if (Model.Error is not null)
+{
+    <div class="alert alert-danger">@Model.Error</div>
+}
+
+<div class="row g-4">
+    <div class="col-12 col-lg-5">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Create invoice</h5>
+                <form method="post" asp-action="Receive">
+                    <div class="mb-3">
+                        <label class="form-label">Amount (sat, blank = any)</label>
+                        <input name="amountSat" type="number" class="form-control" value="@Model.AmountSat" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input name="description" class="form-control" value="@Model.Description" required />
+                    </div>
+                    <button class="btn btn-primary w-100">Create invoice</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-7">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                @if (Model.HasResult)
+                {
+                    <h5 class="card-title text-start">Invoice</h5>
+                    @if (Model.AmountSat is > 0)
+                    {
+                        <p class="text-muted text-start">@Sat(Model.AmountSat.Value) sat — @Model.Description</p>
+                    }
+
+                    <div id="qrcode" class="d-flex justify-content-center my-3"></div>
+
+                    <div class="input-group">
+                        <input class="form-control" id="inv-value" value="@Model.Invoice" readonly />
+                        <button class="btn btn-outline-secondary" type="button" id="copy-btn">Copy</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex align-items-center justify-content-center h-100 text-muted" style="min-height:250px;">
+                        Create an invoice to see its QR code here.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section PageFootContent {
+<script>
+    (function () {
+        var btn = document.getElementById('copy-btn');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            var val = document.getElementById('inv-value').value;
+            var done = () => { btn.textContent = 'Copied'; setTimeout(() => btn.textContent = 'Copy', 1500); };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(val).then(done);
+            } else {
+                var el = document.getElementById('inv-value');
+                el.select(); el.setSelectionRange(0, 99999);
+                document.execCommand('copy'); done();
+            }
+        });
+    })();
+</script>
+}

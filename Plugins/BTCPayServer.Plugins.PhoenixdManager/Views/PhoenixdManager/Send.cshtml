@@ -1,0 +1,114 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.PhoenixdManager.ViewModels
+@model SendViewModel
+@{
+    ViewData.SetLayoutModel(new LayoutModel(nameof(PhoenixdViewAction.Send), "Send Payment") { ActiveCategory = nameof(PhoenixdViewAction) });
+    string Sat(long v) => v.ToString("N0");
+    string A(string tab) => Model.ActiveTab == tab ? "active" : "";
+    string Show(string tab) => Model.ActiveTab == tab ? "show active" : "";
+}
+
+<div class="sticky-header d-flex align-items-center justify-content-between">
+    <h2 class="mb-0">Send</h2>
+</div>
+
+<partial name="_StatusMessage" />
+
+@if (!Model.Configured)
+{
+    <div class="alert alert-warning">
+        Phoenixd is not configured yet. <a asp-action="Settings" class="alert-link">Add your server URL and password</a> to begin.
+    </div>
+    return;
+}
+
+@if (Model.Error is not null)
+{
+    <div class="alert alert-danger"><strong>Payment failed:</strong> @Model.Error</div>
+}
+
+@if (Model.HasResult)
+{
+    <div class="alert alert-success">
+        <h5 class="alert-heading">Payment sent</h5>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Amount</dt>
+            <dd class="col-sm-9">@Sat(Model.RecipientAmountSat ?? 0) sat</dd>
+            <dt class="col-sm-3">Routing fee</dt>
+            <dd class="col-sm-9">@Sat(Model.RoutingFeeSat ?? 0) sat</dd>
+            <dt class="col-sm-3">Payment hash</dt>
+            <dd class="col-sm-9"><code class="text-break">@Model.PaymentHash</code></dd>
+            <dt class="col-sm-3">Preimage</dt>
+            <dd class="col-sm-9"><code class="text-break">@Model.PaymentPreimage</code></dd>
+        </dl>
+    </div>
+}
+
+<div class="card">
+    <div class="card-body">
+        <ul class="nav nav-underline mb-3" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link @A("invoice")" data-bs-toggle="tab" data-bs-target="#tab-invoice" type="button">BOLT11 invoice</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @A("offer")" data-bs-toggle="tab" data-bs-target="#tab-offer" type="button">BOLT12 offer</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @A("address")" data-bs-toggle="tab" data-bs-target="#tab-address" type="button">Lightning address</button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <div class="tab-pane fade @Show("invoice")" id="tab-invoice">
+                <form method="post" asp-action="SendInvoice">
+                    <div class="mb-3">
+                        <label class="form-label">Invoice</label>
+                        <input name="invoice" class="form-control" placeholder="lnbc..." required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount (sat, only for 0-amount invoices)</label>
+                        <input name="amountSat" type="number" class="form-control" />
+                    </div>
+                    <button class="btn btn-primary">Pay invoice</button>
+                </form>
+            </div>
+
+            <div class="tab-pane fade @Show("offer")" id="tab-offer">
+                <form method="post" asp-action="SendOffer">
+                    <div class="mb-3">
+                        <label class="form-label">Offer</label>
+                        <input name="offer" class="form-control" placeholder="lno..." required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount (sat)</label>
+                        <input name="amountSat" type="number" class="form-control" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Message (optional)</label>
+                        <input name="message" class="form-control" />
+                    </div>
+                    <button class="btn btn-primary">Pay offer</button>
+                </form>
+            </div>
+
+            <div class="tab-pane fade @Show("address")" id="tab-address">
+                <form method="post" asp-action="SendAddress">
+                    <div class="mb-3">
+                        <label class="form-label">Lightning address</label>
+                        <input name="address" class="form-control" placeholder="user@@domain.com" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount (sat)</label>
+                        <input name="amountSat" type="number" class="form-control" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Message (optional)</label>
+                        <input name="message" class="form-control" />
+                    </div>
+                    <button class="btn btn-primary">Pay</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

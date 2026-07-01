@@ -1,7 +1,9 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
 @using BTCPayServer.Plugins.PhoenixdManager.ViewModels
 @model PhoenixdSettings
 @{
-    ViewData["Title"] = "Phoenixd Settings";
+    ViewData.SetLayoutModel(new LayoutModel(nameof(PhoenixdViewAction.Summary), "Phoenixd Settings") { ActiveCategory = nameof(PhoenixdViewAction) });
 }
 
 <div class="sticky-header">

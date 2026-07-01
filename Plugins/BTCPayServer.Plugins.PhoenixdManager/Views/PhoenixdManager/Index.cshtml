@@ -1,15 +1,11 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
 @using BTCPayServer.Plugins.PhoenixdManager.ViewModels
 @model DashboardViewModel
 @{
-    ViewData["Title"] = "Phoenixd Manager";
+    ViewData.SetLayoutModel(new LayoutModel(nameof(PhoenixdViewAction.Summary), "Phoenixd Manager") { ActiveCategory = nameof(PhoenixdViewAction) });
     string Sat(long v) => v.ToString("N0");
-    string Ts(long? unixSeconds) => unixSeconds is null or 0
-        ? "-"
-        : DateTimeOffset.FromUnixTimeSeconds(unixSeconds.Value).UtcDateTime.ToString("yyyy-MM-dd HH:mm");
-    // phoenixd timestamps in payments are milliseconds; normalise where needed in the rows below.
-    string TsMs(long? unixMs) => unixMs is null or 0
-        ? "-"
-        : DateTimeOffset.FromUnixTimeMilliseconds(unixMs.Value).UtcDateTime.ToString("yyyy-MM-dd HH:mm");
+    string TsMs(long? unixMs) => unixMs is null or 0 ? "-" : DateTimeOffset.FromUnixTimeMilliseconds(unixMs.Value).UtcDateTime.ToString("yyyy-MM-dd HH:mm");
 }
 
 <div class="sticky-header d-flex align-items-center justify-content-between">
@@ -27,251 +23,115 @@
     return;
 }
 
-@if (Model.Error is not null)
-{
-    <div class="alert alert-danger"><strong>Error talking to phoenixd:</strong> @Model.Error</div>
-}
-
-<!-- ===== Overview ===== -->
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card h-100"><div class="card-body">
-            <h6 class="text-muted">Balance</h6>
-            <div class="h4 mb-0">@Sat(Model.Balance?.BalanceSat ?? 0) <small class="text-muted">sat</small></div>
-        </div></div>
+<div class="row row-cols-2 row-cols-lg-4 g-3 mb-4">
+    <div class="col">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="text-muted">Balance</h6>
+                <div class="h4 mb-0">@Sat(Model.Balance?.BalanceSat ?? 0) <small class="text-muted">sat</small></div>
+            </div>
+        </div>
     </div>
-    <div class="col-md-3">
-        <div class="card h-100"><div class="card-body">
-            <h6 class="text-muted">Fee credit</h6>
-            <div class="h4 mb-0">@Sat(Model.Balance?.FeeCreditSat ?? 0) <small class="text-muted">sat</small></div>
-        </div></div>
+    <div class="col">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="text-muted">Fee credit</h6>
+                <div class="h4 mb-0">@Sat(Model.Balance?.FeeCreditSat ?? 0) <small class="text-muted">sat</small></div>
+            </div>
+        </div>
     </div>
-    <div class="col-md-3">
-        <div class="card h-100"><div class="card-body">
-            <h6 class="text-muted">Channels</h6>
-            <div class="h4 mb-0">@Model.Channels.Count</div>
-        </div></div>
+    <div class="col">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="text-muted">Channels</h6>
+                <div class="h4 mb-0">@Model.Channels.Count</div>
+            </div>
+        </div>
     </div>
-    <div class="col-md-3">
-        <div class="card h-100"><div class="card-body">
-            <h6 class="text-muted">Block height</h6>
-            <div class="h4 mb-0">@(Model.NodeInfo?.BlockHeight.ToString("N0") ?? "-")</div>
-        </div></div>
+    <div class="col">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="text-muted">Block height</h6>
+                <div class="h4 mb-0">@(Model.NodeInfo?.BlockHeight.ToString("N0") ?? "-")</div>
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- ===== Node identity ===== -->
-<div class="card mb-4"><div class="card-body">
-    <h5 class="card-title">Node</h5>
-    <dl class="row mb-0">
-        <dt class="col-sm-3">Node ID</dt><dd class="col-sm-9"><code>@Model.NodeInfo?.NodeId</code></dd>
-        <dt class="col-sm-3">Chain</dt><dd class="col-sm-9">@Model.NodeInfo?.Chain</dd>
-        <dt class="col-sm-3">Version</dt><dd class="col-sm-9">@Model.NodeInfo?.Version</dd>
-        <dt class="col-sm-3">BOLT12 Offer</dt>
-        <dd class="col-sm-9">
-            @if (Model.Offer is not null) { <code class="user-select-all">@Model.Offer</code> } else { <span class="text-muted">unavailable</span> }
-        </dd>
-        <dt class="col-sm-3">Lightning Address</dt>
-        <dd class="col-sm-9">
-            @if (Model.LnAddress is not null) { <code class="user-select-all">@Model.LnAddress</code> } else { <span class="text-muted">unavailable</span> }
-        </dd>
-    </dl>
-</div></div>
-
-<!-- ===== Actions ===== -->
-<ul class="nav nav-tabs" role="tablist">
-    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-receive" type="button">Receive</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-send" type="button">Send</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-onchain" type="button">On-chain</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-utility" type="button">Decode / Liquidity</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-channels" type="button">Channels</button></li>
-</ul>
-
-<div class="tab-content border border-top-0 p-3 mb-4">
-    <!-- Receive -->
-    <div class="tab-pane fade show active" id="tab-receive">
-        <form method="post" asp-action="CreateInvoice" class="row g-2">
-            <div class="col-md-3"><label class="form-label">Amount (sat, blank = any)</label><input name="amountSat" type="number" class="form-control" /></div>
-            <div class="col-md-5"><label class="form-label">Description</label><input name="description" class="form-control" required /></div>
-            <div class="col-md-2"><label class="form-label">External ID</label><input name="externalId" class="form-control" /></div>
-            <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">Create invoice</button></div>
-        </form>
-    </div>
-
-    <!-- Send -->
-    <div class="tab-pane fade" id="tab-send">
-        <h6>Pay a BOLT11 invoice</h6>
-        <form method="post" asp-action="PayInvoice" class="row g-2 mb-4">
-            <div class="col-md-8"><input name="invoice" class="form-control" placeholder="lnbc..." required /></div>
-            <div class="col-md-2"><input name="amountSat" type="number" class="form-control" placeholder="amt (if 0-amount)" /></div>
-            <div class="col-md-2"><button class="btn btn-primary w-100">Pay</button></div>
-        </form>
-
-        <h6>Pay a BOLT12 offer</h6>
-        <form method="post" asp-action="PayOffer" class="row g-2 mb-4">
-            <div class="col-md-6"><input name="offer" class="form-control" placeholder="lno..." required /></div>
-            <div class="col-md-2"><input name="amountSat" type="number" class="form-control" placeholder="amount sat" required /></div>
-            <div class="col-md-2"><input name="message" class="form-control" placeholder="message" /></div>
-            <div class="col-md-2"><button class="btn btn-primary w-100">Pay offer</button></div>
-        </form>
-
-        <h6>Pay a Lightning address</h6>
-        <form method="post" asp-action="PayLnAddress" class="row g-2">
-            <div class="col-md-6"><input name="address" class="form-control" placeholder="user@domain.com" required /></div>
-            <div class="col-md-2"><input name="amountSat" type="number" class="form-control" placeholder="amount sat" required /></div>
-            <div class="col-md-2"><input name="message" class="form-control" placeholder="message" /></div>
-            <div class="col-md-2"><button class="btn btn-primary w-100">Pay</button></div>
-        </form>
-    </div>
-
-    <!-- On-chain -->
-    <div class="tab-pane fade" id="tab-onchain">
-        <form method="post" asp-action="SendToAddress" class="row g-2"
-              onsubmit="return confirm('Send on-chain? This spends channel funds via splice-out.');">
-            <div class="col-md-6"><label class="form-label">Bitcoin address</label><input name="address" class="form-control" required /></div>
-            <div class="col-md-3"><label class="form-label">Amount (sat)</label><input name="amountSat" type="number" class="form-control" required /></div>
-            <div class="col-md-2"><label class="form-label">Feerate (sat/vB)</label><input name="feerateSatByte" type="number" class="form-control" value="2" required /></div>
-            <div class="col-md-1 d-flex align-items-end"><button class="btn btn-primary w-100">Send</button></div>
-        </form>
-    </div>
-
-    <!-- Utility -->
-    <div class="tab-pane fade" id="tab-utility">
-        <h6>Decode invoice or offer</h6>
-        <form method="post" asp-action="Decode" class="row g-2 mb-4">
-            <div class="col-md-10"><input name="value" class="form-control" placeholder="lnbc... or lno..." required /></div>
-            <div class="col-md-2"><button class="btn btn-secondary w-100">Decode</button></div>
-        </form>
-
-        <h6>Estimate liquidity fees</h6>
-        <form method="post" asp-action="EstimateLiquidity" class="row g-2">
-            <div class="col-md-10"><input name="amountSat" type="number" class="form-control" placeholder="amount sat" required /></div>
-            <div class="col-md-2"><button class="btn btn-secondary w-100">Estimate</button></div>
-        </form>
-    </div>
-
-    <!-- Channels -->
-    <div class="tab-pane fade" id="tab-channels">
-        @if (!Model.Channels.Any())
-        {
-            <p class="text-muted">No channels yet.</p>
-        }
-        else
-        {
-            <table class="table table-sm">
-                <thead><tr><th>Channel ID</th><th>State</th><th class="text-end">Balance</th><th class="text-end">Inbound</th><th class="text-end">Capacity</th><th></th></tr></thead>
-                <tbody>
-                @foreach (var c in Model.Channels)
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Node</h5>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Node ID</dt>
+            <dd class="col-sm-9"><code class="text-break user-select-all fs-6 text-body">@Model.NodeInfo?.NodeId</code></dd>
+            <dt class="col-sm-3">Chain</dt>
+            <dd class="col-sm-9 fw-semibold">@Model.NodeInfo?.Chain</dd>
+            <dt class="col-sm-3">Version</dt>
+            <dd class="col-sm-9 fw-semibold">@Model.NodeInfo?.Version</dd>
+            <dt class="col-sm-3">Lightning Address</dt>
+            <dd class="col-sm-9">
+                @if (Model.LnAddress is not null)
                 {
-                    <tr>
-                        <td><code>@c.ChannelId</code></td>
-                        <td>@c.State</td>
-                        <td class="text-end">@Sat(c.BalanceSat)</td>
-                        <td class="text-end">@Sat(c.InboundLiquiditySat)</td>
-                        <td class="text-end">@Sat(c.CapacitySat)</td>
-                        <td class="text-end">
-                            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="collapse" data-bs-target="#close-@c.ChannelId">Close</button>
-                        </td>
-                    </tr>
-                    <tr class="collapse" id="close-@c.ChannelId">
-                        <td colspan="6">
-                            <form method="post" asp-action="CloseChannel" class="row g-2"
-                                  onsubmit="return confirm('Close this channel to the given address?');">
-                                <input type="hidden" name="channelId" value="@c.ChannelId" />
-                                <div class="col-md-7"><input name="address" class="form-control" placeholder="payout bitcoin address" required /></div>
-                                <div class="col-md-3"><input name="feerateSatByte" type="number" class="form-control" value="2" required /></div>
-                                <div class="col-md-2"><button class="btn btn-danger w-100">Confirm close</button></div>
-                            </form>
-                        </td>
-                    </tr>
+                    <code class="text-break user-select-all fs-6 text-body">@Model.LnAddress</code>
                 }
-                </tbody>
-            </table>
-        }
+                else
+                {
+                    <span class="text-muted">unavailable</span>
+                }
+            </dd>
+        </dl>
     </div>
 </div>
 
-<!-- ===== History ===== -->
-<div class="row g-4">
+<div class="row g-5">
     <div class="col-lg-6">
         <h5>Recent incoming</h5>
-        <table class="table table-sm">
-            <thead><tr><th>Created</th><th>Desc</th><th class="text-end">Received</th><th>Status</th></tr></thead>
-            <tbody>
-            @foreach (var p in Model.RecentIncoming)
-            {
-                <tr>
-                    <td>@TsMs(p.CreatedAt)</td>
-                    <td>@p.Description</td>
-                    <td class="text-end">@Sat(p.ReceivedSat)</td>
-                    <td>@(p.IsPaid ? "paid" : p.IsExpired ? "expired" : "pending")</td>
-                </tr>
-            }
-            </tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Created</th>
+                        <th>Desc</th>
+                        <th>Received</th>
+                        <th class="text-end">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Model.RecentIncoming)
+                    {
+                        <tr>
+                            <td class="text-nowrap">@TsMs(p.CreatedAt)</td>
+                            <td>@p.Description</td>
+                            <td>@Sat(p.ReceivedSat)</td>
+                            <td class="text-end">@(p.IsPaid ? "paid" : p.IsExpired ? "expired" : "pending")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
     <div class="col-lg-6">
         <h5>Recent outgoing</h5>
-        <table class="table table-sm">
-            <thead><tr><th>Created</th><th class="text-end">Sent</th><th class="text-end">Fee</th><th>Status</th></tr></thead>
-            <tbody>
-            @foreach (var p in Model.RecentOutgoing)
-            {
-                <tr>
-                    <td>@TsMs(p.CreatedAt)</td>
-                    <td class="text-end">@Sat(p.Sent)</td>
-                    <td class="text-end">@Sat(p.Fees)</td>
-                    <td>@(p.IsPaid ? "paid" : "pending")</td>
-                </tr>
-            }
-            </tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Created</th
+                        ><th>Sent (sats)</th>
+                        <th class="text-end">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Model.RecentOutgoing)
+                    {
+                        <tr>
+                            <td class="text-nowrap">@TsMs(p.CreatedAt)</td>
+                            <td>@Sat(p.Sent)</td>
+                            <td class="text-end">@(p.IsPaid ? "paid" : "pending")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
-
-<!-- ===== Live events (websocket) ===== -->
-<div class="card mt-4"><div class="card-body">
-    <div class="d-flex align-items-center justify-content-between">
-        <h5 class="card-title mb-0">Live events</h5>
-        <span id="ws-status" class="badge bg-secondary">disconnected</span>
-    </div>
-    <p class="form-text">
-        Streams payment events from phoenixd's <code>/websocket</code> endpoint in real time.
-        Connects from your browser directly to phoenixd, so the server URL must be reachable
-        from your browser (not only from BTCPay). Password is used for basic auth.
-    </p>
-    <pre id="ws-log" class="bg-dark text-light p-2 rounded" style="height:200px; overflow:auto; font-size:12px;"></pre>
-    <button id="ws-connect" class="btn btn-sm btn-secondary">Connect</button>
-</div></div>
-
-@section PageFootScripts {
-<script>
-(function () {
-    // Server URL comes from the model (admin-only page). Password is NOT embedded:
-    // phoenixd's websocket uses basic auth; for browser use, front phoenixd with a proxy
-    // that injects credentials, or run it where the browser can reach it on a trusted network.
-    const base = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ServerUrl ?? ""));
-    const statusEl = document.getElementById('ws-status');
-    const logEl = document.getElementById('ws-log');
-    const btn = document.getElementById('ws-connect');
-
-    function log(line) {
-        const t = new Date().toISOString().substring(11, 19);
-        logEl.textContent += `[${t}] ${line}\n`;
-        logEl.scrollTop = logEl.scrollHeight;
-    }
-
-    btn.addEventListener('click', function () {
-        try {
-            const wsUrl = base.replace(/^http/i, 'ws').replace(/\/$/, '') + '/websocket';
-            log('connecting to ' + wsUrl);
-            const ws = new WebSocket(wsUrl);
-            ws.onopen = () => { statusEl.textContent = 'connected'; statusEl.className = 'badge bg-success'; log('open'); };
-            ws.onmessage = (e) => log(e.data);
-            ws.onclose = () => { statusEl.textContent = 'disconnected'; statusEl.className = 'badge bg-secondary'; log('closed'); };
-            ws.onerror = () => { statusEl.textContent = 'error'; statusEl.className = 'badge bg-danger'; log('error (check auth / reachability)'); };
-        } catch (err) { log('exception: ' + err.message); }
-    });
-})();
-</script>
-}
