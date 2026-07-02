@@ -24,74 +24,59 @@
 
 @if (Model.Error is not null)
 {
-    <div class="alert alert-danger">@Model.Error</div>
+    <div class="mb-4" style="max-width: 640px;">
+        <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis px-3 py-2">Error</span>
+        <div class="text-danger small mt-2">@Model.Error</div>
+    </div>
 }
 
-<div class="row g-4">
-    <div class="col-12 col-lg-5">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Create invoice</h5>
-                <form method="post" asp-action="Receive">
-                    <div class="mb-3">
-                        <label class="form-label">Amount (sat, blank = any)</label>
-                        <input name="amountSat" type="number" class="form-control" value="@Model.AmountSat" />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <input name="description" class="form-control" value="@Model.Description" required />
-                    </div>
-                    <button class="btn btn-primary w-100">Create invoice</button>
-                </form>
-            </div>
+@if (Model.HasResult)
+{
+    <div style="max-width: 420px;">
+        @if (Model.AmountSat is > 0)
+        {
+            <p class="text-muted mb-3">@Sat(Model.AmountSat.Value) sat &middot; @Model.Description</p>
+        }
+
+        <div class="input-group">
+            <input class="form-control" id="inv-value" value="@Model.Invoice" readonly />
+            <button class="btn btn-outline-secondary" type="button" id="copy-btn">Copy</button>
         </div>
+
+        <a asp-action="Receive" class="btn btn-link px-0 mt-3">Create another</a>
     </div>
-
-    <div class="col-12 col-lg-7">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                @if (Model.HasResult)
-                {
-                    <h5 class="card-title text-start">Invoice</h5>
-                    @if (Model.AmountSat is > 0)
-                    {
-                        <p class="text-muted text-start">@Sat(Model.AmountSat.Value) sat — @Model.Description</p>
-                    }
-
-                    <div id="qrcode" class="d-flex justify-content-center my-3"></div>
-
-                    <div class="input-group">
-                        <input class="form-control" id="inv-value" value="@Model.Invoice" readonly />
-                        <button class="btn btn-outline-secondary" type="button" id="copy-btn">Copy</button>
-                    </div>
-                }
-                else
-                {
-                    <div class="d-flex align-items-center justify-content-center h-100 text-muted" style="min-height:250px;">
-                        Create an invoice to see its QR code here.
-                    </div>
-                }
-            </div>
+}
+else
+{
+    <form method="post" asp-action="Receive" style="max-width: 640px;">
+        <div class="mb-3">
+            <label class="form-label">Amount (sat)</label>
+            <input name="amountSat" type="number" class="form-control" value="@Model.AmountSat" />
         </div>
-    </div>
-</div>
+        <div class="mb-3">
+            <label class="form-label">Description</label>
+            <input name="description" class="form-control" value="@Model.Description" required />
+        </div>
+        <button class="btn btn-primary">Create invoice</button>
+    </form>
+}
 
 @section PageFootContent {
-<script>
-    (function () {
-        var btn = document.getElementById('copy-btn');
-        if (!btn) return;
-        btn.addEventListener('click', function () {
-            var val = document.getElementById('inv-value').value;
-            var done = () => { btn.textContent = 'Copied'; setTimeout(() => btn.textContent = 'Copy', 1500); };
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(val).then(done);
-            } else {
-                var el = document.getElementById('inv-value');
-                el.select(); el.setSelectionRange(0, 99999);
-                document.execCommand('copy'); done();
-            }
-        });
-    })();
-</script>
+    <script>
+        (function () {
+            var btn = document.getElementById('copy-btn');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                var val = document.getElementById('inv-value').value;
+                var done = () => { btn.textContent = 'Copied'; setTimeout(() => btn.textContent = 'Copy', 1500); };
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(val).then(done);
+                } else {
+                    var el = document.getElementById('inv-value');
+                    el.select(); el.setSelectionRange(0, 99999);
+                    document.execCommand('copy'); done();
+                }
+            });
+        })();
+    </script>
 }

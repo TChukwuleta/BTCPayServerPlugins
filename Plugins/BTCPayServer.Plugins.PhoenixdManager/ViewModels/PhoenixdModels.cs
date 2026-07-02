@@ -142,10 +142,22 @@ public class SendViewModel
     public string? PaymentPreimage { get; set; }
 }
 
+public class OnChainViewModel
+{
+    public bool Configured { get; set; }
+    public string? Error { get; set; }
+    public bool HasResult { get; set; }
+    public string? TxId { get; set; }
+    public long? AmountSat { get; set; }
+    public string? Address { get; set; }
+    public string? Chain { get; set; }
+}
+
 public enum PhoenixdViewAction
 {
     Summary,
     Actions,
     Receive,
-    Send
+    Send,
+    OnChain
 }

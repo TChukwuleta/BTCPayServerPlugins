@@ -1,0 +1,69 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.PhoenixdManager.ViewModels
+@model OnChainViewModel
+@{
+    ViewData.SetLayoutModel(new LayoutModel(nameof(PhoenixdViewAction.OnChain), "On-chain Send") { ActiveCategory = nameof(PhoenixdViewAction) });
+    string Sat(long v) => v.ToString("N0");
+    var isTestnet = string.Equals(Model.Chain, "testnet", StringComparison.OrdinalIgnoreCase);
+    var mempoolBase = isTestnet ? "https://mempool.space/testnet/tx/" : "https://mempool.space/tx/";
+}
+
+<div class="sticky-header d-flex align-items-center justify-content-between">
+    <h2 class="mb-0">On-chain send</h2>
+</div>
+
+<partial name="_StatusMessage" />
+
+@if (!Model.Configured)
+{
+    <div class="alert alert-warning">
+        Phoenixd is not configured yet. <a asp-action="Settings" class="alert-link">Add your server URL and password</a> to begin.
+    </div>
+    return;
+}
+
+@if (Model.Error is not null)
+{
+    <div class="mb-4" style="max-width: 640px;">
+        <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis px-3 py-2">Send failed</span>
+        <div class="text-danger small mt-2">@Model.Error</div>
+    </div>
+}
+
+@if (Model.HasResult)
+{
+    <div class="mb-4" style="max-width: 640px;">
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <span class="badge rounded-pill bg-success-subtle text-success-emphasis px-3 py-2">&check; Broadcast</span>
+            <span class="text-muted">@Sat(Model.AmountSat ?? 0) sat &rarr; @Model.Address</span>
+        </div>
+        <dl class="row mb-0 small">
+            <dt class="col-4 col-sm-2 text-muted fw-normal">Txid</dt>
+            <dd class="col-8 col-sm-10">
+                <a href="@(mempoolBase)@Model.TxId" target="_blank" rel="noopener" class="text-break">@Model.TxId</a>
+            </dd>
+        </dl>
+        <a asp-action="OnChain" class="btn btn-link px-0 mt-2">Send another</a>
+    </div>
+}
+else
+{
+    <form method="post" asp-action="OnChain" style="max-width: 640px;"
+          onsubmit="return confirm('Send on-chain? This moves channel funds on-chain via splice-out and pays a mining fee.');">
+        <div class="mb-3">
+            <label class="form-label">Bitcoin address</label>
+            <input name="address" class="form-control" placeholder="bc1..." required />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Amount (sat)</label>
+            <input name="amountSat" type="number" class="form-control" required />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Feerate (sat/vB)</label>
+            <input name="feerateSatByte" type="number" class="form-control" value="2" min="1" required />
+            <div class="form-text">On-chain mining fee rate. Check mempool.space for a current recommended rate.</div>
+        </div>
+        <button class="btn btn-primary">Send on-chain</button>
+    </form>
+}

@@ -3,12 +3,11 @@
 @using BTCPayServer.Plugins.PhoenixdManager.ViewModels
 @model DashboardViewModel
 @{
-    ViewData.SetLayoutModel(new LayoutModel(nameof(PhoenixdViewAction.Actions), "Phoenixd Actions") { ActiveCategory = nameof(PhoenixdViewAction) });
-    string Sat(long v) => v.ToString("N0");
+    ViewData.SetLayoutModel(new LayoutModel(nameof(PhoenixdViewAction.Actions), "Phoenixd Tools") { ActiveCategory = nameof(PhoenixdViewAction) });
 }
 
 <div class="sticky-header d-flex align-items-center justify-content-between">
-    <h2 class="mb-0">@ViewData["Title"]</h2>
+    <h2 class="mb-0">Tools</h2>
 </div>
 
 <partial name="_StatusMessage" />
@@ -21,179 +20,23 @@
     return;
 }
 
-<div class="row g-4">
-    <div class="col-12 col-xl-6">
-
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">On-chain send</h5>
-                <form method="post" asp-action="SendToAddress"
-                      onsubmit="return confirm('Send on-chain? This spends channel funds via splice-out.');">
-                    <div class="mb-3">
-                        <label class="form-label">Bitcoin address</label>
-                        <input name="address" class="form-control" required />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Amount (sat)</label>
-                        <input name="amountSat" type="number" class="form-control" required />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Feerate (sat/vB)</label>
-                        <input name="feerateSatByte" type="number" class="form-control" value="2" required />
-                    </div>
-                    <button class="btn btn-primary">Send on-chain</button>
-                </form>
-            </div>
+<div style="max-width: 640px;">
+    <h5 class="mb-3">Decode invoice or offer</h5>
+    <form method="post" asp-action="Decode" class="mb-5">
+        <div class="mb-3">
+            <label class="form-label">Invoice or offer</label>
+            <input name="value" class="form-control" placeholder="lnbc... or lno..." required />
         </div>
+        <button class="btn btn-secondary">Decode</button>
+    </form>
 
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Decode / Liquidity</h5>
-
-                <form method="post" asp-action="Decode" class="mb-4">
-                    <div class="mb-3">
-                        <label class="form-label">Decode invoice or offer</label>
-                        <input name="value" class="form-control" placeholder="lnbc... or lno..." required />
-                    </div>
-                    <button class="btn btn-secondary">Decode</button>
-                </form>
-
-                <form method="post" asp-action="EstimateLiquidity">
-                    <div class="mb-3">
-                        <label class="form-label">Estimate liquidity fees for amount (sat)</label>
-                        <input name="amountSat" type="number" class="form-control" required />
-                    </div>
-                    <button class="btn btn-secondary">Estimate</button>
-                </form>
-            </div>
+    <h5 class="mb-3">Estimate liquidity fees</h5>
+    <form method="post" asp-action="EstimateLiquidity">
+        <div class="mb-3">
+            <label class="form-label">Amount (sat)</label>
+            <input name="amountSat" type="number" class="form-control" required />
         </div>
+        <button class="btn btn-secondary">Estimate</button>
+    </form>
 
-    </div>
-    <div class="col-12 col-xl-6">
-
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Pay a BOLT11 invoice</h5>
-                <form method="post" asp-action="PayInvoice">
-                    <div class="mb-3">
-                        <label class="form-label">Invoice</label>
-                        <input name="invoice" class="form-control" placeholder="lnbc..." required />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Amount (sat, if 0-amount invoice)</label>
-                        <input name="amountSat" type="number" class="form-control" />
-                    </div>
-                    <button class="btn btn-primary">Pay invoice</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Send: BOLT12 -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Pay a BOLT12 offer</h5>
-                <form method="post" asp-action="PayOffer">
-                    <div class="mb-3">
-                        <label class="form-label">Offer</label>
-                        <input name="offer" class="form-control" placeholder="lno..." required />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Amount (sat)</label>
-                        <input name="amountSat" type="number" class="form-control" required />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Message (optional)</label>
-                        <input name="message" class="form-control" />
-                    </div>
-                    <button class="btn btn-primary">Pay offer</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Send: Lightning address -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Pay a Lightning address</h5>
-                <form method="post" asp-action="PayLnAddress">
-                    <div class="mb-3">
-                        <label class="form-label">Address</label>
-                        <input name="address" class="form-control" placeholder="user@@domain.com" required />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Amount (sat)</label>
-                        <input name="amountSat" type="number" class="form-control" required />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Message (optional)</label>
-                        <input name="message" class="form-control" />
-                    </div>
-                    <button class="btn btn-primary">Pay</button>
-                </form>
-            </div>
-        </div>
-
-    </div>
-</div>
-
-<!-- Channels -->
-<div class="card mb-4">
-    <div class="card-body">
-        <h5 class="card-title">Channels</h5>
-        @if (Model.Channels.Count == 0)
-        {
-            <p class="text-muted mb-0">No channels yet.</p>
-        }
-        else
-        {
-            <div class="table-responsive">
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>Channel ID</th>
-                            <th>State</th>
-                            <th class="text-end">Balance</th>
-                            <th class="text-end">Inbound</th>
-                            <th class="text-end">Capacity</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var c in Model.Channels)
-                        {
-                            <tr>
-                                <td><code class="text-break">@c.ChannelId</code></td>
-                                <td>@c.State</td>
-                                <td class="text-end">@Sat(c.BalanceSat)</td>
-                                <td class="text-end">@Sat(c.InboundLiquiditySat)</td>
-                                <td class="text-end">@Sat(c.CapacitySat)</td>
-                                <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-danger" type="button"
-                                            data-bs-toggle="collapse" data-bs-target="#close-@c.ChannelId">
-                                        Close
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr class="collapse" id="close-@c.ChannelId">
-                                <td colspan="6">
-                                    <form method="post" asp-action="CloseChannel"
-                                          onsubmit="return confirm('Close this channel to the given address?');">
-                                        <input type="hidden" name="channelId" value="@c.ChannelId" />
-                                        <div class="mb-3">
-                                            <label class="form-label">Payout address</label>
-                                            <input name="address" class="form-control" required />
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Feerate (sat/vB)</label>
-                                            <input name="feerateSatByte" type="number" class="form-control" value="2" required />
-                                        </div>
-                                        <button class="btn btn-danger">Confirm close</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </div>
 </div>

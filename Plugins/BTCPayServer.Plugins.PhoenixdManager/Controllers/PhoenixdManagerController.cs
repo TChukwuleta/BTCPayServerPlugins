@@ -165,6 +165,40 @@ public class PhoenixdManagerController(PhoenixdClient _client, PhoenixdSettingsS
         return View(vm);
     }
 
+    [HttpGet("onchain")]
+    public async Task<IActionResult> OnChain()
+    {
+        var vm = new OnChainViewModel { Configured = await _settings.IsConfigured() };
+        if (vm.Configured)
+        {
+            try 
+            { 
+                vm.Chain = (await _client.GetInfo())?.Chain; 
+            } catch {  }
+        }
+        return View(vm);
+    }
+
+    [HttpPost("onchain")]
+    public async Task<IActionResult> OnChain(string address, long amountSat, int feerateSatByte)
+    {
+        var vm = new OnChainViewModel { Configured = await _settings.IsConfigured() };
+        try
+        {
+            var txid = await _client.SendToAddress(address, amountSat, feerateSatByte);
+            vm.HasResult = !string.IsNullOrWhiteSpace(txid);
+            vm.TxId = txid?.Trim();
+            vm.AmountSat = amountSat;
+            vm.Address = address;
+            vm.Chain = (await _client.GetInfo())?.Chain;
+        }
+        catch (Exception ex)
+        {
+            vm.Error = Describe(ex);
+        }
+        return View(vm);
+    }
+
 
     [HttpPost("pay/invoice")]
     public async Task<IActionResult> PayInvoice(string invoice, long? amountSat)
