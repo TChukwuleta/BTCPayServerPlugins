@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
@@ -13,9 +14,8 @@ public class GlobalSearchPMO(PlaywrightTester tester)
     /// <param name="page"></param>
     public async Task GoToPage(string page)
     {
-        await Page.Keyboard.PressAsync("/");
-        await Page.Keyboard.TypeAsync(page);
-        await Page.Keyboard.PressAsync("Enter");
+        await Fill(page);
+        await Enter();
     }
 
     public async Task Fill(string query)

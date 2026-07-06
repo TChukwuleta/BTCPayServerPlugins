@@ -149,7 +149,7 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
             return View("UpsertDiscountCode", vm);
         }
         var ticketTypeId = string.IsNullOrEmpty(vm.TicketTypeId) ? null : vm.TicketTypeId;
-        DateTimeOffset? expiry = vm.ExpiryDate;
+        DateTimeOffset? expiry = vm.ExpiryDate?.ToUniversalTime();
         if (string.IsNullOrEmpty(vm.Id))
         {
             ctx.DiscountCodes.Add(new DiscountCode

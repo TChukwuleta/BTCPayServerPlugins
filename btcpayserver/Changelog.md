@@ -1,5 +1,62 @@
 # Changelog
 
+## 2.4.0
+
+See the [blog post announcement](https://blog.btcpayserver.org/btcpay-server-2-4-0/).
+
+### Breaking changes
+
+* LNBank and Lightning Charge backends are no longer supported.
+* If you use Boltcards Extension or Shopify v2 plugins, you will need to upgrade to the latest version of the plugin.
+
+### New features
+
+* Add multisig wallet setup (#7218) @thgO-O
+* Add a global search bar to improve navigation (#7183) @NicolasDorier
+* Add loginless and passwordless passkey authentication (#7172) @bitcoinbrisbane @NicolasDorier
+* Add more granular permissions for wallet management (#7357) @thgO-O
+* Subscription: Allow credit refunds via Pull Payments (#7284) @TChukwuleta
+* Subscription: Allow subscribers and customers to modify their notification email in the portal (#7300) @TChukwuleta
+* Point of Sale: Add configuration for tax on tips (#7298) @TChukwuleta
+* Point of Sale: Allow merchants to configure tax inclusion or exclusion (#7290) @TChukwuleta
+* Wallet: Add transaction search and date filters (#7133) @Sup3rlativ3
+* Add Bitcoin.co.ke rate provider (#7370) @sixside
+* Allow setting the maximum number of stores per user (#7320) @Abhijay007
+* Allow server admins to specify whether invited users subscribe to monetization (#7318) @TChukwuleta
+* Add separate `CanSendStoreEmail` permission for the store email API (#7345) @Abhijay007
+* Can bulk archive pull payments (#7400) @TChukwuleta
+
+### Fixes
+
+* Fix: Archiving invoices with a custom range filter returned error 403 (#7383 #7386) @NicolasDorier
+* Fix invalid Yadio rate handling (#7377) @BuffaloDyl
+* Fix iOS touch lockup on Keypad Point of Sale item buttons (#7379) @Wiredancer
+* Fix a corrupted table in the "Enter your xpub" screen @NicolasDorier
+* Fix searched text corrupting the search filter (#7338) @NicolasDorier
+* Fix BTCPay Server hanging on shutdown when Bitcoin support is disabled @NicolasDorier
+* Prevent 2FA code submission when the authenticator is not configured @NicolasDorier
+* Invoice Date Filter - Date Selector Widget closes the month list when clicked (#7384 #7388) @senutpal
+* Invoice Date Filter - Date Selector Widget had month dropdown with white text on a white background in Dark Mode (#7385) @senutpal
+* Refunds and pull payments were unable to make payments from LND 0.21.0 (https://github.com/btcpayserver/BTCPayServer.Lightning/pull/178) @warioishere
+* Uninstall button is missing for language packs (#7390 #7392) @teamssUTXO
+* Lightning invoice silently dropped when the node doesn't return amount on reconnection (#7402) @atharrva01
+* The Server Policies page would timeout when the server had too many apps (#7406) @NicolasDorier
+* Fix support for Core lightning 26.06 (#7412) @NicolasDorier
+
+### Improvements
+
+* Show missing permissions on the 403 page (#7387) @NicolasDorier
+* Adds inline QR and copy actions to the `Store Id` field on the Store Settings page. (#7396) @BuffaloDyl
+* Unnest UI routes for Pull Requests, Pull Payments, Invoices, and Apps (#7368) @NicolasDorier
+* Improve language pack selection (#7347) @teamssUTXO
+* Display Bylls as Bull Bitcoin in rate sources (#7364) @BullishNode
+
+### Miscellaneous
+
+* Remove deprecated Shopify Scripts integration (#6608) @NicolasDorier
+* Deprecate LCAD (#7363) @BullishNode
+* Remove support of some lightning backends: Lightning Charge, LNDHub, LNBank.
+
 ## 2.3.9
 
 ### Fixes

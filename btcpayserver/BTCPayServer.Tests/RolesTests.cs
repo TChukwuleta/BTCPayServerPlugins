@@ -16,7 +16,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Playwright;
 using Xunit;
-using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
 
 namespace BTCPayServer.Tests;
@@ -614,6 +613,7 @@ public class RolesTests(ITestOutputHelper testOutputHelper) : UnitTestBase(testO
         await s.AssertPageAccess(false, StorePath(storeId, "payment-requests"));
         await s.AssertPageAccess(false, StorePath(storeId, "pull-payments"));
         await s.AssertPageAccess(false, StorePath(storeId, "payouts"));
+        await Expect(s.Page.Locator("#details")).ToHaveTextAsync("You are missing the btcpay.store.canviewpayouts permission.");
         await s.AssertPageAccess(true, WalletImport(storeId, cryptoCode));
         await s.AssertPageAccess(false, WalletImportSeed(storeId, cryptoCode));
         await AssertWalletSettingsCannotTargetAnotherStore();
@@ -863,7 +863,7 @@ public class RolesTests(ITestOutputHelper testOutputHelper) : UnitTestBase(testO
         var (_, storeId) = await s.CreateNewStore();
         await s.GoToStore();
         await s.GenerateWallet(isHotWallet: true);
-        await s.AddLightningNode(LightningConnectionType.CLightning, false);
+        await s.AddLightningNode(LightningTestImplementation.CoreLightning, false);
         await s.AddUserToStore(storeId, manager, "Manager");
         await s.AddUserToStore(storeId, employee, "Employee");
         await s.AddUserToStore(storeId, guest, "Guest");

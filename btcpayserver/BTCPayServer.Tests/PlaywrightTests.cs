@@ -34,7 +34,6 @@ using NBXplorer;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Xunit;
-using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
 
 namespace BTCPayServer.Tests
@@ -349,7 +348,7 @@ namespace BTCPayServer.Tests
             await s.RegisterNewUser(true);
             var (_, storeId) = await s.CreateNewStore();
             var network = s.Server.NetworkProvider.GetNetwork<BTCPayNetwork>(cryptoCode).NBitcoinNetwork;
-            await s.AddLightningNode(LightningConnectionType.CLightning, false);
+            await s.AddLightningNode(LightningTestImplementation.CoreLightning, false);
             await s.GoToLightningSettings();
             // LNURL is true by default
             await Expect(s.Page.Locator("#LNURLEnabled")).ToBeCheckedAsync();
@@ -467,7 +466,7 @@ namespace BTCPayServer.Tests
 
             await s.GoToHome();
             var (_, newStoreId) = await s.CreateNewStore(false);
-            await s.AddLightningNode(LightningConnectionType.LndREST, false);
+            await s.AddLightningNode(LightningTestImplementation.LND, false);
             await s.GoToLightningSettings();
             await s.Page.CheckAsync("#LNURLEnabled");
             await s.ClickPagePrimary();
@@ -547,7 +546,7 @@ namespace BTCPayServer.Tests
             //ensure ln address is not available as Lightning is not enable
             Assert.Equal(0, await s.Page.Locator("#menu-item-LightningAddress").CountAsync());
 
-            await s.AddLightningNode(LightningConnectionType.LndREST, false);
+            await s.AddLightningNode(LightningTestImplementation.LND, false);
 
             // Navigate to store to refresh the menu and show Lightning Address
             await s.GoToStore(s.StoreId);
@@ -828,6 +827,7 @@ namespace BTCPayServer.Tests
             await settings.UpdateSetting(policies);
             await s.RegisterNewUser(isAdmin: true);
             await s.GoToUrl("/server/services");
+            await s.Page.WaitForLoadStateAsync();
             Assert.Contains("server/services/ssh", await s.Page.ContentAsync());
             using (var client = await s.Server.PayTester.GetService<BTCPayServerOptions>().SSHSettings
                 .ConnectAsync())
@@ -1794,8 +1794,8 @@ namespace BTCPayServer.Tests
             var user = await s.RegisterNewUser(true);
             await s.SkipWizard();
             await s.GoToProfile(ManageNavPages.TwoFactorAuthentication);
-            await s.Page.FillAsync("[name='Name']", "ln wallet");
-            await s.Page.SelectOptionAsync("[name='type']", $"{(int)Fido2Credential.CredentialType.LNURLAuth}");
+            await s.Page.FillAsync("#security-device-form [name='Name']", "ln wallet");
+            await s.Page.SelectOptionAsync("select[name='type']", "LNURLAuth");
             await s.Page.ClickAsync("#btn-add");
             var linkElements = await s.Page.Locator(".tab-content a").AllAsync();
             var links = new List<string>();
@@ -1841,11 +1841,7 @@ namespace BTCPayServer.Tests
             }
             request = Assert.IsType<LNAuthRequest>(await LNURL.LNURL.FetchInformation(prevEndpoint, null));
             _ = await request.SendChallenge(linkingKey, new HttpClient());
-            await TestUtils.EventuallyAsync(() =>
-            {
-                Assert.StartsWith(s.ServerUri.ToString(), s.Page.Url);
-                return Task.CompletedTask;
-            });
+            await s.WaitLoggedIn();
         }
 
         [Fact]
@@ -2184,7 +2180,7 @@ namespace BTCPayServer.Tests
             var (_, storeId) = await s.CreateNewStore();
             await s.GoToStore();
             await s.GenerateWallet(isHotWallet: true);
-            await s.AddLightningNode(LightningConnectionType.CLightning, false);
+            await s.AddLightningNode(LightningTestImplementation.CoreLightning, false);
 
             // Add apps
             await s.CreateApp("PointOfSale");
@@ -2293,7 +2289,7 @@ namespace BTCPayServer.Tests
             });
 
             // ensure archived invoices are not accessible for logged out users
-            await s.Server.PayTester.InvoiceRepository.ToggleInvoiceArchival(i, true);
+            await s.Server.PayTester.InvoiceRepository.ToggleInvoiceArchival(s.StoreId, i);
             await s.GoToHome();
             await s.Logout();
 

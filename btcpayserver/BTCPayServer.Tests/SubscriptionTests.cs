@@ -21,7 +21,6 @@ using NBitcoin;
 using NBXplorer;
 using Newtonsoft.Json.Linq;
 using Xunit;
-using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
 
 namespace BTCPayServer.Tests;
@@ -354,6 +353,86 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
         await s.Page.ReloadAsync();
         await portal.AssertPlan("Pro Plan");
         await portal.AssertNoScheduledChange();
+    }
+
+    [Fact]
+    [Trait("Playwright", "Playwright-2")]
+    public async Task CanRefundCreditFromMerchant()
+    {
+        await using var s = CreatePlaywrightTester();
+        await s.StartAsync();
+        await s.RegisterNewUser();
+        await s.CreateNewStore();
+        await s.AddDerivationScheme();
+
+        var offering = await CreateNewSubscription(s);
+        await offering.NewSubscriber("Enterprise Plan", "enterprise@example.com", true);
+        await offering.GoToSubscribers();
+
+        await using (var portal = await offering.GoToPortal("enterprise@example.com"))
+        {
+            await portal.ClickCallToAction();
+            await s.Server.WaitForEvent<SubscriptionEvent.SubscriberCredited>(async () =>
+            {
+                await s.PayInvoice(mine: true);
+            });
+            await s.ClickCheckoutRedirect();
+            await portal.AssertNoCallToAction();
+
+            await portal.AddCredit("150");
+            await s.Server.WaitForEvent<SubscriptionEvent.SubscriberCredited>(async () =>
+            {
+                await s.PayInvoice(mine: true);
+            });
+            await s.ClickCheckoutRedirect();
+            await portal.AssertCredit(creditBalance: "$150.00");
+        }
+
+        await offering.GoToSubscribers();
+        var refundedEvt = await s.Server.WaitForEvent<SubscriptionEvent.CreditRefunded>(async () =>
+        {
+            await offering.Refund("enterprise@example.com", 100m);
+        });
+        Assert.Equal(100m, refundedEvt.Amount);
+        await s.FastReloadAsync();
+        var creditText = await s.Page.Locator($"tr[data-subscriber-email='enterprise@example.com'] .subscriber-credit-col").InnerTextAsync();
+        Assert.Contains("50.00", creditText);
+    }
+
+    [Fact]
+    [Trait("Playwright", "Playwright-2")]
+    public async Task CanUpdateNotificationEmail()
+    {
+        await using var s = CreatePlaywrightTester();
+        await s.StartAsync();
+        await s.RegisterNewUser();
+        await s.CreateNewStore();
+        await s.AddDerivationScheme();
+
+        var offering = await CreateNewSubscription(s);
+        await offering.NewSubscriber("Enterprise Plan", "enterprise@example.com", true);
+        await offering.GoToSubscribers();
+
+        await using var portal = await offering.GoToPortal("enterprise@example.com");
+
+        await portal.ClickCallToAction();
+        await s.Server.WaitForEvent<SubscriptionEvent.SubscriberCredited>(async () =>
+        {
+            await s.PayInvoice(mine: true);
+        });
+        await s.ClickCheckoutRedirect();
+        await portal.AssertNoCallToAction();
+
+        await portal.UpdateNotificationEmail("notify@example.com");
+        await s.FindAlertMessage(partialText: "Notification email updated");
+
+        var notifEmail = await s.Page.Locator("input[name='NotificationEmail']").InputValueAsync();
+        Assert.Equal("notify@example.com", notifEmail);
+
+        await portal.UpdateNotificationEmail("");
+        await s.FindAlertMessage(partialText: "Notification email updated");
+        notifEmail = await s.Page.Locator("input[name='NotificationEmail']").InputValueAsync();
+        Assert.Equal("", notifEmail);
     }
 
     private static decimal GetUnusedPeriodValue(int usedDays, decimal planPrice, int daysInPeriod)
@@ -1122,6 +1201,15 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
             await s.Page.ClickAsync(SubscriberRowSelector(subscriber) + " .subscriber-email-col .dropdown-toggle");
             await s.Page.ClickAsync(SubscriberRowSelector(subscriber) + " .subscriber-email-col button");
         }
+        public async Task Refund(string subscriberEmail, decimal amount)
+        {
+            await s.Page.Locator($"{SubscriberRowSelector(subscriberEmail)} .subscriber-credit-col .dropdown-toggle").ClickAsync();
+            await s.Page.Locator($"{SubscriberRowSelector(subscriberEmail)} .subscriber-credit-col a[data-action='refund']").ClickAsync();
+            await s.Page.FillAsync("#updateCreditModal input[name='amount']", amount.ToString(CultureInfo.InvariantCulture));
+            await s.Page.Locator("#updateCreditModal button.refund-mode").ClickAsync();
+            await s.Page.WaitForURLAsync("**/pull-payments/**");
+            await s.Page.GoBackAsync();
+        }
     }
 
     public class PortalPMO(PlaywrightTester s, IAsyncDisposable? disposable) : IAsyncDisposable
@@ -1267,6 +1355,12 @@ public class SubscriptionTests(ITestOutputHelper testOutputHelper) : UnitTestBas
         {
             await s.Page.ClickAsync(".scheduled-change-banner button[value='cancel-scheduled-change']");
             await s.FindAlertMessage(partialText: "cancelled");
+        }
+
+        public async Task UpdateNotificationEmail(string email)
+        {
+            await s.Page.FillAsync("input[name='NotificationEmail']", email);
+            await s.Page.ClickAsync("button[value='update-notification-email']");
         }
     }
 

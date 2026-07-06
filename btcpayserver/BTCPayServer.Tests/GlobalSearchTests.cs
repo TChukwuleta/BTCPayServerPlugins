@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -7,7 +8,6 @@ using BTCPayServer.Plugins.GlobalSearch.Views;
 using NBitcoin;
 using Newtonsoft.Json;
 using Xunit;
-using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
 
 namespace BTCPayServer.Tests;
@@ -22,9 +22,9 @@ public class GlobalSearchTests(ITestOutputHelper helper) : UnitTestBase(helper)
         await s.StartAsync();
         await s.RegisterNewUser(isAdmin: true);
         await s.CreateNewStore();
-
         await s.GlobalSearch.GoToPage("Setup wallet");
         await s.Page.WaitForURLAsync(s.ServerUri + $"stores/{s.StoreId}/onchain/BTC");
+
         var admin = (s.CreatedUser, s.Password);
 
         // Create a new invoice and check that you can search for it either via invoice id, bitcoin address or transaction id.
@@ -53,7 +53,15 @@ public class GlobalSearchTests(ITestOutputHelper helper) : UnitTestBase(helper)
 
         // Now check that you can see some admin only route in the search suggestions
         await s.GoToHome();
-        await s.GlobalSearch.Fill("server settings");
+        try
+        {
+            await s.GlobalSearch.Fill("server settings");
+        }
+        catch
+        {
+            await s.TakeScreenshot("Flaky-GlobalSearch.png");
+            throw;
+        }
         await s.GlobalSearch.AssertShow("Configure the server settings");
 
         // Logout, create a new non admin user

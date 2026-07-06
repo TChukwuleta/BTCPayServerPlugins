@@ -7,11 +7,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Data;
 using BTCPayServer.Plugins.GlobalSearch.Views;
+using BTCPayServer.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Localization;
-using Microsoft.Extensions.Primitives;
 
 namespace BTCPayServer.Plugins.GlobalSearch;
 
@@ -42,9 +42,10 @@ public class SearchResultItemProviders(
         }
 
         await FilterAuthorizedItems(ctx);
-        Translate(ctx);
+        ctx.ItemResults.Sort((a, b) => a.Order.CompareTo(b.Order));
         if (ctx.ItemResults.Count > maxResult)
             ctx.ItemResults = ctx.ItemResults.Take(maxResult.Value).ToList();
+        Translate(ctx);
         return new GlobalSearchViewModel()
         {
             Items = ctx.ItemResults,
@@ -72,8 +73,6 @@ public class SearchResultItemProviders(
             var result = new ResultItemViewModel(o);
             if (result.Title is not null)
                 result.Title = stringLocalizer[result.Title];
-            if (result.SubTitle is not null)
-                result.SubTitle = stringLocalizer[result.SubTitle];
             if (result.Category is not null)
                 result.Category = stringLocalizer[result.Category];
             if (result.Keywords is not null)
@@ -83,6 +82,7 @@ public class SearchResultItemProviders(
                     result.Keywords[i] = stringLocalizer[result.Keywords[i]];
                 }
             }
+            result.Order = o.Order;
             ctx.ItemResults.Add(result);
         }
     }

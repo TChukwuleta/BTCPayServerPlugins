@@ -110,7 +110,7 @@ services:
       - "bitcoin_datadir:/data"
 
   customer_lightningd:
-    image: btcpayserver/lightning:v25.05
+    image: btcpayserver/lightning:v26.06.1
     stop_signal: SIGKILL
     restart: unless-stopped
     environment:
@@ -139,7 +139,7 @@ services:
       - bitcoind
 
   merchant_lightningd:
-    image: btcpayserver/lightning:v25.05
+    image: btcpayserver/lightning:v26.06.1
     stop_signal: SIGKILL
     restart: unless-stopped
     environment:
@@ -179,7 +179,7 @@ services:
       - "postgres_test_datadir:/var/lib/postgresql"
 
   merchant_lnd:
-    image: btcpayserver/lnd:v0.19.3-beta-1
+    image: btcpayserver/lnd:v0.21.0-beta
     restart: unless-stopped
     environment:
       LND_CHAIN: "btc"
@@ -217,7 +217,7 @@ services:
       - bitcoind
 
   customer_lnd:
-    image: btcpayserver/lnd:v0.19.3-beta-1
+    image: btcpayserver/lnd:v0.21.0-beta
     restart: unless-stopped
     environment:
       LND_CHAIN: "btc"
@@ -273,7 +273,6 @@ volumes:
     elementsd_liquid_datadir:
     customer_lightningd_datadir:
     merchant_lightningd_datadir:
-    lightning_charge_datadir:
     customer_lnd_datadir:
     merchant_lnd_datadir:
     postgres_test_datadir:

@@ -135,7 +135,9 @@ public partial class UIStoresController : Controller
         var userId = GetUserId();
         if (userId is null)
             return Forbid();
-        var store = await _storeRepo.FindStore(storeId, userId);
+
+        // We do not need to pass userId to FindStore, because the user may just be an admin
+        var store = await _storeRepo.FindStore(storeId);
         if (store is null)
             return NotFound();
         IActionResult? redirect = null;
@@ -149,7 +151,8 @@ public partial class UIStoresController : Controller
         }
         else if ((await _authorizationService.AuthorizeAsync(User, storeId, WalletPolicies.CanViewWallet)).Succeeded)
         {
-            redirect = RedirectToAction(nameof(UIWalletsController.ListWallets), "UIWallets", new { area = WalletsPlugin.Area });
+            redirect = RedirectToConfiguredWallet(store) ??
+                       RedirectToAction(nameof(UIWalletsController.ListWallets), "UIWallets", new { area = WalletsPlugin.Area });
         }
 
         if (redirect is null)
@@ -158,6 +161,26 @@ public partial class UIStoresController : Controller
         HttpContext.SetStoreData(store);
         HttpContext.SetPreferredStoreId(storeId);
         return redirect;
+    }
+
+    private IActionResult? RedirectToConfiguredWallet(StoreData store)
+    {
+        AddPaymentMethods(store, store.GetStoreBlob(), out var derivationSchemes, out _);
+        var defaultPaymentId = store.GetDefaultPaymentId();
+        var walletId = derivationSchemes
+            .Where(s => s.Enabled && s.WalletSupported)
+            .OrderByDescending(s => s.PaymentMethodId == defaultPaymentId)
+            .ThenByDescending(s => s.Crypto == _networkProvider.DefaultCryptoCode)
+            .Select(s => s.WalletId)
+            .FirstOrDefault();
+
+        return walletId is null
+            ? null
+            : RedirectToAction(nameof(UIWalletsController.WalletTransactions), "UIWallets", new
+            {
+                area = WalletsPlugin.Area,
+                walletId = walletId.ToString()
+            });
     }
 
     public StoreData CurrentStore => HttpContext.GetStoreData();
