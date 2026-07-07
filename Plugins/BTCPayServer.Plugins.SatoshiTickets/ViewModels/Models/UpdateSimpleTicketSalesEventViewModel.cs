@@ -17,6 +17,8 @@ public class UpdateSimpleTicketSalesEventViewModel
     [Display(Name = "Event Type")]
     public EventType EventType { get; set; }
     public List<SelectListItem> EventTypes { get; set; }
+
+    [Required(ErrorMessage = "The Description field is required.")]
     public string Description { get; set; }
 
     [Display(Name = "Event Image URL")]

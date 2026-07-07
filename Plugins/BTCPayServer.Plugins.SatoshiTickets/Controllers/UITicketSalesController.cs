@@ -146,6 +146,9 @@ public class UITicketSalesController(UriResolver uriResolver,
                 Text = e.ToString()
             }).ToList();
 
+        if (!ModelState.IsValid)
+            return View(nameof(ViewEvent), vm);
+
         if (vm.StartDate <= DateTime.UtcNow)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Event date cannot be in the past";
@@ -198,6 +201,9 @@ public class UITicketSalesController(UriResolver uriResolver,
 
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
+
+        if (!ModelState.IsValid)
+            return View(nameof(ViewEvent), vm);
 
         await using var ctx = dbContextFactory.CreateContext();
         var entity = ctx.Events.FirstOrDefault(c => c.Id == eventId && c.StoreId == CurrentStore.Id);
