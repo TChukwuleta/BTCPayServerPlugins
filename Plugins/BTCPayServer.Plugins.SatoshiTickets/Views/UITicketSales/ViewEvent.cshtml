@@ -28,7 +28,8 @@
 
 <partial name="_StatusMessage" />
 
-<form id="event-form" action="@formAction" method="post" enctype="multipart/form-data">
+<form id="event-form" method="post" enctype="multipart/form-data" asp-controller="UITicketSales"
+        asp-action="@(isEditMode ? "UpdateEvent" : "CreateEvent")" asp-route-storeId="@Model.StoreId" asp-route-eventId="@(isEditMode ? Model.EventId : null)">
     @Html.AntiForgeryToken()
     <div class="row">
         <div class="col-sm-10 col-md-9 col-xl-7 col-xxl-6">
@@ -204,14 +205,6 @@
     <script src="~/vendor/summernote/summernote-bs5.js" asp-append-version="true"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            const toggle = document.getElementById("maxCapacityToggle");
-            const inputDiv = document.getElementById("maxCapacityInput");
-            function updateVisibility() {
-                inputDiv.style.display = toggle.checked ? "block" : "none";
-            }
-            updateVisibility();
-            toggle.addEventListener("change", updateVisibility);
-
             const reminderToggle = document.getElementById("reminderToggle");
             const reminderDaysDiv = document.getElementById("reminderDaysInput");
             function updateReminderVisibility() {
@@ -231,6 +224,8 @@
             ];
             const textarea = document.getElementById('EmailBody');
             const popup = document.getElementById('autocompletePopup');
+            if (!textarea || !popup) return;
+
             textarea.parentElement.style.position = 'relative';
             let cursorPosition = 0;
 
