@@ -28,7 +28,7 @@
 
 <partial name="_StatusMessage" />
 
-<form id="event-form" method="post" enctype="multipart/form-data" asp-controller="UITicketSales"
+<form id="event-form" method="post" enctype="multipart/form-data" novalidate asp-controller="UITicketSales"
         asp-action="@(isEditMode ? "UpdateEvent" : "CreateEvent")" asp-route-storeId="@Model.StoreId" asp-route-eventId="@(isEditMode ? Model.EventId : null)">
     @Html.AntiForgeryToken()
     <div class="row">
