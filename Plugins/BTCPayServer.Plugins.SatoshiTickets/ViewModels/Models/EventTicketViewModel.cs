@@ -36,6 +36,7 @@ public class EventContactPersonTicketVm
 {
     public string Id { get; set; }
     public decimal Amount { get; set; }
+    public decimal DiscountAmount { get; set; }
     public string TicketTypeId { get; set; }
     public string TicketTypeName { get; set; }
     public string FirstName { get; set; }

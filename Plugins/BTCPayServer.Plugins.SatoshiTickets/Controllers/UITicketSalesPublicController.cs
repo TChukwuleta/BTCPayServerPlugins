@@ -45,13 +45,22 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         SimpleTicketSalesDbContextFactory dbContextFactory) : Controller
 {
     private const string SessionKeyOrder = "Ticket_Order_";
+    private const string SessionKeyReferral = "Ticket_Referral_";
+
+    private void CaptureReferralCode(string eventId, string referralCode)
+    {
+        if (string.IsNullOrWhiteSpace(referralCode)) return;
+        var key = $"{SessionKeyReferral}{eventId}";
+        HttpContext.Session.SetString(key, DiscountCodeService.Normalize(referralCode));
+    }
 
     [HttpGet("event/{eventId}/summary")]
-    public async Task<IActionResult> EventSummary(string storeId, string eventId)
+    public async Task<IActionResult> EventSummary(string storeId, string eventId, string @ref = null)
     {
         var storeData = await storeRepo.FindStore(storeId);
         if (storeData == null) return NotFound();
 
+        CaptureReferralCode(eventId, @ref);
         await using var ctx = dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
         if (!ValidateEvent(ctx, storeId, eventId))
@@ -76,27 +85,28 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
 
 
     [HttpGet("event/{eventId}/summary/tickets")]
-    public async Task<IActionResult> EventTicket(string storeId, string eventId)
+    public async Task<IActionResult> EventTicket(string storeId, string eventId, string @ref = null)
     {
         var storeData = await storeRepo.FindStore(storeId);
         if (storeData == null) return NotFound();
 
+        CaptureReferralCode(eventId, @ref);
         await using var ctx = dbContextFactory.CreateContext();
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
         if (!ValidateEvent(ctx, storeId, eventId))
             return NotFound();
 
-        var ticketTypes = ctx.TicketTypes.Where(t => t.EventId == eventId && t.TicketTypeState == Data.DiscountCodeState.Active)
-                              .Select(t => new TicketTypeViewModel
-                              {
-                                  StoreId = storeId,
-                                  Name = t.Name,
-                                  Price = t.Price,
-                                  Description = t.Description,
-                                  QuantityAvailable = t.Quantity - t.QuantitySold,
-                                  TicketTypeId = t.Id,
-                                  EventId = t.EventId
-                              }).ToList();
+        var ticketTypes = ctx.TicketTypes.Where(t => t.EventId == eventId && t.TicketTypeState == DiscountCodeState.Active)
+                            .Select(t => new TicketTypeViewModel
+                            {
+                                StoreId = storeId,
+                                Name = t.Name,
+                                Price = t.Price,
+                                Description = t.Description,
+                                QuantityAvailable = t.Quantity - t.QuantitySold,
+                                TicketTypeId = t.Id,
+                                EventId = t.EventId
+                            }).ToList();
 
         return View(new EventTicketPageViewModel
         {
@@ -139,9 +149,18 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
             TxnId = txnId,
             EventId = eventId,
             StoreId = storeId,
-            IsStepOneComplete = true, // Move to Contact page
+            IsStepOneComplete = true,
             Tickets = model.Tickets
         };
+        var referralKey = $"{SessionKeyReferral}{eventId}";
+        var referralCode = HttpContext.Session.GetString(referralKey);
+        if (!string.IsNullOrEmpty(referralCode))
+        {
+            var application = await discountCodeService.Evaluate(storeId, eventId, referralCode, BuildCart(model.Tickets));
+            if (application.IsValid)
+                newOrder.DiscountCode = referralCode;
+            HttpContext.Session.Remove(referralKey);
+        }
         HttpContext.Session.SetObject(sessionKey, newOrder);
         return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, txnId });
     }
@@ -321,6 +340,13 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
                 order.DiscountCodeValue = application.Code.Code;
                 order.DiscountAmount = application.DiscountAmount;
                 order.TotalAmount = subtotal - application.DiscountAmount;
+
+                var code = application.Code;
+                foreach (var t in tickets)
+                {
+                    bool eligible = code.TicketTypeId == null || t.TicketTypeId == code.TicketTypeId;
+                    t.DiscountAmount = eligible ? Math.Round(t.Amount * (code.Value / 100m), 2, MidpointRounding.AwayFromZero) : 0m;
+                }
             }
             else
             {

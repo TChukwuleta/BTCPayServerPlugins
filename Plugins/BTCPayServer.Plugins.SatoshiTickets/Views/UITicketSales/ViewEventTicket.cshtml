@@ -100,7 +100,7 @@
                         </td>
                     </tr>
                     <tr class="collapse" id="collapse_@ticket.OrderId">
-                        <td colspan="7" class="p-0">
+                        <td colspan="5" class="p-0">
                             <div class="card card-body border-0">
                                 <div class="table-responsive">
                                     <table class="table table-borderless mb-0">
@@ -112,6 +112,7 @@
                                                 <th>Last Name</th>
                                                 <th>Email</th>
                                                 <th>Amount</th>
+                                                <th>Discount</th>
                                                 <th>Currency</th>
                                                 <th>Checkin Attendee</th>
                                                 <th>Send Reminder</th>
@@ -127,7 +128,27 @@
                                                     <td>@ticketVm.FirstName</td>
                                                     <td>@ticketVm.LastName</td>
                                                     <td>@ticketVm.Email</td>
-                                                    <td>@ticketVm.Amount</td>
+                                                    <td>
+                                                        @if (ticketVm.DiscountAmount > 0)
+                                                        {
+                                                            <span class="text-muted text-decoration-line-through me-1">@ticketVm.Amount.ToString("N2")</span>
+                                                            <span class="fw-bold">@((ticketVm.Amount - ticketVm.DiscountAmount).ToString("N2"))</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span>@ticketVm.Amount.ToString("N2")</span>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        @if (ticketVm.DiscountAmount > 0)
+                                                        {
+                                                            <span class="badge bg-success" title="@ticket.DiscountCode">@ticket.DiscountCode: -@ticketVm.DiscountAmount.ToString("N2")</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-muted">—</span>
+                                                        }
+                                                    </td>
                                                     <td>@ticketVm.Currency</td>
                                                     <td>
                                                         @if (!ticketVm.CheckedIn)
