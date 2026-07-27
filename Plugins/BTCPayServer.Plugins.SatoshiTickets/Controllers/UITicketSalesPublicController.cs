@@ -136,10 +136,10 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         if (!ValidateEvent(ctx, storeId, eventId))
             return NotFound();
 
-        var availableTicketTypes = ctx.TicketTypes.Where(t => t.EventId == eventId).ToDictionary(t => t.Id, t => t.Quantity - t.QuantitySold);
+        var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == eventId).ToDictionary(t => t.Id);
         foreach (var ticket in model.Tickets.Where(t => t.Quantity > 0))
         {
-            if (!availableTicketTypes.TryGetValue(ticket.TicketTypeId, out var left) || left < ticket.Quantity)
+            if (!ticketTypes.TryGetValue(ticket.TicketTypeId, out var tt) || tt.Quantity - tt.QuantitySold < ticket.Quantity)
                 return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
         }
         string txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(10));
@@ -156,7 +156,7 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         var referralCode = HttpContext.Session.GetString(referralKey);
         if (!string.IsNullOrEmpty(referralCode))
         {
-            var application = await discountCodeService.Evaluate(storeId, eventId, referralCode, BuildCart(model.Tickets));
+            var application = await discountCodeService.Evaluate(storeId, eventId, referralCode, BuildCartFromDb(model.Tickets, ticketTypes));
             if (application.IsValid)
                 newOrder.DiscountCode = referralCode;
             HttpContext.Session.Remove(referralKey);
@@ -333,7 +333,7 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         order.TotalAmount = subtotal;
         if(!string.IsNullOrEmpty(orderViewModel.DiscountCode))
         {
-            var application = await discountCodeService.Evaluate(storeId, eventId, orderViewModel.DiscountCode, BuildCart(orderViewModel.Tickets));
+            var application = await discountCodeService.Evaluate(storeId, eventId, orderViewModel.DiscountCode, BuildCartFromDb(orderViewModel.Tickets, ticketTypes));
             if (application.IsValid && application.DiscountAmount > 0)
             {
                 order.DiscountCodeId = application.Code.Id;
@@ -409,8 +409,6 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
     [HttpPost("event/{eventId}/summary/contact/apply-discount")]
     public async Task<IActionResult> ApplyDiscount(string storeId, string eventId, ContactInfoPageViewModel model)
     {
-        Console.WriteLine($"ApplyDiscount called with discount code: {model.DiscountCode}... and txnid: {model.TxnId}");
-        Console.WriteLine($"ApplyDiscount saving contactInfo count: {model.ContactInfo?.Count ?? -1}, first name: {model.ContactInfo?.FirstOrDefault()?.FirstName}");
         var sessionKey = $"{SessionKeyOrder}{eventId}_{model.TxnId}";
         var order = HttpContext.Session.GetObject<TicketOrderViewModel>(sessionKey);
         if (order?.Tickets?.Any() != true)
@@ -447,6 +445,12 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
     private static IReadOnlyList<DiscountCartLine> BuildCart(IEnumerable<TicketSelectionViewModel> tickets)
     {
         return tickets.Select(t => new DiscountCartLine(t.TicketTypeId, t.Price, t.Quantity)).ToList();
+    }
+
+    private static IReadOnlyList<DiscountCartLine> BuildCartFromDb(IEnumerable<TicketSelectionViewModel> tickets, Dictionary<string, TicketType> ticketTypes)
+    {
+        return tickets.Where(t => ticketTypes.ContainsKey(t.TicketTypeId))
+            .Select(t => new DiscountCartLine(t.TicketTypeId, ticketTypes[t.TicketTypeId].Price, t.Quantity)).ToList();
     }
 
     [HttpGet("satoshiticket/jsqr_min.js")]
