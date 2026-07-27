@@ -507,7 +507,7 @@ public class UITicketSalesController(UriResolver uriResolver,
         }
         try
         {
-            var emailResponse = await emailService.SendTicketRegistrationEmail(CurrentStore.Id, order.Tickets.First(), ticketEvent);
+            var emailResponse = await emailService.SendTicketRegistrationEmail(CurrentStore.Id, ticket, ticketEvent);
             if (emailResponse.IsSuccessful)
                 order.EmailSent = true;
 

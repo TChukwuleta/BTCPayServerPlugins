@@ -1,6 +1,4 @@
-﻿@using BTCPayServer.Plugins.SatoshiTickets.Data
-@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
-@using System.Globalization
+﻿@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
 @model TicketViewModel
 @{
     Layout = "_BaseSimpleTicketPublicLayout";
@@ -27,6 +25,7 @@
                 <div class="mb-4">
                     <p class="mb-1">@Model.Location</p>
                     <p class="mb-1">@Model.StartDate.ToString("yyyy-MM-dd HH:mm:ss UTC") - @Model.EndDate?.ToString("yyyy-MM-dd HH:mm:ss UTC")</p>
+                    <p class="mb-1">@ticket.TicketType</p>
                     <p class="mb-1">@ticket.Amount @ticket.Currency</p>
                 </div>
 
