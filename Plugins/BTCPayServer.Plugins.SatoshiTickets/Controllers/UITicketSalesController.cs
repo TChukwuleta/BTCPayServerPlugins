@@ -410,6 +410,7 @@ public class UITicketSalesController(UriResolver uriResolver,
                     {
                         Id = t.Id,
                         Amount = t.Amount,
+                        DiscountAmount = t.DiscountAmount,
                         TicketTypeId = t.TicketTypeId,
                         FirstName = t.FirstName,
                         LastName = t.LastName,

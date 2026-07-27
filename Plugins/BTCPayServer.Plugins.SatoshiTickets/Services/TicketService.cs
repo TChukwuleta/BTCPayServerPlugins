@@ -51,7 +51,7 @@ public class TicketService(SimpleTicketSalesDbContextFactory dbContextFactory, I
 
         var fileName = $"{ticketEvent.Title}_Tickets-{DateTime.Now:yyyy_MM_dd-HH_mm_ss}.csv";
         var csvData = new StringBuilder();
-        csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Face Value,Currency,Order Subtotal,Discount Code,Order Discount,Order Net Total,Crypto Currency,Crypto Amount Paid,Attended Event");
+        csvData.AppendLine("Purchase Date,Ticket Number,First Name,Last Name,Email,Ticket Tier,Face Value,Ticket Discount,Net Ticket Price,Currency,Discount Code,Order Net Total,Crypto Currency,Crypto Amount Paid,Attended Event");
 
         foreach (var order in orders)
         {
@@ -67,7 +67,9 @@ public class TicketService(SimpleTicketSalesDbContextFactory dbContextFactory, I
             {
                 var proportion = totalFiatAmount > 0 ? ticket.Amount / totalFiatAmount : 0m;
                 var cryptoForTicket = Math.Round(totalCryptoPaid * proportion, 8);
-                csvData.AppendLine($"{order.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{order.Currency},{orderSubtotal},{discountCode},{order.DiscountAmount},{order.TotalAmount},{cryptoCurrency},{cryptoForTicket},{ticket.UsedAt.HasValue}");
+                var netTicketPrice = ticket.Amount - ticket.DiscountAmount;
+                var codeForRow = ticket.DiscountAmount > 0 ? (order.DiscountCodeValue ?? "") : "";
+                csvData.AppendLine($"{order.PurchaseDate:MM/dd/yy HH:mm},{ticket.TxnNumber},{ticket.FirstName},{ticket.LastName},{ticket.Email},{ticket.TicketTypeName},{ticket.Amount},{ticket.DiscountAmount},{netTicketPrice},{order.Currency},{codeForRow},{order.TotalAmount},{cryptoCurrency},{cryptoForTicket},{ticket.UsedAt.HasValue}");
             }
         }
         return (Encoding.UTF8.GetBytes(csvData.ToString()), fileName);
