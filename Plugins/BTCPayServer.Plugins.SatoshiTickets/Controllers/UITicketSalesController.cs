@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
@@ -505,9 +506,15 @@ public class UITicketSalesController(UriResolver uriResolver,
             TempData[WellKnownTempData.ErrorMessage] = $"Email settings not setup. Kindly configure Email SMTP in the admin settings";
             return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId = model.EventId });
         }
+        var targetEmail = string.IsNullOrWhiteSpace(model.Email) ? ticket.Email : model.Email.Trim();
+        if (string.IsNullOrWhiteSpace(targetEmail) || !new EmailAddressAttribute().IsValid(targetEmail))
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "Please enter a valid email address";
+            return RedirectToAction(nameof(ViewEventTicket), new { storeId = CurrentStore.Id, eventId = model.EventId });
+        }
         try
         {
-            var emailResponse = await emailService.SendTicketRegistrationEmail(CurrentStore.Id, ticket, ticketEvent);
+            var emailResponse = await emailService.SendTicketRegistrationEmail(CurrentStore.Id, ticket, ticketEvent, targetEmail);
             if (emailResponse.IsSuccessful)
                 order.EmailSent = true;
 

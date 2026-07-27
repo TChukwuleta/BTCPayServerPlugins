@@ -67,64 +67,9 @@ public class EmailService
         return new EmailDispatchResult { IsSuccessful = failed.Count == 0, FailedRecipients = failed };
     }
 
-
-    private async Task<EmailDispatchResult> SendBulkEmail2(string storeId, IEnumerable<EmailRecipient> recipients)
+    public async Task<EmailDispatchResult> SendTicketRegistrationEmail(string storeId, Ticket ticket, Event ticketEvent, string customEmail = null)
     {
-        var settings = await (await _emailSender.GetEmailSender(storeId)).GetEmailSettings();
-        if (!settings.IsComplete())
-            return new EmailDispatchResult { IsSuccessful = false };
-
-        var failedRecipients = new List<string>();
-        var isSuccess = true;
-        SmtpClient client = null;
-        try
-        {
-            client = await settings.CreateSmtpClient();
-            foreach (var recipient in recipients)
-            {
-                try
-                {
-                    var message = new MimeMessage();
-                    message.From.Add(MailboxAddress.Parse(settings.From));
-                    message.To.Add(recipient.Address);
-                    message.Subject = recipient.Subject;
-                    message.Body = new TextPart("plain") { Text = recipient.MessageText };
-                    await client.SendAsync(message);
-                }
-                catch (Exception ex)
-                {
-                    isSuccess = false;
-                    failedRecipients.Add(recipient.Address.ToString());
-                    _logs.PayServer.LogError(ex, $"Error sending email to: {recipient.Address}");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logs.PayServer.LogError(ex, "Failed to establish SMTP connection for bulk email");
-            return new EmailDispatchResult { IsSuccessful = false, FailedRecipients = recipients.Select(r => r.Address.ToString()).ToList() };
-        }
-        finally
-        {
-            if (client != null)
-            {
-                try
-                {
-                    if (client.IsConnected)
-                        await client.DisconnectAsync(true);
-                }
-                catch (Exception ex)
-                {
-                    _logs.PayServer.LogError(ex, "Error disconnecting SMTP client");
-                }
-                client.Dispose();
-            }
-        }
-        return new EmailDispatchResult { IsSuccessful = isSuccess, FailedRecipients = failedRecipients };
-    }
-
-    public async Task<EmailDispatchResult> SendTicketRegistrationEmail(string storeId, Ticket ticket, Event ticketEvent)
-    {
+        var recipientAddress = string.IsNullOrWhiteSpace(customEmail) ? ticket.Email : customEmail.Trim();
         var recipients = new List<EmailRecipient>();
         string emailBody = ticketEvent.EmailBody
                             .Replace("{{Title}}", ticketEvent.Title)
@@ -141,7 +86,7 @@ Click the link to view your tickets: {ticket.QRCodeLink}";
 
         recipients.Add(new EmailRecipient
         {
-            Address = InternetAddress.Parse(ticket.Email),
+            Address = InternetAddress.Parse(recipientAddress),
             Subject = ticketEvent.EmailSubject,
             MessageText = emailBody
         });
