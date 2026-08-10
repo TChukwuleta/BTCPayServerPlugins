@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Azure;
 using BTCPayServer.Plugins.BigCommercePlugin.Data;
 using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
 using Microsoft.Extensions.Logging;
@@ -69,10 +70,11 @@ public class BigCommerceService(HttpClient client)
         return result.IsSuccessStatusCode;
     }
 
-    public async Task UpdateOrderStatus(long orderId, BigCommerceOrderState status, string storeHash, string accessToken)
+    public async Task<bool> UpdateOrderStatus(long orderId, BigCommerceOrderState status, string storeHash, string accessToken)
     {
         var data = new { status_id = (int)status };
-        await MakeBigCommerceAPICall(HttpMethod.Put, $"v2/orders/{orderId}", storeHash, data, null, accessToken);
+        var result = await MakeBigCommerceAPICall(HttpMethod.Put, $"v2/orders/{orderId}", storeHash, data, null, accessToken);
+        return result.IsSuccessStatusCode ? true : false;
     }
 
     public async Task<BigCommerceOrderDetails> GetOrder(long orderId, string storeHash, string accessToken)
@@ -131,17 +133,17 @@ public class BigCommerceService(HttpClient client)
         if (method == HttpMethod.Post || method == HttpMethod.Put)
             request.Content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
-        try
+        HttpResponseMessage response;
+        try { response = await client.SendAsync(request); }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
-            var response = await client.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-            return response;
-        }
-        catch (HttpRequestException e)
-        {
-            Console.WriteLine($"An error occurred: Request status code: {e.StatusCode}...  Exception message: {e.Message}");
+            Console.WriteLine($"An error occurred..  Exception message: {e.Message}");
             throw;
         }
+        if (!response.IsSuccessStatusCode)
+            Console.WriteLine("BigCommerce {Method} {Endpoint} -> {Status}: {Body}", method, endpoint, (int)response.StatusCode, await response.Content.ReadAsStringAsync());
+
+        return response;
     }
 
     private async Task<T> DeserializeOrLog<T>(HttpResponseMessage result, string what) where T : class

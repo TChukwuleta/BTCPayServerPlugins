@@ -19,6 +19,7 @@ public class Transaction
 
     internal static void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Transaction>().HasIndex(t => t.OrderId).IsUnique();
     }
 }
 

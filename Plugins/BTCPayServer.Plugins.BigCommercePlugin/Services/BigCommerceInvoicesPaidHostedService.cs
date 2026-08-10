@@ -102,19 +102,24 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
             return;
         }
 
-        bigCommerceStoreTransaction.TransactionStatus = Data.TransactionStatus.Success;
         bigCommerceStoreTransaction.InvoiceId = invoice.Id;
         bool confirmOrder = await _bigCommerceService.ConfirmOrderExist(orderId, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
-        if (confirmOrder)
-        {
-            result.Write("Order successfully confirmed on BigCommerce.", InvoiceEventData.EventSeverity.Success);
-            await _bigCommerceService.UpdateOrderStatus(orderId, BigCommerceOrderState.AWAITING_FULFILLMENT, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
-            result.Write("Order status successfully updated on BigCommerce.", InvoiceEventData.EventSeverity.Success);
-        }
-        else
+        if (!confirmOrder)
         {
             result.Write("Couldn't find the order on BigCommerce.", InvoiceEventData.EventSeverity.Error);
+            return;
         }
+
+        result.Write("Order successfully confirmed on BigCommerce.", InvoiceEventData.EventSeverity.Success);
+        bool updated = await _bigCommerceService.UpdateOrderStatus(orderId, BigCommerceOrderState.AWAITING_FULFILLMENT, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+        bigCommerceStoreTransaction.InvoiceId = invoice.Id;
+        if (!updated)
+        {
+            result.Write("Order confirmed but the status update to BigCommerce failed. Order is NOT yet marked fulfillable.", InvoiceEventData.EventSeverity.Error);
+            return;
+        }
+        bigCommerceStoreTransaction.TransactionStatus = Data.TransactionStatus.Success;
+        result.Write("Order successfully confirmed and updated on BigCommerce.", InvoiceEventData.EventSeverity.Success);
     }
 
     private bool IsSuccessfulInvoice(InvoiceEntity invoice)

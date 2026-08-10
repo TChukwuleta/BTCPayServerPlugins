@@ -261,13 +261,20 @@ public class UIBigCommerceController(HttpClient client,
                 TransactionStatus = TransactionStatus.Pending,
                 InvoiceStatus = Client.Models.InvoiceStatus.New.ToString()
             });
-            await ctx.SaveChangesAsync();
-            return Ok(new
+            try
             {
-                id = result.Id,
-                orderId = createOrder.data.id.ToString(),
-                Message = "Order created and invoice generated successfully"
-            });
+                await ctx.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (IsUniqueOrderIdViolation(ex))
+            {
+                var existing = await ctx.Transactions.FirstOrDefaultAsync(t => t.OrderId == bgOrderId);
+                if (existing != null)
+                {
+                    return Ok(new { id = existing.InvoiceId, orderId = createOrder.data.id.ToString(), Message = "An invoice already exists for this order" });
+                }
+                throw;
+            }
+            return Ok(new { id = result.Id, orderId = createOrder.data.id.ToString(), Message = "Order created and invoice generated successfully" });
         }
         catch (Exception ex)
         {
@@ -276,6 +283,7 @@ public class UIBigCommerceController(HttpClient client,
         }
     }
 
+    private static bool IsUniqueOrderIdViolation(DbUpdateException ex) => ex.InnerException is Npgsql.PostgresException { SqlState: "23505" };
 
     [AllowAnonymous]
     [HttpGet("~/stores/{storeId}/plugins/bigcommerce/btcpay-bc.js")]
