@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using BTCPayServer.Abstractions.Constants;
@@ -23,7 +23,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin;
@@ -34,7 +33,6 @@ public class UIBigCommerceController(HttpClient client,
         StoreRepository storeRepo,
         UIInvoiceController invoiceController,
         BigCommerceService bigCommerceService,
-        ILogger<UIBigCommerceController> logger,
         UserManager<ApplicationUser> userManager,
         BigCommerceDbContextFactory dbContextFactory) : Controller
 {
@@ -144,7 +142,6 @@ public class UIBigCommerceController(HttpClient client,
             });
             if (!responseCall.Success)
             {
-                logger.LogError("BigCommerce install failed for store {StoreId}: {Content}", storeId, responseCall.Content);
                 return BadRequest(responseCall.Content);
             }
             var bigCommerceStoreDetails = JsonConvert.DeserializeObject<InstallApplicationResponseModel>(responseCall.Content);
@@ -211,37 +208,68 @@ public class UIBigCommerceController(HttpClient client,
         return Ok("Big commerce store uninstalled successfully");
     }
 
+    private static readonly AsyncDuplicateLock OrderLocks = new();
 
     [AllowAnonymous]
     [IgnoreAntiforgeryToken]
     [HttpPost("~/stores/{storeId}/plugins/bigcommerce/create-order")]
     [EnableCors("AllowAllOrigins")]
-    public async Task<IActionResult> CreateOrder([FromBody] CreateBigCommerceStoreRequest requestModel)
+    public async Task<IActionResult> CreateOrder([FromBody] CreateBigCommerceStoreRequest requestModel, CancellationToken cancellationToken)
     {
         try
         {
             await using var ctx = dbContextFactory.CreateContext();
-            var existingStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == requestModel.storeId);
+            var existingStore = await ctx.BigCommerceStores.FirstOrDefaultAsync(c => c.StoreId == requestModel.storeId, cancellationToken);
             if (existingStore == null)
                 return BadRequest("Cannot create big commerce order. Invalid store Id");
 
+            var lockKey = $"{existingStore.StoreId}:{requestModel.cartId}";
+            using var cartLock = await OrderLocks.LockAsync(lockKey, cancellationToken);
+            var existingTransaction = await ctx.Transactions.FirstOrDefaultAsync(t => t.StoreId == existingStore.StoreId && t.CartId == requestModel.cartId, cancellationToken);
+            if (existingTransaction != null)
+            {
+                return existingTransaction.InvoiceId != null
+                    ? Ok(new { id = existingTransaction.InvoiceId, orderId = existingTransaction.OrderId, Message = "An invoice already exists for this cart." })
+                    : Conflict("This cart is already being processed. Please try again shortly.");
+            }
+
+            var reservation = new Transaction
+            {
+                StoreId = existingStore.StoreId,
+                StoreHash = existingStore.StoreHash,
+                ClientId = existingStore.ClientId,
+                CartId = requestModel.cartId,
+                TransactionStatus = TransactionStatus.Pending,
+                InvoiceStatus = Client.Models.InvoiceStatus.New.ToString()
+            };
+            ctx.Add(reservation);
+            try
+            {
+                await ctx.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                existingTransaction = await ctx.Transactions.FirstOrDefaultAsync(t => t.StoreId == existingStore.StoreId && t.CartId == requestModel.cartId, cancellationToken);
+                return existingTransaction?.InvoiceId != null
+                    ? Ok(new { id = existingTransaction.InvoiceId, orderId = existingTransaction.OrderId, Message = "An invoice already exists for this cart." })
+                    : Conflict("This cart is already being processed. Please try again shortly.");
+            }
             var createOrder = await bigCommerceService.CheckoutOrder(existingStore.StoreHash, requestModel.cartId, existingStore.AccessToken);
             if (createOrder == null)
+            {
+                ctx.Remove(reservation);
+                await ctx.SaveChangesAsync(cancellationToken);
                 return BadRequest("An error occurred while creating the order on BigCommerce.");
-
+            }
             string bgOrderId = $"{BIGCOMMERCE_ORDER_ID_PREFIX}{createOrder.data.id}";
-
-            if (ctx.Transactions.Any(t => t.OrderId == bgOrderId))
-                return BadRequest("An invoice already exists for this order.");
-
             var orderDetails = await bigCommerceService.GetOrder(createOrder.data.id, existingStore.StoreHash, existingStore.AccessToken);
             if (orderDetails == null || !decimal.TryParse(orderDetails.total_inc_tax, NumberStyles.Any, CultureInfo.InvariantCulture, out var authoritativeTotal) ||
                 authoritativeTotal <= 0 || string.IsNullOrEmpty(orderDetails.currency_code))
             {
-                logger.LogError("Could not verify BigCommerce order {OrderId} total for store {StoreId}", createOrder.data.id, existingStore.StoreId);
+                ctx.Remove(reservation);
+                await ctx.SaveChangesAsync(cancellationToken);
                 return BadRequest("Could not verify the order's total with BigCommerce.");
             }
-
             var metadata = new InvoiceMetadata { OrderId = bgOrderId, BuyerEmail = requestModel.email };
             var store = await storeRepo.FindStore(existingStore.StoreId);
             var result = await invoiceController.CreateInvoiceCoreRaw(new Client.Models.CreateInvoiceRequest()
@@ -250,40 +278,18 @@ public class UIBigCommerceController(HttpClient client,
                 Currency = orderDetails.currency_code,
                 Metadata = metadata.ToJObject(),
             }, store, HttpContext.Request.GetAbsoluteRoot());
-
-            ctx.Add(new Transaction
-            {
-                ClientId = existingStore.ClientId,
-                StoreHash = existingStore.StoreHash,
-                StoreId = existingStore.StoreId,
-                OrderId = bgOrderId,
-                InvoiceId = result.Id,
-                TransactionStatus = TransactionStatus.Pending,
-                InvoiceStatus = Client.Models.InvoiceStatus.New.ToString()
-            });
-            try
-            {
-                await ctx.SaveChangesAsync();
-            }
-            catch (DbUpdateException ex) when (IsUniqueOrderIdViolation(ex))
-            {
-                var existing = await ctx.Transactions.FirstOrDefaultAsync(t => t.OrderId == bgOrderId);
-                if (existing != null)
-                {
-                    return Ok(new { id = existing.InvoiceId, orderId = createOrder.data.id.ToString(), Message = "An invoice already exists for this order" });
-                }
-                throw;
-            }
+            reservation.OrderId = bgOrderId;
+            reservation.InvoiceId = result.Id;
+            await ctx.SaveChangesAsync(cancellationToken);
             return Ok(new { id = result.Id, orderId = createOrder.data.id.ToString(), Message = "Order created and invoice generated successfully" });
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "BigCommerce create-order failed for store {StoreId}", requestModel?.storeId);
             return BadRequest($"An error occurred while trying to create order for Big Commerce. {ex.Message}");
         }
     }
 
-    private static bool IsUniqueOrderIdViolation(DbUpdateException ex) => ex.InnerException is Npgsql.PostgresException { SqlState: "23505" };
+    private static bool IsUniqueViolation(DbUpdateException ex) => ex.InnerException is Npgsql.PostgresException { SqlState: "23505" };
 
     [AllowAnonymous]
     [HttpGet("~/stores/{storeId}/plugins/bigcommerce/btcpay-bc.js")]

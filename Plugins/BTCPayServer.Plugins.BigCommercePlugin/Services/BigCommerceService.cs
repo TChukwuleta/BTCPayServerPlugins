@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using Azure;
 using BTCPayServer.Plugins.BigCommercePlugin.Data;
 using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin.Services;
@@ -84,12 +82,6 @@ public class BigCommerceService(HttpClient client)
             return null;
 
         var order = await DeserializeOrLog<BigCommerceOrderDetails>(result, "Get order");
-        if (order is null || string.IsNullOrEmpty(order.total_inc_tax) || string.IsNullOrEmpty(order.currency_code))
-        {
-            Console.WriteLine(
-                "BigCommerce order {OrderId} response did not contain the expected total_inc_tax/currency_code " +
-                "fields - check the raw response logged above and adjust BigCommerceOrderDetails to match.", orderId);
-        }
         return order;
     }
 
@@ -137,12 +129,8 @@ public class BigCommerceService(HttpClient client)
         try { response = await client.SendAsync(request); }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
-            Console.WriteLine($"An error occurred..  Exception message: {e.Message}");
             throw;
         }
-        if (!response.IsSuccessStatusCode)
-            Console.WriteLine("BigCommerce {Method} {Endpoint} -> {Status}: {Body}", method, endpoint, (int)response.StatusCode, await response.Content.ReadAsStringAsync());
-
         return response;
     }
 
@@ -153,10 +141,6 @@ public class BigCommerceService(HttpClient client)
         {
             return JsonConvert.DeserializeObject<T>(body);
         }
-        catch (JsonException ex)
-        {
-            Console.WriteLine($"Could not parse BigCommerce response for {what}: {body}... {ex.Message}");
-            return null;
-        }
+        catch { return null; }
     }
 }
