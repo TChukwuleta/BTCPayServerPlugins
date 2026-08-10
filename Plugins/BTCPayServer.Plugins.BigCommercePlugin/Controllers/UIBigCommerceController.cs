@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -29,51 +30,26 @@ namespace BTCPayServer.Plugins.BigCommercePlugin;
 
 [Route("~/stores/{storeId}/plugins/bigcommerce")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanModifyStoreSettings)]
-public class UIBigCommerceController : Controller
-{
-    private readonly HttpClient _client;
-    private readonly BigCommerceHelper helper;
-    private readonly StoreRepository _storeRepo;
-    private readonly BigCommerceService _bigCommerceService;
-    private readonly UIInvoiceController _invoiceController;
-    private readonly BTCPayNetworkProvider _networkProvider;
-    private readonly ILogger<UIBigCommerceController> _logger;
-    private readonly UserManager<ApplicationUser> _userManager;
-    private readonly BigCommerceDbContextFactory _dbContextFactory;
-    public UIBigCommerceController
-        (HttpClient client,
+public class UIBigCommerceController(HttpClient client,
         StoreRepository storeRepo,
-        BTCPayNetworkProvider networkProvider,
         UIInvoiceController invoiceController,
         BigCommerceService bigCommerceService,
         ILogger<UIBigCommerceController> logger,
         UserManager<ApplicationUser> userManager,
-        BigCommerceDbContextFactory dbContextFactory)
-    {
-        _client = client;
-        _storeRepo = storeRepo;
-        _userManager = userManager;
-        _networkProvider = networkProvider;
-        _dbContextFactory = dbContextFactory;
-        _invoiceController = invoiceController;
-        _bigCommerceService = bigCommerceService;
-        helper = new BigCommerceHelper(_client, _bigCommerceService, _dbContextFactory);
-        _logger = logger;
-    }
+        BigCommerceDbContextFactory dbContextFactory) : Controller
+{
     private const string BIGCOMMERCE_ORDER_ID_PREFIX = "BigCommerce-";
+    BigCommerceHelper helper = new BigCommerceHelper(client, bigCommerceService, dbContextFactory);
     public StoreData CurrentStore => HttpContext.GetStoreData();
 
 
     public async Task<IActionResult> Index(string storeId)
     {
-        if (string.IsNullOrEmpty(storeId))
-            return NotFound();
+        if (string.IsNullOrEmpty(storeId)) return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
-
-        var storeData = await _storeRepo.FindStore(storeId);
-        if (storeData == null)
-            return NotFound();
+        await using var ctx = dbContextFactory.CreateContext();
+        var storeData = await storeRepo.FindStore(storeId);
+        if (storeData == null) return NotFound();
 
         if (TempData["SuccessMessage"] != null)
         {
@@ -85,7 +61,6 @@ public class UIBigCommerceController : Controller
             ViewBag.ErrorMessage = TempData["ErrorMessage"];
             TempData.Remove("ErrorMessage");
         }
-
         var bigCommerceStore = ctx.BigCommerceStores.SingleOrDefault(c => c.StoreId == storeId);
         if (bigCommerceStore == null)
         {
@@ -119,7 +94,7 @@ public class UIBigCommerceController : Controller
         if (CurrentStore is null)
             return NotFound();
 
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var userStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == CurrentStore.Id);
         if (userStore is null) return NotFound();
 
@@ -149,17 +124,16 @@ public class UIBigCommerceController : Controller
             code = HttpUtility.UrlDecode(code);
             context = HttpUtility.UrlDecode(context);
             scope = HttpUtility.UrlDecode(scope);
-            await using var ctx = _dbContextFactory.CreateContext();
-            var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
-            if (bigCommerceStore == null)
-            {
-                return BadRequest("Invalid request. Kindly confirm that your Client Id and secret are configured on your BTCPay instance");
-            }
+            await using var ctx = dbContextFactory.CreateContext();
+            var (bigCommerceStore, notFound) = await FindStoreOrError(ctx, storeId, "Invalid request. Kindly confirm that your Client Id and secret are configured on your BTCPay instance");
+            if (notFound != null)
+                return notFound;
+
             if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(context) || string.IsNullOrEmpty(scope))
             {
                 return BadRequest("Missing required query parameters");
             }
-            var responseCall = await _bigCommerceService.InstallApplication(new InstallBigCommerceApplicationRequestModel
+            var responseCall = await bigCommerceService.InstallApplication(new InstallBigCommerceApplicationRequestModel
             {
                 ClientId = bigCommerceStore.ClientId,
                 ClientSecret = bigCommerceStore.ClientSecret,
@@ -170,7 +144,7 @@ public class UIBigCommerceController : Controller
             });
             if (!responseCall.Success)
             {
-                _logger.LogError($"{responseCall.Content}");
+                logger.LogError("BigCommerce install failed for store {StoreId}: {Content}", storeId, responseCall.Content);
                 return BadRequest(responseCall.Content);
             }
             var bigCommerceStoreDetails = JsonConvert.DeserializeObject<InstallApplicationResponseModel>(responseCall.Content);
@@ -179,8 +153,6 @@ public class UIBigCommerceController : Controller
             bigCommerceStore.StoreHash = bigCommerceStoreDetails.context;
             bigCommerceStore.BigCommerceUserEmail = bigCommerceStoreDetails.user.email;
             bigCommerceStore.BigCommerceUserId = bigCommerceStoreDetails.user.id.ToString();
-            ctx.Update(bigCommerceStore);
-            await ctx.SaveChangesAsync();
             bigCommerceStore = await helper.UploadCheckoutScript(bigCommerceStore, Url.Action(nameof(GetBtcPayJavascript), "UIBigCommerce", new { storeId }, Request.Scheme));
             ctx.Update(bigCommerceStore);
             await ctx.SaveChangesAsync();
@@ -198,12 +170,11 @@ public class UIBigCommerceController : Controller
     [HttpGet("~/stores/{storeId}/plugins/bigcommerce/auth/load")]
     public async Task<IActionResult> Load(string storeId, [FromQuery] string signed_payload_jwt)
     {
-        _logger.LogInformation(signed_payload_jwt);
         if (string.IsNullOrEmpty(signed_payload_jwt))
         {
             return BadRequest("Missing JWT parameter. Kindly refresh this page");
         }
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
         if (bigCommerceStore == null)
         {
@@ -226,7 +197,7 @@ public class UIBigCommerceController : Controller
         {
             return BadRequest("Missing JWT parameter. Kindly refresh this page");
         }
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
         if (bigCommerceStore == null) return BadRequest("Invalid request");
 
@@ -249,41 +220,47 @@ public class UIBigCommerceController : Controller
     {
         try
         {
-            await using var ctx = _dbContextFactory.CreateContext();
-            var exisitngStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == requestModel.storeId);
-            if (exisitngStore == null)
-            {
+            await using var ctx = dbContextFactory.CreateContext();
+            var existingStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == requestModel.storeId);
+            if (existingStore == null)
                 return BadRequest("Cannot create big commerce order. Invalid store Id");
-            }
-            var createOrder = await _bigCommerceService.CheckoutOrderAsync(exisitngStore.StoreHash, requestModel.cartId, exisitngStore.AccessToken);
+
+            var createOrder = await bigCommerceService.CheckoutOrder(existingStore.StoreHash, requestModel.cartId, existingStore.AccessToken);
             if (createOrder == null)
-            {
-                return BadRequest($"An error occurred while creating order. {JsonConvert.SerializeObject(createOrder)}");
-            }
+                return BadRequest("An error occurred while creating the order on BigCommerce.");
+
             string bgOrderId = $"{BIGCOMMERCE_ORDER_ID_PREFIX}{createOrder.data.id}";
-            InvoiceMetadata metadata = new InvoiceMetadata
+
+            if (ctx.Transactions.Any(t => t.OrderId == bgOrderId))
+                return BadRequest("An invoice already exists for this order.");
+
+            var orderDetails = await bigCommerceService.GetOrder(createOrder.data.id, existingStore.StoreHash, existingStore.AccessToken);
+            if (orderDetails == null || !decimal.TryParse(orderDetails.total_inc_tax, NumberStyles.Any, CultureInfo.InvariantCulture, out var authoritativeTotal) ||
+                authoritativeTotal <= 0 || string.IsNullOrEmpty(orderDetails.currency_code))
             {
-                OrderId = bgOrderId,
-                BuyerEmail = requestModel.email
-            };
-            var store = await _storeRepo.FindStore(exisitngStore.StoreId);
-            var result = await _invoiceController.CreateInvoiceCoreRaw(new Client.Models.CreateInvoiceRequest()
+                logger.LogError("Could not verify BigCommerce order {OrderId} total for store {StoreId}", createOrder.data.id, existingStore.StoreId);
+                return BadRequest("Could not verify the order's total with BigCommerce.");
+            }
+
+            var metadata = new InvoiceMetadata { OrderId = bgOrderId, BuyerEmail = requestModel.email };
+            var store = await storeRepo.FindStore(existingStore.StoreId);
+            var result = await invoiceController.CreateInvoiceCoreRaw(new Client.Models.CreateInvoiceRequest()
             {
-                Amount = requestModel.total,
-                Currency = requestModel.currency,
+                Amount = authoritativeTotal,
+                Currency = orderDetails.currency_code,
                 Metadata = metadata.ToJObject(),
             }, store, HttpContext.Request.GetAbsoluteRoot());
-            var entity = new Transaction
+
+            ctx.Add(new Transaction
             {
-                ClientId = exisitngStore.ClientId,
-                StoreHash = exisitngStore.StoreHash,
-                StoreId = exisitngStore.StoreId,
+                ClientId = existingStore.ClientId,
+                StoreHash = existingStore.StoreHash,
+                StoreId = existingStore.StoreId,
                 OrderId = bgOrderId,
                 InvoiceId = result.Id,
                 TransactionStatus = TransactionStatus.Pending,
                 InvoiceStatus = Client.Models.InvoiceStatus.New.ToString()
-            };
-            ctx.Add(entity);
+            });
             await ctx.SaveChangesAsync();
             return Ok(new
             {
@@ -294,6 +271,7 @@ public class UIBigCommerceController : Controller
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "BigCommerce create-order failed for store {StoreId}", requestModel?.storeId);
             return BadRequest($"An error occurred while trying to create order for Big Commerce. {ex.Message}");
         }
     }
@@ -303,17 +281,14 @@ public class UIBigCommerceController : Controller
     [HttpGet("~/stores/{storeId}/plugins/bigcommerce/btcpay-bc.js")]
     public async Task<IActionResult> GetBtcPayJavascript(string storeId)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var bcStore = await ctx.BigCommerceStores.FirstOrDefaultAsync(c => c.StoreId == storeId);
-        if (bcStore == null) return BadRequest("Invalid store Id specified");
+        if (bcStore == null) 
+            return BadRequest("Invalid store Id specified");
 
-        StringBuilder combinedJavascript = new StringBuilder();
-        var fileContent = helper.GetEmbeddedResourceContent("Resources.js.btcpay-bc.js");
-        combinedJavascript.AppendLine(fileContent);
-        string jsVariables = $"var BTCPAYSERVER_URL = '{Request.GetAbsoluteRoot()}'; var BTCPAYSERVER_STORE_ID = '{storeId}'; var STORE_HASH = '{bcStore.StoreHash}';";
-        combinedJavascript.Insert(0, jsVariables + Environment.NewLine);
-        var jsFile = combinedJavascript.ToString();
-        return Content(jsFile, "text/javascript");
+        var jsVariables = $"var BTCPAYSERVER_URL = '{Request.GetAbsoluteRoot()}'; var BTCPAYSERVER_STORE_ID = '{storeId}'; var STORE_HASH = '{bcStore.StoreHash}';";
+        var js = jsVariables + Environment.NewLine + helper.GetEmbeddedResourceContent("Resources.js.btcpay-bc.js");
+        return Content(js, "text/javascript");
     }
 
 
@@ -321,15 +296,13 @@ public class UIBigCommerceController : Controller
     [HttpGet("~/stores/{storeId}/plugins/bigcommerce/modal/btcpay.js")]
     public async Task<IActionResult> GetBtcPayModalJavascript(string storeId)
     {
-        await using var ctx = _dbContextFactory.CreateContext();
+        await using var ctx = dbContextFactory.CreateContext();
         var bcStore = await ctx.BigCommerceStores.FirstOrDefaultAsync(c => c.StoreId == storeId);
-        if (bcStore == null) return BadRequest("Invalid store Id specified");
+        if (bcStore == null) 
+            return BadRequest("Invalid store Id specified");
 
-        StringBuilder combinedJavascript = new StringBuilder();
-        var fileContent = helper.GetEmbeddedResourceContent("Resources.js.btcpay.js");
-        combinedJavascript.AppendLine(fileContent);
-        var jsFile = combinedJavascript.ToString();
-        return Content(jsFile, "text/javascript");
+        var js = helper.GetEmbeddedResourceContent("Resources.js.btcpay.js");
+        return Content(js, "text/javascript");
     }
 
     private string BigCommerceIframeResponse(BigCommerceStore bigCommerceStore)
@@ -381,5 +354,11 @@ public class UIBigCommerceController : Controller
             </html>";
     }
 
-    private string GetUserId() => _userManager.GetUserId(User);
+    private string GetUserId() => userManager.GetUserId(User);
+
+    private async Task<(BigCommerceStore? Store, IActionResult? Error)> FindStoreOrError(BigCommerceDbContext ctx, string storeId, string notFoundMessage)
+    {
+        var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
+        return bigCommerceStore == null ? (null, BadRequest(notFoundMessage)) : (bigCommerceStore, null);
+    }
 }

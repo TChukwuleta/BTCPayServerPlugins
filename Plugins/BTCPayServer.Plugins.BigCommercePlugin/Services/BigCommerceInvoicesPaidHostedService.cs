@@ -1,15 +1,16 @@
-﻿using BTCPayServer.Events;
-using BTCPayServer.HostedServices;
-using BTCPayServer.Logging;
-using System;
+﻿using System;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Client.Models;
-using Microsoft.EntityFrameworkCore;
 using BTCPayServer.Data;
-using BTCPayServer.Services.Invoices;
+using BTCPayServer.Events;
+using BTCPayServer.HostedServices;
+using BTCPayServer.Logging;
 using BTCPayServer.Plugins.BigCommercePlugin.Data;
+using BTCPayServer.Services.Invoices;
+using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin.Services;
 
@@ -88,13 +89,26 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
             return;
         }
 
+        var orderDetails = await _bigCommerceService.GetOrder(orderId, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+        if (orderDetails == null)
+        {
+            result.Write("Couldn't find the order on BigCommerce.", InvoiceEventData.EventSeverity.Error);
+            return;
+        }
+        if (!decimal.TryParse(orderDetails.total_inc_tax, NumberStyles.Any, CultureInfo.InvariantCulture, out var authoritativeTotal) ||
+            !string.Equals(orderDetails.currency_code, invoice.Currency, StringComparison.OrdinalIgnoreCase) || authoritativeTotal > invoice.Price)
+        {
+            result.Write($"Refusing to mark order {orderId} as fulfillable: settled invoice ({invoice.Price} {invoice.Currency}) does not cover BigCommerce's order total ({orderDetails.total_inc_tax} {orderDetails.currency_code}).", InvoiceEventData.EventSeverity.Error);
+            return;
+        }
+
         bigCommerceStoreTransaction.TransactionStatus = Data.TransactionStatus.Success;
         bigCommerceStoreTransaction.InvoiceId = invoice.Id;
-        bool confirmOrder = await _bigCommerceService.ConfirmOrderExistAsync(orderId, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+        bool confirmOrder = await _bigCommerceService.ConfirmOrderExist(orderId, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
         if (confirmOrder)
         {
             result.Write("Order successfully confirmed on BigCommerce.", InvoiceEventData.EventSeverity.Success);
-            await _bigCommerceService.UpdateOrderStatusAsync(orderId, BigCommerceOrderState.AWAITING_FULFILLMENT, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+            await _bigCommerceService.UpdateOrderStatus(orderId, BigCommerceOrderState.AWAITING_FULFILLMENT, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
             result.Write("Order status successfully updated on BigCommerce.", InvoiceEventData.EventSeverity.Success);
         }
         else
