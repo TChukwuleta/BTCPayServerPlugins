@@ -2,17 +2,20 @@
 using BTCPayServer.Plugins.BigCommercePlugin;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace BTCPayServer.Plugins.BigCommercePlugin.Migrations
+namespace BTCPayServer.Plugins.BigCommercePlugin.Data.Migrations
 {
     [DbContext(typeof(BigCommerceDbContext))]
-    partial class BigCommerceDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260810114134_AddTransactionIndexx")]
+    partial class AddTransactionIndexx
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -75,9 +78,6 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text");
 
-                    b.Property<string>("CartId")
-                        .HasColumnType("text");
-
                     b.Property<string>("ClientId")
                         .HasColumnType("text");
 
@@ -103,10 +103,6 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Migrations
 
                     b.HasIndex("OrderId")
                         .IsUnique();
-
-                    b.HasIndex("StoreId", "CartId")
-                        .IsUnique()
-                        .HasFilter("\"CartId\" IS NOT NULL");
 
                     b.ToTable("Transactions", "BTCPayServer.Plugins.BigCommerce");
                 });

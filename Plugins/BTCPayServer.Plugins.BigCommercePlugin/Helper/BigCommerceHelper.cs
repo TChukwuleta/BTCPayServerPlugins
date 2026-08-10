@@ -42,10 +42,10 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
         {
             if (!string.IsNullOrEmpty(bigCommerceStore.JsFileUuid))
             {
-                var existingScript = await _bigCommerceService.GetCheckoutScriptAsync(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+                var existingScript = await _bigCommerceService.GetCheckoutScript(bigCommerceStore.JsFileUuid, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
                 if (existingScript != null) return bigCommerceStore;
             }
-            var script = await _bigCommerceService.SetCheckoutScriptAsync(bigCommerceStore.StoreHash, jsFilePath, bigCommerceStore.AccessToken);
+            var script = await _bigCommerceService.SetCheckoutScript(bigCommerceStore.StoreHash, jsFilePath, bigCommerceStore.AccessToken);
             if (script?.data?.uuid != null)
             {
                 bigCommerceStore.JsFileUuid = script.data.uuid;

@@ -14,11 +14,14 @@ public class Transaction
     public string OrderId { get; set; }
     public string InvoiceId { get; set; }
     public string InvoiceStatus { get; set; }
+    public string CartId { get; set; }
     public TransactionStatus TransactionStatus { get; set; }
 
 
     internal static void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Transaction>().HasIndex(t => t.OrderId).IsUnique();
+        modelBuilder.Entity<Transaction>().HasIndex(t => new { t.StoreId, t.CartId }).IsUnique().HasFilter("\"CartId\" IS NOT NULL");
     }
 }
 
