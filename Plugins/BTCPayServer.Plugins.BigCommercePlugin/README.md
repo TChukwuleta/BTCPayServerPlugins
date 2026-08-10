@@ -69,18 +69,16 @@ P.S: It is important to note that you cannot assign a BigCommerce application cr
 
 Once you have completed the above steps, it is time to install your BigCommerce application in your store and start receiving payment using Bitcoin.
 
-1. Login to your [BigCommerce](https://login.bigcommerce.com/login/), Navigate to Apps => MyApps
-2. Select "My Draft Apps", there you would see a list of all your BigCommerce application that you've set up including this newly created application.
-3. Hover on your newly created application and click on "Learn more"
-4. It would take you to a page containing your application details including permissions granted to the application, with a button to install.
+1. Login to your [BigCommerce](https://login.bigcommerce.com/login/), Navigate to `Apps` -> `Develop`, there you would see a list of all your BigCommerce application that you've set up including this newly created application.
+2. Click on the newwly created app, it would take you to a page containing your application details including permissions granted to the application, with a button to install.
 
 ![image](https://github.com/user-attachments/assets/a6b2ea8b-5d2b-44ee-a359-d471cc52a834)
 
-5. Click on the install button, acknowledge that PCI-DSS compliance, and confirm the installation.
+3. Click on the install button, acknowledge that PCI-DSS compliance, and confirm the installation.
 
 ![image](https://github.com/user-attachments/assets/aa2dd84a-d54a-4f10-83e7-f7b9bc9c4e57)
 
-6. Once the installation is successful, you should see the application listed on the Apps section of your navigation panel.
+4. Once the installation is successful, you should see the application listed on the Apps section of your navigation panel.
 
 You manually need to create an offline payment method containing "Bitcoin" (e.g. Bitcoin / Lightning Network) in the BigCommerce store under Settings => Setup => Payments => Additional providers
 
