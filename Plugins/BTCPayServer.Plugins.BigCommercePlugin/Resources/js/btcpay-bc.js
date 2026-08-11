@@ -29,9 +29,19 @@ const observePaymentOptions = () => {
     updatePaymentButton();
 }
 
+const resetPaymentButton = () => {
+    const paymentButton = document.getElementById('checkout-payment-continue');
+    if (paymentButton) {
+        paymentButton.textContent = 'Pay with Bitcoin';
+        paymentButton.disabled = false;
+        paymentButton.onclick = handleBitcoinPayment;
+    }
+};
+
 const handleBitcoinPayment = (event) => {
     event.preventDefault();
     event.target.textContent = 'Processing ...';
+    event.target.disabled = true;
     clearInterval(pollInterval);
 
     getCart()
@@ -57,8 +67,15 @@ const handleBitcoinPayment = (event) => {
             if (data.id) {
                 showBTCPayModal(data);
             }
+            else {
+                event.target.textContent = 'Pay with Bitcoin';
+                event.target.disabled = false;
+                console.error('No invoice id in response:', data);
+            }
         })
         .catch(error => {
+            event.target.textContent = 'Pay with Bitcoin';
+            event.target.disabled = false;
             console.error('Payment initiation failed:', error);
         });
 }
@@ -118,12 +135,13 @@ const showBTCPayModal = function(data) {
                         break;
                     case 'expired':
                         window.btcpay.hideFrame();
-                        // todo: show error message
                         console.error('Invoice expired.');
+                        resetPaymentButton();
                         break;
                     case 'invalid':
                         window.btcpay.hideFrame();
                         console.error('Invalid invoice.');
+                        resetPaymentButton();
                         break;
                     default:
                         console.error('Unknown status: ' + event.data.status);
@@ -135,11 +153,7 @@ const showBTCPayModal = function(data) {
                     showOrderConfirmation(data.orderId, data.id);
                 }
                 else {
-                    const paymentButton = document.getElementById('checkout-payment-continue');
-                    if (paymentButton) {
-                        paymentButton.textContent = 'Pay with Bitcoin';
-                        paymentButton.onclick = handleBitcoinPayment;
-                    }
+                    resetPaymentButton();
                     pollInterval = setInterval(observePaymentOptions, 300);
                 }
                 console.log('Modal closed.')

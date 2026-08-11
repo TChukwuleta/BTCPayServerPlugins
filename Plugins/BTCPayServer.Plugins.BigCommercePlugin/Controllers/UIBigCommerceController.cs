@@ -226,13 +226,44 @@ public class UIBigCommerceController(HttpClient client,
             var lockKey = $"{existingStore.StoreId}:{requestModel.cartId}";
             using var cartLock = await OrderLocks.LockAsync(lockKey, cancellationToken);
             var existingTransaction = await ctx.Transactions.FirstOrDefaultAsync(t => t.StoreId == existingStore.StoreId && t.CartId == requestModel.cartId, cancellationToken);
-            if (existingTransaction != null)
+            if (existingTransaction is { TransactionStatus: TransactionStatus.Pending, InvoiceId: not null })
             {
-                return existingTransaction.InvoiceId != null
-                    ? Ok(new { id = existingTransaction.InvoiceId, orderId = existingTransaction.OrderId, Message = "An invoice already exists for this cart." })
-                    : Conflict("This cart is already being processed. Please try again shortly.");
+                return Ok(new { id = existingTransaction.InvoiceId, orderId = existingTransaction.OrderId, Message = "An invoice already exists for this cart" });
             }
 
+            if (existingTransaction is { TransactionStatus: TransactionStatus.Failed })
+            {
+                var prefixLen = BIGCOMMERCE_ORDER_ID_PREFIX.Length;
+                var orderIdStr = existingTransaction.OrderId?.Length > prefixLen ? existingTransaction.OrderId[prefixLen..] : null;
+                if (!long.TryParse(orderIdStr, out var existingOrderId))
+                    return BadRequest("Could not recover the existing order for this cart.");
+
+                var orderDetails = await bigCommerceService.GetOrder(existingOrderId, existingStore.StoreHash, existingStore.AccessToken);
+                if (orderDetails == null || !decimal.TryParse(orderDetails.total_inc_tax, NumberStyles.Any, CultureInfo.InvariantCulture, out var authoritativeTotal) ||
+                    authoritativeTotal <= 0 || string.IsNullOrEmpty(orderDetails.currency_code))
+                {
+                    return BadRequest("Could not verify the order's total with BigCommerce.");
+                }
+                var reusableStates = new[] { (int)BigCommerceOrderState.INCOMPLETE, (int)BigCommerceOrderState.PENDING, (int)BigCommerceOrderState.AWAITING_PAYMENT };
+                if (!reusableStates.Contains(orderDetails.status_id))
+                {
+                    return BadRequest("This order is no longer open for payment. Please start a new checkout.");
+                }
+                var retryMetadata = new InvoiceMetadata { OrderId = existingTransaction.OrderId, BuyerEmail = requestModel.email };
+                var retryStore = await storeRepo.FindStore(existingStore.StoreId);
+                var retryResult = await invoiceController.CreateInvoiceCoreRaw(new Client.Models.CreateInvoiceRequest()
+                {
+                    Amount = authoritativeTotal,
+                    Currency = orderDetails.currency_code,
+                    Metadata = retryMetadata.ToJObject(),
+                }, retryStore, HttpContext.Request.GetAbsoluteRoot());
+
+                existingTransaction.InvoiceId = retryResult.Id;
+                existingTransaction.InvoiceStatus = Client.Models.InvoiceStatus.New.ToString();
+                existingTransaction.TransactionStatus = TransactionStatus.Pending;
+                await ctx.SaveChangesAsync(cancellationToken);
+                return Ok(new { id = retryResult.Id, orderId = existingOrderId.ToString(), Message = "Order recovered and a new invoice was generated successfully" });
+            }
             var reservation = new Transaction
             {
                 StoreId = existingStore.StoreId,
@@ -262,22 +293,25 @@ public class UIBigCommerceController(HttpClient client,
                 return BadRequest("An error occurred while creating the order on BigCommerce.");
             }
             string bgOrderId = $"{BIGCOMMERCE_ORDER_ID_PREFIX}{createOrder.data.id}";
-            var orderDetails = await bigCommerceService.GetOrder(createOrder.data.id, existingStore.StoreHash, existingStore.AccessToken);
-            if (orderDetails == null || !decimal.TryParse(orderDetails.total_inc_tax, NumberStyles.Any, CultureInfo.InvariantCulture, out var authoritativeTotal) ||
-                authoritativeTotal <= 0 || string.IsNullOrEmpty(orderDetails.currency_code))
+            var newOrderDetails = await bigCommerceService.GetOrder(createOrder.data.id, existingStore.StoreHash, existingStore.AccessToken);
+            if (newOrderDetails == null || !decimal.TryParse(newOrderDetails.total_inc_tax, NumberStyles.Any, CultureInfo.InvariantCulture, out var newTotal) ||
+                newTotal <= 0 || string.IsNullOrEmpty(newOrderDetails.currency_code))
             {
                 ctx.Remove(reservation);
                 await ctx.SaveChangesAsync(cancellationToken);
                 return BadRequest("Could not verify the order's total with BigCommerce.");
             }
+
+
             var metadata = new InvoiceMetadata { OrderId = bgOrderId, BuyerEmail = requestModel.email };
             var store = await storeRepo.FindStore(existingStore.StoreId);
             var result = await invoiceController.CreateInvoiceCoreRaw(new Client.Models.CreateInvoiceRequest()
             {
-                Amount = authoritativeTotal,
-                Currency = orderDetails.currency_code,
+                Amount = newTotal,
+                Currency = newOrderDetails.currency_code,
                 Metadata = metadata.ToJObject(),
             }, store, HttpContext.Request.GetAbsoluteRoot());
+
             reservation.OrderId = bgOrderId;
             reservation.InvoiceId = result.Id;
             await ctx.SaveChangesAsync(cancellationToken);

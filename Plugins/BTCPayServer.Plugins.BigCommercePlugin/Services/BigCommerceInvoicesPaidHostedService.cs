@@ -65,6 +65,16 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
                     result.Write($"Invoice payment failed. Invoice status: {invoice.GetInvoiceState().Status}", InvoiceEventData.EventSeverity.Error);
                     bigCommerceStoreTransaction.TransactionStatus = Data.TransactionStatus.Failed;
                     bigCommerceStoreTransaction.InvoiceId = invoice.Id;
+                    /*var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == bigCommerceStoreTransaction.StoreId);
+                    if (bigCommerceStore != null)
+                    {
+                        var orderIdStr = bigCommerceStoreTransaction.OrderId?.Substring(BIGCOMMERCE_ORDER_ID_PREFIX.Length);
+                        if (long.TryParse(orderIdStr, out var orderId))
+                        {
+                            await _bigCommerceService.UpdateOrderStatus(orderId, BigCommerceOrderState.CANCELLED, bigCommerceStore.StoreHash, bigCommerceStore.AccessToken);
+                        }
+                    }*/
+
                 }
                 await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
                 ctx.Update(bigCommerceStoreTransaction);
@@ -132,8 +142,6 @@ public class BigCommerceInvoicesPaidHostedService : EventHostedServiceBase
     private bool IsFailedInvoice(InvoiceEntity invoice)
     {
         var status = invoice.GetInvoiceState().Status;
-        var isFailedStatus = status is InvoiceStatus.Invalid or InvoiceStatus.Expired;
-        var hasException = invoice.ExceptionStatus != InvoiceExceptionStatus.None;
-        return isFailedStatus && hasException;
+        return status is InvoiceStatus.Invalid or InvoiceStatus.Expired;
     }
 }
