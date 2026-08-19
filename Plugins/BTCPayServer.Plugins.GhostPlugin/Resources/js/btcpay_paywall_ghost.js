@@ -84,7 +84,10 @@
         return path;
     }
 
-    async paymentCompleted(invoiceId) {
+    async paymentCompleted(invoiceId, attempt = 1) {
+        const maxAttempts = 3;
+        const retryDelayMs = 3000;
+
         if (this.unlocking) return;
         this.unlocking = true;
         try {
@@ -96,9 +99,14 @@
             if (response.ok && data && data.unlocked && data.token) {
                 localStorage.setItem("paywall_token_" + this.uniqueId, data.token);
                 this.unlockContent();
-            } else {
-                console.error("Server did not confirm payment for this content yet.", data);
+                return;
             }
+            if (response.status === 402 && attempt < maxAttempts) {
+                console.log(`Payment not yet settled server-side, retrying (${attempt}/${maxAttempts})...`);
+                setTimeout(() => this.paymentCompleted(invoiceId, attempt + 1), retryDelayMs);
+                return;
+            }
+            console.error("Server did not confirm payment for this content.", data);
         } catch (error) {
             console.error("Could not confirm payment with the server.", error);
         } finally {
