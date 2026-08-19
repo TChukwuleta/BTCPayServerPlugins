@@ -40,6 +40,7 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
                 ValidateIssuer = true,
                 ValidIssuer = "bc",
                 ValidateAudience = true,
+                ValidAudience = store.ClientId,
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.FromMinutes(2)
             };
@@ -51,10 +52,7 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
                 var payloadData = JsonSerializer.Deserialize<BigCommerceSignedJwtPayloadRequest>(payloadJson);
                 return payloadData?.sub == store.StoreHash ? payloadData : null;
             }
-            catch (Exception)
-            {
-                return null;
-            }
+            catch { return null; }
         }
 
         public BigCommerceSignedJwtPayloadRequest DecodeJwtPayload(string token)
