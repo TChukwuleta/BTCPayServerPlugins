@@ -6,7 +6,7 @@
 	<PropertyGroup>
 		<Product>LightSpeed HQ</Product>
 		<Description>A BTCPay Server plugin that adds Bitcoin as a payment method in Lightspeed Retail (X-Series) point-of-sale terminals.</Description>
-		<Version>1.0.9</Version>
+		<Version>1.1.0</Version>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -35,6 +35,7 @@
 	<!-- Pinned unconditionally to match BTCPay core (>= 10.0.1) and prevent the downgrade -->
 	<ItemGroup>
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
+		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.8" />
 	</ItemGroup>
 
 	<ItemGroup>

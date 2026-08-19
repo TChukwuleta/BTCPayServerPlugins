@@ -1,12 +1,15 @@
 ﻿using BTCPayServer.Plugins.BigCommercePlugin.Data;
 using BTCPayServer.Plugins.BigCommercePlugin.Services;
 using BTCPayServer.Plugins.BigCommercePlugin.ViewModels;
+using Microsoft.IdentityModel.Tokens;
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
@@ -23,13 +26,42 @@ namespace BTCPayServer.Plugins.BigCommercePlugin.Helper
             _bigCommerceService = bigCommerceService;
         }
 
+        public BigCommerceSignedJwtPayloadRequest ValidateAndDecodeJwt(string token, BigCommerceStore store)
+        {
+            if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(store?.ClientId) || string.IsNullOrEmpty(store?.ClientSecret)) 
+                return null;
+
+            var handler = new JwtSecurityTokenHandler();
+            var validationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(store.ClientSecret)),
+                ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
+                ValidateIssuer = true,
+                ValidIssuer = "bc",
+                ValidateAudience = true,
+                ValidAudience = store.ClientId,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.FromMinutes(2)
+            };
+            try
+            {
+                handler.ValidateToken(token, validationParameters, out var validatedToken);
+                var jwtToken = (JwtSecurityToken)validatedToken;
+                var payloadJson = JsonSerializer.Serialize(jwtToken.Payload);
+                var payloadData = JsonSerializer.Deserialize<BigCommerceSignedJwtPayloadRequest>(payloadJson);
+                return payloadData?.sub == store.StoreHash ? payloadData : null;
+            }
+            catch { return null; }
+        }
+
         public BigCommerceSignedJwtPayloadRequest DecodeJwtPayload(string token)
         {
             var handler = new JwtSecurityTokenHandler();
             var jwtToken = handler.ReadJwtToken(token);
             var payload = jwtToken.Payload;
-            var payloadJson = System.Text.Json.JsonSerializer.Serialize(payload);
-            var payloadData = System.Text.Json.JsonSerializer.Deserialize<BigCommerceSignedJwtPayloadRequest>(payloadJson);
+            var payloadJson = JsonSerializer.Serialize(payload);
+            var payloadData = JsonSerializer.Deserialize<BigCommerceSignedJwtPayloadRequest>(payloadJson);
             return payloadData;
         }
 

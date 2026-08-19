@@ -18,8 +18,8 @@ BTCPay plugin for LightSpeed is Retail POS (X-Series) only
 3. Once the plugin is installed, you should see `Lightspeed HQ` in the left navigation. Click on it to open the settings page.
 4. Enter your Lightspeed store URL (https://yourstore.retail.lightspeed.app) and then save. The plugin uses to validate payment requests coming from your Lightspeed store.
 5. Copy the Gateway URL shown (https://yourbtcpay.com/plugins/STOREID/lightspeedhq/gateway)
-6. Log into your Lightspeed retail account, and go to `Settings > Payment Methods > Add Payment Method`
-7. Choose `Other psyment method`, name it whatever you choose (Pay with Bitcoin, Pay with BTCPay Server)
+6. Log into your Lightspeed retail account, and go to `Settings > Payment Types > Add Payment types`
+7. Choose `Other payment method`, name it whatever you choose (Pay with Bitcoin, Pay with BTCPay Server)
 8. Paste the gateway url you copied from the plugin into the `Gateway URL` field and save.
 
 That's it. The payment type will now appear on your Lightspeed sell screen.

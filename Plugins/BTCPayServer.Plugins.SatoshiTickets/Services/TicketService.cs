@@ -10,7 +10,6 @@ namespace BTCPayServer.Plugins.SatoshiTickets.Services;
 
 public class TicketService(SimpleTicketSalesDbContextFactory dbContextFactory, InvoiceRepository invoiceRepository)
 {
-
     public async Task<TicketCheckinResponse> CheckinTicket(string eventId, string ticketNumber, string storeId)
     {
         await using var ctx = dbContextFactory.CreateContext();
@@ -20,9 +19,13 @@ public class TicketService(SimpleTicketSalesDbContextFactory dbContextFactory, I
         var ticket = ctx.Tickets.FirstOrDefault(c => (c.TicketNumber == ticketNumber || c.TxnNumber == ticketNumber) && c.EventId == entity.Id);
         if (ticket == null) return new() { ErrorMessage = "Invalid ticket record specified", Success = false };
 
-        if (ticket.UsedAt.HasValue) return new() { ErrorMessage = $"Ticket previously checked in by {ticket.UsedAt.Value:f}", Success = false, Ticket = ticket };
+        if(ticket.PaymentStatus != TransactionStatus.Settled.ToString()) 
+            return new() { ErrorMessage = "Ticket has not been paid for", Success = false, Ticket = ticket };
 
-        var rowsAffected = await ctx.Tickets.Where(t => (t.TicketNumber == ticketNumber || t.TxnNumber == ticketNumber) && t.EventId == eventId && t.StoreId == storeId && t.UsedAt == null)
+        if (ticket.UsedAt.HasValue) 
+            return new() { ErrorMessage = $"Ticket previously checked in by {ticket.UsedAt.Value:f}", Success = false, Ticket = ticket };
+
+        var rowsAffected = await ctx.Tickets.Where(t => (t.TicketNumber == ticketNumber || t.TxnNumber == ticketNumber) && t.EventId == eventId && t.StoreId == storeId && t.UsedAt == null && t.PaymentStatus == TransactionStatus.Settled.ToString())
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, DateTime.UtcNow));
 
         if (rowsAffected == 0)

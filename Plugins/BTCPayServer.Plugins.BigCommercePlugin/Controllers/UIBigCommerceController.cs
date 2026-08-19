@@ -177,10 +177,10 @@ public class UIBigCommerceController(HttpClient client,
         {
             return BadRequest("Invalid request");
         }
-        var claims = helper.DecodeJwtPayload(signed_payload_jwt);
-        if (!helper.ValidateClaims(bigCommerceStore, claims))
+        var claims = helper.ValidateAndDecodeJwt(signed_payload_jwt, bigCommerceStore);
+        if (claims == null)
         {
-            return BadRequest("Invalid JWT parameter. Kindly refresh this page");
+            return Unauthorized("Invalid JWT parameter. Kindly refresh this page");
         }
         return Content(BigCommerceIframeResponse(bigCommerceStore), "text/html");
     }
@@ -198,10 +198,10 @@ public class UIBigCommerceController(HttpClient client,
         var bigCommerceStore = ctx.BigCommerceStores.FirstOrDefault(c => c.StoreId == storeId);
         if (bigCommerceStore == null) return BadRequest("Invalid request");
 
-        var claims = helper.DecodeJwtPayload(signed_payload_jwt);
-        if (!helper.ValidateClaims(bigCommerceStore, claims))
+        var claims = helper.ValidateAndDecodeJwt(signed_payload_jwt, bigCommerceStore);
+        if (claims == null)
         {
-            return BadRequest("Invalid JWT parameter. Kindly refresh this page");
+            return Unauthorized("Invalid JWT parameter. Kindly refresh this page");
         }
         ctx.Remove(bigCommerceStore);
         await ctx.SaveChangesAsync();

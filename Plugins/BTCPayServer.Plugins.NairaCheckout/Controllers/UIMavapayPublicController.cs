@@ -15,17 +15,8 @@ namespace BTCPayServer.Plugins.Template;
 [AllowAnonymous]
 [Route("~/plugins/{storeId}/naira-checkout/public/", Order = 0)]
 [Route("~/plugins/{storeId}/naira-checkout/api/", Order = 1)]
-public class UIMavapayPublicController : Controller
+public class UIMavapayPublicController(NairaCheckoutDbContextFactory dbContextFactory, MavapayApiClientService mavapayApiClientService) : Controller
 {
-    private readonly MavapayApiClientService mavapayApiClientService;
-    private readonly NairaCheckoutDbContextFactory dbContextFactory;
-    public UIMavapayPublicController(NairaCheckoutDbContextFactory dbContextFactory, MavapayApiClientService mavapayApiClientService)
-    {
-        dbContextFactory = dbContextFactory;
-        mavapayApiClientService = mavapayApiClientService;
-    }
-
-
     [HttpPost("mavapay/webhook")]
     public async Task<IActionResult> ReceiveMavapayWebhook(string storeId)
     {

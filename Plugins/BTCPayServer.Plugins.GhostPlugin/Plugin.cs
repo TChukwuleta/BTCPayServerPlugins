@@ -22,6 +22,7 @@ public class Plugin : BaseBTCPayServerPlugin
         services.AddSingleton<EmailService>();
         services.AddSingleton<GhostDbContextFactory>();
         services.AddSingleton<GhostHostedService>();
+        services.AddSingleton<GhostPaywallTokenService>();
         services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<GhostHostedService>());
         services.AddScheduledTask<GhostHostedService>(TimeSpan.FromMinutes(3));
         services.AddDbContext<GhostDbContext>((provider, o) =>

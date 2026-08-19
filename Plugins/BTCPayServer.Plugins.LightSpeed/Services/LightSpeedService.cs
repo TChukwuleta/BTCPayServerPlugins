@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using BTCPayServer.Plugins.LightSpeed.Data;
 using BTCPayServer.Plugins.LightSpeed.ViewModels;
@@ -32,7 +33,8 @@ public class LightSpeedService
                 LightSpeedUrl = settings.LightSpeedUrl,
                 LightspeedDomainPrefix = settings.LightspeedDomainPrefix,
                 LightspeedPersonalAccessToken = settings.LightspeedPersonalAccessToken,
-                Currency = settings.Currency    
+                Currency = settings.Currency,
+                GatewaySecret = GenerateGatewaySecret()
             });
         else
         {
@@ -40,12 +42,14 @@ public class LightSpeedService
             existingSetting.LightspeedDomainPrefix = settings.LightspeedDomainPrefix;
             existingSetting.LightspeedPersonalAccessToken = settings.LightspeedPersonalAccessToken;
             existingSetting.Currency = settings.Currency;
+            if(string.IsNullOrEmpty(existingSetting.GatewaySecret))
+                existingSetting.GatewaySecret = GenerateGatewaySecret();
             ctx.LightspeedSettings.Update(existingSetting);
         }
         await ctx.SaveChangesAsync();
     }
 
-    public async Task DeleteSettingsAsync(string storeId)
+    public async Task DeleteSettings(string storeId)
     {
         await using var ctx = _dbContextFactory.CreateContext();
         var settings = ctx.LightspeedSettings.FirstOrDefault(c => c.StoreId == storeId);
@@ -87,4 +91,43 @@ public class LightSpeedService
         await using var ctx = _dbContextFactory.CreateContext();
         return ctx.LightSpeedPayments.Where(p => p.StoreId == storeId).ToList();
     }
+
+    public async Task<string> EnsureGatewaySecret(string storeId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var settings = ctx.LightspeedSettings.FirstOrDefault(c => c.StoreId == storeId);
+        if (settings is null)
+            return null;
+        if (string.IsNullOrEmpty(settings.GatewaySecret))
+        {
+            settings.GatewaySecret = GenerateGatewaySecret();
+            ctx.LightspeedSettings.Update(settings);
+            await ctx.SaveChangesAsync();
+        }
+        return settings.GatewaySecret;
+    }
+
+    public async Task<string> RegenerateGatewaySecret(string storeId)
+    {
+        await using var ctx = _dbContextFactory.CreateContext();
+        var settings = ctx.LightspeedSettings.FirstOrDefault(c => c.StoreId == storeId);
+        if (settings is null)
+            return null;
+        settings.GatewaySecret = GenerateGatewaySecret();
+        await ctx.SaveChangesAsync();
+        return settings.GatewaySecret;
+    }   
+
+    public static bool GatewaySecretMatches(string providedSecret, string storedSecret)
+    {
+        if (string.IsNullOrEmpty(providedSecret) || string.IsNullOrEmpty(storedSecret))
+            return false;
+        var providedBytes = System.Text.Encoding.UTF8.GetBytes(providedSecret);
+        var expectedBytes = System.Text.Encoding.UTF8.GetBytes(storedSecret);
+        if (providedBytes.Length != expectedBytes.Length)
+            return false;
+        return CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes);
+    }
+
+    private static string GenerateGatewaySecret() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
 }

@@ -11,5 +11,6 @@ public class LightspeedSettings
     public string LightSpeedUrl { get; set; }
     public string LightspeedPersonalAccessToken { get; set; }
     public string Currency { get; set; }
+    public string GatewaySecret { get; set; }
     public bool IsConfigured => !string.IsNullOrWhiteSpace(StoreId) && !string.IsNullOrWhiteSpace(LightSpeedUrl);
 }
