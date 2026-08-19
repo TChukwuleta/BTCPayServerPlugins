@@ -112,7 +112,7 @@ public class LightSpeedService
         await using var ctx = _dbContextFactory.CreateContext();
         var settings = ctx.LightspeedSettings.FirstOrDefault(c => c.StoreId == storeId);
         if (settings is null)
-            throw null;
+            return null;
         settings.GatewaySecret = GenerateGatewaySecret();
         await ctx.SaveChangesAsync();
         return settings.GatewaySecret;
