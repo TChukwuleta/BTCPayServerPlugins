@@ -119,13 +119,7 @@
 else
 {
     <div class="alert alert-warning alert-dismissible mb-4" role="alert">
-        <p class="mb-0" style="font-size: 0.9rem;">
-            To proceed with Ghost plugin on this store, you need to
-            <a href="@Url.Action(nameof(UIStoresController.SetupWallet), "UIStores", new { cryptoCode = Model.CryptoCode, storeId = Model.StoreId })" class="alert-link">
-                set up a wallet
-            </a>
-            first.
-        </p>
+        <p class="mb-0" style="font-size: 0.9rem;">To proceed with Ghost plugin on this store, you need to setup a wallet first</p>
     </div>
 }
 

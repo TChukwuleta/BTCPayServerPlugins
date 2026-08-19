@@ -1,33 +1,34 @@
-﻿using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using BTCPayServer.Data;
-using System.Linq;
-using Microsoft.AspNetCore.Authorization;
-using BTCPayServer.Services.Stores;
-using BTCPayServer.Plugins.GhostPlugin.Services;
-using System;
-using System.Net.Http;
-using BTCPayServer.Models;
-using BTCPayServer.Services;
+﻿using System;
 using System.Collections.Generic;
-using BTCPayServer.Services.Invoices;
-using BTCPayServer.Controllers;
-using Newtonsoft.Json.Linq;
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
-using BTCPayServer.Client.Models;
-using Microsoft.AspNetCore.Cors;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Extensions;
+using BTCPayServer.Client.Models;
+using BTCPayServer.Controllers;
+using BTCPayServer.Data;
+using BTCPayServer.Models;
 using BTCPayServer.Plugins.GhostPlugin.Data;
 using BTCPayServer.Plugins.GhostPlugin.Helper;
+using BTCPayServer.Plugins.GhostPlugin.Services;
 using BTCPayServer.Plugins.GhostPlugin.ViewModels.Models;
+using BTCPayServer.Services;
+using BTCPayServer.Services.Invoices;
+using BTCPayServer.Services.Stores;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Newtonsoft.Json;
-using System.Text;
-using System.IO;
-using NBitcoin.DataEncoders;
 using NBitcoin;
-using System.Security.Cryptography;
-using System.ComponentModel.DataAnnotations;
+using NBitcoin.DataEncoders;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using static BTCPayServer.Models.InvoicingModels.CheckoutModel;
 
 namespace BTCPayServer.Plugins.GhostPlugin;
 
@@ -41,6 +42,8 @@ public class UIGhostPublicController(EmailService emailService,
         IHttpClientFactory clientFactory,
         GhostHostedService ghostHostedService,
         UIInvoiceController invoiceController,
+        InvoiceRepository invoiceRepository,
+        GhostPaywallTokenService paywallTokenService,
         GhostDbContextFactory dbContextFactory) : Controller
 {
 
@@ -315,8 +318,10 @@ public class UIGhostPublicController(EmailService emailService,
     [AllowAnonymous]
     [HttpGet("paywall/create-invoice")]
     [EnableCors("AllowAllOrigins")]
-    public async Task<IActionResult> CreateOrder(string storeId, decimal amount)
+    public async Task<IActionResult> CreateOrder(string storeId, decimal amount, string contentId)
     {
+        if (string.IsNullOrWhiteSpace(contentId) || contentId.Length > 200)
+            return BadRequest("Missing or invalid contentId");
         try
         {
             await using var ctx = dbContextFactory.CreateContext();
@@ -335,6 +340,7 @@ public class UIGhostPublicController(EmailService emailService,
             {
                 OrderId = orderId,
             };
+            metadata.SetAdditionalData("ghostPaywallContentId", contentId);
             var result = await invoiceController.CreateInvoiceCoreRaw(new CreateInvoiceRequest()
             {
                 Amount = amount,
@@ -354,12 +360,51 @@ public class UIGhostPublicController(EmailService emailService,
         }
     }
 
+    
+
+    [AllowAnonymous]
+    [HttpGet("paywall/unlock-token")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> UnlockToken(string storeId, string invoiceId, string contentId)
+    {
+        if (string.IsNullOrWhiteSpace(invoiceId) || string.IsNullOrWhiteSpace(contentId))
+            return BadRequest("Missing invoiceId or contentId");
+
+        var secret = await paywallTokenService.EnsurePaywallSecret(storeId);
+        if (secret is null)
+            return BadRequest("Invalid BTCPay store specified");
+
+        var invoice = await invoiceRepository.GetInvoice(invoiceId);
+        if (invoice is null || invoice.StoreId != storeId || invoice.Metadata?.GetAdditionalData<string>("ghostPaywallContentId") != contentId)
+            return NotFound();
+
+        if (invoice.Status != InvoiceStatus.Settled)
+            return StatusCode(402, new { unlocked = false, message = "Invoice is not settled" });
+
+        var token = paywallTokenService.IssueUnlockToken(secret, contentId);
+        return Ok(new { unlocked = true, token });
+    }
+
+    [AllowAnonymous]
+    [HttpGet("paywall/verify-unlock")]
+    [EnableCors("AllowAllOrigins")]
+    public async Task<IActionResult> VerifyUnlock(string storeId, string contentId, string token)
+    {
+        if (string.IsNullOrWhiteSpace(contentId) || string.IsNullOrWhiteSpace(token))
+            return Ok(new { unlocked = false });
+
+        var secret = await paywallTokenService.EnsurePaywallSecret(storeId);
+        if (secret is null)
+            return Ok(new { unlocked = false });
+
+        var unlocked = paywallTokenService.VerifyUnlockToken(secret, contentId, token);
+        return Ok(new { unlocked });
+    }
 
     private IActionResult RedirectToInvoiceCheckout(string invoiceId)
     {
         return RedirectToAction(nameof(UIInvoiceController.Checkout), "UIInvoice", new { invoiceId });
     }
-
 
     private async Task SaveTransaction(GhostDbContext ctx, Tier tier, GhostMember member, InvoiceEntity invoice, PaymentRequestData paymentRequest, string txnId)
     {

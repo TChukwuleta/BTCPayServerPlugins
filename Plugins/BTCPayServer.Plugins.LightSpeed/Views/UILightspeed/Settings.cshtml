@@ -30,21 +30,31 @@
                 <span asp-validation-for="LightSpeedUrl" class="text-danger small"></span>
             </div>
 
-            <div class="p-3 bg-light border rounded mb-2">
-                <h6 class="fw-semibold mb-2">Register the Gateway URL in Lightspeed</h6>
-                <ol class="mb-2 ps-3 small text-muted">
-                    <li>Go to <strong>Setup → Payment Types</strong> in Lightspeed Retail</li>
-                    <li>Click <strong>Add Payment Type → Other</strong>.</li>
-                    <li>Paste the URL below as the <strong>Gateway URL</strong>.</li>
-                </ol>
-                <div class="input-group input-group-sm">
-                    <input type="text" class="form-control font-monospace bg-white" value="@Model.GatewayUrl" readonly />
-                    <button class="btn btn-outline-secondary" type="button"
-                            onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(()=>{ this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy',1500) })">
-                        Copy
-                    </button>
+            @if (!string.IsNullOrEmpty(Model.GatewayUrl))
+            {
+                <div class="p-3 bg-light border rounded mb-2">
+                    <h6 class="fw-semibold mb-2">Register the Gateway URL in Lightspeed</h6>
+                    <ol class="mb-2 ps-3 small text-muted">
+                        <li>Go to <strong>Setup > Payment Types</strong> in Lightspeed Retail</li>
+                        <li>Click <strong>Add Payment Type > Other</strong>.</li>
+                        <li>Paste the URL below as the <strong>Gateway URL</strong>.</li>
+                    </ol>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control font-monospace bg-white" value="@Model.GatewayUrl" readonly />
+                        <button class="btn btn-outline-secondary" type="button"
+                                onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(()=>{ this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy',1500) })">
+                            Copy
+                        </button>
+                    </div>
+                    <p class="text-muted small mb-2">
+                        This url contains a secret token, treat it like a password. If you ever suspect it has been leaked,
+                        regenerate it below and update the Gateway Url in Lightspeed
+                    </p>
+                    <button type="submit" form="regenerate-gateway-secret-form" class="btn btn-outline-danger btn-sm">Regenerate Gateway URL</button>
                 </div>
-            </div>
+            }
         </div>
     </div>
 </form>
+
+<form id="regenerate-gateway-secret-form" method="post" asp-action="GenerateGatewaySecret" asp-route-storeId="@storeId"></form>

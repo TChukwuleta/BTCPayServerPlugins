@@ -26,6 +26,7 @@ public class GhostSetting
     public string BaseUrl { get; set; }
     public DateTimeOffset? IntegratedAt { get; set; }
     public string Setting { get; set; }
+    public string PaywallSecret { get; set; }
     public bool CredentialsPopulated()
     {
         return

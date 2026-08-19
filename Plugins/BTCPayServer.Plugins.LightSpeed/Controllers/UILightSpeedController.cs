@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
@@ -35,6 +36,8 @@ public class UILightSpeedController : Controller
     }
     private BTCPayServer.Data.StoreData CurrentStore => HttpContext.GetStoreData();
 
+    private static readonly Regex CurrencyCodePattern = new("^[A-Za-z]{2,6}$", RegexOptions.Compiled);
+
     [HttpGet("settings")]
     public async Task<IActionResult> Settings(string storeId)
     {
@@ -43,13 +46,14 @@ public class UILightSpeedController : Controller
         {
             settings.LightSpeedUrl = settings.LightSpeedUrl.Replace("https://", "").Replace(".retail.lightspeed.app", "").Trim('/');
         }
+        var gatewaySecret = settings.IsConfigured ? await _lightSpeedService.EnsureGatewaySecret(storeId) : null;
         return View(new LightspeedSettingsViewModel
         {
             StoreId = settings.StoreId,
             LightSpeedUrl = settings.LightSpeedUrl,
             LightspeedPersonalAccessToken = settings.LightspeedPersonalAccessToken,
             Currency = settings.Currency,
-            GatewayUrl = Url.Action(nameof(Gateway), "UILightSpeed", new { storeId }, Request.Scheme)
+            GatewayUrl = gatewaySecret is null ? null : Url.Action(nameof(Gateway), "UILightSpeed", new { storeId, gatewaySecret }, Request.Scheme)
         });
     }
 
@@ -71,13 +75,25 @@ public class UILightSpeedController : Controller
         return RedirectToAction(nameof(Settings), new { storeId });
     }
 
+    [HttpPost("settings/generate-gateway-secret")]
+    public async Task<IActionResult> GenerateGatewaySecret(string storeId)
+    {
+        var settings = await _lightSpeedService.GetSettings(storeId);
+        if (settings is null)
+            return NotFound();
+        var newSecret = await _lightSpeedService.RegenerateGatewaySecret(storeId);
+        TempData[newSecret is null ? WellKnownTempData.ErrorMessage : WellKnownTempData.SuccessMessage] =
+            newSecret is null ? "Nothing to generate" : "Gateway URL regenerated. Update the Gateway URL saved in Lightspeed's Payment type settings.";
+        return RedirectToAction(nameof(Settings), new { storeId });
+    }
+
     static AsyncDuplicateLock OrderLocks = new AsyncDuplicateLock();
 
-    [HttpGet("gateway")]
+    [HttpGet("gateway/{gatewaySecret}")]
     [AllowAnonymous]
     [XFrameOptions(XFrameOptionsAttribute.XFrameOptions.Unset)]
     public async Task<IActionResult> Gateway(
-        string storeId,
+        string storeId, string gatewaySecret,
         [FromQuery] decimal amount, [FromQuery] string register_id, [FromQuery] string origin,
         [FromQuery] string? currency, [FromQuery] string? retailer_payment_type_id, [FromQuery] string? customer_id, [FromQuery] string? reference_id)
     {
@@ -88,7 +104,13 @@ public class UILightSpeedController : Controller
             if (store == null || settings is null || !settings.IsConfigured)
                 return BadRequest("Plugin not configured for this store");
 
-            if (string.IsNullOrEmpty(currency))
+            if (!LightSpeedService.GatewaySecretMatches(gatewaySecret, settings.GatewaySecret))
+                return NotFound();
+
+            if (amount <= 0)
+                return BadRequest("Invalid amount");
+
+            if (string.IsNullOrEmpty(currency) || !CurrencyCodePattern.IsMatch(currency))
                 return BadRequest("Currency not present");
 
             var expectedOrigin = settings.LightSpeedUrl.TrimEnd('/');

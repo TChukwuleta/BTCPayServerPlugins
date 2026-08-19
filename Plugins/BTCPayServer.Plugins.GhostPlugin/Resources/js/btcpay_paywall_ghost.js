@@ -28,10 +28,9 @@
     `;
 
         this.shadowRoot.appendChild(container);
+        this.unlocking = false;
 
-        if (localStorage.getItem("paywall_unlocked_" + this.uniqueId) === "true") {
-            this.unlockContent();
-        }
+        this.verifyStoredUnlock();
 
         container.querySelector("#payButton").addEventListener("click", (event) => {
             event.preventDefault();
@@ -85,9 +84,45 @@
         return path;
     }
 
-    paymentCompleted() {
-        localStorage.setItem("paywall_unlocked_" + this.uniqueId, "true");
-        this.unlockContent();
+    async paymentCompleted(invoiceId) {
+        if (this.unlocking) return;
+        this.unlocking = true;
+        try {
+            const url = BTCPAYSERVER_URL + "/plugins/" + BTCPAYSERVER_STORE_ID +
+                "/ghost/api/paywall/unlock-token?invoiceId=" + encodeURIComponent(invoiceId) +
+                "&contentId=" + encodeURIComponent(this.uniqueId);
+            const response = await fetch(url, { method: "GET" });
+            const data = await response.json().catch(() => null);
+            if (response.ok && data && data.unlocked && data.token) {
+                localStorage.setItem("paywall_token_" + this.uniqueId, data.token);
+                this.unlockContent();
+            } else {
+                console.error("Server did not confirm payment for this content yet.", data);
+            }
+        } catch (error) {
+            console.error("Could not confirm payment with the server.", error);
+        } finally {
+            this.unlocking = false;
+        }
+    }
+
+    async verifyStoredUnlock() {
+        const token = localStorage.getItem("paywall_token_" + this.uniqueId);
+        if (!token) return;
+        try {
+            const url = BTCPAYSERVER_URL + "/plugins/" + BTCPAYSERVER_STORE_ID +
+                "/ghost/api/paywall/verify-unlock?contentId=" + encodeURIComponent(this.uniqueId) +
+                "&token=" + encodeURIComponent(token);
+            const response = await fetch(url, { method: "GET" });
+            const data = await response.json().catch(() => null);
+            if (response.ok && data && data.unlocked) {
+                this.unlockContent();
+            } else {
+                localStorage.removeItem("paywall_token_" + this.uniqueId);
+            }
+        } catch (error) {
+            console.error("Could not verify stored unlock status with the server.", error);
+        }
     }
 
     unlockContent() {
@@ -96,7 +131,7 @@
     }
 
     handleBitcoinPayment(amount, button) {
-        const url = BTCPAYSERVER_URL + "/plugins/" + BTCPAYSERVER_STORE_ID + "/ghost/api/paywall/create-invoice?amount=" + amount;
+        const url = BTCPAYSERVER_URL + "/plugins/" + BTCPAYSERVER_STORE_ID + "/ghost/api/paywall/create-invoice?amount=" + encodeURIComponent(amount) + "&contentId=" + encodeURIComponent(this.uniqueId);
         fetch(url, {
             method: "GET",
             headers: { "Content-Type": "application/json" }
@@ -143,7 +178,7 @@
                         case 'settled':
                             invoice_paid = true;
                             console.log('Invoice paid.');
-                            self.paymentCompleted();
+                            self.paymentCompleted(data.id);
                             break;
                         case 'expired':
                             window.btcpay.hideFrame();
@@ -160,7 +195,7 @@
             } else {
                 if (event.data === 'close') {
                     if (invoice_paid === true) {
-                        self.paymentCompleted();
+                        self.paymentCompleted(data.id);
                         console.log('Invoice paid.');
                     }
                     console.log('Modal closed.')
