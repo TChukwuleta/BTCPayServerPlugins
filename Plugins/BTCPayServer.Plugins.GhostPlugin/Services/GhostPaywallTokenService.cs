@@ -3,6 +3,8 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Internal;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 
@@ -15,16 +17,12 @@ public class GhostPaywallTokenService(GhostDbContextFactory dbContextFactory)
     public async Task<string> EnsurePaywallSecret(string storeId)
     {
         await using var ctx = dbContextFactory.CreateContext();
-        var setting = ctx.GhostSettings.FirstOrDefault(c => c.StoreId == storeId);
-        if (setting is null) return null;
 
-        if (string.IsNullOrEmpty(setting.PaywallSecret))
-        {
-            setting.PaywallSecret = Encoders.Base58.EncodeData(RandomUtils.GetBytes(32));
-            ctx.GhostSettings.Update(setting);
-            await ctx.SaveChangesAsync();
-        }
-        return setting.PaywallSecret;
+        var candidateSecret = Encoders.Base58.EncodeData(RandomUtils.GetBytes(32));
+        await ctx.GhostSettings.Where(c => c.StoreId == storeId && c.PaywallSecret == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.PaywallSecret, c => candidateSecret));
+
+        return await ctx.GhostSettings.Where(c => c.StoreId == storeId).Select(c => c.PaywallSecret).FirstOrDefaultAsync();
     }
 
     public string IssueUnlockToken(string secret, string contentId)
