@@ -32,6 +32,7 @@
                     <th>Code</th>
                     <th>Discount</th>
                     <th>Applies To</th>
+                    <th>Referrer</th>
                     <th>Uses</th>
                     <th>Expiry</th>
                     <th>Status</th>
@@ -54,6 +55,22 @@
                             }
                         </td>
                         <td>@(string.IsNullOrEmpty(code.TicketTypeName) ? "All ticket types" : code.TicketTypeName)</td>
+                        <td>
+                            @if (string.IsNullOrEmpty(code.ReferrerName))
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                            else
+                            {
+                                <span>@code.ReferrerName</span>
+                                @if (code.KickbackType.HasValue && code.KickbackValue.HasValue)
+                                {
+                                    <span class="text-muted ms-1">
+                                        (@(code.KickbackType == DiscountType.Percentage ? $"{code.KickbackValue.Value.ToString("0.##")}%" : $"{code.KickbackValue.Value.ToString("N2")} {Model.Currency}") kickback)
+                                    </span>
+                                }
+                            }
+                        </td>
                         <td>@code.UsesCount@(code.MaxUses.HasValue ? $" / {code.MaxUses.Value}" : "")</td>
                         <td>@(code.ExpiryDate.HasValue ? code.ExpiryDate.Value.ToString("MMM d, yyyy") : "—")</td>
                         <td>

@@ -184,6 +184,7 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicT
                 if (discountCode != null)
                 {
                     discountCode.UsesCount += 1;
+                    CreateReferralCreditIfApplicable(ctx, discountCode, order);
                 }
             }
             var isEmailConfigured = await _emailService.IsEmailSettingsConfigured(invoice.StoreId);
@@ -200,6 +201,36 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicT
         await ctx.SaveChangesAsync();
         await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
     }
+
+    private static void CreateReferralCreditIfApplicable(SimpleTicketSalesDbContext ctx, DiscountCode discountCode, Order order)
+    {
+        if (string.IsNullOrEmpty(discountCode.ReferrerId) || !discountCode.KickbackType.HasValue || !discountCode.KickbackValue.HasValue)
+            return;
+
+        var eligibleTickets = order.Tickets.Where(t => discountCode.TicketTypeId == null || t.TicketTypeId == discountCode.TicketTypeId);
+        var kickbackBase = eligibleTickets.Sum(t => t.Amount - t.DiscountAmount);
+        if (kickbackBase <= 0) return;
+
+        var kickbackAmount = discountCode.KickbackType.Value switch
+        {
+            DiscountType.Percentage => Math.Round(kickbackBase * (discountCode.KickbackValue.Value / 100m), 2, MidpointRounding.AwayFromZero),
+            DiscountType.FixedAmount => discountCode.KickbackValue.Value,
+            _ => 0m
+        };
+        kickbackAmount = Math.Min(Math.Max(kickbackAmount, 0m), kickbackBase);
+        if (kickbackAmount <= 0) return;
+
+        ctx.ReferralCredits.Add(new ReferralCredit
+        {
+            StoreId = order.StoreId,
+            ReferrerId = discountCode.ReferrerId,
+            EventId = order.EventId,
+            OrderId = order.Id,
+            DiscountCodeId = discountCode.Id,
+            Amount = kickbackAmount,
+            Currency = order.Currency,
+            Status = ReferralCreditStatus.Confirmed,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+    }
 }
-
-

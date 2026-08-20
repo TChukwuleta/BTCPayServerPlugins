@@ -3,5 +3,6 @@
 public enum SatoshiTicketNavPages
 {
     SatoshiTicketIndex,
-    SatoshiTicketSettings
+    SatoshiTicketSettings,
+    SatoshiTicketReferrers
 }

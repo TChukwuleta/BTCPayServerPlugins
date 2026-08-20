@@ -1,0 +1,51 @@
+@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@model AcceptReferrerInvitationViewModel
+@{
+    ViewData["Title"] = "Activate Your Account";
+    Layout = "_BaseSimpleTicketPublicLayout";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-5">
+            <h3 class="text-center mb-1">@Model.StoreName</h3>
+            <p class="text-center text-muted mb-4">
+                @if (!string.IsNullOrEmpty(Model.ReferrerName))
+                {
+                    <text>Welcome, @Model.ReferrerName - set a password to activate your referrer account.</text>
+                }
+                else
+                {
+                    <text>Activate your referrer account</text>
+                }
+            </p>
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="alert alert-danger">@Model.ErrorMessage</div>
+                <a asp-controller="UIReferrerPublic" asp-action="Login" asp-route-storeId="@Model.StoreId" class="btn btn-outline-secondary w-100">Go to Login</a>
+            }
+            else
+            {
+                <form asp-controller="UIReferrerPublic" asp-action="AcceptInvitation" asp-route-storeId="@Model.StoreId" asp-route-token="@Model.Token" method="post">
+                    <input type="hidden" asp-for="Token" />
+                    <div class="form-group mb-3">
+                        <label class="form-label">Email</label>
+                        <input class="form-control" value="@Model.Email" readonly disabled />
+                    </div>
+                    <div class="form-group mb-3">
+                        <label asp-for="NewPassword" class="form-label"></label>
+                        <input asp-for="NewPassword" class="form-control" autofocus />
+                        <span asp-validation-for="NewPassword" class="text-danger"></span>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label asp-for="ConfirmPassword" class="form-label"></label>
+                        <input asp-for="ConfirmPassword" class="form-control" />
+                        <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Activate Account</button>
+                </form>
+            }
+        </div>
+    </div>
+</div>

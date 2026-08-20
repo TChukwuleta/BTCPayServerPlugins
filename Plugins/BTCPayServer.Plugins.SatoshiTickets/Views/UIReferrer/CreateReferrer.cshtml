@@ -1,0 +1,42 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.SatoshiTickets.Data
+@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@model CreateReferrerViewModel
+@{
+    ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketReferrers), "Invite Referrer") { ActiveCategory = nameof(SatoshiTicketNavPages) });
+}
+
+<div class="sticky-header">
+    <h2>Invite Referrer</h2>
+    <a asp-controller="UIReferrer" asp-action="Referrers" asp-route-storeId="@Model.StoreId" class="btn btn-secondary" role="button">Back to list</a>
+</div>
+
+<partial name="_StatusMessage" />
+
+<div class="row">
+    <div class="col-xl-8 col-xxl-constrain">
+        <p class="text-secondary">
+            This sends the referrer an email with a link to set their own password. They'll use that email  password to log in and check their credit balance - no BTCPayServer account is created for them.
+        </p>
+        <form asp-controller="UIReferrer" asp-action="CreateReferrer" asp-route-storeId="@Model.StoreId" method="post">
+            <input type="hidden" asp-for="StoreId" />
+
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="form-group mb-3">
+                <label asp-for="Name" class="form-label"></label>
+                <input asp-for="Name" class="form-control" placeholder="e.g. Jane Promoter" />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            <div class="form-group mb-3">
+                <label asp-for="Email" class="form-label"></label>
+                <input asp-for="Email" class="form-control" placeholder="jane@example.com" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Send Invitation</button>
+        </form>
+    </div>
+</div>

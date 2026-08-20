@@ -26,6 +26,9 @@ public class DiscountCodeListItemViewModel
     public int UsesCount { get; set; }
     public DateTimeOffset? ExpiryDate { get; set; }
     public DiscountCodeState DiscountCodeState { get; set; }
+    public string ReferrerName { get; set; }
+    public DiscountType? KickbackType { get; set; }
+    public decimal? KickbackValue { get; set; }
 }
 
 public class UpsertDiscountCodeViewModel
@@ -61,8 +64,23 @@ public class UpsertDiscountCodeViewModel
 
     [Display(Name = "Active")]
     public bool IsActive { get; set; } = true;
+    
+    [Display(Name = "Referrer (optional)")]
+    public string ReferrerId { get; set; }
 
+    [Display(Name = "Kickback Type")]
+    public DiscountType KickbackType { get; set; } = DiscountType.Percentage;
+
+    [Display(Name = "Kickback Value")]
+    public decimal? KickbackValue { get; set; }
+    public List<ReferrerOption> ReferrerOptions { get; set; } = new();
     public List<DiscountTicketTypeOption> TicketTypeOptions { get; set; } = new();
+}
+
+public class ReferrerOption        
+{
+    public string Id { get; set; }
+    public string Name { get; set; }
 }
 
 public class DiscountTicketTypeOption

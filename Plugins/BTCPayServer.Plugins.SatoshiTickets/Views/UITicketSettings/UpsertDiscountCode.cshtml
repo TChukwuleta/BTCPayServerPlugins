@@ -75,8 +75,52 @@
                     <label asp-for="IsActive" class="form-label mb-0">Active</label>
                 </div>
             </div>
+            
+            <h4 class="mt-4">Referral (optional)</h4>
+            <p class="text-secondary">Attach this code to a referrer to pay them a kickback whenever it's used, on top of the buyer's discount above.</p>
+            <div class="form-group mb-3">
+                <label asp-for="ReferrerId" class="form-label"></label>
+                <select asp-for="ReferrerId" class="form-select" id="ReferrerId">
+                    <option value="">No referrer</option>
+                    @foreach (var opt in Model.ReferrerOptions)
+                    {
+                        <option value="@opt.Id">@opt.Name</option>
+                    }
+                </select>
+                <span asp-validation-for="ReferrerId" class="text-danger"></span>
+                @if (!Model.ReferrerOptions.Any())
+                {
+                    <div class="form-text">No active referrers yet - invite one from the Referrers page first.</div>
+                }
+            </div>
+            <div id="KickbackFields" class="row">
+                <div class="form-group mb-3 col-md-6">
+                    <label asp-for="KickbackType" class="form-label"></label>
+                    <select asp-for="KickbackType" class="form-select">
+                        <option value="@DiscountType.Percentage">Percentage</option>
+                        <option value="@DiscountType.FixedAmount">Fixed Amount</option>
+                    </select>
+                </div>
+                <div class="form-group mb-3 col-md-6">
+                    <label asp-for="KickbackValue" class="form-label"></label>
+                    <input asp-for="KickbackValue" type="number" step="0.01" class="form-control" />
+                    <span asp-validation-for="KickbackValue" class="text-danger"></span>
+                </div>
+            </div>
 
             <button type="submit" class="btn btn-primary">Save Discount Code</button>
         </form>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var referrerSelect = document.getElementById('ReferrerId');
+        var kickbackFields = document.getElementById('KickbackFields');
+        function toggleKickbackFields() {
+            kickbackFields.style.display = referrerSelect.value ? '' : 'none';
+        }
+        referrerSelect.addEventListener('change', toggleKickbackFields);
+        toggleKickbackFields();
+    });
+</script>
