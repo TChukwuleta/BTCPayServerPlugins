@@ -1,0 +1,161 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.SatoshiTickets.Data
+@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@model EditReferrerViewModel
+@{
+    ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketReferrers), "Edit Referrer") { ActiveCategory = nameof(SatoshiTicketNavPages) });
+}
+
+<div class="sticky-header">
+    <h2>Edit Referrer</h2>
+    <a asp-controller="UIReferrer" asp-action="Referrers" asp-route-storeId="@Model.StoreId" class="btn btn-secondary" role="button">Back to list</a>
+</div>
+
+<partial name="_StatusMessage" />
+
+<div class="row">
+    <div class="col-xl-8 col-xxl-constrain">
+        <form asp-controller="UIReferrer" asp-action="SaveReferrer" asp-route-storeId="@Model.StoreId" method="post">
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="StoreId" />
+
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="form-group mb-3">
+                <label asp-for="Name" class="form-label"></label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label">Email</label>
+                <input class="form-control" value="@Model.Email" readonly disabled />
+                <div class="form-text">This is also the referrer's login. Changing it isn't supported yet - delete and re-invite with the new address instead.</div>
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label">Status</label>
+                <div>
+                    @switch (Model.State)
+                    {
+                        case ReferrerState.Active:
+                            <span class="badge bg-success">Active</span>
+                            break;
+                        case ReferrerState.Pending:
+                            <span class="badge bg-warning text-dark">Invitation pending</span>
+                            break;
+                        default:
+                            <span class="badge bg-secondary">Disabled</span>
+                            break;
+                    }
+                </div>
+                <div class="form-text">Use "Disable"/"Resend Invitation" from the list page to change this.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save</button>
+        </form>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-xl-8 col-xxl-constrain">
+        <h4>Referral Credits</h4>
+
+        @if (!Model.AvailableBalances.Any())
+        {
+            <p class="text-secondary">No confirmed referral credits yet.</p>
+        }
+        else
+        {
+            <div class="d-flex flex-wrap gap-3 mb-3">
+                @foreach (var balance in Model.AvailableBalances)
+                {
+                    var formattedBalance = balance.Amount.ToString("N2");
+                    <div class="card border-0 shadow-sm" style="min-width: 220px;">
+                        <div class="card-body">
+                            <p class="text-muted mb-1">Available balance</p>
+                            <p class="h4 mb-2">@formattedBalance @balance.Currency</p>
+                            <form asp-controller="UIReferrer" asp-action="RecordPayout" asp-route-storeId="@Model.StoreId" asp-route-referrerId="@Model.Id" method="post"
+                                onsubmit="return confirm('Record a payout of @formattedBalance @balance.Currency to @Model.Name? This marks the full balance as paid out.');">
+                                <input type="hidden" name="currency" value="@balance.Currency" />
+                                <div class="form-group mb-2">
+                                    <input type="text" name="note" class="form-control form-control-sm" placeholder="Note (optional)" />
+                                </div>
+                            <button type="submit" class="btn btn-sm btn-outline-primary">Record Payout</button>
+                            </form>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <h5 class="mt-4">Recent Activity</h5>
+        @if (!Model.RecentCredits.Any())
+        {
+            <p class="text-secondary">No referral credits recorded yet - these show up automatically when a buyer uses this referrer's discount code.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Event</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var credit in Model.RecentCredits)
+                        {
+                            <tr>
+                                <td>@credit.CreatedAt.ToString("MMM d, yyyy")</td>
+                                <td>@(credit.EventTitle ?? "—")</td>
+                                <td>@credit.Amount.ToString("N2") @credit.Currency</td>
+                                <td>
+                                    @if (credit.Status == ReferralCreditStatus.Confirmed)
+                                    {
+                                        <span class="badge bg-success">Confirmed</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Paid Out</span>
+                                    }
+                                </td>
+                    
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    
+        @if (Model.PayoutHistory.Any())
+        {
+            <h5 class="mt-4">Payout History</h5>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Amount</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var payout in Model.PayoutHistory)
+                        {
+                            <tr>
+                                <td>@payout.CreatedAt.ToString("MMM d, yyyy")</td>
+                                <td>@payout.Amount.ToString("N2") @payout.Currency</td>
+                                <td>@(payout.Note ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

@@ -19,6 +19,10 @@ public class SimpleTicketSalesDbContext : DbContext
     public DbSet<Ticket> Tickets { get; set; }
     public DbSet<TicketType> TicketTypes { get; set; }
     public DbSet<DiscountCode> DiscountCodes { get; set; }
+    public DbSet<Referrer> Referrers { get; set; }
+    public DbSet<ReferrerInvitation> ReferrerInvitations { get; set; }
+    public DbSet<ReferralPayout> ReferralPayouts { get; set; }
+    public DbSet<ReferralCredit> ReferralCredits { get; set; }
     public DbSet<SatoshiTicketsSetting> SatoshiTicketsSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -26,7 +30,12 @@ public class SimpleTicketSalesDbContext : DbContext
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.SatoshiTickets");
 
-        modelBuilder.Entity<DiscountCode>()
-            .HasIndex(d => new { d.EventId, d.Code }).IsUnique();
+        modelBuilder.Entity<DiscountCode>().HasIndex(d => new { d.EventId, d.Code }).IsUnique();
+
+        modelBuilder.Entity<Referrer>().HasIndex(r => new { r.StoreId, r.Email }).IsUnique();
+        
+        modelBuilder.Entity<ReferrerInvitation>().HasIndex(i => i.Token);
+        modelBuilder.Entity<ReferralCredit>().HasIndex(c => c.OrderId).IsUnique();
+        modelBuilder.Entity<ReferralCredit>().HasIndex(c => new { c.ReferrerId, c.Status });
     }
 }

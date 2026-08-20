@@ -4,12 +4,15 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using BTCPayServer.Plugins.Emails.Services;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
 using MailKit.Net.Smtp;
 using Microsoft.Extensions.Logging;
 using MimeKit;
+using Org.BouncyCastle.Cms;
+using static BTCPayServer.Plugins.Monetization.Views.SelectExistingOfferingModalViewModel;
 
 namespace BTCPayServer.Plugins.SatoshiTickets.Services;
 
@@ -162,6 +165,28 @@ Click the link to view your tickets: {ticket.QRCodeLink}";
         }
         var sendBultEmail = await SendBulkEmail(storeId, recipients);
         return sendBultEmail.IsSuccessful;
+    }
+
+        public async Task<EmailDispatchResult> SendReferrerInvitationEmail(string storeId, string toEmail, string referrerName, string storeName, string acceptUrl)
+    {
+        var body = @$"Hi {referrerName},
+
+You've been invited to the {storeName} referral program. Set your password to activate your account and start checking your referral credit balance:
+
+{acceptUrl}
+
+This link expires in 7 days.";
+
+        var recipients = new List<EmailRecipient>
+        {
+            new ()
+            {
+                Address = InternetAddress.Parse(toEmail),
+                Subject = $"You're invited: {storeName} referral program",
+                MessageText = body
+            }
+        };
+        return await SendBulkEmail(storeId, recipients);
     }
 
     public string GetEmbeddedResourceContent(string resourceName)

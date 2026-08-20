@@ -1,0 +1,102 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Abstractions.Models
+@using BTCPayServer.Plugins.SatoshiTickets.Data
+@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@model ReferrerListViewModel
+@{
+    ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketReferrers), "Referrers") { ActiveCategory = nameof(SatoshiTicketNavPages) });
+}
+
+<div class="sticky-header">
+    <h2>Referrers</h2>
+    <div class="d-flex gap-3">
+        <a asp-controller="UITicketSales" asp-action="List" asp-route-storeId="@Model.StoreId" class="btn btn-secondary" role="button">
+            <span class="fa fa-arrow-left me-1"></span> Back to Events
+        </a>
+        <a asp-controller="UIReferrer" asp-action="CreateReferrer" asp-route-storeId="@Model.StoreId" class="btn btn-primary" role="button">Invite Referrer</a>
+    </div>
+</div>
+
+<partial name="_StatusMessage" />
+
+<p class="text-secondary">
+    A referrer is an affiliate or promoter who gets their own referral discount code(s) and their own login to check their credit balance. 
+    Inviting one emails them a link to set their password - they don't get a BTCPayServer account.
+</p>
+
+@if (Model.Referrers != null && Model.Referrers.Any())
+{
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Available Balance</th>
+                    <th>Status</th>
+                    <th class="text-end"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var referrer in Model.Referrers)
+                {
+                    <tr>
+                        <td class="fw-bold">@referrer.Name</td>
+                        <td>@referrer.Email</td>
+                        <td>
+                            @if (!referrer.AvailableBalances.Any())
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                            else
+                            {
+                                @foreach (var balance in referrer.AvailableBalances)
+                                {
+                                    <div>@balance.Amount.ToString("N2") @balance.Currency</div>
+                                }
+                            }
+
+                        </td>
+                        <td>
+                            @switch (referrer.State)
+                            {
+                                case ReferrerState.Active:
+                                    <span class="badge bg-success">Active</span>
+                                    break;
+                                case ReferrerState.Pending:
+                                    <span class="badge bg-warning text-dark">Invitation pending</span>
+                                    break;
+                                default:
+                                    <span class="badge bg-secondary">Disabled</span>
+                                    break;
+                            }
+                        </td>
+                        <td class="text-end">
+                            <div class="d-inline-flex align-items-center gap-3">
+                                <a asp-controller="UIReferrer" asp-action="EditReferrer" asp-route-storeId="@Model.StoreId" asp-route-referrerId="@referrer.Id">Edit</a>
+                                @if (referrer.State == ReferrerState.Pending)
+                                {
+                                    <a asp-controller="UIReferrer" asp-action="ResendInvitation" asp-route-storeId="@Model.StoreId" asp-route-referrerId="@referrer.Id">Resend Invitation</a>
+                                }
+                                else
+                                {
+                                    <a asp-controller="UIReferrer" asp-action="ToggleReferrer" asp-route-storeId="@Model.StoreId" asp-route-referrerId="@referrer.Id">
+                                        @(referrer.State == ReferrerState.Active ? "Disable" : "Activate")
+                                    </a>
+                                }
+                                <a asp-controller="UIReferrer" asp-action="DeleteReferrer"
+                                   asp-route-storeId="@Model.StoreId" asp-route-referrerId="@referrer.Id"
+                                   class="text-danger"
+                                   onclick="return confirm('Delete referrer @referrer.Name? This cannot be undone.');">Delete</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <p class="text-secondary mt-4">No referrers yet. Invite one to give a promoter their own referral code and login.</p>
+}

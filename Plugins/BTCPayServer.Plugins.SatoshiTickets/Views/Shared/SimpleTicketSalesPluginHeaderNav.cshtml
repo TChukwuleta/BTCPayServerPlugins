@@ -1,7 +1,6 @@
 @using BTCPayServer.Abstractions.Contracts
 @using BTCPayServer.Abstractions.Extensions
 @using BTCPayServer.Plugins.SatoshiTickets.Data
-@using Microsoft.AspNetCore.Mvc.TagHelpers
 @inject IScopeProvider ScopeProvider
 @{
     var storeId = ScopeProvider.GetCurrentStoreId();
@@ -27,6 +26,10 @@
                 <li class="nav-item nav-item-sub">
                     <a layout-menu-item="@nameof(SatoshiTicketNavPages.SatoshiTicketSettings)" asp-controller="UITicketSettings" asp-action="Settings" asp-route-storeId="@storeId"
                        text-translate="true">Settings</a>
+                </li>
+                <li class="nav-item nav-item-sub">
+                    <a layout-menu-item="@nameof(SatoshiTicketNavPages.SatoshiTicketReferrers)" asp-controller="UIReferrer" asp-action="Referrers" asp-route-storeId="@storeId"
+                            text-translate="true">Referrers</a>
                 </li>
             </ul>
         }

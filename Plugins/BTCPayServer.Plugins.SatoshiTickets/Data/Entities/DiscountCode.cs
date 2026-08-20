@@ -19,5 +19,8 @@ public class DiscountCode
     public DateTimeOffset? ExpiryDate { get; set; }
     public int? MinQuantity { get; set; }
     public DiscountCodeState DiscountCodeState { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } 
+    public string ReferrerId { get; set; }
+    public DiscountType? KickbackType { get; set; }
+    public decimal? KickbackValue { get; set; }
 }

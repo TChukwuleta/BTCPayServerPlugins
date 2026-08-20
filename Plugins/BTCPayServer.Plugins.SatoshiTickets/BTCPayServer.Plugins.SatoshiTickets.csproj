@@ -62,5 +62,6 @@
 	
   <ItemGroup>
     <Folder Include="img\" />
+    <Folder Include="Views\UIReferrer\" />
   </ItemGroup>
 </Project>

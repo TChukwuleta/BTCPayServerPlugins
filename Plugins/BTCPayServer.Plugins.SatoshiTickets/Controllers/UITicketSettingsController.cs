@@ -38,6 +38,7 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
 
         var ticketTypeNames = ctx.TicketTypes.Where(c => c.EventId == eventId).ToDictionary(c => c.Id, c => c.Name);
         var codes = ctx.DiscountCodes.Where(c => c.EventId == eventId && c.StoreId == CurrentStore.Id).OrderByDescending(c => c.CreatedAt).ToList();
+        var referrerNames = ctx.Referrers.Where(r => r.StoreId == CurrentStore.Id).ToDictionary(r => r.Id, r => r.Name);
 
         var vm = new DiscountCodeListViewModel
         {
@@ -55,7 +56,10 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
                 UsesCount = c.UsesCount,
                 ExpiryDate = c.ExpiryDate,
                 DiscountCodeState = c.DiscountCodeState,
-                TicketTypeName = c.TicketTypeId != null ? ticketTypeNames.GetValueOrDefault(c.TicketTypeId) : null
+                TicketTypeName = c.TicketTypeId != null ? ticketTypeNames.GetValueOrDefault(c.TicketTypeId) : null,
+                ReferrerName = c.ReferrerId != null ? referrerNames.GetValueOrDefault(c.ReferrerId) : null,
+                KickbackType =c.KickbackType,
+                KickbackValue = c.KickbackValue
             }).ToList()
         };
         return View(vm);
@@ -77,7 +81,8 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
             EventId = eventId,
             EventTitle = ticketEvent.Title,
             Currency = ticketEvent.Currency ?? CurrentStore.GetStoreBlob().DefaultCurrency.Trim().ToUpperInvariant(),
-            TicketTypeOptions = GetTicketTypeOptions(ctx, eventId)
+            TicketTypeOptions = GetTicketTypeOptions(ctx, eventId),
+            ReferrerOptions = GetReferrerOptions(ctx, CurrentStore.Id)
         };
         return View("UpsertDiscountCode", vm);
     }
@@ -109,7 +114,11 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
             MaxUses = discountCode.MaxUses,
             ExpiryDate = discountCode.ExpiryDate,
             IsActive = discountCode.DiscountCodeState == DiscountCodeState.Active,
-            TicketTypeOptions = GetTicketTypeOptions(ctx, eventId)
+            TicketTypeOptions = GetTicketTypeOptions(ctx, eventId),
+            ReferrerId = discountCode.ReferrerId,
+            KickbackType = discountCode.KickbackType ?? DiscountType.Percentage,
+            KickbackValue = discountCode.KickbackValue,
+            ReferrerOptions = GetReferrerOptions(ctx, CurrentStore.Id),
         };
         return View("UpsertDiscountCode", vm);
     }
@@ -139,6 +148,21 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
         if (codeClash)
             ModelState.AddModelError(nameof(vm.Code), "A discount code with this name already exists for this event.");
 
+
+        var referrerId = string.IsNullOrEmpty(vm.ReferrerId) ? null : vm.ReferrerId;
+        if (referrerId != null)
+        {
+            var referrerExists = ctx.Referrers.Any(r => r.Id == referrerId && r.StoreId == CurrentStore.Id);
+            if (!referrerExists)
+                ModelState.AddModelError(nameof(vm.ReferrerId), "That referrer could not be found.");
+            
+            if (!vm.KickbackValue.HasValue || vm.KickbackValue.Value <= 0)
+                ModelState.AddModelError(nameof(vm.KickbackValue), "A kickback value is required when a referrer is attached.");
+            else if (vm.KickbackType == DiscountType.Percentage && vm.KickbackValue.Value > 100)
+                ModelState.AddModelError(nameof(vm.KickbackValue), "A percentage kickback can't exceed 100.");
+        }
+        
+
         if (!ModelState.IsValid)
         {
             vm.StoreId = CurrentStore.Id;
@@ -146,10 +170,13 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
             vm.EventTitle = ticketEvent.Title;
             vm.Currency = ticketEvent.Currency;
             vm.TicketTypeOptions = GetTicketTypeOptions(ctx, eventId);
+            vm.ReferrerOptions = GetReferrerOptions(ctx, CurrentStore.Id);
             return View("UpsertDiscountCode", vm);
         }
         var ticketTypeId = string.IsNullOrEmpty(vm.TicketTypeId) ? null : vm.TicketTypeId;
         DateTimeOffset? expiry = vm.ExpiryDate?.ToUniversalTime();
+        var kickbackType = referrerId != null ? vm.KickbackType : (DiscountType?)null;
+        var kickbackValue = referrerId != null ? vm.KickbackValue : null;
         if (string.IsNullOrEmpty(vm.Id))
         {
             ctx.DiscountCodes.Add(new DiscountCode
@@ -165,6 +192,9 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
                 ExpiryDate = expiry,
                 UsesCount = 0,
                 DiscountCodeState = vm.IsActive ? DiscountCodeState.Active : DiscountCodeState.Disabled,
+                ReferrerId = referrerId,
+                KickbackType = kickbackType,
+                KickbackValue = kickbackValue,
                 CreatedAt = DateTimeOffset.UtcNow
             });
         }
@@ -182,6 +212,9 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
             existingCode.MinQuantity = vm.MinQuantity;
             existingCode.ExpiryDate = expiry;
             existingCode.DiscountCodeState = vm.IsActive ? DiscountCodeState.Active : DiscountCodeState.Disabled;
+            existingCode.ReferrerId = referrerId;
+            existingCode.KickbackType = kickbackType;
+            existingCode.KickbackValue = kickbackValue;
         }
         await ctx.SaveChangesAsync();
         TempData[WellKnownTempData.SuccessMessage] = "Discount code saved successfully";
@@ -290,6 +323,16 @@ public class UITicketSettingsController(EmailService emailService, SimpleTicketS
             {
                 Id = c.Id,
                 Name = c.Name
+            }).ToList();
+    }
+
+    private static List<ReferrerOption> GetReferrerOptions(SimpleTicketSalesDbContext ctx, string storeId)
+    {
+        return ctx.Referrers.Where(r => r.StoreId == storeId && r.State != ReferrerState.Disabled).OrderBy(r => r.Name)
+            .Select(r => new ReferrerOption
+            {
+                Id = r.Id,
+                Name = r.Name
             }).ToList();
     }
 }
