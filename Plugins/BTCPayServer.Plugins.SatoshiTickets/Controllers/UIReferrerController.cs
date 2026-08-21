@@ -4,6 +4,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
+using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;
 using BTCPayServer.Data;
 using BTCPayServer.Plugins.SatoshiTickets.Data;
@@ -176,8 +177,8 @@ public class UIReferrerController(SimpleTicketSalesDbContextFactory dbContextFac
         return RedirectToAction(nameof(Referrers), new { storeId });
     }
 
-    [HttpPost("{referrerId}/record-payout")]
-    public async Task<IActionResult> RecordPayout(string storeId, string referrerId, string currency, string note)
+    [HttpGet("{referrerId}/record-payout")]
+    public async Task<IActionResult> RecordPayout(string storeId, string referrerId, string currency)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
@@ -186,14 +187,44 @@ public class UIReferrerController(SimpleTicketSalesDbContextFactory dbContextFac
         var referrer = ctx.Referrers.FirstOrDefault(r => r.Id == referrerId && r.StoreId == CurrentStore.Id);
         if (referrer == null) return NotFound();
 
-        var confirmedCredits = ctx.ReferralCredits.Where(c => c.ReferrerId == referrerId && c.StoreId == CurrentStore.Id
-                     && c.Status == ReferralCreditStatus.Confirmed && c.Currency == currency).ToList();
+        var totalAmount = ctx.ReferralCredits.Where(c => c.ReferrerId == referrerId && c.StoreId == CurrentStore.Id
+                     && c.Status == ReferralCreditStatus.Confirmed && c.Currency == currency).Sum(c => (decimal?)c.Amount) ?? 0;
+        if (totalAmount <= 0)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "There's no confirmed balance in that currency to pay out.";
+            return RedirectToAction(nameof(EditReferrer), new { storeId, referrerId });
+        }
+        return View(new RecordPayoutConfirmViewModel
+        {
+            StoreId = storeId,
+            ReferrerId = referrerId,
+            ReferrerName = referrer.Name,
+            Currency = currency,
+            Amount = totalAmount
+        });
+    }
+
+    [HttpPost("{referrerId}/record-payout")]
+    public async Task<IActionResult> RecordPayoutPost(string storeId, string referrerId, string currency, string note)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = dbContextFactory.CreateContext();
+        var referrer = ctx.Referrers.FirstOrDefault(r => r.Id == referrerId && r.StoreId == CurrentStore.Id);
+        if (referrer == null) return NotFound();
+
+        var confirmedCredits = ctx.ReferralCredits
+            .Where(c => c.ReferrerId == referrerId && c.StoreId == CurrentStore.Id
+                     && c.Status == ReferralCreditStatus.Confirmed && c.Currency == currency)
+            .ToList();
 
         if (!confirmedCredits.Any())
         {
             TempData[WellKnownTempData.ErrorMessage] = "There's no confirmed balance in that currency to pay out.";
             return RedirectToAction(nameof(EditReferrer), new { storeId, referrerId });
         }
+
         var totalAmount = confirmedCredits.Sum(c => c.Amount);
         var payout = new ReferralPayout
         {
@@ -205,16 +236,18 @@ public class UIReferrerController(SimpleTicketSalesDbContextFactory dbContextFac
             CreatedAt = DateTimeOffset.UtcNow
         };
         ctx.ReferralPayouts.Add(payout);
+        await ctx.SaveChangesAsync();
+
         foreach (var credit in confirmedCredits)
         {
             credit.Status = ReferralCreditStatus.PaidOut;
             credit.PayoutId = payout.Id;
         }
         await ctx.SaveChangesAsync();
+
         TempData[WellKnownTempData.SuccessMessage] = $"Recorded a payout of {totalAmount:N2} {currency} to {referrer.Name}.";
         return RedirectToAction(nameof(EditReferrer), new { storeId, referrerId });
     }
-
 
 
     [HttpGet("{referrerId}/toggle")]

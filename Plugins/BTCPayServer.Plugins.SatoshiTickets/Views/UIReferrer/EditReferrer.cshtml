@@ -61,7 +61,8 @@
 
 <div class="row mt-5">
     <div class="col-xl-8 col-xxl-constrain">
-        <h5 class="mb-3">Referral Credits</h5>
+        <h4 class="mb-3">Referral Credits</h4>
+
         @if (!Model.AvailableBalances.Any())
         {
             <p class="text-secondary mb-4">No confirmed referral credits yet - these show up automatically when a buyer uses this referrer's discount code.</p>
@@ -73,17 +74,10 @@
                 {
                     var formattedBalance = DisplayFormatter.Currency(balance.Amount, balance.Currency);
                     <div style="flex: 1 1 260px; min-width: 260px;">
-                        <p class="text-secondary mb-1">Available balance</p>
+                        <p class="text-secondary mb-1">Available balance · @balance.Currency</p>
                         <p class="h3 mb-3">@formattedBalance</p>
-                        <form asp-controller="UIReferrer" asp-action="RecordPayout" asp-route-storeId="@Model.StoreId" asp-route-referrerId="@Model.Id" method="post"
-                              class="d-flex gap-2"
-                              onsubmit="return confirm('Record a payout of @formattedBalance to @Model.Name? This marks the full balance as paid out.');">
-                            <input type="hidden" name="currency" value="@balance.Currency" />
-                            <input type="text" name="note" class="form-control form-control-sm" placeholder="Note (optional)" />
-                            <button type="submit" class="btn btn-sm btn-primary text-nowrap">
-                                <vc:icon symbol="done" /> Payout
-                            </button>
-                        </form>
+                        <a asp-controller="UIReferrer" asp-action="RecordPayout" asp-route-storeId="@Model.StoreId" asp-route-referrerId="@Model.Id" asp-route-currency="@balance.Currency"
+                           class="btn btn-sm btn-primary text-nowrap">Mark as Paid</a>
                     </div>
                 }
             </div>
@@ -92,7 +86,7 @@
         <h5 class="mt-4">Recent Activity</h5>
         @if (!Model.RecentCredits.Any())
         {
-            <p class="text-secondary">No referral credits recorded yet - these show up automatically when a buyer uses this referrer's discount code.</p>
+            <p class="text-secondary">No referral credits recorded yet.</p>
         }
         else
         {

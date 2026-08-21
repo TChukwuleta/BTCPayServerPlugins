@@ -1,0 +1,56 @@
+@using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@using BTCPayServer.Services
+@model RecordPayoutConfirmViewModel
+@inject DisplayFormatter DisplayFormatter
+@{
+    ViewData["Title"] = "Record payout";
+    Layout = "_LayoutSimple";
+}
+@section PageHeadContent {
+    <style>
+        body > .content-wrapper {
+            flex-grow: 1;
+            display: flex;
+        }
+
+            body > .content-wrapper, body > .content-wrapper > .container {
+                flex-grow: 1;
+            }
+
+        .modal-dialog .btn-close {
+            display: none;
+        }
+    </style>
+}
+@section PageFootContent {
+    <script>
+        delegate('click', '#ConfirmCancel', function() {
+            history.back();
+        })
+    </script>
+}
+<div class="modal position-static d-block" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-controller="UIReferrer" asp-action="RecordPayoutPost" asp-route-storeId="@Model.StoreId" asp-route-referrerId="@Model.ReferrerId" asp-route-currency="@Model.Currency" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title">Record payout</h5>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Record that you paid <strong>@Model.ReferrerName</strong> their full available balance of
+                        <strong>@DisplayFormatter.Currency(Model.Amount, Model.Currency)</strong>. This marks every confirmed credit in that currency as paid out.
+                    </p>
+                    <div class="form-group mb-0">
+                        <label for="Note" class="form-label">Note (optional)</label>
+                        <input type="text" name="note" id="Note" class="form-control" placeholder="e.g. Paid via bank transfer" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="ConfirmCancel" type="button" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Record payout</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

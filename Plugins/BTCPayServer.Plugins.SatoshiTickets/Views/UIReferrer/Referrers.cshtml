@@ -10,8 +10,8 @@
 <div class="sticky-header">
     <h2>Referrers</h2>
     <div class="d-flex gap-3">
-        <a asp-controller="UITicketSales" asp-action="List" asp-route-storeId="@Model.StoreId" class="btn btn-secondary" role="button">
-            <span class="fa fa-arrow-left me-1"></span> Back to Events
+        <a asp-controller="UIReferrerPublic" asp-action="Login" asp-route-storeId="@Model.StoreId" class="btn btn-secondary" role="button" target="_blank" rel="noopener">
+            Referrer Login
         </a>
         <a asp-controller="UIReferrer" asp-action="CreateReferrer" asp-route-storeId="@Model.StoreId" class="btn btn-primary" role="button">Invite Referrer</a>
     </div>

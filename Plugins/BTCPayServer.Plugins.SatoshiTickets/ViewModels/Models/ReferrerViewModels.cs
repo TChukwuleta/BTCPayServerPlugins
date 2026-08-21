@@ -112,3 +112,12 @@ public class ReferrerDashboardViewModel : BaseSimpleTicketPublicViewModel
     public List<ReferrerBalanceViewModel> AvailableBalances { get; set; } = new();
     public List<ReferralCreditActivityViewModel> RecentCredits { get; set; } = new();
 }
+
+public class RecordPayoutConfirmViewModel
+{
+    public string StoreId { get; set; }
+    public string ReferrerId { get; set; }
+    public string Currency { get; set; }
+    public string ReferrerName { get; set; }
+    public decimal Amount { get; set; }
+}
