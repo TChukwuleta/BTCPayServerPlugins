@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Extensions;
+using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Controllers;
 using BTCPayServer.Data;
@@ -354,7 +355,21 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
                 HttpContext.Session.SetObject(sessionKey, orderViewModel);
             }
         }
-        var invoice = await CreateInvoice(storeData, order, ticketEvent.Currency, Request.GetAbsoluteRoot(), ticketEvent.RedirectUrl ?? string.Empty);
+        InvoiceEntity invoice;
+        try
+        {
+            invoice = await CreateInvoice(storeData, order, ticketEvent.Currency, Request.GetAbsoluteRoot(), ticketEvent.RedirectUrl ?? string.Empty);
+        }
+        catch (BitpayHttpException ex)
+        {
+            TempData.SetStatusMessageModel(new StatusMessageModel
+            {
+                Html = ex.Message.Replace("\n", "<br />", StringComparison.OrdinalIgnoreCase),
+                Severity = StatusMessageModel.StatusSeverity.Error,
+                AllowDismiss = true
+            });
+            return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, txnId = model.TxnId });
+        }
         order.InvoiceId = invoice.Id;
         order.InvoiceStatus = invoice.Status.ToString();
         ctx.Orders.Update(order);
