@@ -2,7 +2,9 @@
 @using BTCPayServer.Abstractions.Models
 @using BTCPayServer.Plugins.SatoshiTickets.Data
 @using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@using BTCPayServer.Services
 @model ReferrerListViewModel
+@inject DisplayFormatter DisplayFormatter
 @{
     ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketReferrers), "Referrers") { ActiveCategory = nameof(SatoshiTicketNavPages) });
 }
@@ -10,19 +12,14 @@
 <div class="sticky-header">
     <h2>Referrers</h2>
     <div class="d-flex gap-3">
-        <a asp-controller="UITicketSales" asp-action="List" asp-route-storeId="@Model.StoreId" class="btn btn-secondary" role="button">
-            <span class="fa fa-arrow-left me-1"></span> Back to Events
+        <a asp-controller="UIReferrerPublic" asp-action="Login" asp-route-storeId="@Model.StoreId" class="btn btn-secondary" role="button" target="_blank" rel="noopener">
+            Referrer Login
         </a>
         <a asp-controller="UIReferrer" asp-action="CreateReferrer" asp-route-storeId="@Model.StoreId" class="btn btn-primary" role="button">Invite Referrer</a>
     </div>
 </div>
 
 <partial name="_StatusMessage" />
-
-<p class="text-secondary">
-    A referrer is an affiliate or promoter who gets their own referral discount code(s) and their own login to check their credit balance. 
-    Inviting one emails them a link to set their password - they don't get a BTCPayServer account.
-</p>
 
 @if (Model.Referrers != null && Model.Referrers.Any())
 {
@@ -52,7 +49,7 @@
                             {
                                 @foreach (var balance in referrer.AvailableBalances)
                                 {
-                                    <div>@balance.Amount.ToString("N2") @balance.Currency</div>
+                                    <div>@DisplayFormatter.Currency(balance.Amount, balance.Currency)</div>
                                 }
                             }
 
@@ -86,8 +83,7 @@
                                 }
                                 <a asp-controller="UIReferrer" asp-action="DeleteReferrer"
                                    asp-route-storeId="@Model.StoreId" asp-route-referrerId="@referrer.Id"
-                                   class="text-danger"
-                                   onclick="return confirm('Delete referrer @referrer.Name? This cannot be undone.');">Delete</a>
+                                   class="text-danger">Delete</a>
                             </div>
                         </td>
                     </tr>

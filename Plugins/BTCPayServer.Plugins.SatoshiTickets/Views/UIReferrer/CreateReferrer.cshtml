@@ -16,9 +16,6 @@
 
 <div class="row">
     <div class="col-xl-8 col-xxl-constrain">
-        <p class="text-secondary">
-            This sends the referrer an email with a link to set their own password. They'll use that email  password to log in and check their credit balance - no BTCPayServer account is created for them.
-        </p>
         <form asp-controller="UIReferrer" asp-action="CreateReferrer" asp-route-storeId="@Model.StoreId" method="post">
             <input type="hidden" asp-for="StoreId" />
 
