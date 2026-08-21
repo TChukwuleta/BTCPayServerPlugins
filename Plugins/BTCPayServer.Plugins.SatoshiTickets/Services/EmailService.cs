@@ -167,8 +167,19 @@ Click the link to view your tickets: {ticket.QRCodeLink}";
         return sendBultEmail.IsSuccessful;
     }
 
-        public async Task<EmailDispatchResult> SendReferrerInvitationEmail(string storeId, string toEmail, string referrerName, string storeName, string acceptUrl)
+    public async Task<EmailDispatchResult> SendReferrerInvitationEmail(string storeId, string toEmail, string referrerName, string storeName, string acceptUrl)
     {
+        InternetAddress address;
+        try
+        {
+            address = InternetAddress.Parse(toEmail);
+        }
+        catch (Exception ex)
+        {
+            _logs.PayServer.LogWarning(ex, $"Invalid referrer email, invitation not sent: {toEmail}");
+            return new EmailDispatchResult { IsSuccessful = false, FailedRecipients = { toEmail } };
+        }
+
         var body = @$"Hi {referrerName},
 
 You've been invited to the {storeName} referral program. Set your password to activate your account and start checking your referral credit balance:
@@ -178,14 +189,14 @@ You've been invited to the {storeName} referral program. Set your password to ac
 This link expires in 7 days.";
 
         var recipients = new List<EmailRecipient>
+    {
+        new()
         {
-            new ()
-            {
-                Address = InternetAddress.Parse(toEmail),
-                Subject = $"You're invited: {storeName} referral program",
-                MessageText = body
-            }
-        };
+            Address = address,
+            Subject = $"You're invited: {storeName} referral program",
+            MessageText = body
+        }
+    };
         return await SendBulkEmail(storeId, recipients);
     }
 

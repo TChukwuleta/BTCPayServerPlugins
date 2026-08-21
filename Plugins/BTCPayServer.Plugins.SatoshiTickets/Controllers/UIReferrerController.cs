@@ -12,11 +12,7 @@ using BTCPayServer.Plugins.SatoshiTickets.Services;
 using BTCPayServer.Plugins.SatoshiTickets.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Routing;
-using Microsoft.CodeAnalysis.Differencing;
-using NLog.Layouts;
-using static BTCPayServer.Models.InvoicingModels.CheckoutModel;
-using static BTCPayServer.Plugins.Monetization.Views.SelectExistingOfferingModalViewModel;
+using Microsoft.EntityFrameworkCore;
 
 namespace BTCPayServer.Plugins.SatoshiTickets;
 
@@ -119,8 +115,7 @@ public class UIReferrerController(SimpleTicketSalesDbContextFactory dbContextFac
             Email = normalizedEmail,
             State = ReferrerState.Pending,
             CreatedAt = DateTimeOffset.UtcNow
-        }
-        ;
+        };
         ctx.Referrers.Add(referrer);
         await ctx.SaveChangesAsync();
         var emailSent = await SendInvitation(ctx, referrer, storeId);
@@ -214,23 +209,12 @@ public class UIReferrerController(SimpleTicketSalesDbContextFactory dbContextFac
         var referrer = ctx.Referrers.FirstOrDefault(r => r.Id == referrerId && r.StoreId == CurrentStore.Id);
         if (referrer == null) return NotFound();
 
-        var confirmedCredits = ctx.ReferralCredits
-            .Where(c => c.ReferrerId == referrerId && c.StoreId == CurrentStore.Id
-                     && c.Status == ReferralCreditStatus.Confirmed && c.Currency == currency)
-            .ToList();
-
-        if (!confirmedCredits.Any())
-        {
-            TempData[WellKnownTempData.ErrorMessage] = "There's no confirmed balance in that currency to pay out.";
-            return RedirectToAction(nameof(EditReferrer), new { storeId, referrerId });
-        }
-
-        var totalAmount = confirmedCredits.Sum(c => c.Amount);
+        await using var transaction = await ctx.Database.BeginTransactionAsync();
         var payout = new ReferralPayout
         {
             StoreId = CurrentStore.Id,
             ReferrerId = referrerId,
-            Amount = totalAmount,
+            Amount = 0,
             Currency = currency,
             Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
             CreatedAt = DateTimeOffset.UtcNow
@@ -238,20 +222,53 @@ public class UIReferrerController(SimpleTicketSalesDbContextFactory dbContextFac
         ctx.ReferralPayouts.Add(payout);
         await ctx.SaveChangesAsync();
 
-        foreach (var credit in confirmedCredits)
-        {
-            credit.Status = ReferralCreditStatus.PaidOut;
-            credit.PayoutId = payout.Id;
-        }
-        await ctx.SaveChangesAsync();
+        var claimed = await ctx.ReferralCredits.Where(c => c.ReferrerId == referrerId && c.StoreId == CurrentStore.Id
+                     && c.Status == ReferralCreditStatus.Confirmed && c.Currency == currency)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, ReferralCreditStatus.PaidOut).SetProperty(c => c.PayoutId, payout.Id));
 
+        if (claimed == 0)
+        {
+            await transaction.RollbackAsync();
+            TempData[WellKnownTempData.ErrorMessage] = "There's no confirmed balance in that currency to pay out.";
+            return RedirectToAction(nameof(EditReferrer), new { storeId, referrerId });
+        }
+        var totalAmount = await ctx.ReferralCredits.Where(c => c.PayoutId == payout.Id).SumAsync(c => c.Amount);
+        payout.Amount = totalAmount;
+        await ctx.SaveChangesAsync();
+        await transaction.CommitAsync();
         TempData[WellKnownTempData.SuccessMessage] = $"Recorded a payout of {totalAmount:N2} {currency} to {referrer.Name}.";
         return RedirectToAction(nameof(EditReferrer), new { storeId, referrerId });
     }
 
-
     [HttpGet("{referrerId}/toggle")]
     public async Task<IActionResult> ToggleReferrer(string storeId, string referrerId)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = dbContextFactory.CreateContext();
+        var referrer = ctx.Referrers.FirstOrDefault(r => r.Id == referrerId && r.StoreId == CurrentStore.Id);
+        if (referrer == null) return NotFound();
+
+        if (referrer.State == ReferrerState.Pending)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "This referrer hasn't accepted their invitation yet.";
+            return RedirectToAction(nameof(Referrers), new { storeId });
+        }
+
+        var activating = referrer.State != ReferrerState.Active;
+        var action = activating ? "Activate" : "Disable";
+        return View("Confirm", new ConfirmModel($"{action} referrer",
+            $"<strong>{referrer.Name}</strong> will be {(activating ? "activated" : "disabled")}. Are you sure?", action)
+        {
+            ActionName = nameof(ToggleReferrerPost),
+            ActionValues = new { storeId, referrerId },
+            Antiforgery = true
+        });
+    }
+
+    [HttpPost("{referrerId}/toggle")]
+    public async Task<IActionResult> ToggleReferrerPost(string storeId, string referrerId)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
@@ -286,6 +303,30 @@ public class UIReferrerController(SimpleTicketSalesDbContextFactory dbContextFac
             TempData[WellKnownTempData.ErrorMessage] = "This referrer has already activated their account.";
             return RedirectToAction(nameof(Referrers), new { storeId });
         }
+
+        return View("Confirm", new ConfirmModel("Resend invitation",
+            $"A fresh invitation link will be emailed to <strong>{referrer.Email}</strong>, replacing the current 7-day window.", "Resend invitation")
+        {
+            ActionName = nameof(ResendInvitationPost),
+            ActionValues = new { storeId, referrerId }
+        });
+    }
+
+    [HttpPost("{referrerId}/resend-invitation")]
+    public async Task<IActionResult> ResendInvitationPost(string storeId, string referrerId)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = dbContextFactory.CreateContext();
+        var referrer = ctx.Referrers.FirstOrDefault(r => r.Id == referrerId && r.StoreId == CurrentStore.Id);
+        if (referrer == null) return NotFound();
+
+        if (referrer.State != ReferrerState.Pending)
+        {
+            TempData[WellKnownTempData.ErrorMessage] = "This referrer has already activated their account.";
+            return RedirectToAction(nameof(Referrers), new { storeId });
+        }
         var emailSent = await SendInvitation(ctx, referrer, storeId);
         TempData[emailSent ? WellKnownTempData.SuccessMessage : WellKnownTempData.ErrorMessage] = emailSent
                    ? $"Invitation resent to {referrer.Email}."
@@ -295,6 +336,24 @@ public class UIReferrerController(SimpleTicketSalesDbContextFactory dbContextFac
 
     [HttpGet("{referrerId}/delete")]
     public async Task<IActionResult> DeleteReferrer(string storeId, string referrerId)
+    {
+        if (string.IsNullOrEmpty(CurrentStore.Id))
+            return NotFound();
+
+        await using var ctx = dbContextFactory.CreateContext();
+        var referrer = ctx.Referrers.FirstOrDefault(r => r.Id == referrerId && r.StoreId == CurrentStore.Id);
+        if (referrer == null) return NotFound();
+
+        return View("Confirm", new ConfirmModel("Delete referrer",
+            $"The referrer <strong>{referrer.Name}</strong> will be permanently deleted. This cannot be undone.", "Delete")
+        {
+            ActionName = nameof(DeleteReferrerPost),
+            ActionValues = new { storeId, referrerId }
+        });
+    }
+
+    [HttpPost("{referrerId}/delete")]
+    public async Task<IActionResult> DeleteReferrerPost(string storeId, string referrerId)
     {
         if (string.IsNullOrEmpty(CurrentStore.Id))
             return NotFound();
@@ -337,6 +396,7 @@ public class UIReferrerController(SimpleTicketSalesDbContextFactory dbContextFac
             Amount = p.Amount,
             Currency = p.Currency,
             Note = p.Note,
-            CreatedAt = p.CreatedAt}).ToList();
+            CreatedAt = p.CreatedAt
+        }).ToList();
     }
 }

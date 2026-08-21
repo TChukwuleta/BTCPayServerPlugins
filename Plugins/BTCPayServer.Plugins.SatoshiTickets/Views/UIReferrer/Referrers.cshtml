@@ -2,7 +2,9 @@
 @using BTCPayServer.Abstractions.Models
 @using BTCPayServer.Plugins.SatoshiTickets.Data
 @using BTCPayServer.Plugins.SatoshiTickets.ViewModels
+@using BTCPayServer.Services
 @model ReferrerListViewModel
+@inject DisplayFormatter DisplayFormatter
 @{
     ViewData.SetLayoutModel(new LayoutModel(nameof(SatoshiTicketNavPages.SatoshiTicketReferrers), "Referrers") { ActiveCategory = nameof(SatoshiTicketNavPages) });
 }
@@ -47,7 +49,7 @@
                             {
                                 @foreach (var balance in referrer.AvailableBalances)
                                 {
-                                    <div>@balance.Amount.ToString("N2") @balance.Currency</div>
+                                    <div>@DisplayFormatter.Currency(balance.Amount, balance.Currency)</div>
                                 }
                             }
 
@@ -81,8 +83,7 @@
                                 }
                                 <a asp-controller="UIReferrer" asp-action="DeleteReferrer"
                                    asp-route-storeId="@Model.StoreId" asp-route-referrerId="@referrer.Id"
-                                   class="text-danger"
-                                   onclick="return confirm('Delete referrer @referrer.Name? This cannot be undone.');">Delete</a>
+                                   class="text-danger">Delete</a>
                             </div>
                         </td>
                     </tr>
