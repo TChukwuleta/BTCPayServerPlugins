@@ -187,6 +187,8 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicT
                     CreateReferralCreditIfApplicable(ctx, discountCode, order);
                 }
             }
+            ctx.Orders.Update(order);
+            await ctx.SaveChangesAsync();
             var isEmailConfigured = await _emailService.IsEmailSettingsConfigured(invoice.StoreId);
             if (isEmailConfigured)
             {
@@ -197,8 +199,6 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicT
                 catch { result.Write($"Failed to send email for Order Id: {order.Id}.", InvoiceEventData.EventSeverity.Error); }
             }
         }
-        ctx.Orders.Update(order);
-        await ctx.SaveChangesAsync();
         await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
     }
 
