@@ -199,6 +199,7 @@ public class UIReferrerController(SimpleTicketSalesDbContextFactory dbContextFac
         });
     }
 
+
     [HttpPost("{referrerId}/record-payout")]
     public async Task<IActionResult> RecordPayoutPost(string storeId, string referrerId, string currency, string note)
     {
@@ -209,7 +210,6 @@ public class UIReferrerController(SimpleTicketSalesDbContextFactory dbContextFac
         var referrer = ctx.Referrers.FirstOrDefault(r => r.Id == referrerId && r.StoreId == CurrentStore.Id);
         if (referrer == null) return NotFound();
 
-        await using var transaction = await ctx.Database.BeginTransactionAsync();
         var payout = new ReferralPayout
         {
             StoreId = CurrentStore.Id,
@@ -228,17 +228,19 @@ public class UIReferrerController(SimpleTicketSalesDbContextFactory dbContextFac
 
         if (claimed == 0)
         {
-            await transaction.RollbackAsync();
+            ctx.ReferralPayouts.Remove(payout);
+            await ctx.SaveChangesAsync();
             TempData[WellKnownTempData.ErrorMessage] = "There's no confirmed balance in that currency to pay out.";
             return RedirectToAction(nameof(EditReferrer), new { storeId, referrerId });
         }
+
         var totalAmount = await ctx.ReferralCredits.Where(c => c.PayoutId == payout.Id).SumAsync(c => c.Amount);
         payout.Amount = totalAmount;
         await ctx.SaveChangesAsync();
-        await transaction.CommitAsync();
         TempData[WellKnownTempData.SuccessMessage] = $"Recorded a payout of {totalAmount:N2} {currency} to {referrer.Name}.";
         return RedirectToAction(nameof(EditReferrer), new { storeId, referrerId });
     }
+
 
     [HttpGet("{referrerId}/toggle")]
     public async Task<IActionResult> ToggleReferrer(string storeId, string referrerId)
