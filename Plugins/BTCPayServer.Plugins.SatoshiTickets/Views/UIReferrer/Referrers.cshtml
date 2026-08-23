@@ -70,7 +70,7 @@
                         </td>
                         <td class="text-end">
                             <div class="d-inline-flex align-items-center gap-3">
-                                <a asp-controller="UIReferrer" asp-action="EditReferrer" asp-route-storeId="@Model.StoreId" asp-route-referrerId="@referrer.Id">Edit</a>
+                                <a asp-controller="UIReferrer" asp-action="EditReferrer" asp-route-storeId="@Model.StoreId" asp-route-referrerId="@referrer.Id">Details</a>
                                 @if (referrer.State == ReferrerState.Pending)
                                 {
                                     <a asp-controller="UIReferrer" asp-action="ResendInvitation" asp-route-storeId="@Model.StoreId" asp-route-referrerId="@referrer.Id">Resend Invitation</a>
