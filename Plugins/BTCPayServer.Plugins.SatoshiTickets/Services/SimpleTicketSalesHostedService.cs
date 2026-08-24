@@ -186,18 +186,8 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicT
                 var discountCode = ctx.DiscountCodes.FirstOrDefault(d => d.Id == order.DiscountCodeId && d.StoreId == order.StoreId && d.EventId == order.EventId);
                 if (discountCode != null)
                 {
-                    var cart = order.Tickets.GroupBy(t => t.TicketTypeId)
-                        .Select(g => new DiscountCartLine(g.Key, g.First().Amount, g.Count())).ToList();
-
-                    var consumeResult = await _discountCodeService.Consume(order.StoreId, order.EventId, discountCode.Code, cart);
-                    if (consumeResult.IsValid)
-                    {
-                        CreateReferralCreditIfApplicable(ctx, discountCode, order);
-                    }
-                    else
-                    {
-                        result.Write($"Discount code {discountCode.Code} could not be consumed on settlement: {consumeResult.ErrorMessage}", InvoiceEventData.EventSeverity.Warning);
-                    }
+                    discountCode.UsesCount += 1;
+                    CreateReferralCreditIfApplicable(ctx, discountCode, order);
                 }
             }
             ctx.Orders.Update(order);
