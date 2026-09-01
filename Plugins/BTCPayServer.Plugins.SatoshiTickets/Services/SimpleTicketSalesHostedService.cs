@@ -136,6 +136,7 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicT
                     bool? success = invoice.Status switch
                     {
                         InvoiceStatus.Settled => true,
+                        InvoiceStatus.Expired when invoice.ExceptionStatus is InvoiceExceptionStatus.PaidLate or InvoiceExceptionStatus.PaidOver => true,
                         InvoiceStatus.Invalid or InvoiceStatus.Expired => false,
                         _ => null
                     };
