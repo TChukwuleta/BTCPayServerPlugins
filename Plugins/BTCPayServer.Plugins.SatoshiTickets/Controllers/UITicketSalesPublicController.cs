@@ -392,8 +392,9 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         var tickets = order.Tickets.AsEnumerable();
         if (!string.IsNullOrEmpty(txnNumber))
         {
-            if (order.Tickets.FirstOrDefault(c => c.TxnNumber == txnNumber) == null) return NotFound();
-            tickets = order.Tickets.Where(c => c.TxnNumber == txnNumber);
+            var anchorTicket = order.Tickets.FirstOrDefault(c => c.TxnNumber == txnNumber);
+            if (anchorTicket == null) return NotFound();
+            tickets = order.Tickets.Where(c => c.Email == anchorTicket.Email);
         }
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
         if (ticketEvent == null || !tickets.Any()) return NotFound();
