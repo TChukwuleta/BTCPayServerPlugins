@@ -394,7 +394,7 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         {
             var anchorTicket = order.Tickets.FirstOrDefault(c => c.TxnNumber == txnNumber);
             if (anchorTicket == null) return NotFound();
-            tickets = order.Tickets.Where(c => c.Email == anchorTicket.Email);
+            tickets = order.Tickets.Where(c => string.Equals(c.Email, anchorTicket.Email, StringComparison.OrdinalIgnoreCase));
         }
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.StoreId == storeId && c.Id == eventId);
         if (ticketEvent == null || !tickets.Any()) return NotFound();

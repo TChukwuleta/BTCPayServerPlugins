@@ -99,7 +99,7 @@ Click the link to view your tickets: {ticket.QRCodeLink}";
     public async Task SendTicketRegistrationEmail(string storeId, IEnumerable<Ticket> tickets, Event ticketEvent)
     {
         var recipients = new List<EmailRecipient>();
-        foreach (var ticket in tickets)
+        foreach (var ticket in tickets.DistinctBy(t => t.Email?.Trim(), StringComparer.OrdinalIgnoreCase))
         {
             string emailBody = ticketEvent.EmailBody
                 .Replace("{{Title}}", ticketEvent.Title)

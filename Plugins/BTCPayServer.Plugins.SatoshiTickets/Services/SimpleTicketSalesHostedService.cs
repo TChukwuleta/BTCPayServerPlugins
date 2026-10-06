@@ -96,7 +96,7 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicT
 
                 var settledTickets = ctx.Orders.Include(o => o.Tickets).Where(o => o.EventId == ticketEvent.Id
                              && o.StoreId == ticketEvent.StoreId && o.PaymentStatus == Data.TransactionStatus.Settled.ToString())
-                    .SelectMany(o => o.Tickets).ToList().DistinctBy(t => t.Email).ToList();
+                    .SelectMany(o => o.Tickets).ToList().DistinctBy(t => t.Email, StringComparer.OrdinalIgnoreCase).ToList();
 
                 if (!settledTickets.Any()) continue;
 
