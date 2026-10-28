@@ -27,6 +27,7 @@ using Microsoft.EntityFrameworkCore;
 using NBitcoin;
 using NBitcoin.DataEncoders;
 using Newtonsoft.Json.Linq;
+using NicolasDorier.RateLimits;
 using QRCoder;
 using TransactionStatus = BTCPayServer.Plugins.SatoshiTickets.Data.TransactionStatus;
 
@@ -40,7 +41,6 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         StoreRepository storeRepo,
         EmailService emailService,
         TicketService ticketService,
-        InvoiceRepository invoiceRepository,
         UIInvoiceController invoiceController,
         DiscountCodeService discountCodeService,
         SimpleTicketSalesDbContextFactory dbContextFactory) : Controller
@@ -109,6 +109,10 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
                                 EventId = t.EventId
                             }).ToList();
 
+        var pending = PendingPerType(ctx, storeId, eventId, null, HoldWindow(storeData));
+        foreach (var t in ticketTypes)
+            t.QuantityAvailable -= pending.GetValueOrDefault(t.TicketTypeId);
+
         return View(new EventTicketPageViewModel
         {
             StoreId = storeId,
@@ -137,12 +141,20 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         if (!ValidateEvent(ctx, storeId, eventId))
             return NotFound();
 
+        var storeData = await storeRepo.FindStore(storeId);
+        if (storeData == null) return NotFound();
+
         var ticketTypes = ctx.TicketTypes.Where(c => c.EventId == eventId).ToDictionary(t => t.Id);
-        foreach (var ticket in model.Tickets.Where(t => t.Quantity > 0))
+        var requested = RequestedPerType(model.Tickets, ticketTypes);
+        if (requested is null)
+            return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
+        var soldOut = FirstSoldOut(requested, ticketTypes, PendingPerType(ctx, storeId, eventId, null, HoldWindow(storeData)));
+        if (soldOut is not null)
         {
-            if (!ticketTypes.TryGetValue(ticket.TicketTypeId, out var tt) || tt.Quantity - tt.QuantitySold < ticket.Quantity)
-                return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
+            TempData[WellKnownTempData.ErrorMessage] = $"Not enough tickets left for {soldOut}. Someone may be finishing a purchase, try again in a few minutes.";
+            return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
         }
+
         string txnId = Encoders.Base58.EncodeData(RandomUtils.GetBytes(10));
         var sessionKey = $"{SessionKeyOrder}{eventId}_{txnId}";
         var newOrder = new TicketOrderViewModel
@@ -151,7 +163,7 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
             EventId = eventId,
             StoreId = storeId,
             IsStepOneComplete = true,
-            Tickets = model.Tickets
+            Tickets = model.Tickets.Where(t => t.Quantity > 0).ToList()
         };
         var referralKey = $"{SessionKeyReferral}{eventId}";
         var referralCode = HttpContext.Session.GetString(referralKey);
@@ -266,41 +278,46 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         if (!ValidateEvent(ctx, storeId, eventId))
             return NotFound();
 
-        foreach (var ticket in orderViewModel.Tickets)
+        var order = ctx.Orders.FirstOrDefault(o => o.StoreId == storeId && o.EventId == eventId && o.TxnId == model.TxnId);
+        if (!string.IsNullOrEmpty(order?.InvoiceId))
+            return RedirectToAction(nameof(UIInvoiceController.Checkout), "UIInvoice", new { invoiceId = order.InvoiceId });
+
+        var requested = RequestedPerType(orderViewModel.Tickets, ticketTypes);
+        var soldOut = requested is null ? "the selected tickets" : FirstSoldOut(requested, ticketTypes, PendingPerType(ctx, storeId, eventId, model.TxnId, HoldWindow(storeData)));
+        if (soldOut is not null)
         {
-            if (!ticketTypes.TryGetValue(ticket.TicketTypeId, out var tt) || tt.Quantity - tt.QuantitySold < ticket.Quantity)
-            {
-                TempData[WellKnownTempData.ErrorMessage] = $"Quantity for {ticket.TicketTypeName} is more than number of tickets available";
-                return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
-            }
+            TempData[WellKnownTempData.ErrorMessage] = $"Not enough tickets left for {soldOut}";
+            return RedirectToAction(nameof(EventTicket), new { storeId, eventId });
         }
         orderViewModel.ContactInfo = model.ContactInfo;
         orderViewModel.IsStepTwoComplete = true; // Move to Payment step
         HttpContext.Session.SetObject(sessionKey, orderViewModel);
-        var now = DateTimeOffset.UtcNow;
-        var tickets = new List<Ticket>();
-        var order = new Order
-        {
-            TxnId = model.TxnId,
-            EventId = eventId,
-            StoreId = storeId,
-            Currency = ticketEvent.Currency,
-            PaymentStatus = TransactionStatus.New.ToString(),
-            CreatedAt = now,
-            TotalAmount = 0,
-        };
-        ctx.Orders.Add(order);
-        await ctx.SaveChangesAsync();
-
         var deliveryOption = Request.Form["ticketDeliveryOption"].ToString();
         var sendIndividually = deliveryOption == "individual";
-        var contactIndex = 0;
         var expectedTickets = orderViewModel.Tickets.Sum(t => t.Quantity);
         if (model.ContactInfo.Count != expectedTickets)
         {
             TempData[WellKnownTempData.ErrorMessage] = "Contact information does not match the number of tickets selected";
             return RedirectToAction(nameof(EventContactDetails), new { storeId, eventId, txnId = model.TxnId });
         }
+        var now = DateTimeOffset.UtcNow;
+        var tickets = new List<Ticket>();
+        if (order == null)
+        {
+            order = new Order
+            {
+                TxnId = model.TxnId,
+                EventId = eventId,
+                StoreId = storeId,
+                Currency = ticketEvent.Currency,
+                PaymentStatus = TransactionStatus.New.ToString(),
+                CreatedAt = now,
+                TotalAmount = 0,
+            };
+            ctx.Orders.Add(order);
+            await ctx.SaveChangesAsync();
+        }
+        var contactIndex = 0;
         foreach (var ticketRequest in orderViewModel.Tickets)
         {
             var ticketType = ticketTypes[ticketRequest.TicketTypeId];
@@ -463,6 +480,44 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
         return tickets.Select(t => new DiscountCartLine(t.TicketTypeId, t.Price, t.Quantity)).ToList();
     }
 
+    private static Dictionary<string, int> RequestedPerType(IEnumerable<TicketSelectionViewModel> lines, Dictionary<string, TicketType> ticketTypes)
+    {
+        var requested = new Dictionary<string, int>();
+        foreach (var line in lines ?? Enumerable.Empty<TicketSelectionViewModel>())
+        {
+            if (line.Quantity == 0) continue;
+            if (line.Quantity < 0 || line.TicketTypeId is null || !ticketTypes.ContainsKey(line.TicketTypeId)) return null;
+            requested[line.TicketTypeId] = requested.GetValueOrDefault(line.TicketTypeId) + line.Quantity;
+        }
+        return requested.Count == 0 ? null : requested;
+    }
+
+    private static Dictionary<string, int> PendingPerType(SimpleTicketSalesDbContext ctx, string storeId, string eventId, string excludeTxnId, TimeSpan holdFor)
+    {
+        var since = DateTimeOffset.UtcNow - holdFor;
+        return ctx.Orders.AsNoTracking()
+            .Where(o => o.StoreId == storeId && o.EventId == eventId && o.InvoiceId != null
+                        && o.PaymentStatus == TransactionStatus.New.ToString() && o.TxnId != excludeTxnId
+                        && o.CreatedAt >= since)
+            .SelectMany(o => o.Tickets)
+            .GroupBy(t => t.TicketTypeId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionary(x => x.Key, x => x.Count);
+    }
+
+    private static TimeSpan HoldWindow(BTCPayServer.Data.StoreData store) => store.GetStoreBlob().InvoiceExpiration + TimeSpan.FromMinutes(1);
+
+    private static string FirstSoldOut(Dictionary<string, int> requested, Dictionary<string, TicketType> ticketTypes, Dictionary<string, int> pending)
+    {
+        foreach (var (id, qty) in requested)
+        {
+            var tt = ticketTypes[id];
+            if (tt.Quantity - tt.QuantitySold - pending.GetValueOrDefault(id) < qty)
+                return tt.Name;
+        }
+        return null;
+    }
+
     private static IReadOnlyList<DiscountCartLine> BuildCartFromDb(IEnumerable<TicketSelectionViewModel> tickets, Dictionary<string, TicketType> ticketTypes)
     {
         return tickets.Where(t => ticketTypes.ContainsKey(t.TicketTypeId))
@@ -500,6 +555,7 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
     }
 
     [HttpPost("{eventId}/check-in/{token}/verify-pin")]
+    [RateLimitsFilter(ZoneLimits.Login, Scope = RateLimitsScope.RemoteAddress)]
     public async Task<IActionResult> VerifyPin(string storeId, string eventId, string token, string pin)
     {
         await using var ctx = dbContextFactory.CreateContext();
@@ -577,16 +633,6 @@ public class UITicketSalesPublicController(UriResolver uriResolver,
     private async Task<InvoiceEntity> CreateInvoice(BTCPayServer.Data.StoreData store, Order order, string currency, string url, string redirectUrl)
     {
         var ticketSalesSearchTerm = $"{SimpleTicketSalesHostedService.TICKET_SALES_PREFIX}{order.TxnId}";
-        var matchedExistingInvoices = await invoiceRepository.GetInvoices(new InvoiceQuery()
-        {
-            TextSearch = ticketSalesSearchTerm,
-            StoreId = new[] { store.Id }
-        });
-        matchedExistingInvoices = matchedExistingInvoices.Where(entity => entity.GetInternalTags(ticketSalesSearchTerm).Any(s => s == order.TxnId.ToString())).ToArray();
-
-        var settledInvoice = matchedExistingInvoices.LastOrDefault(entity => new[] { "settled", "processing", "confirmed", "paid", "complete" }.Contains(entity.GetInvoiceState().Status.ToString().ToLower()));
-        if (settledInvoice != null) return settledInvoice;
-
         var invoiceRequest = new CreateInvoiceRequest()
         {
             Amount = order.TotalAmount,

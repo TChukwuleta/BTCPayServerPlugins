@@ -153,22 +153,28 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicT
     private async Task RegisterTicketTransaction(InvoiceEntity invoice, string orderId, bool success)
     {
         await using var ctx = _dbContextFactory.CreateContext();
-        var order = ctx.Orders.Include(c => c.Tickets).FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id);
+        var invoiceOrderId = invoice.Metadata.OrderId;
+        var order = ctx.Orders.Include(c => c.Tickets).FirstOrDefault(c => c.StoreId == invoice.StoreId && c.InvoiceId == invoice.Id && c.Id == invoiceOrderId);
         if (order == null) return;
 
         var result = new InvoiceLogs();
         result.Write($"Invoice status: {invoice.Status.ToString().ToLower()}", InvoiceEventData.EventSeverity.Info);
-        if (order != null && order.PaymentStatus != Data.TransactionStatus.New.ToString())
+        var currentStatus = order.PaymentStatus;
+        if (currentStatus == Data.TransactionStatus.Settled.ToString() || (!success && currentStatus != Data.TransactionStatus.New.ToString()))
         {
             result.Write("Transaction has previously been acted on", InvoiceEventData.EventSeverity.Info);
             await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
             return;
         }
+        var newStatus = success
+            ? Data.TransactionStatus.Settled.ToString()
+            : invoice.Status == InvoiceStatus.Invalid ? Data.TransactionStatus.Invalid.ToString() : Data.TransactionStatus.Expired.ToString();
+
         var ticketEvent = ctx.Events.FirstOrDefault(c => c.Id == order.EventId && c.StoreId == order.StoreId);
         order.PurchaseDate = DateTime.UtcNow;
         order.InvoiceStatus = invoice.Status.ToString().ToLower();
-        order.PaymentStatus = success ? Data.TransactionStatus.Settled.ToString() : Data.TransactionStatus.Expired.ToString();
-        order.Tickets.ToList().ForEach(c => c.PaymentStatus = success ? Data.TransactionStatus.Settled.ToString() : Data.TransactionStatus.Expired.ToString());
+        order.PaymentStatus = newStatus;
+        order.Tickets.ToList().ForEach(c => c.PaymentStatus = newStatus);
         result.Write($"New ticket payment completed for Event: {ticketEvent?.Title}, Order Id: {order.Id}, Order Txn Id: {order.TxnId}", InvoiceEventData.EventSeverity.Success);
 
         if (success)
@@ -202,6 +208,11 @@ public class SimpleTicketSalesHostedService : EventHostedServiceBase, IPeriodicT
                 }
                 catch { result.Write($"Failed to send email for Order Id: {order.Id}.", InvoiceEventData.EventSeverity.Error); }
             }
+        }
+        else
+        {
+            ctx.Orders.Update(order);
+            await ctx.SaveChangesAsync();
         }
         await _invoiceRepository.AddInvoiceLogs(invoice.Id, result);
     }
